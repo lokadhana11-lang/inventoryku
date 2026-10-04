@@ -1,11 +1,11 @@
-/* InventoryKu — frontend (Tahap 1: kerangka PWA dan akses).
+/* InventoryKu — frontend (Tahap 1: kerangka PWA dan akses; Tahap 2: form Stock).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.2.0';
+  var VERSI_APLIKASI = '0.3.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -105,7 +105,12 @@
     }
   };
 
-  /** Antrean kirim per pengguna. Pengiriman antrean dibangun di Tahap 2. */
+  /**
+   * Antrean kirim per pengguna (spesifikasi sistem Bagian 7.2 dan 11). Entri:
+   * { id (= submissionId), aksi, isi, formId, judul, tanggal, dibuat,
+   *   status: menunggu | gagal, pesan }. Isian selalu dikirim atas nama
+   *   pengisinya: hanya antrean pengguna yang sedang masuk yang dikirim.
+   */
   var Antrean = {
     daftar: function (nama) {
       var isi = Simpan.baca(kunciPengguna(nama, 'antrean'));
@@ -113,6 +118,22 @@
     },
     jumlah: function (nama) {
       return Antrean.daftar(nama).length;
+    },
+    simpan: function (nama, daftar) {
+      Simpan.tulis(kunciPengguna(nama, 'antrean'), daftar);
+    },
+    tambah: function (nama, entri) {
+      var daftar = Antrean.daftar(nama);
+      if (!daftar.some(function (e) { return e.id === entri.id; })) daftar.push(entri);
+      Antrean.simpan(nama, daftar);
+    },
+    hapus: function (nama, id) {
+      Antrean.simpan(nama, Antrean.daftar(nama).filter(function (e) { return e.id !== id; }));
+    },
+    ubah: function (nama, id, perubahan) {
+      Antrean.simpan(nama, Antrean.daftar(nama).map(function (e) {
+        return e.id === id ? Object.assign({}, e, perubahan) : e;
+      }));
     }
   };
 
@@ -163,7 +184,7 @@
       return Promise.reject(err);
     }
     if (navigator.onLine === false) {
-      return Promise.reject(new Error(PESAN.tidakAdaSinyal));
+      return Promise.reject(galatJaringan(PESAN.tidakAdaSinyal));
     }
 
     var body = Object.assign({}, isi || {}, { action: aksi });
@@ -185,20 +206,20 @@
       signal: kendali ? kendali.signal : undefined
     })
       .then(function (respons) {
-        if (!respons.ok) throw new Error(PESAN.ditolak);
+        if (!respons.ok) throw galatJaringan(PESAN.ditolak);
         return respons.text();
       }, function () {
-        throw new Error(habisWaktu ? PESAN.terlaluLama : PESAN.tidakTerhubung);
+        throw galatJaringan(habisWaktu ? PESAN.terlaluLama : PESAN.tidakTerhubung);
       })
       .then(function (teks) {
         var json;
         try {
           json = JSON.parse(teks);
         } catch (err) {
-          throw new Error(PESAN.jawabanTidakDikenal);
+          throw galatJaringan(PESAN.jawabanTidakDikenal);
         }
         if (!json || typeof json !== 'object' || typeof json.ok !== 'boolean') {
-          throw new Error(PESAN.jawabanTidakDikenal);
+          throw galatJaringan(PESAN.jawabanTidakDikenal);
         }
         if (!json.ok) {
           var galat = new Error(typeof json.pesan === 'string' && json.pesan ? json.pesan : PESAN.gagalUmum);
@@ -208,12 +229,23 @@
         return json.data || {};
       })
       .catch(function (err) {
-        if (habisWaktu) throw new Error(PESAN.terlaluLama);
+        if (habisWaktu) throw galatJaringan(PESAN.terlaluLama);
         throw err;
       })
       .finally(function () {
         clearTimeout(penghitung);
       });
+  }
+
+  /**
+   * Galat sambungan (sinyal, batas waktu, jawaban bukan dari API). Isian yang
+   * gagal karena ini masuk antrean dan dikirim ulang; server menolak kiriman
+   * ganda lewat submissionId, jadi kirim ulang aman.
+   */
+  function galatJaringan(pesan) {
+    var err = new Error(pesan);
+    err.jaringan = true;
+    return err;
   }
 
   /** Token ditolak server: kembali ke layar Login. Mengembalikan true jika ditangani. */
@@ -346,6 +378,52 @@
     if (isNaN(d.getTime())) return '';
     if (tanggalIso(d) === tanggalIso(new Date())) return 'pukul ' + jam(iso);
     return d.getDate() + ' ' + BULAN_SINGKAT[d.getMonth()] + ' pukul ' + jam(iso);
+  }
+
+  /** Isian angka: menerima koma maupun titik. Kosong → null; tidak sah → NaN. */
+  function bacaAngka(teks) {
+    var t = String(teks == null ? '' : teks).replace(/\s/g, '');
+    if (t === '') return null;
+    if (!/^\d+([.,]\d+)?$/.test(t)) return NaN;
+    return Number(t.replace(',', '.'));
+  }
+
+  function bulat3(n) {
+    return Math.round(n * 1000) / 1000;
+  }
+
+  var FORMAT_ANGKA = typeof Intl !== 'undefined' && Intl.NumberFormat
+    ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 })
+    : null;
+
+  /** 1250.5 → "1.250,5"; minus memakai tanda − (spesifikasi tampilan Bagian 3). */
+  function formatAngka(n) {
+    if (n == null || !isFinite(n)) return '–';
+    var r = bulat3(n);
+    var teks = FORMAT_ANGKA ? FORMAT_ANGKA.format(Math.abs(r)) : String(Math.abs(r)).replace('.', ',');
+    return (r < 0 ? '−' : '') + teks;
+  }
+
+  /** "12,5 kg" yang tidak pernah terpisah baris. */
+  function angkaSatuan(n, satuan) {
+    return el('span', { class: 'angka-satuan', text: formatAngka(n) + (satuan ? ' ' + satuan : '') });
+  }
+
+  /** Tanda pengenal kiriman (submission_id), dibuat di HP. */
+  function buatId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
+  /** "3 Okt" */
+  function tanggalPendek(iso) {
+    var p = String(iso).split('-');
+    return Number(p[2]) + ' ' + BULAN_SINGKAT[Number(p[1]) - 1];
+  }
+
+  function geserHari(iso, hari) {
+    var p = String(iso).split('-');
+    return tanggalIso(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + hari));
   }
 
   function zonaWaktuPerangkat() {
@@ -707,12 +785,19 @@
    *    Jika gagal, data lama tetap tampil dengan pesannya; tanpa data lama
    *    tampil pesan dan "Coba lagi".
    * opsi: { kunciCache, ambil() → Promise, gambar(data, dariHp), kerangka(),
-   *         galat(pesan, cobaLagi), penanda: elemen .memperbarui }
+   *         galat(pesan, cobaLagi), penanda: elemen .memperbarui,
+   *         dariHp() → data|null dan simpanHp(data) (pengganti kunciCache) }
    * Jawaban yang datang setelah pengguna pindah layar diabaikan.
    */
   function muatData(opsi) {
     var nomor = nomorLayar;
-    var simpanan = opsi.kunciCache ? Cache.baca(opsi.kunciCache) : null;
+    var simpanan = null;
+    if (opsi.dariHp) {
+      var dariHp = opsi.dariHp();
+      simpanan = dariHp ? { data: dariHp } : null;
+    } else if (opsi.kunciCache) {
+      simpanan = Cache.baca(opsi.kunciCache);
+    }
     if (simpanan) {
       opsi.gambar(simpanan.data, true);
       if (opsi.penanda) opsi.penanda.textContent = PESAN.memperbarui;
@@ -722,6 +807,7 @@
     return opsi.ambil().then(function (data) {
       if (nomor !== nomorLayar) return;
       if (opsi.kunciCache) Cache.tulis(opsi.kunciCache, data);
+      if (opsi.simpanHp) opsi.simpanHp(data);
       if (opsi.penanda) opsi.penanda.textContent = '';
       if (simpanan && JSON.stringify(simpanan.data) === JSON.stringify(data)) return;
       opsi.gambar(data, false);
@@ -790,7 +876,11 @@
     var tinggi = vv ? vv.height : window.innerHeight;
     var bar = document.querySelector('.bar');
     var tutupAtas = bar && !$('#aplikasi').hidden ? bar.getBoundingClientRect().bottom : 0;
-    if (r.top < atas + Math.max(0, tutupAtas) + 8 || r.bottom > atas + tinggi - 8) {
+    var bawah = atas + tinggi;
+    // Bilah kirim tidak boleh menutupi kolom yang sedang diisi.
+    var bilah = !isian.closest('.lembar') && document.querySelector('#layar .bilah-kirim');
+    if (bilah && bilah.offsetHeight) bawah = Math.min(bawah, bilah.getBoundingClientRect().top);
+    if (r.top < atas + Math.max(0, tutupAtas) + 8 || r.bottom > bawah - 8) {
       kolom.scrollIntoView({ block: 'center' });
     }
   }
@@ -925,9 +1015,24 @@
 
   var nomorLayar = 0;
   var segarkanLayar = null; // diisi layar yang bisa diperbarui saat aplikasi dibuka lagi
+  var segarkanAntrean = null; // diisi layar yang menampilkan isian di antrean
+  var pembersihLayar = []; // dijalankan saat layar ditinggalkan
+
+  function bersihkanLayar() {
+    pembersihLayar.splice(0).forEach(function (fn) {
+      try {
+        fn();
+      } catch (err) {
+        /* abaikan */
+      }
+    });
+    segarkanLayar = null;
+    segarkanAntrean = null;
+  }
 
   var RUTE = [
     { pola: /^\/$/, menu: 'beranda', layar: layarBeranda },
+    { pola: /^\/stock$/, menu: 'beranda', layar: layarStock },
     { pola: /^\/riwayat$/, menu: 'riwayat', layar: layarBelumDibangun('Riwayat') },
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarBelumDibangun('Laporan') },
     { pola: /^\/dashboard$/, menu: 'dashboard', pengelola: true, layar: layarBelumDibangun('Dashboard') },
@@ -962,7 +1067,7 @@
     if (lembarKini) lembarKini.tutup(true);
     kosongkan($('#lembar-wadah')); // lembar yang sedang menutup langsung hilang
     nomorLayar++;
-    segarkanLayar = null;
+    bersihkanLayar();
     var main = $('#layar');
     kosongkanLayar();
     main.classList.remove('layar-masuk');
@@ -1002,13 +1107,14 @@
     gantiAlamat('#/');
     jalankanRute();
     if (pesanSambutan) toast(pesanSambutan);
+    kirimAntrean();
   }
 
   /** Keluar di HP saja (sesi dihapus), lalu kembali ke layar Login. */
   function keluarLokal(pesan) {
     Sesi.hapus();
     nomorLayar++;
-    segarkanLayar = null;
+    bersihkanLayar();
     if (lembarKini) lembarKini.tutup(true);
     kosongkanLayar();
     menuAktif = null;
@@ -1156,16 +1262,21 @@
       }
       var grid = el('div', { class: 'nama-grid' });
       namaBisaMasuk().forEach(function (s) {
+        var tunggu = Antrean.jumlah(s.nama);
         grid.appendChild(el('button', {
           type: 'button',
           class: 'tombol-nama',
-          text: s.nama,
+          'aria-label': s.nama + (tunggu ? ', ' + tunggu + ' isian menunggu kirim' : ''),
           onclick: function () {
             if (keadaan.sibuk) return;
             tulisPesanLogin('');
             tampilPin(s.nama);
           }
-        }));
+        }, [
+          el('span', { text: s.nama }),
+          // Isian di antrean menunggu sampai pengisinya masuk lagi (Bagian 7.2).
+          tunggu ? el('span', { class: 'tombol-nama-ket', text: tunggu + ' isian menunggu kirim' }) : null
+        ]));
       });
       kanan.appendChild(grid);
     }
@@ -1610,7 +1721,9 @@
       gambarTiket(form);
       gambarKemajuan(form);
       gambarPemberitahuan(data.permintaanReset || []);
+      dataTerakhir = data;
     }
+    var dataTerakhir = null;
 
     function gambarTiket(form) {
       kosongkan(grid);
@@ -1630,12 +1743,17 @@
         var ket = [];
         if (f.status === 'terkirim' && f.detail) ket.push(f.detail);
         if (f.terakhir) ket.push(jam(f.terakhir.waktu) + ', ' + f.terakhir.oleh);
+        var tunggu = antreanForm(f.id, tanggalIso(new Date())).length;
+        if (tunggu) ket.push(tunggu + ' isian menunggu kirim');
         var tiket = el('button', {
           type: 'button',
           class: 'tiket' + (gerak && i < 8 ? ' gerak' : ''),
           'data-form': f.id,
           style: gerak && i < 8 ? '--urut:' + i : null,
-          onclick: function () { toast(PESAN.formBelumDibangun, 'info'); }
+          onclick: function () {
+            if (LAYAR_FORM[f.id]) location.hash = LAYAR_FORM[f.id];
+            else toast(PESAN.formBelumDibangun, 'info');
+          }
         }, [
           el('span', { class: 'tiket-nama', text: f.nama }),
           tanda,
@@ -1688,6 +1806,8 @@
     /** Pengelola: "NAMA meminta reset PIN", ketuk untuk membuka layar reset PIN staff itu. */
     function gambarPemberitahuan(permintaan) {
       kosongkan(bawah);
+      var baris = barisAntrean();
+      if (baris) bawah.appendChild(baris);
       if (!sesiKini().pengguna.pengelola || !permintaan.length) return;
       var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemberitahuan' });
       permintaan.forEach(function (p) {
@@ -1702,7 +1822,7 @@
           ikon('kanan')
         ]));
       });
-      bawah.appendChild(daftar);
+      bawah.insertBefore(daftar, bawah.firstChild);
     }
 
     function muat() {
@@ -1723,6 +1843,9 @@
 
     muat();
     segarkanLayar = muat;
+    segarkanAntrean = function () {
+      if (dataTerakhir) gambar(dataTerakhir, true);
+    };
   }
 
   function sesiKini() {
@@ -1738,6 +1861,766 @@
     if (namaOutlet) sesi.namaOutlet = namaOutlet;
     Sesi.tulis(sesi);
     if (berubah) gambarMenu();
+  }
+
+  /* =======================================================================
+   * Antrean kirim (spesifikasi sistem Bagian 11): isian tanpa sinyal
+   * menunggu di HP dan dikirim saat aplikasi terbuka dan sinyal kembali.
+   * ===================================================================== */
+
+  /** Form yang sudah punya layar isi. */
+  var LAYAR_FORM = { STOCK: '#/stock' };
+
+  function antreanForm(formId, tanggal) {
+    var p = penggunaKini();
+    if (!p) return [];
+    return Antrean.daftar(p.nama).filter(function (e) {
+      return e.formId === formId && (!tanggal || e.tanggal === tanggal);
+    });
+  }
+
+  function simpanKeAntrean(entri) {
+    var p = penggunaKini();
+    if (!p) return;
+    Antrean.tambah(p.nama, Object.assign({ dibuat: Date.now(), status: 'menunggu' }, entri));
+    if (segarkanAntrean) segarkanAntrean();
+  }
+
+  var antreanJalan = false;
+
+  /**
+   * Mengirim antrean pengguna yang sedang masuk, satu per satu, dengan
+   * tokennya sendiri. Berhenti jika sinyal putus. Jika sesi habis, isian
+   * tetap di HP sampai pengguna itu masuk lagi. Isian yang ditolak server
+   * ditandai gagal (tidak dikirim berulang-ulang) dan bisa dikirim ulang
+   * atau dihapus dari daftar isian di HP.
+   */
+  function kirimAntrean() {
+    var sesi = Sesi.baca();
+    if (!sesi || antreanJalan || navigator.onLine === false) return Promise.resolve(0);
+    var nama = sesi.pengguna.nama;
+    var daftar = Antrean.daftar(nama).filter(function (e) { return e.status !== 'gagal'; });
+    if (!daftar.length) return Promise.resolve(0);
+    antreanJalan = true;
+    var terkirim = 0;
+    var berhenti = null;
+    return daftar.reduce(function (janji, e) {
+      return janji.then(function () {
+        if (berhenti) return null;
+        return panggilApi(e.aksi, e.isi).then(function () {
+          Antrean.hapus(nama, e.id);
+          terkirim++;
+        }, function (err) {
+          if (err && (err.jaringan || err.sesiBerakhir)) {
+            berhenti = err;
+            return;
+          }
+          Antrean.ubah(nama, e.id, { status: 'gagal', pesan: pesanGalat(err) });
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      antreanJalan = false;
+      if (berhenti && berhenti.sesiBerakhir) {
+        tanganiSesiBerakhir(berhenti);
+        return terkirim;
+      }
+      if (terkirim) {
+        toast(terkirim + ' isian terkirim.');
+        if (segarkanLayar) segarkanLayar();
+      }
+      if (segarkanAntrean) segarkanAntrean();
+      return terkirim;
+    });
+  }
+
+  /** Baris ringkas di Beranda: "2 isian menunggu kirim" / "1 isian gagal kirim". */
+  function barisAntrean() {
+    var p = penggunaKini();
+    if (!p) return null;
+    var daftar = Antrean.daftar(p.nama);
+    if (!daftar.length) return null;
+    var gagal = daftar.filter(function (e) { return e.status === 'gagal'; }).length;
+    var tunggu = daftar.length - gagal;
+    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Isian di HP' }, el('button', {
+      type: 'button',
+      class: 'daftar-baris',
+      onclick: bukaLembarAntrean
+    }, [
+      el('span', { class: 'daftar-baris-isi' }, [
+        el('span', { class: 'deret-tombol' }, [
+          tunggu ? tandaStatus('menunggu', tunggu + ' isian menunggu kirim') : null,
+          gagal ? tandaStatus('masalah', gagal + ' isian gagal kirim') : null
+        ]),
+        el('span', { class: 'daftar-baris-ket', text: 'Tersimpan di HP. Ketuk untuk melihat atau mengirim ulang.' })
+      ]),
+      ikon('kanan')
+    ]));
+  }
+
+  /** Daftar isian di HP: status tiap isian, Kirim ulang, dan Hapus untuk yang gagal. */
+  function bukaLembarAntrean() {
+    var p = penggunaKini();
+    if (!p) return;
+    var daftar = Antrean.daftar(p.nama);
+    var isi = el('ul', { class: 'daftar' });
+    daftar.forEach(function (e) {
+      var gagal = e.status === 'gagal';
+      isi.appendChild(el('li', { class: 'baris-tetap' }, [
+        el('span', { class: 'baris-tetap-teks' }, [
+          el('span', { class: 'daftar-baris-judul', text: e.judul + ', ' + tanggalPendek(e.tanggal) }),
+          el('br'),
+          gagal ? tandaStatus('masalah', 'Gagal kirim') : tandaStatus('menunggu', 'Menunggu kirim'),
+          gagal && e.pesan ? el('span', { class: 'daftar-baris-ket', text: ' ' + e.pesan }) : null
+        ]),
+        gagal ? tombol('Hapus', 'bahaya', {
+          'aria-label': 'Hapus isian ' + e.judul,
+          onclick: function () {
+            konfirmasi({
+              judul: 'Hapus isian ini?',
+              teks: e.judul + ', ' + tanggalPendek(e.tanggal) + ' belum pernah terkirim. Isian ini hilang dari HP.',
+              teksYa: 'Hapus',
+              bahaya: true
+            }).then(function (ya) {
+              if (!ya) return;
+              Antrean.hapus(p.nama, e.id);
+              toast('Isian dihapus dari HP.');
+              if (segarkanAntrean) segarkanAntrean();
+            });
+          }
+        }) : null
+      ]));
+    });
+    bukaLembar({
+      judul: 'Isian di HP',
+      isi: daftar.length ? isi : el('p', { text: 'Semua isian sudah terkirim.' }),
+      aksi: [
+        { teks: 'Tutup', jenis: 'kedua' },
+        {
+          teks: 'Kirim ulang',
+          jenis: 'utama',
+          klik: function (t, l) {
+            if (navigator.onLine === false) {
+              toast('Belum terkirim. Periksa sinyal, lalu ketuk Kirim ulang.', 'masalah');
+              return;
+            }
+            Antrean.simpan(p.nama, Antrean.daftar(p.nama).map(function (e) {
+              return Object.assign({}, e, { status: 'menunggu', pesan: '' });
+            }));
+            l.tutup();
+            kirimAntrean().then(function (n) {
+              var sisa = Antrean.daftar(p.nama).length;
+              if (!n && sisa) toast('Belum terkirim. Periksa sinyal, lalu ketuk Kirim ulang.', 'masalah');
+            });
+          }
+        }
+      ]
+    });
+  }
+
+  /* =======================================================================
+   * Tanda nihil (spesifikasi sistem Bagian 5.8), dipakai semua form kecuali Suhu
+   * ===================================================================== */
+
+  /**
+   * opsi: { formId, namaForm, tanggal, nihil: { oleh, waktu } | null,
+   *         adaIsian, menunggu: entri antrean nihil | null, selesai(nihil) }
+   * Mengembalikan elemen: keterangan nihil, atau tombol "Tidak ada hari ini"
+   * selama belum ada isian pada tanggal itu.
+   */
+  function bagianNihil(opsi) {
+    if (opsi.nihil) {
+      return el('p', { class: 'baris-nihil' }, [
+        tandaStatus('menunggu', 'Nihil'),
+        el('span', { text: ' Ditandai nihil oleh ' + opsi.nihil.oleh + ', ' + jam(opsi.nihil.waktu) })
+      ]);
+    }
+    if (opsi.menunggu) {
+      return el('p', { class: 'baris-nihil' }, [tandaStatus('menunggu', 'Nihil menunggu kirim')]);
+    }
+    if (opsi.adaIsian) return null;
+    var t = tombol('Tidak ada hari ini', 'kedua');
+    t.addEventListener('click', function () {
+      if (t.disabled) return;
+      var isi = { submissionId: buatId(), formId: opsi.formId, tanggal: opsi.tanggal, waktuPerangkat: new Date().toISOString() };
+      var kapan = opsi.tanggal === tanggalIso(new Date()) ? 'hari ini' : tanggalPendek(opsi.tanggal);
+      var keAntrean = function () {
+        simpanKeAntrean({ id: isi.submissionId, aksi: 'tandaiNihil', isi: isi, formId: opsi.formId,
+          judul: opsi.namaForm + ' (nihil)', tanggal: opsi.tanggal });
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+      };
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(t, true, 'Menyimpan…');
+      panggilApi('tandaiNihil', isi).then(function (hasil) {
+        toast(opsi.namaForm + ' ditandai nihil untuk ' + kapan + '.');
+        opsi.selesai(hasil.nihil);
+      }).catch(function (err) {
+        aturTombolProses(t, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (tanganiSesiBerakhir(err)) return;
+        toast(pesanGalat(err), 'masalah');
+      });
+    });
+    return el('div', { class: 'baris-nihil' }, t);
+  }
+
+  /* =======================================================================
+   * Form Stock Inventory Harian (spesifikasi sistem Bagian 5.5, tampilan 5.3)
+   * ===================================================================== */
+
+  var DESKTOP = '(min-width: 1024px)';
+
+  /**
+   * Draft per pengguna: { tanggal, kategori, isian: { kategori: { item:
+   * { masuk, keluar, besar } } }, sid: { kategori: submissionId } }.
+   * submissionId dibuat saat form dibuka dan diganti setelah terkirim.
+   */
+  function bacaDraftStock() {
+    var d = Draft.baca('stock');
+    var data = d && d.data ? d.data : {};
+    return {
+      tanggal: data.tanggal || '',
+      kategori: data.kategori || '',
+      isian: data.isian || {},
+      sid: data.sid || {},
+      waktu: d ? d.waktu : null
+    };
+  }
+
+  /** Data stock yang tersimpan di HP. Untuk tanggal lain, stock dianggap tidak bergerak sejak data itu. */
+  function dataStockDariHp(tanggal) {
+    var c = Cache.baca('stock');
+    if (!c || !c.data || !c.data.item) return null;
+    var d = c.data;
+    if (d.tanggal === tanggal) return d;
+    return {
+      tanggal: tanggal,
+      kategori: d.kategori,
+      item: d.item.map(function (i) {
+        var stock = d.tanggal < tanggal ? i.akhir : i.awal;
+        return Object.assign({}, i, { awal: stock, masuk: 0, keluar: 0, hasilPrep: 0, dipakaiPrep: 0, waste: 0, penyesuaian: 0, akhir: stock });
+      }),
+      kiriman: { jumlah: 0, terakhir: null },
+      nihil: null,
+      turunan: true
+    };
+  }
+
+  /** "Hari ini: masuk 5, dipakai prep 1,5, waste 0,5" — yang bernilai nol tidak ditulis. */
+  function teksTercatat(it) {
+    var bagian = [];
+    [['masuk', 'masuk'], ['keluar', 'keluar'], ['hasilPrep', 'hasil prep'], ['dipakaiPrep', 'dipakai prep'], ['waste', 'waste']]
+      .forEach(function (k) {
+        if (it[k[0]]) bagian.push(k[1] + ' ' + formatAngka(it[k[0]]));
+      });
+    if (it.penyesuaian) bagian.push('penyesuaian ' + (it.penyesuaian > 0 ? '+' : '') + formatAngka(it.penyesuaian));
+    return bagian.join(', ');
+  }
+
+  function layarStock(k) {
+    aturJudul('Stock');
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var draft = bacaDraftStock();
+    var hariIni = tanggalIso(new Date());
+    var kemarin = geserHari(hariIni, -1);
+    // Draft yang tanggalnya sudah lewat kembali ke hari ini (isiannya tetap).
+    var tanggal = draft.tanggal === kemarin || (pengelola && draft.tanggal && draft.tanggal <= hariIni) ? draft.tanggal : hariIni;
+    var data = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var statusForm = el('div', { class: 'status-form' });
+    var wadahItem = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolKirim = tombol('Kirim stock', 'utama');
+    var pilihKategori = el('select', { class: 'isian', id: 'pilih-kategori' });
+
+    // Tanggal: Hari ini / Kemarin, Pengelola punya "Tanggal lain".
+    var pilihan = ['Hari ini', 'Kemarin'].concat(pengelola ? ['Tanggal lain'] : []);
+    var nilaiPilihan = tanggal === hariIni ? 'Hari ini' : (tanggal === kemarin ? 'Kemarin' : 'Tanggal lain');
+    var gTanggal = grupPilihan('Tanggal', pilihan, nilaiPilihan);
+    var tanggalLain = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Tanggal lain' });
+    tanggalLain.value = tanggal;
+    tanggalLain.hidden = nilaiPilihan !== 'Tanggal lain';
+    gTanggal.wadah.appendChild(tanggalLain);
+    gTanggal.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        var v = gTanggal.nilai();
+        tanggalLain.hidden = v !== 'Tanggal lain';
+        if (v === 'Hari ini') gantiTanggal(hariIni);
+        else if (v === 'Kemarin') gantiTanggal(kemarin);
+        else if (tanggalLain.value) gantiTanggal(tanggalLain.value);
+      });
+    });
+    tanggalLain.addEventListener('change', function () {
+      if (tanggalLain.value && tanggalLain.value <= hariIni) gantiTanggal(tanggalLain.value);
+    });
+
+    var kotakInfo = el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      gTanggal.wadah,
+      el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'pilih-kategori', text: 'Kategori' }), pilihKategori]),
+      el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
+    ]);
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
+      tautanKembali('Beranda', '#/'),
+      el('h1', { class: 'judul-layar', text: 'Stock Inventory' }),
+      catatanDraft,
+      kotakInfo,
+      wadahItem,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
+    ]));
+
+    function simpanDraft() {
+      var waktu = Draft.simpan('stock', { tanggal: tanggal, kategori: draft.kategori, isian: draft.isian, sid: draft.sid });
+      var adaIsian = Object.keys(draft.isian).some(function (kat) {
+        return Object.keys(draft.isian[kat]).some(function (n) {
+          var x = draft.isian[kat][n];
+          return x.masuk || x.keluar;
+        });
+      });
+      catatanDraft.textContent = adaIsian && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    function isianItem(nama) {
+      var kat = draft.kategori;
+      draft.isian[kat] = draft.isian[kat] || {};
+      draft.isian[kat][nama] = draft.isian[kat][nama] || { masuk: '', keluar: '', besar: false };
+      return draft.isian[kat][nama];
+    }
+
+    function sidKategori() {
+      if (!draft.sid[draft.kategori]) {
+        draft.sid[draft.kategori] = buatId();
+        simpanDraft();
+      }
+      return draft.sid[draft.kategori];
+    }
+
+    function itemKategori() {
+      return (data && data.item || []).filter(function (it) { return it.kategori === draft.kategori; });
+    }
+
+    /** Stock Akhir sementara: yang sudah tercatat + yang sedang diketik. */
+    function hitung(it, isian) {
+      var masuk = bacaAngka(isian.masuk);
+      var keluar = bacaAngka(isian.keluar);
+      var besar = isian.besar && it.satuanBesar;
+      var masukDasar = masuk > 0 ? (besar ? masuk * it.isiSatuanBesar : masuk) : 0;
+      return {
+        masukSalah: masuk !== null && isNaN(masuk),
+        keluarSalah: keluar !== null && isNaN(keluar),
+        masukDasar: bulat3(masukDasar),
+        akhir: bulat3(it.akhir + masukDasar - (keluar > 0 ? keluar : 0)),
+        terisi: String(isian.masuk || '').trim() !== '' || String(isian.keluar || '').trim() !== ''
+      };
+    }
+
+    function perbaruiPenghitung() {
+      var semua = itemKategori();
+      var terisi = semua.filter(function (it) { return hitung(it, isianItem(it.nama)).terisi; }).length;
+      penghitung.textContent = terisi + ' dari ' + semua.length + ' item terisi';
+    }
+
+    /** Peringatan di layar: Stock Akhir minus, atau di bawah stok minimum. Isian tetap bisa dikirim. */
+    function peringatan(it, akhir, ringkas) {
+      if (akhir < 0 && ringkas) return tandaStatus('masalah', 'Stock akhir minus');
+      if (akhir < 0) {
+        return el('p', { class: 'pesan-formulir masalah peringatan' }, [ikon('seru'),
+          el('span', { text: 'Stock akhir minus. Periksa angka yang diketik, atau minta Pengelola meluruskan stock.' })]);
+      }
+      if (it.stokMin != null && akhir < it.stokMin) return tandaStatus('tinjau', 'Perlu reorder');
+      return null;
+    }
+
+    /** Kolom isian angka + (untuk Tambah masuk) pilihan satuan besar. */
+    function isianAngka(it, jenis, label, idBantuan) {
+      var isian = isianItem(it.nama);
+      var input = el('input', {
+        class: 'isian isian-angka',
+        type: 'text',
+        inputmode: 'decimal',
+        autocomplete: 'off',
+        'data-kunci': it.nama + '|' + jenis,
+        'aria-label': label + ' ' + it.nama,
+        'aria-describedby': idBantuan || null
+      });
+      input.value = isian[jenis] || '';
+      return input;
+    }
+
+    /** Satu item: kartu (HP dan tablet) atau baris tabel (laptop dan desktop). */
+    function buatItem(it, nomor, modeTabel) {
+      var isian = isianItem(it.nama);
+      var idKonversi = 'konversi-' + nomor;
+      var inMasuk = isianAngka(it, 'masuk', 'Tambah masuk', it.satuanBesar ? idKonversi : null);
+      var inKeluar = isianAngka(it, 'keluar', 'Tambah keluar');
+      var pilihSatuan = null;
+      if (it.satuanBesar) {
+        pilihSatuan = el('select', { class: 'isian pilih-satuan', 'aria-label': 'Satuan Tambah masuk ' + it.nama, 'data-kunci': it.nama + '|satuan' }, [
+          el('option', { value: 'dasar', text: it.satuan }),
+          el('option', { value: 'besar', text: it.satuanBesar })
+        ]);
+        pilihSatuan.value = isian.besar ? 'besar' : 'dasar';
+      }
+      var konversi = el('span', { class: 'konversi', id: idKonversi });
+      var akhirTeks = el('span', { class: 'stock-akhir-angka' });
+      var wadahPeringatan = el('span', { class: 'wadah-peringatan' });
+      var sesuaikan = pengelola ? tombol('Sesuaikan stock', 'tautan', {
+        'aria-label': 'Sesuaikan stock ' + it.nama,
+        onclick: function () { bukaSesuaikan(it); }
+      }) : null;
+
+      function perbarui() {
+        var h = hitung(it, isian);
+        inMasuk.setAttribute('aria-invalid', h.masukSalah ? 'true' : 'false');
+        inKeluar.setAttribute('aria-invalid', h.keluarSalah ? 'true' : 'false');
+        kosongkan(akhirTeks).appendChild(angkaSatuan(h.akhir, modeTabel ? '' : it.satuan));
+        akhirTeks.classList.toggle('minus', h.akhir < 0);
+        konversi.textContent = isian.besar && it.satuanBesar && h.masukDasar > 0
+          ? '= ' + formatAngka(h.masukDasar) + ' ' + it.satuan : '';
+        kosongkan(wadahPeringatan);
+        var p = peringatan(it, h.akhir, modeTabel);
+        if (p) wadahPeringatan.appendChild(p);
+        if (kartu) kartu.classList.toggle('masalah', h.akhir < 0);
+        perbaruiPenghitung();
+      }
+      function ubah(jenis, nilai) {
+        isian[jenis] = nilai;
+        simpanDraft();
+        perbarui();
+      }
+      inMasuk.addEventListener('input', function () { ubah('masuk', inMasuk.value); });
+      inKeluar.addEventListener('input', function () { ubah('keluar', inKeluar.value); });
+      if (pilihSatuan) pilihSatuan.addEventListener('change', function () { ubah('besar', pilihSatuan.value === 'besar'); });
+
+      var tercatat = teksTercatat(it);
+      var awalanTercatat = tanggal === hariIni ? 'Hari ini: ' : 'Tercatat: ';
+      var kartu = null;
+      var hasil;
+      if (modeTabel) {
+        hasil = el('tr', {}, [
+          el('td', { class: 'angka', text: String(nomor) }),
+          el('td', { class: 'nama-item' }, [el('span', { class: 'daftar-baris-judul', text: it.nama }), sesuaikan ? el('br') : null, sesuaikan]),
+          el('td', { class: 'angka otomatis' }, angkaSatuan(it.awal)),
+          el('td', { class: 'otomatis tercatat', text: tercatat || '–' }),
+          el('td', {}, el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan, konversi])),
+          el('td', {}, inKeluar),
+          el('td', { class: 'angka otomatis' }, [akhirTeks, el('br'), wadahPeringatan]),
+          el('td', { class: 'otomatis', text: it.satuan })
+        ]);
+      } else {
+        kartu = el('article', { class: 'kartu-item', 'aria-label': it.nama }, [
+          el('div', { class: 'kartu-item-kepala' }, [
+            el('h2', { class: 'kartu-item-nama', text: it.nama }),
+            el('span', { class: 'kartu-item-satuan', text: it.satuan })
+          ]),
+          el('p', { class: 'otomatis' }, ['Awal ', angkaSatuan(it.awal, it.satuan)]),
+          tercatat ? el('p', { class: 'otomatis', text: awalanTercatat + tercatat }) : null,
+          el('div', { class: 'kolom' }, [
+            el('label', { class: 'kolom-label', text: 'Tambah masuk' }),
+            el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan || el('span', { class: 'satuan-tetap', text: it.satuan })]),
+            konversi
+          ]),
+          el('div', { class: 'kolom' }, [
+            el('label', { class: 'kolom-label', text: 'Tambah keluar' }),
+            el('div', { class: 'baris-angka' }, [inKeluar, el('span', { class: 'satuan-tetap', text: it.satuan })])
+          ]),
+          el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Stock akhir' }), akhirTeks]),
+          wadahPeringatan,
+          sesuaikan
+        ]);
+        // Label menunjuk ke kolomnya.
+        var label = kartu.querySelectorAll('label');
+        inMasuk.id = 'masuk-' + nomor;
+        inKeluar.id = 'keluar-' + nomor;
+        label[0].setAttribute('for', inMasuk.id);
+        label[1].setAttribute('for', inKeluar.id);
+        inMasuk.removeAttribute('aria-label');
+        inKeluar.removeAttribute('aria-label');
+        hasil = kartu;
+      }
+      perbarui();
+      return hasil;
+    }
+
+    /** Menggambar ulang daftar item; kolom yang sedang diketik tetap aktif. */
+    function gambarItem() {
+      var aktif = document.activeElement;
+      var kunciAktif = aktif && aktif.getAttribute ? aktif.getAttribute('data-kunci') : null;
+      var posisi = kunciAktif && typeof aktif.selectionStart === 'number' ? aktif.selectionStart : null;
+      kosongkan(wadahItem);
+      tulisPesan(pesan, '');
+      var semua = itemKategori();
+      if (!semua.length) {
+        wadahItem.appendChild(kotakKosong(data && data.item && data.item.length
+          ? 'Belum ada item aktif di kategori ini.'
+          : 'Belum ada item. Pengelola mengisi daftar item dan kategori di tab M_Item dan M_Kategori.'));
+        perbaruiPenghitung();
+        return;
+      }
+      if (mediaDesktop.matches) {
+        var badan = el('tbody');
+        semua.forEach(function (it, i) { badan.appendChild(buatItem(it, i + 1, true)); });
+        wadahItem.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian' }, [
+          el('thead', {}, el('tr', {}, ['No', 'Nama Item', 'Stock Awal', 'Tercatat Hari Ini', 'Tambah Masuk', 'Tambah Keluar', 'Stock Akhir', 'Satuan']
+            .map(function (j, i) { return el('th', { scope: 'col', class: [0, 2, 6].indexOf(i) >= 0 ? 'angka' : null, text: j }); }))),
+          badan
+        ])));
+      } else {
+        var grid = el('div', { class: 'grid-item' });
+        semua.forEach(function (it, i) { grid.appendChild(buatItem(it, i + 1, false)); });
+        wadahItem.appendChild(grid);
+      }
+      if (kunciAktif) {
+        var baru = wadahItem.querySelector('[data-kunci="' + kunciAktif.replace(/"/g, '\\"') + '"]');
+        if (baru) {
+          baru.focus({ preventScroll: true });
+          if (posisi != null && baru.setSelectionRange) {
+            try { baru.setSelectionRange(posisi, posisi); } catch (err) { /* select */ }
+          }
+        }
+      }
+    }
+
+    function gambarStatus() {
+      kosongkan(statusForm);
+      if (!data) return;
+      var menunggu = antreanForm('STOCK', tanggal);
+      var kirimMenunggu = menunggu.filter(function (e) { return e.aksi === 'kirimStock'; });
+      var nihilMenunggu = menunggu.filter(function (e) { return e.aksi === 'tandaiNihil'; })[0] || null;
+      if (data.kiriman.jumlah) {
+        var t = data.kiriman.terakhir;
+        statusForm.appendChild(el('p', {}, [tandaStatus('baik', 'Terkirim'),
+          el('span', { class: 'kolom-bantuan', text: ' ' + data.kiriman.jumlah + ' kiriman' + (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') })]));
+      }
+      if (kirimMenunggu.length) statusForm.appendChild(tandaStatus('menunggu', kirimMenunggu.length + ' isian menunggu kirim'));
+      var nihil = bagianNihil({
+        formId: 'STOCK',
+        namaForm: 'Stock',
+        tanggal: tanggal,
+        nihil: data.nihil,
+        adaIsian: data.kiriman.jumlah > 0 || kirimMenunggu.length > 0,
+        menunggu: nihilMenunggu,
+        selesai: function (n) {
+          data.nihil = n;
+          gambarStatus();
+        }
+      });
+      if (nihil) statusForm.appendChild(nihil);
+    }
+
+    function gambar(d) {
+      data = d;
+      var kat = d.kategori || [];
+      kosongkan(pilihKategori);
+      kat.forEach(function (n) { pilihKategori.appendChild(el('option', { value: n, text: n })); });
+      if (kat.indexOf(draft.kategori) < 0) draft.kategori = kat[0] || '';
+      pilihKategori.value = draft.kategori;
+      pilihKategori.disabled = !kat.length;
+      gambarStatus();
+      gambarItem();
+    }
+
+    function terapkanJawaban(form) {
+      Cache.tulis('stock', form);
+      if (form.tanggal === tanggal) gambar(form);
+    }
+
+    function gantiTanggal(baru) {
+      if (baru === tanggal) return;
+      tanggal = baru;
+      simpanDraft();
+      muat();
+    }
+
+    pilihKategori.addEventListener('change', function () {
+      draft.kategori = pilihKategori.value;
+      simpanDraft();
+      gambarItem();
+    });
+
+    function kosongkanKategori(kat) {
+      delete draft.isian[kat];
+      draft.sid[kat] = buatId();
+      simpanDraft();
+    }
+
+    tombolKirim.addEventListener('click', function () {
+      if (tombolKirim.disabled || !data) return;
+      tulisPesan(pesan, '');
+      var baris = [];
+      var salah = null;
+      itemKategori().forEach(function (it) {
+        var isian = isianItem(it.nama);
+        var h = hitung(it, isian);
+        if (h.masukSalah || h.keluarSalah) {
+          if (!salah) salah = { it: it, jenis: h.masukSalah ? 'masuk' : 'keluar' };
+          return;
+        }
+        var masuk = bacaAngka(isian.masuk) || 0;
+        var keluar = bacaAngka(isian.keluar) || 0;
+        if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
+        baris.push({ item: it.nama, masuk: masuk, keluar: keluar, satuanMasuk: isian.besar && it.satuanBesar ? 'besar' : 'dasar' });
+      });
+      if (salah) {
+        tulisPesan(pesan, 'Periksa angka ' + (salah.jenis === 'masuk' ? 'Tambah masuk' : 'Tambah keluar') + ' ' +
+          salah.it.nama + '. Isi angka, misalnya 2,5.', 'masalah');
+        var kolom = wadahItem.querySelector('[data-kunci="' + (salah.it.nama + '|' + salah.jenis).replace(/"/g, '\\"') + '"]');
+        if (kolom) kolom.focus();
+        return;
+      }
+      if (!baris.length) {
+        tulisPesan(pesan, 'Isi Tambah masuk atau Tambah keluar minimal untuk satu item.', 'masalah');
+        return;
+      }
+      var kat = draft.kategori;
+      var isi = { submissionId: sidKategori(), tanggal: tanggal, kategori: kat, waktuPerangkat: new Date().toISOString(), baris: baris };
+      var entri = { id: isi.submissionId, aksi: 'kirimStock', isi: isi, formId: 'STOCK', judul: 'Stock · ' + kat, tanggal: tanggal };
+      function keAntrean() {
+        simpanKeAntrean(entri);
+        kosongkanKategori(kat);
+        gambarStatus();
+        gambarItem();
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+      }
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(tombolKirim, true, 'Mengirim…');
+      panggilApi('kirimStock', isi).then(function (hasil) {
+        aturTombolProses(tombolKirim, false);
+        kosongkanKategori(kat);
+        terapkanJawaban(hasil.form);
+        toast('Stock terkirim.');
+      }).catch(function (err) {
+        aturTombolProses(tombolKirim, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (err && err.sesiBerakhir) {
+          // Isian tidak pernah hilang karena sesi habis: menunggu sampai pengguna ini masuk lagi.
+          simpanKeAntrean(entri);
+          kosongkanKategori(kat);
+          tanganiSesiBerakhir(err);
+          return;
+        }
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+
+    /** Sesuaikan stock satu item (spesifikasi sistem Bagian 5.7), hanya Pengelola. */
+    function bukaSesuaikan(it) {
+      var kSebenarnya = kolomIsian({ label: 'Stock sebenarnya (' + it.satuan + ')', inputmode: 'decimal', kelas: 'isian-angka' });
+      var gAlasan = grupPilihan('Alasan', ['Stok pembuka', 'Hasil hitung ulang', 'Lainnya'], '');
+      var kCatatan = kolomIsian({ label: 'Catatan', maxlength: 200, bantuan: 'Wajib untuk alasan Lainnya.' });
+      var ringkas = el('p', { class: 'pesan-formulir tinjau', 'aria-live': 'polite' });
+      var pesanLembar = el('p', { class: 'pesan-formulir', role: 'alert' });
+      var sid = buatId();
+      function perbaruiRingkas() {
+        var n = bacaAngka(kSebenarnya.input.value);
+        if (n === null || isNaN(n)) {
+          tulisPesan(ringkas, 'Tercatat ' + formatAngka(it.akhir) + ' ' + it.satuan + '.', 'tinjau');
+          return;
+        }
+        var selisih = bulat3(n - it.akhir);
+        tulisPesan(ringkas, 'Tercatat ' + formatAngka(it.akhir) + ' ' + it.satuan + ', sebenarnya ' + formatAngka(n) + ' ' +
+          it.satuan + '. Selisih ' + (selisih > 0 ? '+' : '') + formatAngka(selisih) + ' ' + it.satuan + '.', 'tinjau');
+      }
+      kSebenarnya.input.addEventListener('input', perbaruiRingkas);
+      perbaruiRingkas();
+      var form = el('form', { class: 'formulir', novalidate: true }, [
+        el('p', { class: 'kolom-bantuan', text: 'Tanggal ' + tanggalPendek(tanggal) + '. Selisihnya dicatat sebagai penyesuaian.' }),
+        kSebenarnya.wadah, ringkas, gAlasan.wadah, kCatatan.wadah, pesanLembar
+      ]);
+      function simpan(t, l) {
+        tulisPesan(pesanLembar, '');
+        var n = bacaAngka(kSebenarnya.input.value);
+        var ok = [
+          kSebenarnya.galat(n === null ? 'Isi stock sebenarnya.' : (isNaN(n) ? 'Isi angka, misalnya 2,5.' : '')),
+          gAlasan.galat(gAlasan.nilai() ? '' : 'Pilih alasan.'),
+          kCatatan.galat(gAlasan.nilai() === 'Lainnya' && !kCatatan.input.value.trim() ? 'Tulis catatan untuk alasan Lainnya.' : '')
+        ];
+        if (ok.indexOf(false) >= 0) return;
+        aturTombolProses(t, true, 'Menyimpan…');
+        l.sibuk(true);
+        panggilApi('sesuaikanStock', {
+          submissionId: sid,
+          item: it.nama,
+          tanggal: tanggal,
+          stockSebenarnya: n,
+          alasan: gAlasan.nilai(),
+          catatan: kCatatan.input.value,
+          waktuPerangkat: new Date().toISOString()
+        }).then(function (hasil) {
+          l.sibuk(false);
+          l.tutup();
+          terapkanJawaban(hasil.form);
+          toast('Stock ' + it.nama + ' disesuaikan. Selisih ' + (hasil.selisih > 0 ? '+' : '') +
+            formatAngka(hasil.selisih) + ' ' + it.satuan + '.');
+        }).catch(function (err) {
+          l.sibuk(false);
+          aturTombolProses(t, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesanLembar, pesanGalat(err), 'masalah');
+        });
+      }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        simpan(lembar.tombol[1], lembar);
+      });
+      var lembar = bukaLembar({
+        judul: 'Sesuaikan stock ' + it.nama,
+        isi: form,
+        aksi: [
+          { teks: 'Batal', jenis: 'kedua' },
+          { teks: 'Simpan penyesuaian', jenis: 'utama', klik: simpan }
+        ]
+      });
+    }
+
+    function muat() {
+      return muatData({
+        dariHp: function () { return dataStockDariHp(tanggal); },
+        simpanHp: function (d) { Cache.tulis('stock', d); },
+        ambil: function () { return panggilApi('formStock', { tanggal: tanggal }); },
+        gambar: function (d) {
+          if (d.tanggal === tanggal) gambar(d);
+        },
+        kerangka: function () {
+          kosongkan(wadahItem).appendChild(kerangkaBaris(4));
+        },
+        galat: function (teks, cobaLagi) {
+          kosongkan(wadahItem).appendChild(kotakGalat(teks, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      if (data) gambarItem();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    muat();
+    segarkanLayar = muat;
+    segarkanAntrean = gambarStatus;
   }
 
   /* =======================================================================
@@ -2303,8 +3186,15 @@
     pasangPapanKetik();
     window.addEventListener('online', function () {
       aturSinyal();
-      if (segarkanLayar) segarkanLayar();
+      // Antrean dikirim saat sinyal kembali; layar diperbarui sesudahnya.
+      kirimAntrean().then(function (n) {
+        if (!n && segarkanLayar) segarkanLayar();
+      });
     });
+    // Sinyal lemah tidak selalu memicu "online": coba lagi tiap menit selama aplikasi terbuka.
+    setInterval(function () {
+      if (document.visibilityState === 'visible' && !$('#aplikasi').hidden) kirimAntrean();
+    }, 60000);
     window.addEventListener('offline', aturSinyal);
     window.addEventListener('hashchange', function () {
       if (!$('#aplikasi').hidden) jalankanRute();
@@ -2318,7 +3208,9 @@
         keluarLokal(PESAN.sesiBerakhir);
         return;
       }
-      if (segarkanLayar) segarkanLayar();
+      kirimAntrean().then(function (n) {
+        if (!n && segarkanLayar) segarkanLayar();
+      });
     });
     $('#bar-pengguna').addEventListener('click', bukaGantiPengguna);
 
@@ -2327,6 +3219,7 @@
       gambarMenu();
       if (!location.hash) gantiAlamat('#/');
       jalankanRute();
+      kirimAntrean();
     } else {
       // Sesi yang sudah habis 12 jam: kembali ke Login dengan pesannya.
       var lama = Simpan.baca(AWALAN + 'sesi');

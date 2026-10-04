@@ -76,14 +76,25 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   permintaanReset, terkunci }] }`; `tambahStaff {nama, role, pin}`, `ubahStaff {nama, role?,
   aktif?}` → `{ staff }`; `aturPin {nama, pin}` → `{ staff, sesiBaru? }`; `bacaPenerima` dan
   `simpanPenerima {email: []}` → `{ email: [] }`.
+- Aksi Tahap 2 (bertoken): `formStock {tanggal}` → `{ tanggal, kategori: [nama], item: [{ nama,
+  kategori, satuan, satuanBesar, isiSatuanBesar, stokMin, awal, masuk, keluar, hasilPrep,
+  dipakaiPrep, waste, penyesuaian, akhir }], kiriman: { jumlah, terakhir }, nihil }`;
+  `kirimStock {submissionId, tanggal, kategori, waktuPerangkat, baris: [{ item, masuk, keluar,
+  satuanMasuk: dasar|besar }]}` → `{ sudahTerkirim, jumlah, form }`; `tandaiNihil {submissionId,
+  formId, tanggal, waktuPerangkat}` → `{ formId, tanggal, nihil: { oleh, waktu } }`. Khusus
+  Pengelola: `sesuaikanStock {submissionId, item, tanggal, stockSebenarnya, alasan, catatan}` →
+  `{ sudahTerkirim, tercatat, selisih, form }`.
+- Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
+  masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
+  mengirim ulang menganggapnya selesai.
 
 ## Tahap dan status
 
 | Tahap | Isi | Status |
 |---|---|---|
 | 0 | Fondasi: spesifikasi dipindah, CLAUDE.md, halaman uji sambungan, `doPost`/`doGet`/`ping`, `setupSpreadsheet` | Selesai (config.js sudah diisi pemilik). Halaman uji sambungan dihapus di Tahap 1; aksi `ping` tetap |
-| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai (Code.gs v0.2, aplikasi 0.2.0), diuji dengan API tiruan. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP |
-| 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Belum |
+| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai dan digabung (Code.gs v0.2, aplikasi 0.2.0) |
+| 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Kode selesai (Code.gs v0.3, aplikasi 0.3.0), diuji dengan API tiruan. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan setupSpreadsheet, deploy versi baru, uji dari HP dan di Sheet |
 | 3 | Riwayat, pemeriksaan, dan koreksi | Belum |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Belum |
 | 5 | Form Waste dan Suhu | Belum |
@@ -161,8 +172,9 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     proteksi, filter, dan pelipatan kolom sistem hanya dipasang jika belum ada; baris awal
     hanya ditambahkan jika kuncinya belum ada; urutan tab dirapikan. Lembar bawaan
     "Sheet1"/"Lembar1" dihapus hanya jika benar-benar kosong.
-17. **Aturan "tanggal terbaru di atas" dan warna berselang per hari** di tab Data dipasang
-    oleh kode penulis data di tahap formnya (mulai Tahap 2), bukan oleh setupSpreadsheet.
+17. **Aturan "tanggal terbaru di atas"** di tab Data dijalankan oleh kode penulis data setiap kali
+    menulis (mulai Tahap 2). **Warna berselang per hari** (diubah di Tahap 2, lihat butir 44)
+    berupa format bersyarat yang dipasang setupSpreadsheet.
 
 ### Tahap 1
 
@@ -230,3 +242,66 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 33. **Ikon:** pembatas buku digambar sebagai bentuk isi amber (versi garis terbaca seperti huruf W
     di ukuran besar); favicon disesuaikan. Bilah status iPhone: `black-translucent`, isi memakai
     jarak aman atas.
+
+### Tahap 2
+
+34. **Layar isi Stock** ada di `#/stock`; tiket form yang sudah punya layar didaftarkan di
+    `LAYAR_FORM` (app.js), tiket lain masih menampilkan "Form ini dibangun di tahap berikutnya.".
+    Kategori dan item yang tampil: item aktif di kategori aktif, kategori urut `Urutan`, item urut
+    nama. Pengelola memilih "Tanggal lain" dengan pemilih tanggal bawaan browser.
+35. **Angka isian** menerima koma dan titik sebagai pemisah desimal ("2,5" = "2.5"); titik tidak
+    dianggap pemisah ribuan ("1.250" = 1,25). Angka minus dan huruf ditolak. Disimpan paling
+    banyak 3 angka di belakang koma. Tampilan memakai format Indonesia ("1.250,5") dan tanda −.
+36. **Data_Stock:** satu baris per item yang diisi per kiriman; kategori dan satuan diambil dari
+    `M_Item` saat ditulis. Satuan besar: Stock Masuk disimpan dalam satuan dasar, `Masuk Diketik`
+    berisi angka aslinya ("2 dus"). Kiriman dari antrean untuk item yang sudah dinonaktifkan tetap
+    diterima (data tidak hilang).
+37. **Hitung ulang stock** (`hitungUlangStock_([{ item, dari }])`, Code.gs) membaca semua sumber di
+    `SUMBER_STOCK`: `Data_Stock` (Stock Masuk, Stock Keluar), `Data_Prep` (Hasil → Hasil Prep),
+    `Data_PrepBahan` (Qty Terpakai → Dipakai Prep), `Data_Waste` (Qty → Waste),
+    `Data_Penyesuaian` (Selisih → Penyesuaian). Tahap 5 dan 6 cukup menulis kolom itu lalu memanggil
+    fungsi ini. Rekap yang ada diperbarui di tempat, yang baru ditambahkan, dan tanggal yang tidak
+    punya gerakan lagi dihapus; baris item lain tidak ditulis. Setelah itu `Stock_Harian` diurutkan
+    (tanggal terbaru, kategori, nama item) supaya mudah dibaca; rumus tidak bergantung pada urutan.
+38. **Tab penuh:** tab Sheet baru hanya punya 1.000 baris. `barisTulis_` menambah baris di dalam
+    rentang (sebelum baris terakhir) supaya format, warna, dan filter ikut melebar; baris kosong
+    yang tersisa hilang saat tab diurutkan.
+39. **Aturan tanggal** diperiksa server dengan zona waktu `M_Konfigurasi`. Isian di antrean yang
+    tanggalnya sudah terlalu lama bagi Staff ditolak server dan ditandai "Gagal kirim" di HP,
+    lengkap dengan pesannya; isian itu tetap di HP sampai dikirim ulang atau dihapus.
+40. **Penyesuaian stock** dibuka dari tombol "Sesuaikan stock" di tiap item layar Stock (hanya
+    Pengelola; di Tahap 3 juga dari Riwayat per item). Tanggalnya = tanggal yang dipilih di form.
+    Stock tercatat = Stock Akhir pada tanggal itu menurut server; selisih nol ditolak dengan pesan.
+    Nilai Selisih (Rp) = selisih × Harga Satuan, kosong jika harga kosong. Butuh sinyal (tidak
+    masuk antrean). Catatan yang diawali =, +, -, atau @ diberi tanda kutip supaya tidak menjadi rumus.
+41. **Tanda nihil** umum untuk semua form kecuali Suhu: aksi `tandaiNihil` dan komponen
+    `bagianNihil` (app.js). Ditolak jika form sudah punya isian pada tanggal itu; menekan lagi
+    tidak menambah baris. Tanpa sinyal, tanda nihil masuk antrean. Batal sendiri karena kelengkapan
+    selalu mendahulukan kiriman (baris `Data_Nihil` tidak dihapus).
+42. **Antrean kirim:** galat sambungan (sinyal, batas waktu, jawaban bukan dari API) memasukkan isian
+    ke antrean; galat dari server (aturan, angka) tampil di layar dan draft tetap. Antrean dikirim
+    saat aplikasi dibuka, setelah login, saat sinyal kembali, saat aplikasi dibuka lagi, dan tiap
+    menit selama terbuka. Beranda menampilkan "N isian menunggu kirim" / "N isian gagal kirim" yang
+    membuka lembar "Isian di HP" (Kirim ulang, Hapus untuk yang gagal); tiket form dan layar form
+    menampilkan jumlahnya; tombol nama di Login menampilkan isian yang menunggu pengguna itu.
+43. **Data form di HP:** jawaban `formStock` terakhir disimpan (`cache:stock`). Untuk tanggal lain
+    tanpa sinyal, layar memakai data itu dengan anggapan stock tidak bergerak sejak itu, dengan
+    tulisan "Belum diperbarui.". Draft Stock per pengguna menyimpan tanggal, kategori, isian per
+    kategori, dan submissionId per kategori; draft yang tanggalnya sudah lewat kembali ke hari ini
+    (isiannya tetap).
+44. **Warna berselang per hari** di tab `Data_*` dan `Stock_Harian`: format bersyarat
+    `=AND(ISNUMBER($A2),ISEVEN(INT($A2)))` berlatar Baja. Hari berurutan berganti warna; dua hari
+    yang sama-sama genap tetapi tidak berurutan (ada hari kosong di antaranya) bisa berwarna sama.
+45. **Harian_Stock:** satu rumus di A9 (LET/REDUCE/XLOOKUP). Semua item aktif di kategori aktif,
+    dikelompokkan per kategori dengan baris judul (nama kategori di kolom Nama Item), No mulai dari
+    1 di tiap kategori. Item tanpa rekap pada tanggal itu menampilkan Awal = Akhir = rekap terakhir
+    sebelumnya dan gerakan kosong. Diisi oleh dan Diperiksa oleh menjadi bagian akhir hasil rumus
+    (supaya tidak bertabrakan dengan tabel yang panjangnya berubah). Sorotan stok minimum memakai
+    `INDIRECT` ke `M_Item`, karena format bersyarat tidak bisa merujuk tab lain secara langsung.
+46. **Blok Stock Inventory di Dashboard:** baris 6 ringkasan (jumlah di bawah stok minimum dan
+    minus), baris 7 judul, baris 8 tabel (Item, Stock Akhir terkini, Satuan, Masuk dan Keluar
+    selama periode B3, Keterangan) dengan ruang tetap 150 baris (`TINGGI_BLOK_STOCK`). Dashboard
+    Tahap 0 diberi ruang dengan menyisipkan 151 baris sebelum blok "Nilai stock" (hanya sekali).
+47. **Tabel isian di laptop/desktop:** kolom No dan Nama Item diam saat tabel digeser. Di tabel,
+    peringatan minus ditulis ringkas ("Stock akhir minus"); kalimat lengkapnya di kartu HP/tablet.
+    "Perlu reorder" tampil jika Stock Akhir sementara lebih kecil dari Stok Minimum.
