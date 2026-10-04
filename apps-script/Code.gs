@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.2 (Tahap 1)
+// InventoryKu Code.gs v0.3 (Tahap 2)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -14,13 +14,17 @@
  * - Tahap 1            : akses (pemasangan pertama, login PIN, sesi 12 jam,
  *                        Lupa PIN, pemulihan akses), Beranda, Pengaturan →
  *                        Staff dan PIN, Pengaturan → Penerima email.
+ * - Tahap 2            : form Stock Inventory Harian (catatan gerakan di
+ *                        Data_Stock, rekap Stock_Harian, hitung ulang stock),
+ *                        penyesuaian stock, tanda nihil, rumus Harian_Stock dan
+ *                        blok Stock Inventory di Dashboard.
  * - setupSpreadsheet   : dijalankan dari editor; menyimpan ID spreadsheet dan
  *                        membuat semua tab. Aman dijalankan ulang.
  * - buatKodePemasangan : dijalankan dari editor saat tidak ada Pengelola yang
  *                        bisa masuk; membuat Kode Pemasangan baru.
  */
 
-var VERSI_KODE = 'v0.2';
+var VERSI_KODE = 'v0.3';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -52,7 +56,11 @@ var AKSI_ = {
   ubahStaff: { jalankan: aksiUbahStaff_, pengelola: true },
   aturPin: { jalankan: aksiAturPin_, pengelola: true },
   bacaPenerima: { jalankan: aksiBacaPenerima_, pengelola: true },
-  simpanPenerima: { jalankan: aksiSimpanPenerima_, pengelola: true }
+  simpanPenerima: { jalankan: aksiSimpanPenerima_, pengelola: true },
+  formStock: { jalankan: aksiFormStock_ },
+  kirimStock: { jalankan: aksiKirimStock_ },
+  tandaiNihil: { jalankan: aksiTandaiNihil_ },
+  sesuaikanStock: { jalankan: aksiSesuaikanStock_, pengelola: true }
 };
 
 /**
@@ -1021,6 +1029,614 @@ function aksiSimpanPenerima_(body) {
 
 
 /* =========================================================================
+ * Tahap 2: tabel data, tanggal isian, dan kolom sistem (dipakai semua form)
+ * ========================================================================= */
+
+/** Angka disimpan dengan paling banyak 3 angka di belakang koma. */
+function bulat_(x) {
+  return Math.round(Number(x) * 1000) / 1000;
+}
+
+/** Angka isian: kosong = 0; boleh "2,5" atau "2.5"; tidak boleh minus. */
+function angkaIsian_(nilai, label) {
+  if (nilai === '' || nilai == null) return 0;
+  var n = typeof nilai === 'number' ? nilai : Number(String(nilai).trim().replace(',', '.'));
+  if (String(nilai).trim() === '' || !isFinite(n) || n < 0) {
+    throw galatPengguna_(label + ' harus angka 0 atau lebih, misalnya 2,5.');
+  }
+  if (n > 1e9) throw galatPengguna_(label + ' terlalu besar. Periksa angkanya.');
+  return bulat_(n);
+}
+
+/** Angka untuk teks: 2.5 → "2,5". */
+function teksAngka_(n) {
+  return String(bulat_(n)).replace('.', ',');
+}
+
+/** "2026-10-04" + 1 hari → "2026-10-05" (tanpa zona waktu). */
+function geserTanggal_(tanggal, hari) {
+  var p = String(tanggal).split('-');
+  return new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + hari)).toISOString().slice(0, 10);
+}
+
+function tanggalSah_(tanggal) {
+  return typeof tanggal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(tanggal) && geserTanggal_(tanggal, 0) === tanggal;
+}
+
+/** Hari ini menurut zona waktu sistem (M_Konfigurasi). */
+function hariIni_() {
+  return Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd');
+}
+
+/**
+ * Aturan tanggal isian (spesifikasi sistem Bagian 5.0): Staff hari ini dan
+ * kemarin; Pengelola tanggal lain; tanggal masa depan ditolak.
+ */
+function periksaTanggalIsian_(tanggal, pengguna) {
+  if (!tanggalSah_(tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  var hari = hariIni_();
+  if (tanggal > hari) throw galatPengguna_('Tanggal masa depan tidak bisa diisi.');
+  if (!pengguna.pengelola && tanggal < geserTanggal_(hari, -1)) {
+    throw galatPengguna_('Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini.');
+  }
+  return tanggal;
+}
+
+/** Tanggal untuk sel Sheet (tengah malam menurut zona waktu spreadsheet). */
+function tanggalSel_(tanggal) {
+  return Utilities.parseDate(tanggal, ss_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+}
+
+function periksaSubmissionId_(sid) {
+  if (typeof sid !== 'string' || !/^[A-Za-z0-9-]{8,64}$/.test(sid)) {
+    throw galatPengguna_('Isian tidak punya tanda pengenal. Muat ulang aplikasi, lalu kirim lagi.');
+  }
+  return sid;
+}
+
+/**
+ * Membaca satu tab sebagai tabel: { nama, sheet, judul, kol: { judul: indeks },
+ * baris: [[...]] }. null jika tab tidak ada.
+ */
+function bacaTabel_(nama) {
+  var sheet = ss_().getSheetByName(nama);
+  if (!sheet) return null;
+  var lebar = sheet.getLastColumn();
+  var tinggi = sheet.getLastRow();
+  var semua = lebar && tinggi ? sheet.getRange(1, 1, tinggi, lebar).getValues() : [[]];
+  var judul = semua[0].map(function (j) { return String(j).trim(); });
+  var kol = {};
+  judul.forEach(function (j, i) {
+    if (j && !(j in kol)) kol[j] = i;
+  });
+  return { nama: nama, sheet: sheet, judul: judul, kol: kol, baris: semua.slice(1) };
+}
+
+function wajibTabel_(nama) {
+  var t = bacaTabel_(nama);
+  if (!t) throw galatPengguna_('Tab ' + nama + ' tidak ada. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+  return t;
+}
+
+function nilai_(tabel, baris, judul) {
+  var i = tabel.kol[judul];
+  return i === undefined ? '' : baris[i];
+}
+
+/** Baris tabel (array) dari objek { judul: nilai }. */
+function susunBaris_(tabel, isi) {
+  var baris = [];
+  for (var i = 0; i < tabel.judul.length; i++) baris.push('');
+  Object.keys(isi).forEach(function (judul) {
+    var i = tabel.kol[judul];
+    if (i === undefined) {
+      throw galatPengguna_('Kolom ' + judul + ' tidak ada di tab ' + tabel.nama +
+        '. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+    }
+    baris[i] = isi[judul];
+  });
+  return baris;
+}
+
+/**
+ * Nomor baris pertama untuk menulis n baris baru di bawah data. Tab baru
+ * hanya punya 1.000 baris; jika kurang, baris ditambah di dalam rentang
+ * (sebelum baris terakhir), supaya format, aturan warna, dan filter ikut
+ * melebar. Baris kosong yang tersisa di tengah hilang saat tab diurutkan.
+ */
+function barisTulis_(sheet, n) {
+  var akhirData = sheet.getLastRow();
+  var maks = sheet.getMaxRows();
+  if (akhirData + n <= maks) return akhirData + 1;
+  sheet.insertRowsAfter(Math.max(1, maks - 1), n + 500);
+  return akhirData < maks ? akhirData + 1 : maks;
+}
+
+/** Menambah banyak baris sekaligus di bawah. */
+function tambahBarisTabel_(tabel, daftarIsi) {
+  if (!daftarIsi.length) return;
+  var nilai = daftarIsi.map(function (isi) { return susunBaris_(tabel, isi); });
+  tabel.sheet.getRange(barisTulis_(tabel.sheet, nilai.length), 1, nilai.length, tabel.judul.length).setValues(nilai);
+}
+
+/** Tanggal terbaru di atas, lalu kolom berikutnya (spesifikasi sistem Bagian 8.4). */
+function urutkanTabel_(tabel, urutan) {
+  var sheet = tabel.sheet;
+  var n = sheet.getLastRow() - 1;
+  if (n < 2) return;
+  var spek = urutan.filter(function (u) { return tabel.kol[u[0]] !== undefined; }).map(function (u) {
+    return { column: tabel.kol[u[0]] + 1, ascending: u[1] };
+  });
+  sheet.getRange(2, 1, n, sheet.getLastColumn()).sort(spek);
+}
+
+/** Kiriman yang sama (submission_id) tidak ditulis dua kali. */
+function adaSubmission_(tabel, sid) {
+  var i = tabel.kol.submission_id;
+  if (i === undefined) return false;
+  return tabel.baris.some(function (b) { return String(b[i]) === sid; });
+}
+
+/** Kolom sistem Bagian 5.0 untuk satu baris baru. */
+function isiSistem_(konteks) {
+  return {
+    submission_id: konteks.sid,
+    row_id: Utilities.getUuid(),
+    outlet: konteks.outlet,
+    timestamp_server: konteks.kini,
+    timestamp_device: konteks.waktuPerangkat,
+    submitted_by: konteks.pengguna.nama,
+    status: 'Terkirim'
+  };
+}
+
+function konteksKiriman_(body, pengguna) {
+  var perangkat = new Date(String(body.waktuPerangkat || ''));
+  return {
+    sid: periksaSubmissionId_(body.submissionId),
+    outlet: namaOutlet_(),
+    kini: new Date(),
+    waktuPerangkat: isNaN(perangkat.getTime()) ? '' : perangkat,
+    pengguna: pengguna
+  };
+}
+
+function gabung_(a, b) {
+  var hasil = {};
+  [a, b].forEach(function (o) {
+    Object.keys(o).forEach(function (k) { hasil[k] = o[k]; });
+  });
+  return hasil;
+}
+
+/* ---------- Master item dan kategori ---------- */
+
+function benar_(v) {
+  return v === true || String(v).toUpperCase() === 'TRUE';
+}
+
+function angkaAtauNull_(v) {
+  if (v === '' || v == null) return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+/** M_Item: { namaKecil: { nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, aktif } }. */
+function bacaItem_() {
+  var t = wajibTabel_('M_Item');
+  var peta = {};
+  t.baris.forEach(function (b) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Item'));
+    if (!nama || peta[nama.toLowerCase()]) return;
+    var isi = angkaAtauNull_(nilai_(t, b, 'Isi per Satuan Besar'));
+    var besar = rapikanTeks_(nilai_(t, b, 'Satuan Besar'));
+    peta[nama.toLowerCase()] = {
+      nama: nama,
+      kategori: rapikanTeks_(nilai_(t, b, 'Kategori')),
+      satuan: rapikanTeks_(nilai_(t, b, 'Satuan')),
+      satuanBesar: besar && isi > 0 ? besar : '',
+      isiSatuanBesar: besar && isi > 0 ? isi : null,
+      harga: angkaAtauNull_(nilai_(t, b, 'Harga Satuan (Rp)')),
+      stokMin: angkaAtauNull_(nilai_(t, b, 'Stok Minimum')),
+      stokMaks: angkaAtauNull_(nilai_(t, b, 'Stok Maksimum')),
+      aktif: benar_(nilai_(t, b, 'Aktif'))
+    };
+  });
+  return peta;
+}
+
+/** Kategori aktif, urut menurut Urutan lalu nama. */
+function bacaKategori_() {
+  var t = wajibTabel_('M_Kategori');
+  var daftar = [];
+  var sudah = {};
+  t.baris.forEach(function (b) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Kategori'));
+    if (!nama || sudah[nama.toLowerCase()] || !benar_(nilai_(t, b, 'Aktif'))) return;
+    sudah[nama.toLowerCase()] = true;
+    daftar.push({ nama: nama, urutan: angkaAtauNull_(nilai_(t, b, 'Urutan')) });
+  });
+  return daftar.sort(function (a, b) {
+    var ua = a.urutan == null ? 1e9 : a.urutan;
+    var ub = b.urutan == null ? 1e9 : b.urutan;
+    return ua - ub || a.nama.localeCompare(b.nama, 'id');
+  });
+}
+
+/* =========================================================================
+ * Tahap 2: rekap stock (spesifikasi sistem Bagian 5.5)
+ * ========================================================================= */
+
+/** Kolom angka rekap Stock_Harian, dalam urutan rumus Stock Akhir. */
+var KOLOM_REKAP = {
+  awal: 'Stock Awal',
+  masuk: 'Stock Masuk',
+  hasilPrep: 'Hasil Prep',
+  keluar: 'Stock Keluar',
+  dipakaiPrep: 'Dipakai Prep',
+  waste: 'Waste',
+  penyesuaian: 'Penyesuaian',
+  akhir: 'Stock Akhir'
+};
+
+/**
+ * Sumber gerakan stock. Setiap gerakan dicatat sekali di form asalnya.
+ * Tab Prep, PrepBahan, dan Waste masih kosong sampai formnya dibangun
+ * (Tahap 5 dan 6), jadi gerakannya bernilai nol.
+ */
+var SUMBER_STOCK = [
+  { tab: 'Data_Stock', item: 'Nama Item', isi: { masuk: 'Stock Masuk', keluar: 'Stock Keluar' } },
+  { tab: 'Data_Prep', item: 'Item / Menu Prep', isi: { hasilPrep: 'Hasil' } },
+  { tab: 'Data_PrepBahan', item: 'Item Bahan', isi: { dipakaiPrep: 'Qty Terpakai' } },
+  { tab: 'Data_Waste', item: 'Item / Produk', isi: { waste: 'Qty' } },
+  { tab: 'Data_Penyesuaian', item: 'Nama Item', isi: { penyesuaian: 'Selisih' } }
+];
+
+function gerakanKosong_() {
+  return { masuk: 0, hasilPrep: 0, keluar: 0, dipakaiPrep: 0, waste: 0, penyesuaian: 0 };
+}
+
+function hitungAkhir_(awal, g) {
+  return bulat_(awal + g.masuk + g.hasilPrep - g.keluar - g.dipakaiPrep - g.waste + g.penyesuaian);
+}
+
+/** Rekap per item dari Stock_Harian: { tabel, item: { namaKecil: [{ nomor, tanggal, awal, ..., akhir }] } }. */
+function bacaRekap_() {
+  var t = wajibTabel_('Stock_Harian');
+  var zona = ss_().getSpreadsheetTimeZone();
+  var item = {};
+  t.baris.forEach(function (b, i) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Item')).toLowerCase();
+    var tanggal = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    if (!nama || !tanggal) return;
+    var r = { nomor: i + 2, tanggal: tanggal };
+    Object.keys(KOLOM_REKAP).forEach(function (k) {
+      r[k] = Number(nilai_(t, b, KOLOM_REKAP[k])) || 0;
+    });
+    (item[nama] = item[nama] || []).push(r);
+  });
+  return { tabel: t, item: item };
+}
+
+/**
+ * Stock satu item pada satu tanggal: rekap tanggal itu jika ada; jika tidak,
+ * Stock Awal = Stock Akhir pada rekap terakhir sebelumnya (item baru: nol).
+ */
+function posisiStock_(rekapItem, tanggal) {
+  var sebelum = null;
+  var pada = null;
+  (rekapItem || []).forEach(function (r) {
+    if (r.tanggal === tanggal) pada = r;
+    else if (r.tanggal < tanggal && (!sebelum || r.tanggal > sebelum.tanggal)) sebelum = r;
+  });
+  if (pada) {
+    var hasil = {};
+    Object.keys(KOLOM_REKAP).forEach(function (k) { hasil[k] = pada[k]; });
+    return hasil;
+  }
+  var awal = sebelum ? sebelum.akhir : 0;
+  return gabung_(gerakanKosong_(), { awal: awal, akhir: awal });
+}
+
+/** Gerakan per item per tanggal dari semua sumber, hanya untuk item yang diminta. */
+function bacaGerakan_(itemKecil) {
+  var zona = ss_().getSpreadsheetTimeZone();
+  var hasil = {};
+  SUMBER_STOCK.forEach(function (s) {
+    var t = bacaTabel_(s.tab);
+    if (!t || t.kol[s.item] === undefined || t.kol.Tanggal === undefined) return;
+    t.baris.forEach(function (b) {
+      var nama = rapikanTeks_(nilai_(t, b, s.item)).toLowerCase();
+      if (!itemKecil[nama]) return;
+      var tanggal = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+      if (!tanggal) return;
+      var perItem = hasil[nama] = hasil[nama] || {};
+      var g = perItem[tanggal] = perItem[tanggal] || gerakanKosong_();
+      Object.keys(s.isi).forEach(function (k) {
+        g[k] = bulat_(g[k] + (Number(nilai_(t, b, s.isi[k])) || 0));
+      });
+    });
+  });
+  return hasil;
+}
+
+/**
+ * Hitung ulang rekap Stock_Harian. permintaan: [{ item, dari: 'yyyy-mm-dd' }].
+ * Untuk tiap item: mulai dari tanggal "dari" sampai rekap terakhirnya, semua
+ * sumber gerakan dibaca lagi dan rekapnya ditulis ulang sebagai angka. Hanya
+ * baris item itu yang disentuh: rekap yang ada diperbarui di tempat, yang baru
+ * ditambahkan, dan yang tidak punya gerakan lagi dihapus. Stock Awal tanggal
+ * pertama = Stock Akhir rekap terakhir sebelum "dari".
+ * Dipakai oleh kiriman Stock, penyesuaian, dan nanti oleh koreksi (Tahap 3),
+ * Waste (Tahap 5), Prep (Tahap 6), dan stock opname (Tahap 8).
+ * Harus dipanggil di dalam denganKunci_.
+ */
+function hitungUlangStock_(permintaan) {
+  var minta = {};
+  permintaan.forEach(function (p) {
+    var k = rapikanTeks_(p.item).toLowerCase();
+    if (!k || !tanggalSah_(p.dari)) return;
+    if (!minta[k] || p.dari < minta[k].dari) minta[k] = { item: rapikanTeks_(p.item), dari: p.dari };
+  });
+  if (!Object.keys(minta).length) return;
+
+  var gerakan = bacaGerakan_(minta);
+  var rekap = bacaRekap_();
+  var t = rekap.tabel;
+  var master = bacaItem_();
+  var outlet = namaOutlet_();
+  var kini = new Date();
+  var ubah = [];
+  var tambah = [];
+  var hapus = [];
+
+  Object.keys(minta).forEach(function (k) {
+    var dari = minta[k].dari;
+    var m = master[k] || { nama: minta[k].item, kategori: '', satuan: '' };
+    var lama = {};
+    var awal = 0;
+    var terakhirSebelum = '';
+    (rekap.item[k] || []).forEach(function (r) {
+      if (r.tanggal >= dari) {
+        if (lama[r.tanggal]) hapus.push(r.nomor); // rekap ganda: buang
+        else lama[r.tanggal] = r.nomor;
+      } else if (r.tanggal > terakhirSebelum) {
+        terakhirSebelum = r.tanggal;
+        awal = r.akhir;
+      }
+    });
+    var perTanggal = gerakan[k] || {};
+    Object.keys(perTanggal).filter(function (tg) { return tg >= dari; }).sort().forEach(function (tg) {
+      var g = perTanggal[tg];
+      var akhir = hitungAkhir_(awal, g);
+      var isi = {
+        'Tanggal': tanggalSel_(tg),
+        'Kategori': m.kategori,
+        'Nama Item': m.nama,
+        'Satuan': m.satuan,
+        outlet: outlet,
+        timestamp_server: kini
+      };
+      isi[KOLOM_REKAP.awal] = bulat_(awal);
+      Object.keys(g).forEach(function (kk) { isi[KOLOM_REKAP[kk]] = g[kk]; });
+      isi[KOLOM_REKAP.akhir] = akhir;
+      var baris = susunBaris_(t, isi);
+      if (lama[tg]) {
+        ubah.push({ nomor: lama[tg], baris: baris });
+        delete lama[tg];
+      } else {
+        tambah.push(baris);
+      }
+      awal = akhir;
+    });
+    Object.keys(lama).forEach(function (tg) { hapus.push(lama[tg]); });
+  });
+
+  var lebar = t.judul.length;
+  ubah.forEach(function (u) {
+    t.sheet.getRange(u.nomor, 1, 1, lebar).setValues([u.baris]);
+  });
+  hapus.sort(function (a, b) { return b - a; }).forEach(function (n) {
+    t.sheet.deleteRow(n);
+  });
+  if (tambah.length) {
+    t.sheet.getRange(barisTulis_(t.sheet, tambah.length), 1, tambah.length, lebar).setValues(tambah);
+  }
+  urutkanTabel_(t, [['Tanggal', false], ['Kategori', true], ['Nama Item', true]]);
+}
+
+/* =========================================================================
+ * Tahap 2: aksi form Stock Inventory Harian
+ * ========================================================================= */
+
+var URUTAN_DATA = [['Tanggal', false], ['Kategori', true], ['Nama Item', true], ['timestamp_server', true]];
+
+/**
+ * Data layar isi stock dalam satu jawaban: kategori, item aktif beserta
+ * stock pada tanggal itu (Awal, yang sudah tercatat, Akhir), jumlah kiriman,
+ * dan tanda nihil.
+ */
+function dataFormStock_(tanggal) {
+  var zona = ss_().getSpreadsheetTimeZone();
+  var master = bacaItem_();
+  var kategori = bacaKategori_();
+  var namaKategori = {};
+  kategori.forEach(function (k) { namaKategori[k.nama.toLowerCase()] = k.nama; });
+  var rekap = bacaRekap_();
+  var dipakai = {};
+  var item = [];
+  Object.keys(master).forEach(function (k) {
+    var m = master[k];
+    var kat = namaKategori[m.kategori.toLowerCase()];
+    if (!m.aktif || !kat) return;
+    dipakai[kat] = true;
+    item.push(gabung_({
+      nama: m.nama,
+      kategori: kat,
+      satuan: m.satuan,
+      satuanBesar: m.satuanBesar,
+      isiSatuanBesar: m.isiSatuanBesar,
+      stokMin: m.stokMin
+    }, posisiStock_(rekap.item[k], tanggal)));
+  });
+  item.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+
+  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, zona, ['submission_id']);
+  var sid = {};
+  kiriman.forEach(function (b) { sid[b.submission_id] = true; });
+  var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(function (n) {
+    return rapikanTeks_(n['ID Form']).toUpperCase() === 'STOCK';
+  });
+  return {
+    tanggal: tanggal,
+    kategori: kategori.filter(function (k) { return dipakai[k.nama]; }).map(function (k) { return k.nama; }),
+    item: item,
+    kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman) },
+    nihil: kiriman.length ? null : barisTerakhir_(nihil)
+  };
+}
+
+function aksiFormStock_(body) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  return dataFormStock_(body.tanggal);
+}
+
+/**
+ * Kiriman form Stock: satu baris Data_Stock per item yang diisi. Tiap
+ * kiriman menambah, tidak menimpa. submission_id yang sudah pernah masuk
+ * tidak ditulis lagi (jawabannya sudahTerkirim: true, supaya antrean di HP
+ * yang mengirim ulang menganggapnya selesai).
+ */
+function aksiKirimStock_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var masukan = Array.isArray(body.baris) ? body.baris : [];
+  if (masukan.length > 500) throw galatPengguna_('Isian terlalu banyak untuk satu kiriman.');
+
+  return denganKunci_(function () {
+    var tabel = wajibTabel_('Data_Stock');
+    if (adaSubmission_(tabel, konteks.sid)) {
+      return { sudahTerkirim: true, jumlah: 0, form: dataFormStock_(tanggal) };
+    }
+    var master = bacaItem_();
+    var baru = [];
+    masukan.forEach(function (b) {
+      var m = master[rapikanTeks_(b && b.item).toLowerCase()];
+      if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
+      var masuk = angkaIsian_(b.masuk, 'Tambah masuk ' + m.nama);
+      var keluar = angkaIsian_(b.keluar, 'Tambah keluar ' + m.nama);
+      if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
+      var diketik = '';
+      if (b.satuanMasuk === 'besar' && masuk) {
+        if (!m.satuanBesar) throw galatPengguna_(m.nama + ' tidak punya satuan besar. Isi Tambah masuk dalam ' + m.satuan + '.');
+        diketik = teksAngka_(masuk) + ' ' + m.satuanBesar;
+        masuk = bulat_(masuk * m.isiSatuanBesar);
+      }
+      baru.push(gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'Kategori': m.kategori,
+        'Nama Item': m.nama,
+        'Stock Masuk': masuk,
+        'Stock Keluar': keluar,
+        'Satuan': m.satuan,
+        'Masuk Diketik': diketik
+      }, isiSistem_(konteks)));
+    });
+    if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
+
+    tambahBarisTabel_(tabel, baru);
+    urutkanTabel_(tabel, URUTAN_DATA);
+    hitungUlangStock_(baru.map(function (b) { return { item: b['Nama Item'], dari: tanggal }; }));
+    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormStock_(tanggal) };
+  });
+}
+
+/**
+ * Tanda nihil (spesifikasi sistem Bagian 5.8), untuk form mana pun kecuali
+ * Suhu. Dicatat di Data_Nihil. Batal sendiri jika kemudian ada kiriman:
+ * kelengkapan selalu mendahulukan kiriman.
+ */
+function aksiTandaiNihil_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var idForm = rapikanTeks_(body.formId).toUpperCase();
+  var form = null;
+  bacaDaftarForm_().forEach(function (f) {
+    if (f.id === idForm && f.aktif) form = f;
+  });
+  if (!form || idForm === 'SUHU') throw galatPengguna_('Form ini tidak bisa ditandai nihil.');
+
+  return denganKunci_(function () {
+    var zona = ss_().getSpreadsheetTimeZone();
+    var tabel = wajibTabel_('Data_Nihil');
+    var punyaForm = function (n) { return rapikanTeks_(n['ID Form']).toUpperCase() === idForm; };
+    var ada = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(punyaForm);
+    if (!adaSubmission_(tabel, konteks.sid) && !ada.length) {
+      if (bacaBarisTanggal_(TAB_DATA_FORM[idForm] || ('Data_K_' + idForm), tanggal, zona, []).length) {
+        throw galatPengguna_(form.nama + ' sudah punya isian pada tanggal ini.');
+      }
+      tambahBarisTabel_(tabel, [gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'ID Form': idForm,
+        'Nama Form': form.nama
+      }, isiSistem_(konteks))]);
+      urutkanTabel_(tabel, [['Tanggal', false], ['ID Form', true], ['timestamp_server', true]]);
+      ada = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(punyaForm);
+    }
+    return { formId: idForm, tanggal: tanggal, nihil: barisTerakhir_(ada) };
+  });
+}
+
+var ALASAN_PENYESUAIAN = ['Stok pembuka', 'Hasil hitung ulang', 'Lainnya'];
+
+/**
+ * Penyesuaian stock satu item (spesifikasi sistem Bagian 5.7), hanya
+ * Pengelola. Selisih terhadap stock tercatat pada tanggal itu disimpan di
+ * Data_Penyesuaian sebagai gerakan baru, lalu rekap dihitung ulang.
+ */
+function aksiSesuaikanStock_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var sebenarnya = angkaIsian_(body.stockSebenarnya, 'Stock sebenarnya');
+  if (body.stockSebenarnya === '' || body.stockSebenarnya == null) throw galatPengguna_('Isi stock sebenarnya.');
+  var alasan = String(body.alasan || '');
+  if (ALASAN_PENYESUAIAN.indexOf(alasan) < 0) throw galatPengguna_('Pilih alasan penyesuaian.');
+  var catatan = rapikanTeks_(body.catatan).slice(0, 200);
+  if (alasan === 'Lainnya' && !catatan) throw galatPengguna_('Tulis catatan untuk alasan Lainnya.');
+  if (/^[=+\-@]/.test(catatan)) catatan = "'" + catatan;
+
+  return denganKunci_(function () {
+    var tabel = wajibTabel_('Data_Penyesuaian');
+    if (adaSubmission_(tabel, konteks.sid)) {
+      return { sudahTerkirim: true, form: dataFormStock_(tanggal) };
+    }
+    var m = bacaItem_()[rapikanTeks_(body.item).toLowerCase()];
+    if (!m) throw galatPengguna_('Item tidak ada di daftar item. Muat ulang form.');
+    var tercatat = posisiStock_(bacaRekap_().item[m.nama.toLowerCase()], tanggal).akhir;
+    var selisih = bulat_(sebenarnya - tercatat);
+    if (!selisih) {
+      throw galatPengguna_('Stock ' + m.nama + ' tercatat ' + teksAngka_(tercatat) + ' ' + m.satuan +
+        '. Tidak ada selisih yang perlu disimpan.');
+    }
+    tambahBarisTabel_(tabel, [gabung_({
+      'Tanggal': tanggalSel_(tanggal),
+      'Kategori': m.kategori,
+      'Nama Item': m.nama,
+      'Stock Tercatat': tercatat,
+      'Stock Sebenarnya': sebenarnya,
+      'Selisih': selisih,
+      'Satuan': m.satuan,
+      'Nilai Selisih (Rp)': m.harga == null ? '' : Math.round(selisih * m.harga),
+      'Alasan': alasan,
+      'Catatan': catatan
+    }, isiSistem_(konteks))]);
+    urutkanTabel_(tabel, URUTAN_DATA);
+    hitungUlangStock_([{ item: m.nama, dari: tanggal }]);
+    return { sudahTerkirim: false, tercatat: tercatat, selisih: selisih, form: dataFormStock_(tanggal) };
+  });
+}
+
+/* =========================================================================
  * Susunan spreadsheet (spesifikasi sistem Bagian 5 dan 8)
  * ========================================================================= */
 
@@ -1035,7 +1651,9 @@ var WARNA = {
   teksDiNavy: '#A9B8CF',
   relPadam: '#5A6F8F',
   garis: '#C5CEDA',
-  garisIsian: '#6F7E96'
+  garisIsian: '#6F7E96',
+  masalah: '#B42318',
+  tinjau: '#B54708'
 };
 
 /** Warna tab per kelompok (spesifikasi sistem Bagian 8.2). */
@@ -1404,6 +2022,7 @@ function setupSpreadsheet() {
         sistem: def.sistem || KOLOM_SISTEM,
         warnaTab: WARNA_TAB.data,
         proteksi: 'keras',
+        pitaTanggal: true,
         catatan: catatan
       });
     });
@@ -1429,7 +2048,11 @@ function setupSpreadsheet() {
     isiBarisAwal_(ss.getSheetByName('M_Form'), FORM_BAWAAN, 'M_Form', catatan);
     isiKonfigurasiAwal_(ss.getSheetByName('M_Konfigurasi'), catatan);
 
-    // 4. Urutkan tab dan buang lembar kosong bawaan Google Sheets.
+    // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
+    pasangRumusHarianStock_(ss, catatan);
+    pasangBlokStockDashboard_(ss, catatan);
+
+    // 5. Urutkan tab dan buang lembar kosong bawaan Google Sheets.
     aturUrutanTab_(ss);
     hapusLembarBawaanKosong_(ss, catatan);
 
@@ -1506,6 +2129,36 @@ function siapkanTabTabel_(ss, sheet, def, opsi) {
 
   lindungi_(sheet, opsi.proteksi, [], opsi.catatan);
   sheet.setTabColor(opsi.warnaTab);
+  if (opsi.pitaTanggal) pasangPitaTanggal_(sheet);
+}
+
+/**
+ * Warna latar berselang per hari di tab Data (spesifikasi sistem Bagian 8.4):
+ * aturan format bersyarat, tanggal genap berlatar Baja. Karena data urut
+ * tanggal, hari yang berurutan berganti warna.
+ */
+function pasangPitaTanggal_(sheet) {
+  var rentang = sheet.getRange(2, 1, Math.max(1, sheet.getMaxRows() - 1), sheet.getMaxColumns());
+  pasangAturanWarna_(sheet, [SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND(ISNUMBER($A2),ISEVEN(INT($A2)))')
+    .setBackground(WARNA.baja)
+    .setRanges([rentang])
+    .build()]);
+}
+
+/**
+ * Memasang aturan format bersyarat tanpa menggandakan: aturan lama yang
+ * rentangnya sama dengan aturan baru dibuang dulu. Aman dijalankan ulang.
+ */
+function pasangAturanWarna_(sheet, aturanBaru) {
+  var milikBaru = {};
+  aturanBaru.forEach(function (a) {
+    a.getRanges().forEach(function (r) { milikBaru[r.getA1Notation()] = true; });
+  });
+  var tetap = sheet.getConditionalFormatRules().filter(function (a) {
+    return !a.getRanges().some(function (r) { return milikBaru[r.getA1Notation()]; });
+  });
+  sheet.setConditionalFormatRules(tetap.concat(aturanBaru));
 }
 
 /**
@@ -1680,7 +2333,8 @@ function siapkanDashboard_(ss, sheet, catatan) {
       sheet.getRange(baris, 1).setValue(judul).setFontWeight('bold').setFontColor(WARNA.kertas);
       sheet.getRange(baris + 1, 1).setValue('Belum ada data.')
         .setFontColor(WARNA.tintaRedup).setFontStyle('italic');
-      baris += 3;
+      // Blok Stock Inventory punya ruang tetap untuk tabelnya (Tahap 2).
+      baris += judul === 'Stock Inventory' ? 4 + TINGGI_BLOK_STOCK : 3;
     });
     sheet.setColumnWidths(1, lebar, 120);
     catatan.push('Tata letak dibuat: Dashboard');
@@ -1694,6 +2348,216 @@ function siapkanDashboard_(ss, sheet, catatan) {
 }
 
 /* ---------- Nilai awal ---------- */
+
+/* ---------- Tahap 2: rumus Harian_Stock dan blok Stock Inventory ---------- */
+
+/** Tinggi tabel blok Stock Inventory di Dashboard (baris item + judul kategori). */
+var TINGGI_BLOK_STOCK = 150;
+
+function hurufKolom_(n) {
+  var s = '';
+  while (n > 0) {
+    var m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+/** Rentang satu kolom penuh (baris 2 ke bawah) menurut judulnya, misalnya Stock_Harian!$A$2:$A. */
+function kolomRumus_(ss, tab, judul) {
+  var sheet = ss.getSheetByName(tab);
+  var ada = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function (j) {
+    return String(j).trim();
+  });
+  var i = ada.indexOf(judul);
+  if (i < 0) throw new Error('Kolom ' + judul + ' tidak ada di tab ' + tab + '.');
+  var h = hurufKolom_(i + 1);
+  return tab + '!$' + h + '$2:$' + h;
+}
+
+function kosong_(n) {
+  var s = [];
+  for (var i = 0; i < n; i++) s.push('""');
+  return s.join(',');
+}
+
+/** LET bersama: kolom Stock_Harian, M_Item, dan M_Kategori yang dipakai rumus stock. */
+function letStock_(ss) {
+  var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
+  return 'shT,' + K('Stock_Harian', 'Tanggal') + ',shI,' + K('Stock_Harian', 'Nama Item') + ',' +
+    'iN,' + K('M_Item', 'Nama Item') + ',iK,' + K('M_Item', 'Kategori') + ',iS,' + K('M_Item', 'Satuan') + ',' +
+    'iMin,' + K('M_Item', 'Stok Minimum') + ',iA,' + K('M_Item', 'Aktif') + ',' +
+    'kN,' + K('M_Kategori', 'Nama Kategori') + ',kU,' + K('M_Kategori', 'Urutan') + ',kA,' + K('M_Kategori', 'Aktif') + ',';
+}
+
+/**
+ * Rumus tab Harian_Stock (spesifikasi sistem Bagian 8.3), satu rumus di A9.
+ * Semua item aktif, dikelompokkan per kategori (urut M_Kategori), tiap
+ * kelompok diawali baris judul kategori; di dalamnya urut Nama Item. Item
+ * yang punya rekap pada tanggal itu menampilkan gerakannya; item lain
+ * menampilkan Stock Awal = Stock Akhir = rekap terakhir sebelumnya. Di bawah
+ * tabel: Diisi oleh dan Diperiksa oleh.
+ */
+function rumusHarianStock_(ss) {
+  var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
+  var hari = function (judul) { return 'XLOOKUP(1,cocok,' + K('Stock_Harian', judul) + ',0)'; };
+  var akhirSH = K('Stock_Harian', 'Stock Akhir');
+  var baris =
+    'LAMBDA(grp,x,LET(' +
+      'lt,MAXIFS(shT,shI,x,shT,"<="&tgl),' +
+      'cocok,(shI=x)*(shT=tgl),' +
+      'ada,lt=tgl,' +
+      'lalu,IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),' + akhirSH + ',0)),' +
+      'VSTACK(grp,HSTACK(ROWS(grp),x,' +
+        'IF(ada,' + hari('Stock Awal') + ',lalu),' +
+        'IF(ada,' + hari('Stock Masuk') + ',""),' +
+        'IF(ada,' + hari('Hasil Prep') + ',""),' +
+        'IF(ada,' + hari('Stock Keluar') + ',""),' +
+        'IF(ada,' + hari('Dipakai Prep') + ',""),' +
+        'IF(ada,' + hari('Waste') + ',""),' +
+        'IF(ada,' + hari('Penyesuaian') + ',""),' +
+        'IF(ada,' + hari('Stock Akhir') + ',lalu),' +
+        'XLOOKUP(x,iN,iS,"")))))';
+  var grup =
+    'LAMBDA(acc,k,LET(' +
+      'it,SORT(FILTER(iN,iN<>"",iK=k,iA=TRUE)),' +
+      'IF(OR(k="",ISERROR(INDEX(it,1,1))),acc,VSTACK(acc,REDUCE(HSTACK("",k,' + kosong_(9) + '),it,' + baris + ')))))';
+  var pilihKat = 'kN<>"",kA=TRUE,(pk="")+(kN=pk)';
+  var pilihIsi = '(dsT=tgl)*((pk="")+(dsK=pk))';
+  return '=LET(tgl,$B$5,pk,$B$6,' + letStock_(ss) +
+    'kat,IFERROR(SORT(FILTER(kN,' + pilihKat + '),FILTER(kU,' + pilihKat + '),TRUE),""),' +
+    'isi,REDUCE(HSTACK(' + kosong_(11) + '),kat,' + grup + '),' +
+    'n,ROWS(isi),' +
+    'dsT,' + K('Data_Stock', 'Tanggal') + ',dsK,' + K('Data_Stock', 'Kategori') + ',' +
+    'dsW,' + K('Data_Stock', 'timestamp_server') + ',dsBy,' + K('Data_Stock', 'submitted_by') + ',' +
+    'dsC,' + K('Data_Stock', 'checked_by') + ',dsCA,' + K('Data_Stock', 'checked_at') + ',' +
+    'olehIsi,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(dsBy,' + pilihIsi + '))),""),' +
+    'jamIsi,IFERROR(TEXT(MAX(FILTER(dsW,' + pilihIsi + ')),"hh:mm"),""),' +
+    'olehCek,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(dsC,' + pilihIsi + ',dsC<>""))),""),' +
+    'jamCek,IFERROR(TEXT(MAX(FILTER(dsCA,' + pilihIsi + ',dsC<>"")),"hh:mm"),""),' +
+    'bawah,VSTACK(HSTACK(' + kosong_(11) + '),' +
+      'HSTACK("","Diisi oleh",IF(olehIsi="","Belum ada isian",olehIsi&", terakhir "&jamIsi),' + kosong_(8) + '),' +
+      'HSTACK("","Diperiksa oleh",IF(olehCek="","Belum diperiksa",olehCek&", "&jamCek),' + kosong_(8) + ')),' +
+    'IF(n<2,VSTACK(HSTACK("Belum ada data.",' + kosong_(10) + '),bawah),' +
+      'VSTACK(CHOOSEROWS(isi,SEQUENCE(n-1,1,2)),bawah)))';
+}
+
+/**
+ * Memasang rumus Harian_Stock di A9 (menggantikan tulisan "Belum ada data."
+ * dari Tahap 0), format angka, dan sorotan: baris judul kategori (latar Baja,
+ * tebal), Stock Akhir minus (teks Masalah, tebal), Stock Akhir di bawah stok
+ * minimum (teks Perlu ditinjau, tebal). Aman dijalankan ulang.
+ */
+function pasangRumusHarianStock_(ss, catatan) {
+  var sheet = ss.getSheetByName('Harian_Stock');
+  var mulai = HARIAN.barisJudulTabel + 1;
+  var sel = sheet.getRange(mulai, 1);
+  var isiLama = String(sel.getFormula() || sel.getValue() || '');
+  if (isiLama && isiLama !== 'Belum ada data.' && isiLama.charAt(0) !== '=') {
+    catatan.push('Peringatan: A' + mulai + ' di Harian_Stock berisi teks lain; rumus stock tidak dipasang.');
+    return;
+  }
+  sel.setFormula(rumusHarianStock_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
+  sheet.getRange(mulai, 3, tinggi, 8).setNumberFormat(FORMAT.angka);
+  sheet.getRange(mulai, 1, tinggi, 1).setNumberFormat(FORMAT.bulat).setHorizontalAlignment('right');
+
+  var item = ss.getSheetByName('M_Item');
+  var judulItem = item.getRange(1, 1, 1, item.getLastColumn()).getValues()[0].map(function (j) {
+    return String(j).trim();
+  });
+  var kolNama = judulItem.indexOf('Nama Item') + 1;
+  var kolMin = judulItem.indexOf('Stok Minimum') + 1;
+  var cariMin = 'IFERROR(N(VLOOKUP($B' + mulai + ',INDIRECT("M_Item!' + hurufKolom_(kolNama) + '2:' +
+    hurufKolom_(kolMin) + '"),' + (kolMin - kolNama + 1) + ',FALSE)),0)';
+  var semua = sheet.getRange(mulai, 1, tinggi, 11);
+  var akhir = sheet.getRange(mulai, 10, tinggi, 1);
+  pasangAturanWarna_(sheet, [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($A' + mulai + '="",$B' + mulai + '<>"",$C' + mulai + '="")')
+      .setBackground(WARNA.baja).setBold(true).setRanges([semua]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '<0)')
+      .setFontColor(WARNA.masalah).setBold(true).setRanges([akhir]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '>=0,$J' +
+        mulai + '<' + cariMin + ')')
+      .setFontColor(WARNA.tinjau).setBold(true).setRanges([akhir]).build()
+  ]);
+  catatan.push('Rumus stock dipasang: Harian_Stock');
+}
+
+/**
+ * Rumus blok Stock Inventory di Dashboard (spesifikasi sistem Bagian 8.5):
+ * stock akhir terkini per item dikelompokkan per kategori, masuk dan keluar
+ * selama periode pilihan (B3), dan keterangan "Stock akhir minus" atau
+ * "Perlu reorder".
+ */
+function rumusDashboardStock_(ss) {
+  var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
+  var periode = 'shT,">="&awalP,shT,"<="&TODAY()';
+  var baris =
+    'LAMBDA(grp,x,LET(' +
+      'lt,MAXIFS(shT,shI,x),' +
+      'akhir,IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),' + K('Stock_Harian', 'Stock Akhir') + ',0)),' +
+      'mn,XLOOKUP(x,iN,iMin,""),' +
+      'VSTACK(grp,HSTACK(x,akhir,XLOOKUP(x,iN,iS,""),' +
+        'SUMIFS(' + K('Stock_Harian', 'Stock Masuk') + ',shI,x,' + periode + '),' +
+        'SUMIFS(' + K('Stock_Harian', 'Stock Keluar') + ',shI,x,' + periode + '),' +
+        'IF(akhir<0,"Stock akhir minus",IF(AND(ISNUMBER(mn),akhir<mn),"Perlu reorder",""))))))';
+  var grup =
+    'LAMBDA(acc,k,LET(' +
+      'it,SORT(FILTER(iN,iN<>"",iK=k,iA=TRUE)),' +
+      'IF(OR(k="",ISERROR(INDEX(it,1,1))),acc,VSTACK(acc,REDUCE(HSTACK(k,' + kosong_(5) + '),it,' + baris + ')))))';
+  return '=LET(awalP,IF($B$3="30 hari",TODAY()-29,IF($B$3="Bulan berjalan",DATE(YEAR(TODAY()),MONTH(TODAY()),1),TODAY()-6)),' +
+    letStock_(ss) +
+    'kat,IFERROR(SORT(FILTER(kN,kN<>"",kA=TRUE),FILTER(kU,kN<>"",kA=TRUE),TRUE),""),' +
+    'isi,REDUCE(HSTACK(' + kosong_(6) + '),kat,' + grup + '),' +
+    'n,ROWS(isi),' +
+    'IF(n<2,"Belum ada data.",ARRAY_CONSTRAIN(CHOOSEROWS(isi,SEQUENCE(n-1,1,2)),' + TINGGI_BLOK_STOCK + ',6)))';
+}
+
+/**
+ * Blok Stock Inventory di Dashboard: baris 6 ringkasan, baris 7 judul tabel,
+ * baris 8 rumus tabel dengan ruang TINGGI_BLOK_STOCK baris. Dashboard dari
+ * Tahap 0 (blok berikutnya langsung di baris 8) diberi ruang dulu dengan
+ * menyisipkan baris. Aman dijalankan ulang.
+ */
+function pasangBlokStockDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  if (String(sheet.getRange(5, 1).getValue()) !== 'Stock Inventory') {
+    catatan.push('Peringatan: blok Stock Inventory di Dashboard tidak ditemukan di A5; rumus tidak dipasang.');
+    return;
+  }
+  if (String(sheet.getRange(8, 1).getValue()) === 'Nilai stock') {
+    sheet.insertRowsBefore(8, TINGGI_BLOK_STOCK + 1);
+    catatan.push('Dashboard: ruang tabel blok Stock Inventory disisipkan');
+  }
+  var akhirTabel = 7 + TINGGI_BLOK_STOCK;
+  var rentangKet = '$F$8:$F$' + akhirTabel;
+  sheet.getRange(6, 1).setFormula('="Di bawah stok minimum: "&COUNTIF(' + rentangKet + ',"Perlu reorder")&' +
+    '" item · Stock akhir minus: "&COUNTIF(' + rentangKet + ',"Stock akhir minus")&" item · Masuk dan keluar: "&$B$3')
+    .setFontStyle('normal').setFontColor(WARNA.tinta);
+  sheet.getRange(7, 1, 1, 6).setValues([['Item', 'Stock Akhir', 'Satuan', 'Masuk', 'Keluar', 'Keterangan']])
+    .setFontWeight('bold').setFontColor(WARNA.tintaRedup).setBackground(WARNA.baja);
+  sheet.getRange(8, 1).setFormula(rumusDashboardStock_(ss));
+  sheet.getRange(8, 2, TINGGI_BLOK_STOCK, 1).setNumberFormat(FORMAT.angka);
+  sheet.getRange(8, 4, TINGGI_BLOK_STOCK, 2).setNumberFormat(FORMAT.angka);
+  var tabel = sheet.getRange(8, 1, TINGGI_BLOK_STOCK, 6);
+  pasangAturanWarna_(sheet, [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($A8<>"",$B8="")')
+      .setBackground(WARNA.baja).setBold(true).setRanges([tabel]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$F8="Stock akhir minus"')
+      .setFontColor(WARNA.masalah).setBold(true).setRanges([tabel]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$F8="Perlu reorder"')
+      .setFontColor(WARNA.tinjau).setBold(true).setRanges([tabel]).build()
+  ]);
+  catatan.push('Rumus stock dipasang: Dashboard (blok Stock Inventory)');
+}
 
 /** Menambahkan baris yang kunci kolom A-nya belum ada. Baris lama tidak disentuh. */
 function isiBarisAwal_(sheet, baris, label, catatan) {

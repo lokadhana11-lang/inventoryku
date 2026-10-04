@@ -2088,6 +2088,318 @@ body.papan-ketik .lembar-aksi {
 }
 
 /* =========================================================================
+ * Layar isi form (spesifikasi tampilan Bagian 5.3): pola umum semua form
+ * ========================================================================= */
+
+/* Tombol nama di Login: pengingat isian di antrean */
+.tombol-nama {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.tombol-nama-ket {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--teks-di-navy);
+}
+
+.layar-form .catatan-draft {
+  margin-bottom: 8px;
+}
+
+.layar-form .catatan-draft:empty {
+  display: none;
+}
+
+/* Kotak info: tanggal dan kategori/shift */
+.kotak-info {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 600px) {
+  .kotak-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kotak-info .lebar-penuh {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.kotak-info .lebar-penuh:empty {
+  display: none;
+}
+
+.kotak-info .pilihan-grup input[type='date'] {
+  flex: 1 1 100%;
+}
+
+.status-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.status-form:empty {
+  display: none;
+}
+
+.baris-nihil {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Kartu item: satu kolom di HP, dua kolom di tablet */
+.grid-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 600px) {
+  .grid-item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kartu-item {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 16px;
+  background: var(--kertas);
+  border: 1px solid var(--garis);
+  border-radius: 8px;
+}
+
+.kartu-item.masalah {
+  border-color: var(--masalah-teks);
+}
+
+.kartu-item-kepala {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kartu-item-nama {
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.kartu-item-satuan {
+  flex: none;
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+/* Nilai otomatis: teks Tinta Redup, bukan kolom isian */
+.otomatis {
+  color: var(--tinta-redup);
+}
+
+.baris-angka {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.baris-angka .isian-angka {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Angka yang diisi: 20 px, 500, lurus kanan */
+.isian-angka {
+  font-size: 20px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pilih-satuan {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 88px;
+}
+
+.satuan-tetap {
+  flex: 0 0 auto;
+  min-width: 56px;
+  align-self: center;
+  color: var(--tinta-redup);
+}
+
+.konversi {
+  font-size: 14px;
+  color: var(--tinta-redup);
+  font-variant-numeric: tabular-nums;
+}
+
+.konversi:empty {
+  display: none;
+}
+
+.stock-akhir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--garis);
+}
+
+/* Stock akhir lebih besar dari angka otomatis lain: 18 px, tebal */
+.stock-akhir-angka {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.stock-akhir-angka.minus {
+  color: var(--masalah-teks);
+}
+
+.wadah-peringatan:empty {
+  display: none;
+}
+
+.peringatan {
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+.kartu-item > .tombol-tautan {
+  justify-self: start;
+}
+
+/* Tabel isian di laptop dan desktop: kolom otomatis berlatar Baja */
+.tabel-isian-bingkai {
+  margin-top: 16px;
+}
+
+.tabel-isian td {
+  vertical-align: top;
+}
+
+.tabel-isian td.otomatis {
+  background: var(--baja);
+  color: var(--tinta-redup);
+}
+
+.tabel-isian td.tercatat {
+  white-space: normal;
+  min-width: 140px;
+  font-size: 14px;
+}
+
+/* No sempit; No dan Nama Item tetap diam saat tabel digeser ke samping */
+.tabel-isian th:first-child,
+.tabel-isian td:first-child {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  border-right: 0;
+}
+
+.tabel-isian th:nth-child(2),
+.tabel-isian td:nth-child(2) {
+  position: sticky;
+  left: 48px;
+  z-index: 1;
+  min-width: 160px;
+  max-width: 260px;
+  white-space: normal;
+  background: var(--kertas);
+  border-right: 1px solid var(--garis-isian);
+}
+
+.tabel-isian th:nth-child(2) {
+  background: var(--baja);
+}
+
+.tabel-isian .isian-angka {
+  width: 120px;
+}
+
+.tabel-isian .baris-angka {
+  flex-wrap: wrap;
+  max-width: 230px;
+}
+
+.tabel-isian .konversi {
+  flex: 1 1 100%;
+}
+
+.tabel-isian .stock-akhir-angka {
+  font-size: 18px;
+}
+
+.tabel-isian .wadah-peringatan {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.tabel-isian .tombol-tautan {
+  min-height: 44px;
+  padding-left: 0;
+}
+
+/* Bilah kirim: penghitung isian di kiri, tombol kirim di kanan; tetap di bawah */
+.bilah-kirim {
+  position: sticky;
+  z-index: 15;
+  bottom: calc(var(--tinggi-menu) + var(--aman-bawah));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--kertas);
+  border: 1px solid var(--garis);
+  border-radius: 10px;
+}
+
+body.papan-ketik .bilah-kirim {
+  bottom: 0;
+}
+
+.penghitung {
+  color: var(--tinta-redup);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 599px) {
+  .bilah-kirim {
+    margin-left: calc(-1 * var(--pad-kiri) + 8px);
+    margin-right: calc(-1 * var(--pad-kanan) + 8px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bilah-kirim {
+    bottom: 0;
+    border-radius: 10px 10px 0 0;
+  }
+}
+
+/* =========================================================================
  * Gerak (spesifikasi tampilan Bagian 8): hanya transform dan opacity
  * ========================================================================= */
 
