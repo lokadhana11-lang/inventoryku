@@ -2400,6 +2400,434 @@ body.papan-ketik .bilah-kirim {
 }
 
 /* =========================================================================
+ * Riwayat (spesifikasi tampilan Bagian 5.4)
+ * ========================================================================= */
+
+.riwayat-atas > * {
+  grid-column: 1 / -1;
+}
+
+/* Pilihan form: tombol berjajar, digeser ke samping di dalam bingkainya jika lebih dari empat */
+.pilihan-gulir {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px;
+  margin: -2px;
+  scrollbar-width: thin;
+}
+
+.pilihan-gulir .pilihan {
+  flex: 0 0 auto;
+}
+
+.pilihan-gulir .pilihan span {
+  white-space: nowrap;
+}
+
+.deret-tanggal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+
+.deret-tanggal .kolom-label {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.riwayat-alat .deret-tombol {
+  align-items: flex-end;
+}
+
+.pilih-tampilan {
+  flex: 1 1 260px;
+}
+
+.pilih-tampilan .pilihan-grup {
+  flex-wrap: nowrap;
+}
+
+.ringkas-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.ringkas-filter:empty {
+  display: none;
+}
+
+.riwayat > .memperbarui {
+  display: flex;
+  margin-top: 8px;
+}
+
+.riwayat > .memperbarui:empty {
+  display: none;
+}
+
+.riwayat-isi {
+  margin-top: 16px;
+}
+
+.riwayat-detail:empty {
+  display: none;
+}
+
+.kelompok + .kelompok {
+  margin-top: 24px;
+}
+
+.kelompok-judul {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.kelompok-subjudul {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta-redup);
+}
+
+/* Satu kiriman di daftar: siapa, jam, tanda status, lalu item dan angkanya */
+.kiriman-baris {
+  align-items: flex-start;
+}
+
+.kiriman-baris > .ikon {
+  margin-top: 2px;
+}
+
+.kiriman-baris.terpilih {
+  background: var(--baja);
+  box-shadow: inset 3px 0 0 var(--biru-malam);
+}
+
+.kiriman-kepala {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.kiriman-ringkas {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.ringkas-baris {
+  overflow-wrap: anywhere;
+}
+
+.ringkas-nama {
+  color: var(--tinta);
+  font-weight: 500;
+}
+
+.ikon-tanda {
+  display: inline-flex;
+  vertical-align: -3px;
+  margin-left: 6px;
+}
+
+.ikon-tanda .ikon {
+  width: 16px;
+  height: 16px;
+}
+
+.ikon-tanda.tinjau {
+  color: var(--tinjau-teks);
+}
+
+.tanda-deret.bungkus {
+  flex-wrap: wrap;
+}
+
+.daftar-baris-isi > .tanda-status {
+  justify-self: start;
+}
+
+/* Tanda nihil, penyesuaian, dan stock opname: ikon berbeda dari isian biasa */
+.peristiwa {
+  align-items: flex-start;
+}
+
+.peristiwa.tetap {
+  cursor: default;
+}
+
+.peristiwa.tetap:active {
+  transform: none;
+  background: var(--kertas);
+}
+
+.ikon-peristiwa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--menunggu-latar);
+  color: var(--menunggu-teks);
+}
+
+/* Nilai yang pernah dikoreksi: nilai lama dicoret, lalu nilai baru */
+.nilai-lama {
+  color: var(--tinta-redup);
+  text-decoration-thickness: 1.5px;
+  white-space: nowrap;
+}
+
+.nilai-asli {
+  color: var(--tinta-redup);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.blok {
+  display: block;
+}
+
+/* Rekap harian */
+.rekap-baris {
+  align-items: flex-start;
+}
+
+.rekap-akhir {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rekap-akhir.minus,
+.stock-akhir-sel.minus,
+.riwayat-item-sekarang .minus {
+  color: var(--masalah-teks);
+}
+
+.rekap-baris.minus,
+.tabel tr.minus td,
+.tabel tr.minus th {
+  background: var(--masalah-latar);
+}
+
+.tabel-rekap .baris-kategori th,
+.tabel-rekap .baris-kategori td {
+  background: var(--baja);
+  color: var(--tinta);
+  font-weight: 600;
+}
+
+.stock-akhir-sel {
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+/* Detail satu kiriman */
+.detail-kepala {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.detail-kepala .kartu-judul {
+  margin-bottom: 0;
+}
+
+.detail-tanggal {
+  font-weight: 500;
+}
+
+.detail-kepala .kolom-bantuan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-kepala .kolom-bantuan .ikon {
+  width: 16px;
+  height: 16px;
+}
+
+.riwayat-detail .grid-item {
+  margin-top: 0;
+}
+
+.kartu-item.dilaporkan {
+  border-color: var(--tinjau-teks);
+}
+
+.tabel tr.dilaporkan td {
+  background: var(--tinjau-latar);
+}
+
+.nilai-daftar {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.nilai-daftar dt {
+  color: var(--tinta-redup);
+}
+
+.nilai-daftar dd {
+  margin: 0;
+  text-align: right;
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.catatan-flag {
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+.aksi-baris {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+
+.aksi-baris .tombol-tautan {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.tabel-detail td {
+  vertical-align: top;
+}
+
+.tabel-detail td .catatan-flag,
+.tabel-detail td .kolom-bantuan {
+  margin-top: 6px;
+  white-space: normal;
+}
+
+.tabel-detail td.nama-item {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.tabel-detail .aksi-baris {
+  margin-top: 4px;
+}
+
+/* Tabel rekap per tanggal: lebar kolom sama di semua tanggal */
+.tabel-rekap {
+  table-layout: fixed;
+  min-width: 1000px;
+}
+
+.tabel-rekap th:first-child,
+.tabel-rekap td:first-child {
+  width: 220px;
+  max-width: 220px;
+  white-space: normal;
+}
+
+.tabel-rekap th:nth-child(10) { width: 72px; }
+.tabel-rekap th:nth-child(11) { width: 200px; }
+.tabel-rekap td:last-child { white-space: normal; }
+
+/* Riwayat per item: tabel di dalam lembar, kolom tanggal diam saat digeser */
+.riwayat-item {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.riwayat-item > .tabel-bingkai,
+.riwayat-item > .kosong {
+  justify-self: stretch;
+}
+
+.riwayat-item-sekarang {
+  font-size: 16px;
+}
+
+.riwayat-item-sekarang strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tabel-riwayat-item th:first-child,
+.tabel-riwayat-item td:first-child {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+.tabel-riwayat-item tbody th {
+  background: var(--kertas);
+  color: var(--tinta);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tabel-riwayat-item td,
+.tabel-riwayat-item th {
+  padding: 10px;
+}
+
+.tabel-riwayat-item .tanda-status {
+  margin-top: 4px;
+}
+
+@media (min-width: 1024px) {
+  .lembar.lembar-lebar {
+    max-width: 960px;
+  }
+
+  .riwayat-atas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .riwayat-atas > .riwayat-form,
+  .riwayat-atas > .kolom {
+    grid-column: auto;
+  }
+
+  /* Dua kolom: daftar di kiri, detail di kanan (tampilan Bagian 4.3) */
+  .riwayat-isi.dua-kolom {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .riwayat-isi.dua-kolom .riwayat-detail {
+    position: sticky;
+    top: calc(var(--tinggi-bar) + var(--aman-atas) + 16px);
+    max-height: calc(100dvh - var(--tinggi-bar) - var(--aman-atas) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .riwayat-isi.dua-kolom .riwayat-detail:empty {
+    display: block;
+  }
+}
+
+/* =========================================================================
  * Gerak (spesifikasi tampilan Bagian 8): hanya transform dan opacity
  * ========================================================================= */
 
@@ -2489,6 +2917,7 @@ body.papan-ketik .bilah-kirim {
   .daftar-baris:active,
   .menu-item:active,
   .pilihan span:active,
+  .peristiwa.tetap:active,
   .beranda-pengguna:active,
   .bar-pengguna:active,
   .tombol-kembali:active {
