@@ -1,0 +1,309 @@
+/* InventoryKu — gaya dasar. Warna, huruf, jarak, dan gerak mengikuti
+   spesifikasi/spesifikasi_tampilan_ui.md (Bagian 2, 3, 4, 6, 8). */
+
+/* ---------- Huruf (disimpan di repo, bukan CDN) ---------- */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/barlow-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/barlow-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/barlow-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+}
+
+/* ---------- Token ---------- */
+:root {
+  /* Dasar */
+  --navy-pass: #0B1F3A;
+  --biru-malam: #16335C;
+  --lampu-pass: #F2A93B; /* aksen tunggal, hanya di atas navy */
+  --baja: #F3F5F8;
+  --kertas: #FFFFFF;
+  --tinta: #0F1B2D;
+  --tinta-redup: #4A5A72;
+  --teks-di-navy: #A9B8CF;
+  --rel-padam: #5A6F8F;
+  --garis: #C5CEDA;
+  --garis-isian: #6F7E96;
+
+  /* Makna status */
+  --baik-teks: #067647;
+  --baik-latar: #ECFDF3;
+  --masalah-teks: #B42318;
+  --masalah-latar: #FEF3F2;
+  --tinjau-teks: #B54708;
+  --tinjau-latar: #FFFAEB;
+  --menunggu-teks: #3B5374;
+  --menunggu-latar: #EEF2F7;
+
+  /* Keadaan tekan tombol utama: Biru Malam sedikit lebih gelap */
+  --biru-malam-tekan: #102848;
+
+  /* Huruf */
+  --huruf: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --huruf-sempit: 'Barlow Condensed', 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  /* Jarak tepi layar: 16 px di HP, 24 px mulai 600 px */
+  --tepi: 16px;
+}
+
+@media (min-width: 600px) {
+  :root { --tepi: 24px; }
+}
+
+/* ---------- Dasar ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--baja);
+  color: var(--tinta);
+  font-family: var(--huruf);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, p, dl, dd {
+  margin: 0;
+}
+
+/* ---------- Kepala navy ---------- */
+.kepala {
+  background: var(--navy-pass);
+  color: var(--kertas);
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: 12px;
+  padding-left: max(var(--tepi), env(safe-area-inset-left));
+  padding-right: max(var(--tepi), env(safe-area-inset-right));
+}
+
+.kepala-isi {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.ikon-buku {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ikon-buku-sampul { stroke: var(--kertas); }
+.ikon-buku-pembatas { stroke: var(--lampu-pass); }
+
+.nama-aplikasi {
+  font-family: var(--huruf-sempit);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* ---------- Isi layar ---------- */
+.isi {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  padding-left: max(var(--tepi), env(safe-area-inset-left));
+  padding-right: max(var(--tepi), env(safe-area-inset-right));
+}
+
+.kartu {
+  max-width: 560px;
+  margin: 0 auto;
+  background: var(--kertas);
+  border: 1px solid var(--garis);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+@media (min-width: 600px) {
+  .kartu { padding: 24px; }
+}
+
+.judul-kartu {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 16px;
+}
+
+/* ---------- Tombol utama ---------- */
+.tombol-utama {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--biru-malam);
+  color: var(--kertas);
+  font-family: var(--huruf);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 100ms ease-out, background-color 100ms ease-out;
+}
+
+@media (min-width: 600px) {
+  .tombol-utama { width: auto; }
+}
+
+.tombol-utama:active:not(:disabled) {
+  transform: scale(0.98);
+  background: var(--biru-malam-tekan);
+}
+
+.tombol-utama:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+.tombol-utama:disabled {
+  cursor: progress;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tombol-utama:hover:not(:disabled) {
+    background: var(--biru-malam-tekan);
+  }
+}
+
+/* Indikator putar: hanya tampil saat tombol memproses */
+.putar {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--kertas);
+  border-radius: 50%;
+  animation: putar 800ms linear infinite;
+}
+
+.tombol-utama.sedang-proses .putar {
+  display: inline-block;
+}
+
+@keyframes putar {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Hasil uji ---------- */
+.hasil:empty {
+  display: none;
+}
+
+.hasil {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--garis);
+}
+
+.tanda-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.tanda-status svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tanda-baik {
+  color: var(--baik-teks);
+  background: var(--baik-latar);
+}
+
+.tanda-masalah {
+  color: var(--masalah-teks);
+  background: var(--masalah-latar);
+}
+
+.hasil-pesan {
+  margin-top: 12px;
+}
+
+.hasil-rincian {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.hasil-rincian dt {
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.hasil-rincian dd {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Kurangi gerak ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .tombol-utama {
+    transition: none;
+  }
+  .tombol-utama:active:not(:disabled) {
+    transform: none;
+  }
+  /* Indikator putar tetap berjalan: ia memberi tahu proses masih berjalan. */
+}
