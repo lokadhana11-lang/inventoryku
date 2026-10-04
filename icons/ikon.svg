@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ikon InventoryKu: buku bergaya garis (Kertas) di atas Navy Pass, pembatas Lampu Pass. -->
+  <rect width="512" height="512" rx="112" fill="#0B1F3A"/>
+  <g transform="translate(256 256) scale(18.5) translate(-12 -12)" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 6a1.5 1.5 0 0 1 1.5-1.5H19v12H6.5A1.5 1.5 0 0 0 5 18z" stroke="#FFFFFF"/>
+    <path d="M5 18a1.5 1.5 0 0 0 1.5 1.5H19v-3" stroke="#FFFFFF"/>
+    <path d="M11 4.5h3v5.25l-1.5-1.1-1.5 1.1z" fill="#F2A93B" stroke="#F2A93B" stroke-width="0.8"/>
+  </g>
+</svg>

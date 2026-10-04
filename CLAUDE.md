@@ -19,10 +19,13 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 ```
 /                      frontend (ditayangkan GitHub Pages dari akar repo)
 ├── index.html
-├── app.css
-├── app.js
+├── app.css            gaya bersama: token warna, tiga susunan lebar layar, komponen, gerak
+├── app.js             seluruh frontend: API, penyimpanan per pengguna, komponen, router, layar
+├── sw.js              service worker (cache halaman aplikasi; versi = VERSI_APLIKASI di app.js)
+├── manifest.webmanifest
 ├── config.js          satu baris: alamat API (URL Web App)
 ├── .nojekyll          kosong; mencegah GitHub Pages memproses repo dengan Jekyll
+├── icons/             ikon PWA: ikon-192/512 (any), ikon-maskable-192/512, ikon-180 (iPhone), ikon.svg (sumber)
 ├── fonts/             Barlow 400/500/600 dan Barlow Condensed 600 (woff2, subset latin) + lisensi OFL
 ├── apps-script/
 │   └── Code.gs        SELURUH kode backend (ditempel tangan ke editor Apps Script)
@@ -49,23 +52,37 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Kesepakatan API (berlaku untuk semua aksi)
 
-- Permintaan: `POST` ke `API_URL`, body `JSON.stringify({ action: '<nama>', ...isi })`,
-  header hanya `Content-Type: text/plain;charset=utf-8`. Mulai Tahap 1 token sesi ikut di body.
+- Permintaan: `POST` ke `API_URL`, body `JSON.stringify({ action: '<nama>', token, ...isi })`,
+  header hanya `Content-Type: text/plain;charset=utf-8`. Token sesi ikut di body.
 - Jawaban selalu JSON:
   - berhasil: `{ "ok": true, "data": { ... } }`
-  - gagal: `{ "ok": false, "pesan": "Pesan berbahasa Indonesia yang siap ditampilkan." }`
-- Di Code.gs, aksi didaftarkan di objek `AKSI_`. Kesalahan yang boleh dilihat pengguna dilempar
-  dengan `galatPengguna_(pesan)`; kesalahan lain dicatat di log dan dibalas pesan umum.
-- Di frontend, semua panggilan lewat `panggilApi(aksi, isi)` di `app.js`, yang mengembalikan
-  `data` atau melempar `Error` berpesan bahasa Indonesia.
-- Aksi yang ada: `ping` → `{ namaSpreadsheet, waktuServer }` (waktu ISO UTC). Tanpa token.
+  - gagal: `{ "ok": false, "pesan": "Pesan berbahasa Indonesia yang siap ditampilkan." }`,
+    ditambah `"sesiBerakhir": true` jika token tidak sah lagi (frontend kembali ke Login).
+- Di Code.gs, aksi didaftarkan di objek `AKSI_` sebagai `{ jalankan(body, pengguna), tanpaToken?,
+  pengelola? }`. `doPost` memeriksa token (dan role, untuk `pengelola: true`) sebelum
+  `jalankan`. Kesalahan yang boleh dilihat pengguna dilempar dengan `galatPengguna_(pesan)`;
+  kesalahan lain dicatat di log dan dibalas pesan umum. Penulisan memakai `denganKunci_`.
+- Di frontend, semua panggilan lewat `panggilApi(aksi, isi)` di `app.js`, yang menambahkan token,
+  mengembalikan `data`, atau melempar `Error` berpesan bahasa Indonesia (`err.sesiBerakhir`).
+- Aksi tanpa token: `ping` → `{ namaSpreadsheet, waktuServer }`; `infoLogin` → `{ perluPemasangan,
+  namaOutlet, staff: [{ nama, pengelola, punyaPin }] }`; `login {nama, pin}`, `pasang {kode,
+  namaOutlet, nama, role, pin, zonaWaktu}`, `pulihkan {kode, nama, pin}` → `{ token,
+  berlakuSampai, pengguna: { nama, role, pengelola }, namaOutlet }`; `lupaPin {nama}` →
+  `{ sudahAda, waktu }`; `keluar {token}` → `{}`.
+- Aksi bertoken: `beranda {tanggal}` → `{ pengguna, namaOutlet, tanggal, form: [{ id, nama, jenis,
+  wajib, status: belum|sebagian|terkirim|nihil, lengkap, detail, terakhir: { oleh, waktu } }],
+  permintaanReset (khusus Pengelola): [{ nama, waktu }] }`.
+- Aksi khusus Pengelola: `daftarStaff` → `{ staff: [{ nama, role, pengelola, aktif, punyaPin,
+  permintaanReset, terkunci }] }`; `tambahStaff {nama, role, pin}`, `ubahStaff {nama, role?,
+  aktif?}` → `{ staff }`; `aturPin {nama, pin}` → `{ staff, sesiBaru? }`; `bacaPenerima` dan
+  `simpanPenerima {email: []}` → `{ email: [] }`.
 
 ## Tahap dan status
 
 | Tahap | Isi | Status |
 |---|---|---|
-| 0 | Fondasi: spesifikasi dipindah, CLAUDE.md, halaman uji sambungan, `doPost`/`doGet`/`ping`, `setupSpreadsheet` | Kode selesai (Code.gs v0.1). Menunggu pemilik: jalankan setupSpreadsheet, deploy, isi config.js, uji dari HP |
-| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Belum |
+| 0 | Fondasi: spesifikasi dipindah, CLAUDE.md, halaman uji sambungan, `doPost`/`doGet`/`ping`, `setupSpreadsheet` | Selesai (config.js sudah diisi pemilik). Halaman uji sambungan dihapus di Tahap 1; aksi `ping` tetap |
+| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai (Code.gs v0.2, aplikasi 0.2.0), diuji dengan API tiruan. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP |
 | 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Belum |
 | 3 | Riwayat, pemeriksaan, dan koreksi | Belum |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Belum |
@@ -146,3 +163,70 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     "Sheet1"/"Lembar1" dihapus hanya jika benar-benar kosong.
 17. **Aturan "tanggal terbaru di atas" dan warna berselang per hari** di tab Data dipasang
     oleh kode penulis data di tahap formnya (mulai Tahap 2), bukan oleh setupSpreadsheet.
+
+### Tahap 1
+
+18. **Versi aplikasi** ditulis di dua tempat yang nilainya harus sama: `VERSI_APLIKASI` di
+    `app.js` (tampil di layar Login) dan `VERSI` di `sw.js` (nama cache `inventoryku-<versi>`).
+    Naikkan keduanya di setiap rilis frontend. Pola nomor: `0.<tahap+1>.<perbaikan>`; Tahap 1 = 0.2.0.
+19. **Service worker:** file aplikasi (halaman, CSS, JS, huruf, ikon, manifest) diambil dari cache
+    lebih dulu; `config.js` dari jaringan lebih dulu (batas 4 detik) supaya alamat API bisa diganti
+    tanpa rilis; navigasi selalu dijawab `index.html`. POST ke API tidak disentuh. Versi baru
+    langsung aktif (`skipWaiting`) dan halaman dimuat ulang otomatis hanya jika tidak ada lembar
+    atau kolom yang sedang diisi; jika ada, versi baru dipakai saat aplikasi dibuka lagi.
+20. **Sesi** disimpan di Script Properties (`SESI_<hash token>`; token mentahnya tidak disimpan),
+    berlaku 12 jam. Setiap aksi membaca ulang role dan status aktif dari `M_Staff`, jadi perubahan
+    role dan penonaktifan langsung berlaku. Sesi gugur saat PIN orang itu direset atau akunnya
+    dinonaktifkan. Pengelola yang mereset PIN-nya sendiri langsung mendapat sesi baru. Sesi dan
+    kunci yang sudah habis dibersihkan setiap ada login.
+21. **Hash PIN:** `h1$<garam>$<HMAC-SHA256(garam:pin)>`, dengan kunci rahasia `PIN_RAHASIA` yang
+    dibuat sekali di Script Properties (bukan di Sheet). Jika Script Properties terhapus, semua
+    PIN tidak berlaku: jalankan `buatKodePemasangan`, pakai "Pulihkan akses Pengelola", lalu reset
+    PIN staff lain dari Pengaturan.
+22. **Hitungan salah** PIN (per staff, `GAGAL_PIN_*`) dan Kode Pemasangan (`GAGAL_KODE`, dipakai
+    bersama layar pemasangan dan pemulihan) di Script Properties; lima kali berturut-turut mengunci
+    15 menit. PIN yang bukan 6 angka ditolak tanpa dihitung. Login benar mengosongkan hitungan.
+    Reset PIN oleh Pengelola dan pemulihan membuka kunci PIN; `buatKodePemasangan` membuka kunci kode.
+23. **Pemasangan pertama** hanya bisa jika belum ada Pengelola aktif yang punya PIN. Jika nama yang
+    diisi sudah ada di `M_Staff` (diisi tangan), baris itu yang dipakai. Zona waktu perangkat juga
+    dipasang sebagai zona waktu spreadsheet, supaya `TODAY()` di tab Harian sama dengan server.
+    Kode yang hangus dikosongkan dan keterangannya mencatat waktu pemakaian.
+24. **Layar Login** menampilkan staff aktif yang punya PIN, urut abjad. "Pulihkan akses Pengelola"
+    memilih nama dari Pengelola aktif. Di laptop, angka PIN juga bisa diketik di papan ketik.
+    Pada layar setinggi 500–699 px, langkah PIN menyembunyikan ikon dan nama outlet supaya papan
+    angka 64 px muat tanpa digulir.
+25. **Tanggal Beranda** adalah tanggal perangkat (dikirim sebagai `tanggal`), sesuai Bagian 4.2.
+    Kelengkapan Bagian 5.8 sudah dihitung server dari tab Data (`Data_Stock`, `Data_Suhu`,
+    `Data_Prep`, `Data_Waste`, `Data_Nihil`, `Data_K_<ID Form>`), jadi rel langsung benar begitu
+    form dibangun. Wajib = form bawaan yang tampil, atau form kustom berjadwal `harian`. Jadwal
+    `hari tertentu` belum dihitung wajib karena daftar harinya belum punya tempat di `M_Form`
+    (diatur di Tahap 9). Suhu tanpa unit aktif tidak pernah lengkap. Tiket Suhu: "x dari y
+    pengecekan" selagi sebagian; setelah lengkap "Terkirim" dengan keterangan "y dari y pengecekan".
+26. **Pemberitahuan "NAMA meminta reset PIN"** tampil di bawah tiket (paling atas di antara
+    pemberitahuan), bukan di atas tiket, supaya tiket tetap tergantung di rel. Ketukan membuka
+    `#/pengaturan/staff/<nama>/pin`, yang langsung membuka lembar reset PIN.
+27. **Pengaturan → Staff dan PIN:** staff baru langsung dibuat dengan PIN. Nama tidak bisa diganti
+    (nama dipakai sebagai `submitted_by`). Role dan keadaan akun sendiri tidak bisa diubah sendiri,
+    supaya Pengelola tidak mengunci diri. Daftar staff memakai pola tabel lebar (kolom nama diam).
+    Pengaturan hanya menampilkan dua bagian yang sudah dibangun; bagian lain menyusul di tahapnya.
+28. **Penerima email** disimpan di `M_Outlet` kolom Email Penerima Laporan, dipisah koma; alamat
+    ganda (huruf besar/kecil) dibuang.
+29. **Penyimpanan di HP** (localStorage): `inventoryku:sesi`, `inventoryku:infoLogin`, dan per
+    pengguna `inventoryku:p:<nama>:draft:<id>`, `:antrean`, `:cache:<layar>`. Lewat `Draft`,
+    `Antrean`, dan `Cache` di app.js. Draft Tahap 1 dipakai di lembar Tambah staff (tanpa PIN)
+    dan kolom Penerima email. PIN tidak pernah disimpan di HP.
+30. **Pola bersama di app.js** untuk layar berikutnya: router `#/...` (`RUTE`, menu per role, rute
+    `pengelola: true` dialihkan ke Beranda untuk Staff); `muatData` (data tersimpan dulu dengan
+    "Memperbarui…", kerangka jika belum ada, tidak menggambar ulang jika jawaban server sama);
+    `tombol` + `aturTombolProses`; `bukaLembar` dan `konfirmasi` (lembar bawah di HP/tablet,
+    dialog di desktop); `toast`; `kolomIsian`, `kolomPin`, `grupPilihan`; `tandaStatus`;
+    `kotakKosong`, `kotakGalat`; kelas CSS `tabel-bingkai`/`tabel`, `kartu`, `daftar-baris`.
+    Menu Riwayat, Laporan, dan Dashboard sementara menampilkan "… dibangun di tahap berikutnya.".
+31. **Papan ketik:** viewport `interactive-widget=resizes-content` (Android); di perangkat sentuh
+    bar bawah disembunyikan selama kolom teks difokus; tinggi papan ketik yang menutupi layar
+    (iPhone) dibaca dari `visualViewport` ke `--papan-ketik` untuk lembar dan pesan singkat.
+32. **Pita sinyal** di Beranda berada di atas kepala navy (di layar lain di bawah bar), supaya tiket
+    tetap tergantung di rel. Saat offline, "Belum diperbarui." tidak mengulang pesan pita.
+33. **Ikon:** pembatas buku digambar sebagai bentuk isi amber (versi garis terbaca seperti huruf W
+    di ukuran besar); favicon disesuaikan. Bilah status iPhone: `black-translucent`, isi memakai
+    jarak aman atas.
