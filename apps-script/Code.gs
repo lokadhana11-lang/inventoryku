@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.7 (Tahap 6: Prep List dan resep)
+// InventoryKu Code.gs v0.8 (Tahap 7: Dashboard di aplikasi dan pengelolaan master)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -32,6 +32,11 @@
  *                        resep melingkar), form Prep List (Data_Prep,
  *                        Data_PrepBahan, gerakan stock), masa simpan, rumus
  *                        Harian_Prep dan blok Prep List di Dashboard.
+ * - Tahap 7            : menu Dashboard di aplikasi (angka ringkas, nilai
+ *                        stock, Perlu perhatian, data dua grafik kecil),
+ *                        Pengaturan → Item, Unit, Kategori dan satuan, Outlet
+ *                        dan jadwal; blok Nilai stock dan Kepatuhan serta
+ *                        grafik tiap blok di tab Dashboard.
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - pasangTrigger      : dijalankan dari editor; memasang kedua trigger.
@@ -44,7 +49,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.7';
+var VERSI_KODE = 'v0.8';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -78,7 +83,8 @@ var AKSI_ = {
   aturPin: { jalankan: aksiAturPin_, pengelola: true },
   hapusStaff: { jalankan: aksiHapusStaff_, pengelola: true,
     pesan: 'Menghapus staff hanya bisa dilakukan Head Kitchen atau Manager.' },
-  bacaOutletJadwal: { jalankan: aksiBacaOutletJadwal_, pengelola: true },
+  bacaOutletJadwal: { jalankan: aksiBacaOutletJadwal_, pengelola: true,
+    pesan: 'Pengaturan outlet dan jadwal hanya untuk Head Kitchen dan Manager.' },
   simpanOutletJadwal: { jalankan: aksiSimpanOutletJadwal_, pengelola: true,
     pesan: 'Pengaturan outlet dan jadwal hanya bisa diubah Head Kitchen atau Manager.' },
   bacaPenerima: { jalankan: aksiBacaPenerima_, pengelola: true },
@@ -101,6 +107,30 @@ var AKSI_ = {
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
   aturItemAktif: { jalankan: aksiAturItemAktif_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
+  daftarItem: { jalankan: aksiDaftarItem_, pengelola: true,
+    pesan: 'Pengaturan item hanya untuk Head Kitchen dan Manager.' },
+  simpanItem: { jalankan: aksiSimpanItem_, pengelola: true,
+    pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
+  daftarKategoriSatuan: { jalankan: aksiDaftarKategoriSatuan_, pengelola: true,
+    pesan: 'Pengaturan kategori dan satuan hanya untuk Head Kitchen dan Manager.' },
+  simpanKategori: { jalankan: aksiSimpanKategori_, pengelola: true,
+    pesan: 'Kategori hanya bisa diubah Head Kitchen atau Manager.' },
+  aturKategoriAktif: { jalankan: aksiAturKategoriAktif_, pengelola: true,
+    pesan: 'Kategori hanya bisa diubah Head Kitchen atau Manager.' },
+  urutKategori: { jalankan: aksiUrutKategori_, pengelola: true,
+    pesan: 'Kategori hanya bisa diubah Head Kitchen atau Manager.' },
+  simpanSatuan: { jalankan: aksiSimpanSatuan_, pengelola: true,
+    pesan: 'Satuan hanya bisa diubah Head Kitchen atau Manager.' },
+  aturSatuanAktif: { jalankan: aksiAturSatuanAktif_, pengelola: true,
+    pesan: 'Satuan hanya bisa diubah Head Kitchen atau Manager.' },
+  daftarUnit: { jalankan: aksiDaftarUnit_, pengelola: true,
+    pesan: 'Pengaturan unit hanya untuk Head Kitchen dan Manager.' },
+  simpanUnit: { jalankan: aksiSimpanUnit_, pengelola: true,
+    pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
+  aturUnitAktif: { jalankan: aksiAturUnitAktif_, pengelola: true,
+    pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
+  dashboard: { jalankan: aksiDashboard_, pengelola: true,
+    pesan: 'Dashboard hanya untuk Head Kitchen dan Manager.' },
   riwayat: { jalankan: aksiRiwayat_ },
   detailKiriman: { jalankan: aksiDetailKiriman_ },
   riwayatItem: { jalankan: aksiRiwayatItem_ },
@@ -744,7 +774,10 @@ var KUNCI_MASTER = {
   M_Form: 'ID Form',
   M_Konfigurasi: 'Kunci',
   M_Resep: 'Item Hasil',
-  M_ResepBahan: 'Item Hasil'
+  M_ResepBahan: 'Item Hasil',
+  M_Item: 'Nama Item',
+  M_Kategori: 'Nama Kategori',
+  M_Unit: 'Nama Unit'
 };
 
 function kolomKunciMaster_(sheet) {
@@ -1239,23 +1272,6 @@ function aksiAturPin_(body, pengguna) {
       hasil.sesiBaru = { token: sesi.token, berlakuSampai: sesi.berlakuSampai };
     }
     return hasil;
-  });
-}
-
-/* ---------- Outlet dan jadwal (baru berisi lama keluar otomatis) ---------- */
-
-function aksiBacaOutletJadwal_() {
-  return { keluarOtomatisMenit: keluarOtomatisMenit_() };
-}
-
-function aksiSimpanOutletJadwal_(body) {
-  var n = Number(body.keluarOtomatisMenit);
-  if (PILIHAN_KELUAR_OTOMATIS.indexOf(n) < 0) {
-    throw galatPengguna_('Pilih 5, 10, 15, atau 30 menit.');
-  }
-  return denganKunci_(function () {
-    tulisKonfigurasi_('keluar_otomatis_menit', String(n), KETERANGAN_KELUAR_OTOMATIS);
-    return { keluarOtomatisMenit: n };
   });
 }
 
@@ -2501,43 +2517,6 @@ function aksiAturResepAktif_(body) {
 }
 
 /**
- * Pengaman item (Bagian 5.1): item yang masih menjadi bahan atau hasil resep
- * aktif tidak bisa dinonaktifkan. Dipakai Pengaturan → Item (Tahap 7); di
- * Tahap 6 aksinya sudah ada di server. Jawaban: { item: { nama, aktif }, stock }.
- */
-function aksiAturItemAktif_(body) {
-  var aktif = body.aktif === true;
-  return denganKunci_(function () {
-    var t = wajibTabel_('M_Item');
-    var kecil = rapikanTeks_(body.nama).toLowerCase();
-    var nomor = 0;
-    var nama = '';
-    t.baris.forEach(function (b, i) {
-      var n = rapikanTeks_(nilai_(t, b, 'Nama Item'));
-      if (!nomor && n && n.toLowerCase() === kecil) {
-        nomor = i + 2;
-        nama = n;
-      }
-    });
-    if (!nomor) throw galatPengguna_('Item tidak ada di daftar item.');
-    if (!aktif) {
-      var resep = bacaResep_();
-      if (resep[kecil] && resep[kecil].aktif) {
-        throw galatPengguna_(nama + ' masih punya resep aktif. Nonaktifkan resepnya dulu.');
-      }
-      var pemakai = Object.keys(resep).filter(function (k) {
-        return resep[k].aktif && resep[k].bahan.some(function (b) { return b.item.toLowerCase() === kecil; });
-      }).map(function (k) { return resep[k].itemHasil; });
-      if (pemakai.length) {
-        throw galatPengguna_(nama + ' masih dipakai resep ' + pemakai.join(', ') + '. Ubah atau nonaktifkan resepnya dulu.');
-      }
-    }
-    t.sheet.getRange(nomor, t.kol['Aktif'] + 1).setValue(aktif);
-    return { item: { nama: nama, aktif: aktif }, stock: posisiStock_(bacaRekap_().item[kecil], hariIni_()).akhir };
-  });
-}
-
-/**
  * Data layar isi Prep List: item aktif (dan bahan resep aktif) dengan stock
  * tercatat pada tanggal itu, resep aktif, prep yang sudah tercatat, dan tanda
  * nihil. Disimpan di HP supaya form bisa dibuka tanpa sinyal.
@@ -2830,6 +2809,914 @@ function setelahKoreksiPrep_(baris, pengguna, kini) {
     });
   }
   hitungUlangStock_(minta);
+}
+
+/* =========================================================================
+ * Tahap 7: pengelolaan master (spesifikasi sistem Bagian 5.1, tampilan
+ * Bagian 5.7): Item, Unit, Kategori dan satuan, Outlet dan jadwal
+ * ========================================================================= */
+
+var PANJANG_ITEM_MAKS = 60;
+var PANJANG_MASTER_MAKS = 40; // nama kategori dan unit
+var PANJANG_SATUAN_MAKS = 20;
+var JENIS_SATUAN = ['Berat', 'Isi', 'Hitungan', 'Kemasan'];
+var TIPE_UNIT = ['Chiller', 'Freezer'];
+var JADWAL_OPNAME = ['mingguan', 'bulanan'];
+var JEDA_LAPORAN_MAKS = 240;
+var KETERANGAN_PASANG_TRIGGER = 'Diisi otomatis. "Perlu dijalankan" setelah jam closing, jeda laporan, hari cadangan, atau zona waktu ' +
+  'diubah dari Pengaturan; pemilik Sheet lalu menjalankan pasangTrigger di editor Apps Script.';
+
+/** Nomor baris pertama di tab master yang kolom kuncinya sama dengan nama (huruf besar/kecil tidak dibedakan); 0 jika tidak ada. */
+function barisMaster_(t, judulKunci, nama) {
+  var kecil = rapikanTeks_(nama).toLowerCase();
+  if (!kecil) return 0;
+  for (var i = 0; i < t.baris.length; i++) {
+    if (rapikanTeks_(nilai_(t, t.baris[i], judulKunci)).toLowerCase() === kecil) return i + 2;
+  }
+  return 0;
+}
+
+/** Menulis beberapa sel di satu baris tab master: isi { judul: nilai }. */
+function tulisBarisMaster_(t, nomor, isi) {
+  Object.keys(isi).forEach(function (judul) {
+    var i = t.kol[judul];
+    if (i === undefined) {
+      throw galatPengguna_('Kolom ' + judul + ' tidak ada di tab ' + t.nama + '. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+    }
+    t.sheet.getRange(nomor, i + 1).setValue(isi[judul]);
+  });
+}
+
+/**
+ * Baris baru di tab master (butir 79): tab dirapikan dulu, lalu baris ditulis
+ * tepat di bawah baris terakhir yang kolom kuncinya terisi. Dipanggil di dalam kunci.
+ */
+function tambahBarisMaster_(nama, isi) {
+  var t = wajibTabel_(nama);
+  var kolKunci = t.kol[KUNCI_MASTER[nama]];
+  if (kolKunci === undefined) {
+    throw galatPengguna_('Kolom ' + KUNCI_MASTER[nama] + ' tidak ada di tab ' + nama + '. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+  }
+  rapikanTabMaster_(t.sheet, kolKunci + 1);
+  var baris = susunBaris_(t, isi);
+  t.sheet.getRange(barisBaruMaster_(t.sheet, kolKunci + 1, 1), 1, 1, t.judul.length).setValues([baris]);
+}
+
+/** Angka opsional dari Pengaturan: kosong → null; boleh "2,5"; tidak boleh minus. desimal: angka di belakang koma yang disimpan. */
+function angkaOpsional_(nilai, label, desimal) {
+  if (nilai === '' || nilai == null) return null;
+  var n = typeof nilai === 'number' ? nilai : Number(String(nilai).trim().replace(',', '.'));
+  if (String(nilai).trim() === '' || !isFinite(n) || n < 0) throw galatPengguna_(label + ' harus angka 0 atau lebih, misalnya 2,5, atau dikosongkan.');
+  if (n > 1e9) throw galatPengguna_(label + ' terlalu besar. Periksa angkanya.');
+  var f = Math.pow(10, desimal);
+  return Math.round(n * f) / f;
+}
+
+/**
+ * Nama yang dipilih dari daftar master (kategori, satuan). Mengembalikan
+ * tulisan di master. Pilihan yang nonaktif hanya boleh jika sama dengan nilai
+ * lama (tidak berubah).
+ */
+function pilihMaster_(daftar, kunci, nilai, nilaiLama, label) {
+  var kecil = rapikanTeks_(nilai).toLowerCase();
+  var x = null;
+  daftar.forEach(function (d) { if (!x && d[kunci].toLowerCase() === kecil) x = d; });
+  if (!kecil || !x) throw galatPengguna_('Pilih ' + label + ' dari daftar.');
+  if (!x.aktif && kecil !== rapikanTeks_(nilaiLama).toLowerCase()) {
+    throw galatPengguna_(label.charAt(0).toUpperCase() + label.slice(1) + ' ' + x[kunci] + ' nonaktif. Pilih ' + label + ' yang aktif.');
+  }
+  return x[kunci];
+}
+
+/** Semua kategori di M_Kategori (aktif dan nonaktif): [{ nama, urutan, aktif }], urut menurut Urutan lalu nama. */
+function bacaSemuaKategori_() {
+  var t = wajibTabel_('M_Kategori');
+  var daftar = [];
+  var sudah = {};
+  t.baris.forEach(function (b) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Kategori'));
+    if (!nama || sudah[nama.toLowerCase()]) return;
+    sudah[nama.toLowerCase()] = true;
+    daftar.push({ nama: nama, urutan: angkaAtauNull_(nilai_(t, b, 'Urutan')), aktif: benar_(nilai_(t, b, 'Aktif')) });
+  });
+  return daftar.sort(function (a, b) {
+    var ua = a.urutan == null ? 1e9 : a.urutan;
+    var ub = b.urutan == null ? 1e9 : b.urutan;
+    return ua - ub || a.nama.localeCompare(b.nama, 'id');
+  });
+}
+
+/** M_Satuan: [{ satuan, jenis, aktif }] menurut urutan di Sheet (nama ganda dilewati). */
+function bacaSatuan_() {
+  var t = wajibTabel_('M_Satuan');
+  var hasil = [];
+  var sudah = {};
+  t.baris.forEach(function (b) {
+    var s = rapikanTeks_(nilai_(t, b, 'Satuan'));
+    if (!s || sudah[s.toLowerCase()]) return;
+    sudah[s.toLowerCase()] = true;
+    hasil.push({ satuan: s, jenis: rapikanTeks_(nilai_(t, b, 'Jenis')), aktif: benar_(nilai_(t, b, 'Aktif')) });
+  });
+  return hasil;
+}
+
+/** Nama (huruf kecil) yang tercatat di satu kolom sebuah tab. Tab atau kolom yang belum ada dianggap kosong. */
+function namaDiKolom_(namaTab, judul, hasil) {
+  var sheet = ss_().getSheetByName(namaTab);
+  if (!sheet || sheet.getLastRow() < 2) return hasil;
+  var c = posisiKolomOpsional_(sheet, judul);
+  if (!c) return hasil;
+  sheet.getRange(2, c, sheet.getLastRow() - 1, 1).getValues().forEach(function (r) {
+    var n = rapikanTeks_(r[0]).toLowerCase();
+    if (n) hasil[n] = true;
+  });
+  return hasil;
+}
+
+/**
+ * Item yang sudah punya catatan stock (Bagian 5.1): rekap Stock_Harian, semua
+ * sumber gerakan (termasuk prep tanpa resep di Data_Prep), dan Data_Opname.
+ */
+function itemBercatatan_() {
+  var hasil = {};
+  namaDiKolom_('Stock_Harian', 'Nama Item', hasil);
+  SUMBER_STOCK.forEach(function (s) { namaDiKolom_(s.tab, s.item, hasil); });
+  namaDiKolom_('Data_Opname', 'Nama Item', hasil);
+  return hasil;
+}
+
+/* ---------- Pengaturan → Item ---------- */
+
+/**
+ * Jawaban Pengaturan → Item: semua item (aktif dan nonaktif) dengan stock
+ * tercatat hari ini, apakah sudah punya catatan stock (satuan dasar terkunci),
+ * apakah namanya masih bisa diganti, dan resep aktif yang memakainya; daftar
+ * kategori dan satuan untuk pilihan.
+ */
+function dataItem_() {
+  var master = bacaItem_();
+  var resep = bacaResep_();
+  var rekap = bacaRekap_();
+  var catatan = itemBercatatan_();
+  var hari = hariIni_();
+  var dipakai = {};
+  var diResep = {};
+  Object.keys(resep).forEach(function (k) {
+    var r = resep[k];
+    diResep[k] = true;
+    r.bahan.forEach(function (b) {
+      var kb = b.item.toLowerCase();
+      diResep[kb] = true;
+      if (r.aktif) (dipakai[kb] = dipakai[kb] || []).push(r.itemHasil);
+    });
+  });
+  var item = Object.keys(master).map(function (k) {
+    var m = master[k];
+    return {
+      nama: m.nama,
+      kategori: m.kategori,
+      satuan: m.satuan,
+      satuanBesar: m.satuanBesar,
+      isiSatuanBesar: m.isiSatuanBesar,
+      harga: m.harga,
+      stokMin: m.stokMin,
+      stokMaks: m.stokMaks,
+      aktif: m.aktif,
+      stock: posisiStock_(rekap.item[k], hari).akhir,
+      punyaCatatan: !!catatan[k],
+      bisaGantiNama: !catatan[k] && !diResep[k],
+      resepAktif: !!(resep[k] && resep[k].aktif),
+      dipakaiResep: (dipakai[k] || []).sort(function (a, b) { return a.localeCompare(b, 'id'); })
+    };
+  }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+  return {
+    hariIni: hari,
+    item: item,
+    kategori: bacaSemuaKategori_().map(function (k) { return { nama: k.nama, aktif: k.aktif }; }),
+    satuan: bacaSatuan_()
+  };
+}
+
+function aksiDaftarItem_() {
+  return dataItem_();
+}
+
+/**
+ * Tambah atau ubah item (Bagian 5.1). body: { baru, namaLama, nama, kategori,
+ * satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks }.
+ * - Nama unik. Nama hanya bisa diganti selama item belum punya catatan stock
+ *   dan belum dipakai resep (catatan lama menyimpan nama sebagai teks);
+ *   mengganti huruf besar/kecil saja selalu boleh.
+ * - Satuan dasar tidak bisa diganti setelah item punya catatan stock.
+ * - Satuan besar opsional: berbeda dari satuan dasar, isinya lebih dari 0.
+ *   Mengubah isinya tidak mengubah catatan lama.
+ * - Item baru langsung aktif; stock-nya nol sampai stok pembuka diisi.
+ */
+function aksiSimpanItem_(body) {
+  var nama = periksaNama_(body.nama, 'Nama item', PANJANG_ITEM_MAKS);
+  var harga = angkaOpsional_(body.harga, 'Harga satuan', 2);
+  var stokMin = angkaOpsional_(body.stokMin, 'Stok minimum', 3);
+  var stokMaks = angkaOpsional_(body.stokMaks, 'Stok maksimum', 3);
+  if (stokMin != null && stokMaks != null && stokMaks < stokMin) {
+    throw galatPengguna_('Stok maksimum harus sama dengan atau lebih besar dari stok minimum.');
+  }
+  var besarDiketik = rapikanTeks_(body.satuanBesar);
+  var isi = besarDiketik ? angkaOpsional_(body.isiSatuanBesar, 'Isi satuan besar', 3) : null;
+
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Item');
+    var master = bacaItem_();
+    var lama = null;
+    if (!body.baru) {
+      lama = master[rapikanTeks_(body.namaLama).toLowerCase()] || null;
+      if (!lama) throw galatPengguna_('Item ' + rapikanTeks_(body.namaLama) + ' tidak ditemukan. Kembali ke daftar item.');
+    }
+    var ada = master[nama.toLowerCase()];
+    if (ada && ada !== lama) {
+      throw galatPengguna_('Item ' + ada.nama + ' sudah ada' + (ada.aktif ? '' : ' tetapi nonaktif') + '. ' +
+        (ada.aktif ? 'Pakai nama lain.' : 'Buka ' + ada.nama + ' di daftar item untuk mengaktifkannya lagi.'));
+    }
+    var catatan = lama ? itemBercatatan_()[lama.nama.toLowerCase()] : false;
+    if (lama && nama.toLowerCase() !== lama.nama.toLowerCase()) {
+      var resep = bacaResep_();
+      var diResep = !!resep[lama.nama.toLowerCase()] || Object.keys(resep).some(function (k) {
+        return resep[k].bahan.some(function (b) { return b.item.toLowerCase() === lama.nama.toLowerCase(); });
+      });
+      if (catatan || diResep) {
+        throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena item ini sudah ' +
+          (catatan ? 'punya catatan stock' : 'dipakai resep') + '. Catatan lama menyimpan nama ini.');
+      }
+    }
+    var kategori = pilihMaster_(bacaSemuaKategori_(), 'nama', body.kategori, lama && lama.kategori, 'kategori');
+    var daftarSatuan = bacaSatuan_();
+    var satuan = pilihMaster_(daftarSatuan, 'satuan', body.satuan, lama && lama.satuan, 'satuan');
+    if (lama && catatan && satuan.toLowerCase() !== lama.satuan.toLowerCase()) {
+      throw galatPengguna_('Satuan dasar ' + lama.nama + ' tidak bisa diganti karena item ini sudah punya catatan stock. ' +
+        'Jika satuannya memang berbeda, buat item baru.');
+    }
+    var besar = '';
+    if (besarDiketik) {
+      besar = pilihMaster_(daftarSatuan, 'satuan', besarDiketik, lama && lama.satuanBesar, 'satuan besar');
+      if (besar.toLowerCase() === satuan.toLowerCase()) throw galatPengguna_('Satuan besar harus berbeda dari satuan dasar.');
+      if (!(isi > 0)) throw galatPengguna_('Isi berapa ' + satuan + ' dalam 1 ' + besar + ', lebih dari 0.');
+    }
+    var nilai = {
+      'Nama Item': nama,
+      'Kategori': kategori,
+      'Satuan': satuan,
+      'Satuan Besar': besar,
+      'Isi per Satuan Besar': besar ? isi : '',
+      'Harga Satuan (Rp)': harga == null ? '' : harga,
+      'Stok Minimum': stokMin == null ? '' : stokMin,
+      'Stok Maksimum': stokMaks == null ? '' : stokMaks
+    };
+    if (lama) {
+      tulisBarisMaster_(t, barisMaster_(t, 'Nama Item', lama.nama), nilai);
+    } else {
+      nilai['Aktif'] = true;
+      tambahBarisMaster_('M_Item', nilai);
+    }
+    var data = dataItem_();
+    data.disimpan = nama;
+    return data;
+  });
+}
+
+/**
+ * Pengaman item (Bagian 5.1): item yang masih menjadi bahan atau hasil resep
+ * aktif tidak bisa dinonaktifkan. Item yang stock-nya belum nol tetap boleh
+ * dinonaktifkan; peringatannya tampil di layar sebelum disimpan (stock dari
+ * daftarItem). Jawaban: daftarItem ditambah diubah: { nama, aktif }.
+ */
+function aksiAturItemAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Item');
+    var nomor = barisMaster_(t, 'Nama Item', body.nama);
+    if (!nomor) throw galatPengguna_('Item tidak ada di daftar item.');
+    var nama = rapikanTeks_(nilai_(t, t.baris[nomor - 2], 'Nama Item'));
+    var kecil = nama.toLowerCase();
+    if (!aktif) {
+      var resep = bacaResep_();
+      if (resep[kecil] && resep[kecil].aktif) {
+        throw galatPengguna_(nama + ' masih punya resep aktif. Nonaktifkan resepnya dulu.');
+      }
+      var pemakai = Object.keys(resep).filter(function (k) {
+        return resep[k].aktif && resep[k].bahan.some(function (b) { return b.item.toLowerCase() === kecil; });
+      }).map(function (k) { return resep[k].itemHasil; });
+      if (pemakai.length) {
+        throw galatPengguna_(nama + ' masih dipakai resep ' + pemakai.join(', ') + '. Ubah atau nonaktifkan resepnya dulu.');
+      }
+    }
+    tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
+    var data = dataItem_();
+    data.diubah = { nama: nama, aktif: aktif };
+    return data;
+  });
+}
+
+/* ---------- Pengaturan → Kategori dan satuan ---------- */
+
+/** Jawaban Pengaturan → Kategori dan satuan: jumlah item (semua dan aktif) yang memakai tiap kategori dan satuan. */
+function dataKategoriSatuan_() {
+  var master = bacaItem_();
+  var kat = {};
+  var sat = {};
+  function hitung(peta, nama, aktif) {
+    var k = String(nama || '').toLowerCase();
+    if (!k) return;
+    var x = peta[k] = peta[k] || { semua: 0, aktif: 0 };
+    x.semua++;
+    if (aktif) x.aktif++;
+  }
+  Object.keys(master).forEach(function (k) {
+    var m = master[k];
+    hitung(kat, m.kategori, m.aktif);
+    hitung(sat, m.satuan, m.aktif);
+    if (m.satuanBesar && m.satuanBesar.toLowerCase() !== m.satuan.toLowerCase()) hitung(sat, m.satuanBesar, m.aktif);
+  });
+  var nol = { semua: 0, aktif: 0 };
+  return {
+    kategori: bacaSemuaKategori_().map(function (k) {
+      var x = kat[k.nama.toLowerCase()] || nol;
+      return { nama: k.nama, urutan: k.urutan, aktif: k.aktif, jumlahItem: x.semua, jumlahItemAktif: x.aktif };
+    }),
+    satuan: bacaSatuan_().map(function (s) {
+      var x = sat[s.satuan.toLowerCase()] || nol;
+      return { satuan: s.satuan, jenis: s.jenis, aktif: s.aktif, jumlahItem: x.semua, jumlahItemAktif: x.aktif };
+    }),
+    jenisSatuan: JENIS_SATUAN
+  };
+}
+
+function aksiDaftarKategoriSatuan_() {
+  return dataKategoriSatuan_();
+}
+
+/**
+ * Tambah atau ganti nama kategori. Kategori baru aktif dan diletakkan paling
+ * bawah. Nama hanya bisa diganti selama belum dipakai item (catatan lama
+ * menyimpan nama kategori sebagai teks); huruf besar/kecil saja selalu boleh.
+ */
+function aksiSimpanKategori_(body) {
+  var nama = periksaNama_(body.nama, 'Nama kategori', PANJANG_MASTER_MAKS);
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Kategori');
+    var data = dataKategoriSatuan_();
+    var cari = function (n) {
+      return data.kategori.filter(function (k) { return k.nama.toLowerCase() === rapikanTeks_(n).toLowerCase(); })[0] || null;
+    };
+    var lama = body.baru ? null : cari(body.namaLama);
+    if (!body.baru && !lama) throw galatPengguna_('Kategori tidak ditemukan. Muat ulang layar ini.');
+    var ada = cari(nama);
+    if (ada && ada !== lama) throw galatPengguna_('Kategori ' + ada.nama + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif. Aktifkan lagi dari daftar.'));
+    if (lama) {
+      if (nama.toLowerCase() !== lama.nama.toLowerCase() && lama.jumlahItem) {
+        throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena sudah dipakai ' + lama.jumlahItem + ' item.');
+      }
+      tulisBarisMaster_(t, barisMaster_(t, 'Nama Kategori', lama.nama), { 'Nama Kategori': nama });
+    } else {
+      var maks = 0;
+      data.kategori.forEach(function (k) { if (k.urutan > maks) maks = k.urutan; });
+      tambahBarisMaster_('M_Kategori', { 'Nama Kategori': nama, 'Urutan': Math.floor(maks) + 1, 'Aktif': true });
+    }
+    var hasil = dataKategoriSatuan_();
+    hasil.disimpan = nama;
+    return hasil;
+  });
+}
+
+/** Kategori yang masih dipakai item aktif tidak bisa dinonaktifkan (item itu akan hilang dari form Stock). */
+function aksiAturKategoriAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Kategori');
+    var k = dataKategoriSatuan_().kategori.filter(function (x) {
+      return x.nama.toLowerCase() === rapikanTeks_(body.nama).toLowerCase();
+    })[0];
+    if (!k) throw galatPengguna_('Kategori tidak ditemukan. Muat ulang layar ini.');
+    if (!aktif && k.jumlahItemAktif) {
+      throw galatPengguna_('Kategori ' + k.nama + ' masih dipakai ' + k.jumlahItemAktif + ' item aktif. ' +
+        'Pindahkan item itu ke kategori lain atau nonaktifkan dulu.');
+    }
+    tulisBarisMaster_(t, barisMaster_(t, 'Nama Kategori', k.nama), { 'Aktif': aktif });
+    return dataKategoriSatuan_();
+  });
+}
+
+/** Urutan kategori (form Stock, tab Harian, dan PDF tersusun menurut urutan ini). body.urutan: semua nama kategori, urut baru. */
+function aksiUrutKategori_(body) {
+  var urutan = Array.isArray(body.urutan) ? body.urutan.map(rapikanTeks_) : [];
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Kategori');
+    var ada = bacaSemuaKategori_();
+    var sudah = {};
+    urutan.forEach(function (n) { sudah[n.toLowerCase()] = true; });
+    var lengkap = urutan.length === ada.length && ada.every(function (k) { return sudah[k.nama.toLowerCase()]; });
+    if (!lengkap) throw galatPengguna_('Daftar kategori sudah berubah. Muat ulang layar ini, lalu atur urutannya lagi.');
+    urutan.forEach(function (n, i) {
+      tulisBarisMaster_(t, barisMaster_(t, 'Nama Kategori', n), { 'Urutan': i + 1 });
+    });
+    return dataKategoriSatuan_();
+  });
+}
+
+/** Tambah satuan, atau ubah satuan yang belum dipakai item. Jenis: Berat, Isi, Hitungan, Kemasan. */
+function aksiSimpanSatuan_(body) {
+  var satuan = periksaNama_(body.satuan, 'Satuan', PANJANG_SATUAN_MAKS);
+  var jenis = String(body.jenis || '');
+  if (JENIS_SATUAN.indexOf(jenis) < 0) throw galatPengguna_('Pilih jenis satuan: Berat, Isi, Hitungan, atau Kemasan.');
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Satuan');
+    var data = dataKategoriSatuan_();
+    var cari = function (n) {
+      return data.satuan.filter(function (s) { return s.satuan.toLowerCase() === rapikanTeks_(n).toLowerCase(); })[0] || null;
+    };
+    var lama = body.baru ? null : cari(body.satuanLama);
+    if (!body.baru && !lama) throw galatPengguna_('Satuan tidak ditemukan. Muat ulang layar ini.');
+    var ada = cari(satuan);
+    if (ada && ada !== lama) throw galatPengguna_('Satuan ' + ada.satuan + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif. Aktifkan lagi dari daftar.'));
+    if (lama) {
+      if (satuan.toLowerCase() !== lama.satuan.toLowerCase() && lama.jumlahItem) {
+        throw galatPengguna_('Satuan ' + lama.satuan + ' tidak bisa diganti karena sudah dipakai ' + lama.jumlahItem + ' item.');
+      }
+      tulisBarisMaster_(t, barisMaster_(t, 'Satuan', lama.satuan), { 'Satuan': satuan, 'Jenis': jenis });
+    } else {
+      tambahBarisMaster_('M_Satuan', { 'Satuan': satuan, 'Jenis': jenis, 'Aktif': true });
+    }
+    var hasil = dataKategoriSatuan_();
+    hasil.disimpan = satuan;
+    return hasil;
+  });
+}
+
+/** Satuan yang masih dipakai item aktif (sebagai satuan dasar atau satuan besar) tidak bisa dinonaktifkan. */
+function aksiAturSatuanAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Satuan');
+    var s = dataKategoriSatuan_().satuan.filter(function (x) {
+      return x.satuan.toLowerCase() === rapikanTeks_(body.satuan).toLowerCase();
+    })[0];
+    if (!s) throw galatPengguna_('Satuan tidak ditemukan. Muat ulang layar ini.');
+    if (!aktif && s.jumlahItemAktif) {
+      throw galatPengguna_('Satuan ' + s.satuan + ' masih dipakai ' + s.jumlahItemAktif + ' item aktif.');
+    }
+    tulisBarisMaster_(t, barisMaster_(t, 'Satuan', s.satuan), { 'Aktif': aktif });
+    return dataKategoriSatuan_();
+  });
+}
+
+/* ---------- Pengaturan → Unit chiller dan freezer ---------- */
+
+/** Jawaban Pengaturan → Unit: unit menurut urutan M_Unit, apakah sudah punya catatan suhu, dan batas suhu. */
+function dataUnit_() {
+  var catatan = namaDiKolom_('Data_Suhu', 'Nama Unit', {});
+  return {
+    unit: bacaUnit_().map(function (u) {
+      return { nama: u.nama, tipe: u.tipe, aktif: u.aktif, punyaCatatan: !!catatan[u.nama.toLowerCase()] };
+    }),
+    batas: batasSuhu_()
+  };
+}
+
+function aksiDaftarUnit_() {
+  return dataUnit_();
+}
+
+/**
+ * Tambah atau ubah unit. Unit baru aktif dan diletakkan paling bawah. Nama
+ * hanya bisa diganti selama unit belum punya catatan suhu. Tipe boleh diganti;
+ * catatan lama tetap menyimpan tipe dan status saat dicatat.
+ */
+function aksiSimpanUnit_(body) {
+  var nama = periksaNama_(body.nama, 'Nama unit', PANJANG_MASTER_MAKS);
+  var tipe = String(body.tipe || '');
+  if (TIPE_UNIT.indexOf(tipe) < 0) throw galatPengguna_('Pilih tipe unit: Chiller atau Freezer.');
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Unit');
+    var data = dataUnit_();
+    var cari = function (n) {
+      return data.unit.filter(function (u) { return u.nama.toLowerCase() === rapikanTeks_(n).toLowerCase(); })[0] || null;
+    };
+    var lama = body.baru ? null : cari(body.namaLama);
+    if (!body.baru && !lama) throw galatPengguna_('Unit tidak ditemukan. Muat ulang layar ini.');
+    var ada = cari(nama);
+    if (ada && ada !== lama) throw galatPengguna_('Unit ' + ada.nama + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif. Aktifkan lagi dari daftar.'));
+    if (lama) {
+      if (nama.toLowerCase() !== lama.nama.toLowerCase() && lama.punyaCatatan) {
+        throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena unit ini sudah punya catatan suhu.');
+      }
+      tulisBarisMaster_(t, barisMaster_(t, 'Nama Unit', lama.nama), { 'Nama Unit': nama, 'Tipe': tipe });
+    } else {
+      tambahBarisMaster_('M_Unit', { 'Nama Unit': nama, 'Tipe': tipe, 'Aktif': true });
+    }
+    var hasil = dataUnit_();
+    hasil.disimpan = nama;
+    return hasil;
+  });
+}
+
+/** Unit nonaktif tidak tampil di form Suhu dan tidak dihitung dalam kelengkapan Suhu. */
+function aksiAturUnitAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Unit');
+    var nomor = barisMaster_(t, 'Nama Unit', body.nama);
+    if (!nomor) throw galatPengguna_('Unit tidak ditemukan. Muat ulang layar ini.');
+    tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
+    return dataUnit_();
+  });
+}
+
+/* ---------- Pengaturan → Outlet dan jadwal ---------- */
+
+/** "21:30" dari teks jj:mm atau jj.mm (atau nilai waktu Sheet); '' jika tidak sah. */
+function jamSah_(nilai) {
+  if (nilai instanceof Date && !isNaN(nilai.getTime())) {
+    return Utilities.formatDate(nilai, ss_().getSpreadsheetTimeZone(), 'HH:mm');
+  }
+  var m = String(nilai == null ? '' : nilai).trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return '';
+  return ('0' + Number(m[1])).slice(-2) + ':' + m[2];
+}
+
+/** Jeda laporan (menit, bilangan bulat 0–240), atau null jika tidak sah. */
+function jedaSah_(nilai) {
+  var t = String(nilai == null ? '' : nilai).trim();
+  if (!/^\d{1,3}$/.test(t) || Number(t) > JEDA_LAPORAN_MAKS) return null;
+  return Number(t);
+}
+
+/** Nama hari sesuai HARI_ID ("Minggu"), atau '' jika tidak dikenal. */
+function hariSah_(nilai) {
+  var k = rapikanTeks_(nilai).toLowerCase();
+  var hasil = '';
+  HARI_ID.forEach(function (h) { if (h.toLowerCase() === k) hasil = h; });
+  if (!hasil && k === "jum'at") hasil = 'Jumat';
+  return hasil;
+}
+
+/** Zona waktu yang dikenal Apps Script (dicoba lewat Utilities.formatDate). */
+function zonaDikenal_(zona) {
+  if (!zonaSah_(zona)) return false;
+  try {
+    Utilities.formatDate(new Date(), zona, 'yyyy-MM-dd');
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/** Isi Pengaturan → Outlet dan jadwal (tampilan Bagian 5.7). */
+function dataOutletJadwal_() {
+  var n = bacaKonfigurasi_().nilai;
+  var jeda = jedaSah_(n.jeda_laporan_menit);
+  var opname = String(n.jadwal_opname || '').trim().toLowerCase();
+  return {
+    namaOutlet: namaOutlet_(),
+    zonaWaktu: zonaWaktu_(),
+    jamClosing: jamSah_(n.jam_closing) || '21:30',
+    jedaLaporanMenit: jeda == null ? 45 : jeda,
+    jadwalOpname: JADWAL_OPNAME.indexOf(opname) >= 0 ? opname : 'mingguan',
+    hariCadangan: hariSah_(n.hari_cadangan) || 'Minggu',
+    keluarOtomatisMenit: keluarOtomatisMenit_(n.keluar_otomatis_menit),
+    perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
+  };
+}
+
+function aksiBacaOutletJadwal_() {
+  return dataOutletJadwal_();
+}
+
+/**
+ * Menyimpan Outlet dan jadwal. Hanya field yang dikirim yang diperiksa dan
+ * ditulis: namaOutlet, zonaWaktu, jamClosing, jedaLaporanMenit, jadwalOpname,
+ * hariCadangan, keluarOtomatisMenit. Zona waktu baru juga dipasang sebagai
+ * zona waktu spreadsheet (supaya TODAY() di tab Harian sama dengan server).
+ * Perubahan zona waktu, jam closing, jeda laporan, atau hari cadangan baru
+ * berlaku untuk trigger setelah pasangTrigger dijalankan lagi: M_Konfigurasi
+ * pasang_trigger diisi "Perlu dijalankan …", yang tampil sebagai peringatan
+ * di Beranda dan Dashboard Pengelola sampai pasangTrigger dijalankan.
+ */
+function aksiSimpanOutletJadwal_(body, pengguna) {
+  var ada = function (k) { return Object.prototype.hasOwnProperty.call(body, k) && body[k] != null; };
+  var baru = {};
+  if (ada('namaOutlet')) baru.namaOutlet = periksaNama_(body.namaOutlet, 'Nama outlet', PANJANG_OUTLET_MAKS);
+  if (ada('zonaWaktu')) {
+    if (!zonaDikenal_(String(body.zonaWaktu))) throw galatPengguna_('Zona waktu tidak dikenal. Pilih dari daftar.');
+    baru.zonaWaktu = String(body.zonaWaktu);
+  }
+  if (ada('jamClosing')) {
+    baru.jamClosing = jamSah_(body.jamClosing);
+    if (!baru.jamClosing) throw galatPengguna_('Isi jam closing dengan format jj:mm, misalnya 21:30.');
+  }
+  if (ada('jedaLaporanMenit')) {
+    baru.jedaLaporanMenit = jedaSah_(body.jedaLaporanMenit);
+    if (baru.jedaLaporanMenit == null) throw galatPengguna_('Jeda laporan diisi menit bulat, 0 sampai ' + JEDA_LAPORAN_MAKS + '.');
+  }
+  if (ada('jadwalOpname')) {
+    baru.jadwalOpname = String(body.jadwalOpname).toLowerCase();
+    if (JADWAL_OPNAME.indexOf(baru.jadwalOpname) < 0) throw galatPengguna_('Pilih jadwal stock opname: mingguan atau bulanan.');
+  }
+  if (ada('hariCadangan')) {
+    baru.hariCadangan = hariSah_(body.hariCadangan);
+    if (!baru.hariCadangan) throw galatPengguna_('Pilih hari cadangan.');
+  }
+  if (ada('keluarOtomatisMenit')) {
+    baru.keluarOtomatisMenit = Number(body.keluarOtomatisMenit);
+    if (PILIHAN_KELUAR_OTOMATIS.indexOf(baru.keluarOtomatisMenit) < 0) throw galatPengguna_('Pilih 5, 10, 15, atau 30 menit.');
+  }
+
+  return denganKunci_(function () {
+    var kini = dataOutletJadwal_();
+    var berubah = function (k) { return k in baru && String(baru[k]) !== String(kini[k]); };
+    if (berubah('namaOutlet')) {
+      var outlet = ambilTab_('M_Outlet');
+      outlet.getRange(2, posisiKolom_(outlet, { nama: 'Nama Outlet' }).nama).setValue(baru.namaOutlet);
+    }
+    if (berubah('zonaWaktu')) {
+      tulisKonfigurasi_('zona_waktu', baru.zonaWaktu);
+      try {
+        ss_().setSpreadsheetTimeZone(baru.zonaWaktu);
+      } catch (err) {
+        console.error('Zona waktu spreadsheet tidak bisa diubah: ' + err);
+      }
+    }
+    if (berubah('jamClosing')) tulisKonfigurasi_('jam_closing', baru.jamClosing);
+    if (berubah('jedaLaporanMenit')) tulisKonfigurasi_('jeda_laporan_menit', String(baru.jedaLaporanMenit));
+    if (berubah('jadwalOpname')) tulisKonfigurasi_('jadwal_opname', baru.jadwalOpname);
+    if (berubah('hariCadangan')) tulisKonfigurasi_('hari_cadangan', baru.hariCadangan);
+    if (berubah('keluarOtomatisMenit')) {
+      tulisKonfigurasi_('keluar_otomatis_menit', String(baru.keluarOtomatisMenit), KETERANGAN_KELUAR_OTOMATIS);
+    }
+    var jadwalBerubah = berubah('zonaWaktu') || berubah('jamClosing') || berubah('jedaLaporanMenit') || berubah('hariCadangan');
+    if (jadwalBerubah) {
+      tulisKonfigurasi_('pasang_trigger', 'Perlu dijalankan: jadwal diubah ' + waktuSekarangId_() + ' oleh ' + pengguna.nama + '.',
+        KETERANGAN_PASANG_TRIGGER);
+    }
+    var hasil = dataOutletJadwal_();
+    hasil.jadwalBerubah = jadwalBerubah;
+    return hasil;
+  });
+}
+
+/* =========================================================================
+ * Tahap 7: Dashboard di aplikasi (spesifikasi sistem Bagian 8.5, tampilan
+ * Bagian 5.6). Satu panggilan: angka ringkas hari ini, nilai stock, daftar
+ * "Perlu perhatian", dan data kedua grafik kecil.
+ * ========================================================================= */
+
+var HARI_GRAFIK_WASTE = 7;
+
+/**
+ * Nilai stock (Bagian 8.5): Stock Akhir pada tanggal itu × Harga Satuan yang
+ * berlaku sekarang di M_Item. Yang dihitung: item aktif, dan item nonaktif yang
+ * stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah
+ * (tanpaHarga). Harga barang jadi dari resep tidak dipakai di sini, supaya
+ * angkanya sama dengan blok Nilai stock di tab Dashboard. Stock minus ikut
+ * dihitung apa adanya (nilainya minus).
+ */
+function nilaiStock_(master, rekap, tanggal) {
+  var urut = {};
+  var namaKat = {};
+  bacaSemuaKategori_().forEach(function (k, i) {
+    urut[k.nama.toLowerCase()] = i;
+    namaKat[k.nama.toLowerCase()] = k.nama;
+  });
+  var per = {};
+  var total = 0;
+  var jumlah = 0;
+  var tanpa = [];
+  Object.keys(master).forEach(function (k) {
+    var m = master[k];
+    var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
+    if (!m.aktif && !akhir) return;
+    var kat = namaKat[m.kategori.toLowerCase()] || m.kategori || 'Tanpa kategori';
+    if (m.harga == null) {
+      tanpa.push({ nama: m.nama, kategori: kat, satuan: m.satuan, stock: akhir, aktif: m.aktif });
+      return;
+    }
+    var nilai = akhir * m.harga;
+    var x = per[kat.toLowerCase()] = per[kat.toLowerCase()] || { kategori: kat, nilai: 0, jumlahItem: 0 };
+    x.nilai += nilai;
+    x.jumlahItem++;
+    total += nilai;
+    jumlah++;
+  });
+  var posisi = function (kat) {
+    var u = urut[kat.toLowerCase()];
+    return u == null ? 1e6 : u;
+  };
+  var perKategori = Object.keys(per).map(function (k) {
+    per[k].nilai = Math.round(per[k].nilai);
+    return per[k];
+  }).sort(function (a, b) {
+    return posisi(a.kategori) - posisi(b.kategori) || a.kategori.localeCompare(b.kategori, 'id');
+  });
+  tanpa.sort(function (a, b) {
+    return posisi(a.kategori) - posisi(b.kategori) || a.nama.localeCompare(b.nama, 'id');
+  });
+  return { total: Math.round(total), jumlahItem: jumlah, perKategori: perKategori, tanpaHarga: tanpa };
+}
+
+/** Grafik waste (tampilan Bagian 5.6): estimasi kerugian per hari selama 7 hari sampai tanggal itu, hari ini paling kanan. */
+function grafikWaste_(tanggal, zona) {
+  var hari = [];
+  var peta = {};
+  for (var i = HARI_GRAFIK_WASTE - 1; i >= 0; i--) {
+    var tg = geserTanggal_(tanggal, -i);
+    peta[tg] = { tanggal: tg, rp: 0, catatan: 0 };
+    hari.push(peta[tg]);
+  }
+  var t = bacaTabel_('Data_Waste');
+  if (t) {
+    t.baris.forEach(function (b) {
+      var x = peta[teksTanggal_(nilai_(t, b, 'Tanggal'), zona)];
+      if (!x || !rapikanTeks_(nilai_(t, b, 'Item / Produk'))) return;
+      x.catatan++;
+      x.rp += Number(nilai_(t, b, 'Estimasi Kerugian (Rp)')) || 0;
+    });
+  }
+  hari.forEach(function (x) { x.rp = Math.round(x.rp); });
+  return { hari: hari };
+}
+
+/**
+ * Grafik suhu (tampilan Bagian 5.6): semua pengecekan pada tanggal itu per
+ * unit, termasuk cek ulang. Unit aktif menurut urutan M_Unit, ditambah unit
+ * nonaktif yang punya isian hari itu. Status memakai yang tersimpan.
+ */
+function grafikSuhu_(tanggal, zona) {
+  var daftar = [];
+  var peta = {};
+  bacaUnit_().forEach(function (u) {
+    if (!u.aktif) return;
+    peta[u.nama.toLowerCase()] = { nama: u.nama, tipe: u.tipe, cek: [] };
+    daftar.push(peta[u.nama.toLowerCase()]);
+  });
+  var jumlah = 0;
+  var luar = 0;
+  bacaBarisTanggal_('Data_Suhu', tanggal, zona, ['Waktu Cek', 'Nama Unit', 'Tipe Unit', 'Suhu (°C)', 'Status Suhu', 'Tindakan Korektif'])
+    .sort(function (a, b) { return (a.waktu ? a.waktu.getTime() : 0) - (b.waktu ? b.waktu.getTime() : 0); })
+    .forEach(function (b) {
+      var nama = rapikanTeks_(b['Nama Unit']);
+      var suhu = angkaAtauNull_(b['Suhu (°C)']);
+      if (!nama || suhu == null) return;
+      var u = peta[nama.toLowerCase()];
+      if (!u) {
+        u = peta[nama.toLowerCase()] = {
+          nama: nama, tipe: rapikanTeks_(b['Tipe Unit']).toLowerCase() === 'freezer' ? 'Freezer' : 'Chiller', cek: [], nonaktif: true
+        };
+        daftar.push(u);
+      }
+      var diLuar = rapikanTeks_(b['Status Suhu']) === STATUS_SUHU_LUAR;
+      jumlah++;
+      if (diLuar) luar++;
+      u.cek.push({
+        waktuCek: rapikanTeks_(b['Waktu Cek']),
+        suhu: suhu,
+        luar: diLuar,
+        tindakan: rapikanTeks_(b['Tindakan Korektif']),
+        oleh: b.oleh,
+        waktu: b.waktu ? b.waktu.toISOString() : null
+      });
+    });
+  return { batas: batasSuhu_(), unit: daftar, jumlah: jumlah, luar: luar };
+}
+
+/** "Tomat, Bawang, dan Cabai" untuk keterangan Perlu perhatian (paling banyak 3 nama, sisanya "dan 2 lainnya"). */
+function daftarNamaSingkat_(nama) {
+  if (nama.length === 1) return nama[0];
+  if (nama.length === 2) return nama[0] + ' dan ' + nama[1];
+  if (nama.length === 3) return nama[0] + ', ' + nama[1] + ', dan ' + nama[2];
+  return nama.slice(0, 3).join(', ') + ', dan ' + (nama.length - 3) + ' lainnya';
+}
+
+/**
+ * Daftar "Perlu perhatian" (tampilan Bagian 5.6), urut dari yang paling
+ * mendesak: Masalah (suhu yang masih di luar standar, Stock Akhir minus, lewat
+ * masa simpan, laporan atau cadangan gagal), lalu Perlu ditinjau (baris
+ * dilaporkan keliru, permintaan reset PIN, di bawah stok minimum, habis besok,
+ * jadwal yang perlu pasangTrigger), lalu Menunggu (form wajib yang belum
+ * lengkap, isian belum diperiksa, item belum punya harga). Tiap butir:
+ * { jenis, tingkat: masalah | tinjau | menunggu, judul, ket, data }.
+ */
+function perhatianDashboard_(d) {
+  var hasil = [];
+  function tambah(jenis, tingkat, judul, ket, data) {
+    hasil.push({ jenis: jenis, tingkat: tingkat, judul: judul, ket: ket || '', data: data || null });
+  }
+  // Suhu: unit yang pengecekan terakhirnya hari ini masih di luar standar.
+  d.suhu.unit.forEach(function (u) {
+    var c = u.cek[u.cek.length - 1];
+    if (!c || !c.luar) return;
+    var jam = c.waktu ? jamId_(new Date(c.waktu)) : '';
+    tambah('suhu', 'masalah', u.nama + ' di luar standar',
+      suhuId_(c.suhu) + ' pada ' + c.waktuCek + (jam ? ' ' + jam : '') + '. ' +
+      (c.waktuCek === 'Cek ulang' ? 'Cek ulang masih di luar standar.' : 'Belum ada cek ulang yang normal.'), { unit: u.nama });
+  });
+  if (d.stock.minus.length) {
+    tambah('minus', 'masalah', d.stock.minus.length + ' item stock akhir minus',
+      daftarNamaSingkat_(d.stock.minus.map(function (x) { return x.m.nama; })) + '. Periksa catatannya atau sesuaikan stock.',
+      { item: d.stock.minus.map(function (x) { return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan }; }) });
+  }
+  if (d.masaSimpan.lewat.length) {
+    tambah('lewatMasaSimpan', 'masalah', d.masaSimpan.lewat.length + ' barang jadi lewat masa simpan',
+      daftarNamaSingkat_(d.masaSimpan.lewat.map(function (x) { return x.item; })) + '.', { lewat: d.masaSimpan.lewat });
+  }
+  d.peringatan.forEach(function (p) {
+    if (/^Jadwal:/.test(p)) return; // ditulis sebagai butir Perlu ditinjau di bawah
+    tambah('sistem', 'masalah', 'Perlu perhatian', p + ' Rinciannya di tab M_Konfigurasi.');
+  });
+  if (d.pemeriksaan.dilaporkan) {
+    tambah('dilaporkan', 'tinjau', d.pemeriksaan.dilaporkan + ' baris dilaporkan keliru', 'Periksa dan koreksi dari Riwayat.',
+      { formId: d.pemeriksaan.formDilaporkan, dari: d.pemeriksaan.dari, sampai: d.pemeriksaan.sampai });
+  }
+  d.reset.forEach(function (s) {
+    tambah('resetPin', 'tinjau', s.nama + ' meminta reset PIN', 'Buat PIN baru di Pengaturan → Staff dan PIN.', { nama: s.nama });
+  });
+  if (d.stock.belanja.length) {
+    tambah('bawahMinimum', 'tinjau', d.stock.belanja.length + ' item di bawah stok minimum',
+      daftarNamaSingkat_(d.stock.belanja.map(function (x) { return x.m.nama; })) + '.',
+      { item: d.stock.belanja.map(function (x) { return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan, stokMin: x.m.stokMin, saran: x.saran }; }) });
+  }
+  if (d.masaSimpan.habisBesok.length) {
+    tambah('habisBesok', 'tinjau', d.masaSimpan.habisBesok.length + ' barang jadi habis besok',
+      daftarNamaSingkat_(d.masaSimpan.habisBesok.map(function (x) { return x.item; })) + '.', { habisBesok: d.masaSimpan.habisBesok });
+  }
+  d.peringatan.forEach(function (p) {
+    if (/^Jadwal:/.test(p)) tambah('jadwal', 'tinjau', 'Jadwal belum dipasang ulang', p.replace(/^Jadwal:\s*/, ''));
+  });
+  var belum = d.form.filter(function (f) { return f.wajib && !f.lengkap; });
+  if (belum.length) {
+    tambah('formBelum', 'menunggu', belum.length + ' form belum lengkap hari ini', belum.map(function (f) {
+      return f.nama + (f.status === 'sebagian' && f.detail ? ' ' + f.detail : ' belum diisi');
+    }).join(' · ') + '.');
+  }
+  if (d.pemeriksaan.belumDiperiksa) {
+    tambah('belumDiperiksa', 'menunggu', d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa', BATAS_RIWAYAT_HARI + ' hari terakhir.',
+      { formId: d.pemeriksaan.formBelum, dari: d.pemeriksaan.dari, sampai: d.pemeriksaan.sampai });
+  }
+  if (d.nilai.tanpaHarga.length) {
+    tambah('tanpaHarga', 'menunggu', d.nilai.tanpaHarga.length + ' item belum punya harga',
+      'Tidak ikut nilai stock: ' + daftarNamaSingkat_(d.nilai.tanpaHarga.map(function (x) { return x.nama; })) + '.');
+  }
+  return hasil;
+}
+
+/** Alamat tab Dashboard di Google Sheets (hanya terbuka bagi akun yang diberi akses pemilik, Bagian 7.3). */
+function alamatDashboardSheet_() {
+  var ss = ss_();
+  var tab = ss.getSheetByName('Dashboard');
+  return ss.getUrl() + (tab ? '#gid=' + tab.getSheetId() : '');
+}
+
+/**
+ * Menu Dashboard di aplikasi (khusus Pengelola): satu jawaban berisi angka
+ * ringkas hari ini, nilai stock, Perlu perhatian, kedua grafik kecil, dan
+ * alamat tab Dashboard. tanggal: tanggal perangkat (tidak boleh lewat hari ini).
+ */
+function aksiDashboard_(body) {
+  var hari = hariIni_();
+  var tanggal = tanggalSah_(body.tanggal) && body.tanggal <= hari ? body.tanggal : hari;
+  var zona = ss_().getSpreadsheetTimeZone();
+  var master = bacaItem_();
+  var rekap = bacaRekap_();
+  var form = kelengkapanForm_(tanggal);
+  var wajib = form.filter(function (f) { return f.wajib; });
+  var d = {
+    form: form,
+    stock: ringkasStockHari_(tanggal, master, rekap),
+    nilai: nilaiStock_(master, rekap, tanggal),
+    waste: grafikWaste_(tanggal, zona),
+    suhu: grafikSuhu_(tanggal, zona),
+    masaSimpan: masaSimpan_(tanggal),
+    pemeriksaan: ringkasPemeriksaan_(),
+    reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).sort(function (a, b) {
+      return a.reset.getTime() - b.reset.getTime();
+    }),
+    peringatan: peringatanSistem_()
+  };
+  var hariIniWaste = d.waste.hari[d.waste.hari.length - 1];
+  return {
+    tanggal: tanggal,
+    ringkas: {
+      formLengkap: wajib.filter(function (f) { return f.lengkap; }).length,
+      formWajib: wajib.length,
+      belumDiperiksa: d.pemeriksaan.belumDiperiksa,
+      suhuLuar: d.suhu.luar,
+      bawahMinimum: d.stock.belanja.length,
+      wasteRp: hariIniWaste.rp,
+      wasteCatatan: hariIniWaste.catatan,
+      nilaiStock: d.nilai.total
+    },
+    nilaiStock: d.nilai,
+    perhatian: perhatianDashboard_(d),
+    grafikWaste: d.waste,
+    grafikSuhu: d.suhu,
+    alamatSheet: alamatDashboardSheet_()
+  };
 }
 
 /* =========================================================================
@@ -4405,6 +5292,11 @@ function peringatanSistem_() {
   var cad = String(nilai.cadangan_terakhir || '');
   if (/^Gagal/.test(lap)) hasil.push('Laporan harian: ' + lap);
   if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
+  // Jadwal diubah dari Pengaturan → Outlet dan jadwal, trigger belum dipasang ulang (Tahap 7).
+  if (/^Perlu/.test(String(nilai.pasang_trigger || ''))) {
+    hasil.push('Jadwal: jam closing, jeda laporan, hari cadangan, atau zona waktu sudah diubah. ' +
+      'Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script supaya jadwal baru berlaku.');
+  }
   return hasil;
 }
 
@@ -4496,10 +5388,10 @@ function teksMasaSimpan_(x, lewat) {
     (x.baikSampai ? ' (baik sampai ' + Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1].slice(0, 3) + ')' : '') + '.';
 }
 
-/** Stock pada akhir tanggal itu: item minus dan item di bawah stok minimum (item aktif). */
-function ringkasStockHari_(tanggal) {
-  var master = bacaItem_();
-  var rekap = bacaRekap_();
+/** Stock pada akhir tanggal itu: item minus dan item di bawah stok minimum (item aktif). master dan rekap opsional. */
+function ringkasStockHari_(tanggal, master, rekap) {
+  master = master || bacaItem_();
+  rekap = rekap || bacaRekap_();
   var minus = [];
   var belanja = [];
   Object.keys(master).sort().forEach(function (k) {
@@ -4812,6 +5704,8 @@ function pasangTrigger() {
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00.');
+  catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +
+    jamTeks + ', cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00.', KETERANGAN_PASANG_TRIGGER);
 }
 
 /* =========================================================================
@@ -5246,6 +6140,9 @@ function setupSpreadsheet() {
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
     pasangRumusHarianStock_(ss, catatan);
     pasangBlokStockDashboard_(ss, catatan);
+    // Tahap 7: keadaan item (untuk grafik) dan blok Nilai stock, sebelum blok berikutnya diberi ruang.
+    pasangRingkasStockDashboard_(ss, catatan);
+    pasangBlokNilaiDashboard_(ss, catatan);
     // Rumus Waste dan Suhu (Tahap 5): tab Harian dan bloknya di Dashboard.
     pasangRumusHarianWaste_(ss, catatan);
     pasangRumusHarianSuhu_(ss, catatan);
@@ -5254,6 +6151,9 @@ function setupSpreadsheet() {
     // Rumus Prep List (Tahap 6): tab Harian_Prep dan blok Prep List di Dashboard.
     pasangRumusHarianPrep_(ss, catatan);
     pasangBlokPrepDashboard_(ss, catatan);
+    // Tahap 7: blok Kepatuhan dan grafik tiap blok di Dashboard (setelah semua blok punya tempat).
+    pasangBlokKepatuhanDashboard_(ss, catatan);
+    pasangGrafikDashboard_(ss, catatan);
 
     // 5. Urutkan tab dan buang lembar kosong bawaan Google Sheets.
     aturUrutanTab_(ss);
@@ -6274,6 +7174,261 @@ function pasangBlokPrepDashboard_(ss, catatan) {
       'MAP(u,LAMBDA(x,c(x,"Pagi"))),MAP(u,LAMBDA(x,c(x,"Siang"))),MAP(u,LAMBDA(x,c(x,"Malam")))),10,4)))'));
   sheet.getRange(h + 15, 6, 10, 3).setNumberFormat(FORMAT.bulat);
   catatan.push('Rumus prep dipasang: Dashboard (blok Prep List)');
+}
+
+/* ---------- Tahap 7: blok Nilai stock dan Kepatuhan, grafik tiap blok di Dashboard ---------- */
+
+/** Tinggi blok Nilai stock dan Kepatuhan di Dashboard (baris judul blok sampai sebelum blok berikutnya). */
+var TINGGI_BLOK_NILAI = 20;
+var BARIS_TABEL_NILAI = 15;
+var TINGGI_BLOK_KEPATUHAN = 36;
+var BARIS_TABEL_KEPATUHAN = 31; // periode terpanjang: bulan berjalan atau 30 hari
+
+/** Nomor baris judul blok di kolom A Dashboard, atau 0. */
+function barisBlokDashboard_(sheet, judul) {
+  var akhir = sheet.getLastRow();
+  if (akhir < 1) return 0;
+  var kolA = sheet.getRange(1, 1, akhir, 1).getValues();
+  for (var i = 0; i < kolA.length; i++) if (String(kolA[i][0]) === judul) return i + 1;
+  return 0;
+}
+
+/**
+ * Ringkasan keadaan item di samping tabel blok Stock Inventory (G7:H10): item
+ * yang cukup, di bawah stok minimum, dan Stock Akhir minus. Sumber grafik blok ini.
+ */
+function pasangRingkasStockDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  if (String(sheet.getRange(5, 1).getValue()) !== 'Stock Inventory') return;
+  var akhir = 7 + TINGGI_BLOK_STOCK;
+  judulTabelDashboard_(sheet.getRange(7, 7, 1, 2), ['Keadaan item', 'Item']);
+  sheet.getRange(8, 7, 3, 1).setValues([['Cukup'], ['Di bawah stok minimum'], ['Stock akhir minus']])
+    .setFontColor(WARNA.tinta);
+  sheet.getRange(8, 8).setFormula(rumusLokal_('=SUMPRODUCT(ISNUMBER($B$8:$B$' + akhir + ')*($F$8:$F$' + akhir + '=""))'));
+  sheet.getRange(9, 8).setFormula(rumusLokal_('=COUNTIF($F$8:$F$' + akhir + ',"Perlu reorder")'));
+  sheet.getRange(10, 8).setFormula(rumusLokal_('=COUNTIF($F$8:$F$' + akhir + ',"Stock akhir minus")'));
+  sheet.getRange(8, 8, 3, 1).setNumberFormat(FORMAT.bulat);
+  catatan.push('Rumus stock dipasang: Dashboard (keadaan item untuk grafik)');
+}
+
+/**
+ * LET bersama blok Nilai stock (Bagian 8.5). Sama dengan nilaiStock_ di
+ * aplikasi: Stock Akhir terkini × Harga Satuan di M_Item; yang dihitung item
+ * aktif dan item nonaktif yang stock-nya belum nol (ikut); item tanpa harga
+ * tidak dihitung. Bahan terpakai per periode B3 = (Stock Keluar + Dipakai
+ * Prep) × Harga Satuan, hanya untuk item yang tidak punya resep aktif.
+ */
+function letNilaiStock_(ss) {
+  var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
+  var periode = 'shT,">="&awalP,shT,"<="&TODAY()';
+  return AWAL_PERIODE_ +
+    'shT,' + K('Stock_Harian', 'Tanggal') + ',shI,' + K('Stock_Harian', 'Nama Item') + ',' +
+    'shA,' + K('Stock_Harian', 'Stock Akhir') + ',shK,' + K('Stock_Harian', 'Stock Keluar') + ',' +
+    'shD,' + K('Stock_Harian', 'Dipakai Prep') + ',' +
+    'iN,' + K('M_Item', 'Nama Item') + ',' +
+    'it,FILTER(iN,iN<>""),' +
+    'ka,FILTER(' + K('M_Item', 'Kategori') + ',iN<>""),' +
+    'sa,FILTER(' + K('M_Item', 'Satuan') + ',iN<>""),' +
+    'hg,FILTER(' + K('M_Item', 'Harga Satuan (Rp)') + ',iN<>""),' +
+    'ac,FILTER(' + K('M_Item', 'Aktif') + ',iN<>""),' +
+    'kN,' + K('M_Kategori', 'Nama Kategori') + ',kU,' + K('M_Kategori', 'Urutan') + ',' +
+    'rH,' + K('M_Resep', 'Item Hasil') + ',rA,' + K('M_Resep', 'Aktif') + ',' +
+    'ak,MAP(it,LAMBDA(x,LET(lt,MAXIFS(shT,shI,x,shT,"<="&TODAY()),IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),shA,0))))),' +
+    'ikut,ARRAYFORMULA(((ac=TRUE)+(ak<>0))>0),' +
+    'ber,ARRAYFORMULA(ISNUMBER(hg)),' +
+    'nv,ARRAYFORMULA(IF(ber,ak*hg,0)),' +
+    'bt,MAP(it,hg,LAMBDA(x,h,IF(AND(ISNUMBER(h),COUNTIFS(rH,x,rA,TRUE)=0),' +
+      '(SUMIFS(shK,shI,x,' + periode + ')+SUMIFS(shD,shI,x,' + periode + '))*h,0))),' +
+    'kt,ARRAYFORMULA(IF(ka="","Tanpa kategori",ka)),';
+}
+
+/**
+ * Blok Nilai stock di Dashboard (Bagian 8.5): ringkasan (nilai stock saat
+ * ini, jumlah item tanpa harga, bahan terpakai dalam periode B3); per
+ * kategori: nilai stock dan bahan terpakai (urut M_Kategori); daftar item
+ * yang belum punya harga.
+ */
+function pasangBlokNilaiDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  var h = ruangBlokDashboard_(sheet, 'Nilai stock', TINGGI_BLOK_NILAI, catatan);
+  if (!h) return;
+  var L = letNilaiStock_(ss);
+  var rp = '"""Rp ""#,##0"';
+  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('=LET(' + L +
+    '"Nilai stock saat ini: "&TEXT(SUMPRODUCT(nv*ikut),' + rp + ')&" · Belum punya harga: "&SUMPRODUCT(ikut*(ber=FALSE))&' +
+    '" item · Bahan terpakai: "&TEXT(SUM(bt),' + rp + ')&" · Periode: "&$B$3)'))
+    .setFontStyle('normal').setFontColor(WARNA.tinta);
+  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
+    ['Kategori', 'Nilai stock (Rp)', 'Bahan terpakai (Rp)', '', 'Belum punya harga', 'Kategori', 'Stock', 'Satuan']);
+  sheet.getRange(h + 2, 1, 1, 8).setWrap(true);
+  sheet.getRange(h + 3, 1).setFormula(rumusLokal_('=LET(' + L +
+    'ku,IFERROR(UNIQUE(FILTER(kt,((ikut*ber)+(bt<>0))>0)),""),' +
+    'IF(INDEX(ku,1,1)="","Belum ada item yang punya harga.",LET(' +
+      'ur,MAP(ku,LAMBDA(k,LET(u,IFERROR(XLOOKUP(k,kN,kU),""),IF(u="",999,u)))),' +
+      'ks,SORT(ku,ur,TRUE,ku,TRUE),' +
+      'ARRAY_CONSTRAIN(HSTACK(ks,MAP(ks,LAMBDA(k,SUMPRODUCT((kt=k)*ikut*nv))),MAP(ks,LAMBDA(k,SUMPRODUCT((kt=k)*bt)))),' +
+      BARIS_TABEL_NILAI + ',3))))'));
+  sheet.getRange(h + 3, 5).setFormula(rumusLokal_('=LET(' + L +
+    'n,SUMPRODUCT(ikut*(ber=FALSE)),' +
+    'IF(n=0,"Semua item sudah punya harga.",ARRAY_CONSTRAIN(SORT(FILTER(HSTACK(it,kt,ak,sa),ikut,ber=FALSE),1,TRUE),' +
+      BARIS_TABEL_NILAI + ',4)))'));
+  sheet.getRange(h + 3, 2, BARIS_TABEL_NILAI, 2).setNumberFormat(FORMAT.rupiah);
+  sheet.getRange(h + 3, 7, BARIS_TABEL_NILAI, 1).setNumberFormat(FORMAT.angka);
+  catatan.push('Rumus nilai stock dipasang: Dashboard (blok Nilai stock)');
+}
+
+/**
+ * Blok Kepatuhan di Dashboard (Bagian 8.5): satu baris per hari dalam periode
+ * B3 (lama ke baru) dengan status tiap form bawaan menurut aturan kelengkapan
+ * Bagian 5.8 (Terkirim, Nihil, Belum diisi; Suhu "x dari y" memakai unit
+ * aktif sekarang; form yang disembunyikan "–"), jumlah form yang belum
+ * lengkap, isian (kiriman) yang belum diperiksa, dan baris dilaporkan keliru.
+ * Form kustom menyusul di Tahap 9.
+ */
+function pasangBlokKepatuhanDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  var h = ruangBlokDashboard_(sheet, 'Kepatuhan', TINGGI_BLOK_KEPATUHAN, catatan);
+  if (!h) return;
+  var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
+  var tab = function (awalan, namaTab, kolItem) {
+    return awalan + 'T,' + K(namaTab, 'Tanggal') + ',' + awalan + 'I,' + K(namaTab, kolItem) + ',' +
+      awalan + 'S,' + K(namaTab, 'submission_id') + ',' + awalan + 'St,' + K(namaTab, 'status') + ',' +
+      awalan + 'F,' + K(namaTab, 'flagged_by') + ',';
+  };
+  var fI = K('M_Form', 'ID Form');
+  var fN = K('M_Form', 'Nama');
+  var awal = h + 3;
+  var akhir = awal + BARIS_TABEL_KEPATUHAN - 1;
+  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('="Hari dengan form belum lengkap: "&COUNTIF($F$' + awal + ':$F$' + akhir + ',">0")&' +
+    '" dari "&COUNT($A$' + awal + ':$A$' + akhir + ')&" hari · Isian belum diperiksa: "&SUM($G$' + awal + ':$G$' + akhir + ')&' +
+    '" · Baris dilaporkan keliru: "&SUM($H$' + awal + ':$H$' + akhir + ')&" · Periode: "&$B$3'))
+    .setFontStyle('normal').setFontColor(WARNA.tinta);
+  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
+    ['Tanggal', 'Stock', 'Suhu', 'Prep list', 'Waste', 'Form belum lengkap', 'Isian belum diperiksa', 'Baris dilaporkan keliru']);
+  sheet.getRange(h + 2, 1, 1, 8).setWrap(true);
+  [['STOCK', 'Stock'], ['SUHU', 'Suhu'], ['PREP', 'Prep list'], ['WASTE', 'Waste']].forEach(function (f, i) {
+    sheet.getRange(h + 2, 2 + i).setFormula(rumusLokal_('=IFERROR(XLOOKUP("' + f[0] + '",' + fI + ',' + fN + '),"' + f[1] + '")'));
+  });
+  sheet.getRange(awal, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
+    'fI,' + fI + ',fA,' + K('M_Form', 'Aktif') + ',' +
+    'nT,' + K('Data_Nihil', 'Tanggal') + ',nF,' + K('Data_Nihil', 'ID Form') + ',' +
+    tab('s', 'Data_Stock', 'Nama Item') + tab('c', 'Data_Suhu', 'Nama Unit') + 'cW,' + K('Data_Suhu', 'Waktu Cek') + ',' +
+    tab('p', 'Data_Prep', 'Item / Menu Prep') + tab('w', 'Data_Waste', 'Item / Produk') +
+    'uN,' + K('M_Unit', 'Nama Unit') + ',uA,' + K('M_Unit', 'Aktif') + ',' +
+    'nu,IFERROR(ROWS(FILTER(uN,uN<>"",uA=TRUE)),0),' +
+    'ua,IFERROR(FILTER(uN,uN<>"",uA=TRUE),""),' +
+    'st,LAMBDA(id,dt,di,dd,IF(XLOOKUP(id,fI,fA,FALSE)<>TRUE,"–",IF(COUNTIFS(dt,dd,di,"<>")>0,"Terkirim",' +
+      'IF(COUNTIFS(nT,dd,nF,id)>0,"Nihil","Belum diisi")))),' +
+    'su,LAMBDA(dd,IF(XLOOKUP("SUHU",fI,fA,FALSE)<>TRUE,"–",IF(nu=0,"Tidak ada unit",LET(' +
+      'n,IFERROR(ROWS(UNIQUE(FILTER(ARRAYFORMULA(cI&"|"&cW),cT=dd,(cW="Opening")+(cW="Middle")+(cW="Closing"),ISNUMBER(MATCH(cI,ua,0))))),0),' +
+      'IF(n>=nu*3,"Terkirim",IF(n=0,"Belum diisi",n&" dari "&nu*3)))))),' +
+    'bp,LAMBDA(dt,ds,dst,dd,IFERROR(ROWS(UNIQUE(FILTER(ds,dt=dd,ds<>"",dst<>"Diperiksa"))),0)),' +
+    'hari,SEQUENCE(TODAY()-awalP+1,1,awalP,1),' +
+    'isi,REDUCE(HSTACK(' + kosong_(8) + '),hari,LAMBDA(acc,d,LET(' +
+      'a,st("STOCK",sT,sI,d),b,su(d),c,st("PREP",pT,pI,d),e,st("WASTE",wT,wI,d),' +
+      'VSTACK(acc,HSTACK(d,a,b,c,e,' +
+        '(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi"),' +
+        'bp(sT,sS,sSt,d)+bp(cT,cS,cSt,d)+bp(pT,pS,pSt,d)+bp(wT,wS,wSt,d),' +
+        'COUNTIFS(sT,d,sF,"<>")+COUNTIFS(cT,d,cF,"<>")+COUNTIFS(pT,d,pF,"<>")+COUNTIFS(wT,d,wF,"<>")))))),' +
+    'CHOOSEROWS(isi,SEQUENCE(ROWS(isi)-1,1,2)))'));
+  sheet.getRange(awal, 1, BARIS_TABEL_KEPATUHAN, 1).setNumberFormat('d mmm');
+  sheet.getRange(awal, 6, BARIS_TABEL_KEPATUHAN, 3).setNumberFormat(FORMAT.bulat);
+  pasangAturanWarna_(sheet, [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(rumusLokal_('=AND(B' + awal + '<>"",B' + awal + '<>"Terkirim",B' + awal + '<>"Nihil",B' + awal + '<>"–")'))
+      .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 2, BARIS_TABEL_KEPATUHAN, 4)]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($H' + awal + '),$H' + awal + '>0)'))
+      .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 8, BARIS_TABEL_KEPATUHAN, 1)]).build()
+  ]);
+  catatan.push('Rumus kepatuhan dipasang: Dashboard (blok Kepatuhan)');
+}
+
+/** Judul grafik yang dibuat setupSpreadsheet; grafik berjudul sama dibuat ulang setiap kali dijalankan. */
+var GRAFIK_DASHBOARD = {
+  stock: 'Keadaan item stock',
+  nilai: 'Nilai stock per kategori',
+  waste: 'Estimasi kerugian waste per bulan',
+  suhu: 'Rata-rata suhu per unit, 7 hari terakhir',
+  prep: 'Jumlah resep per item, 7 hari terakhir',
+  kepatuhan: 'Kepatuhan per hari'
+};
+
+/**
+ * Grafik tiap blok di Dashboard (Bagian 8.5), di kanan tabel blok (kolom J),
+ * dari tabel yang sudah dihitung rumus blok itu. Grafik lama berjudul sama
+ * dibuang dulu, jadi aman dijalankan ulang. Blok Stock opname mendapat
+ * grafiknya bersama stock opname (Tahap 8). Warna navy (tanpa amber,
+ * tampilan Bagian 2); keadaan item memakai warna makna status.
+ */
+function pasangGrafikDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  var milik = {};
+  Object.keys(GRAFIK_DASHBOARD).forEach(function (k) { milik[GRAFIK_DASHBOARD[k]] = true; });
+  sheet.getCharts().forEach(function (c) {
+    var judul = '';
+    try {
+      judul = String(c.getOptions().get('title') || '');
+    } catch (err) {
+      judul = '';
+    }
+    if (milik[judul]) sheet.removeChart(c);
+  });
+  var jumlah = 0;
+  function buat(jenis, rentang, baris, judul, opsi) {
+    var b = sheet.newChart().setChartType(jenis).setPosition(baris, 10, 0, 0).setNumHeaders(1)
+      .setOption('title', judul)
+      .setOption('width', 560)
+      .setOption('height', 300)
+      .setOption('legend', { position: 'bottom' })
+      .setOption('titleTextStyle', { color: WARNA.navyPass, fontSize: 14, bold: true })
+      .setOption('colors', [WARNA.biruMalam, WARNA.relPadam, WARNA.garisIsian]);
+    rentang.forEach(function (r) { b = b.addRange(r); });
+    Object.keys(opsi || {}).forEach(function (k) { b = b.setOption(k, opsi[k]); });
+    sheet.insertChart(b.build());
+    jumlah++;
+  }
+  var h = barisBlokDashboard_(sheet, 'Stock Inventory');
+  if (h) {
+    buat(Charts.ChartType.PIE, [sheet.getRange(h + 2, 7, 4, 2)], h + 2, GRAFIK_DASHBOARD.stock,
+      { colors: ['#067647', WARNA.tinjau, WARNA.masalah], legend: { position: 'right' } });
+  }
+  h = barisBlokDashboard_(sheet, 'Nilai stock');
+  if (h) {
+    buat(Charts.ChartType.BAR, [sheet.getRange(h + 2, 1, BARIS_TABEL_NILAI + 1, 2)], h + 1, GRAFIK_DASHBOARD.nilai,
+      { legend: { position: 'none' } });
+  }
+  h = barisBlokDashboard_(sheet, 'Waste');
+  if (h) {
+    buat(Charts.ChartType.COLUMN, [sheet.getRange(h + 9, 1, 7, 2)], h + 1, GRAFIK_DASHBOARD.waste,
+      { legend: { position: 'none' } });
+  }
+  h = barisBlokDashboard_(sheet, 'Suhu Chiller & Freezer');
+  if (h) {
+    var b = sheet.getRange(h + 14, 1, 11, 8);
+    var c = sheet.newChart().setChartType(Charts.ChartType.LINE).addRange(b).setPosition(h + 1, 10, 0, 0)
+      .setTransposeRowsAndColumns(true).setNumHeaders(1)
+      .setOption('title', GRAFIK_DASHBOARD.suhu)
+      .setOption('width', 560)
+      .setOption('height', 300)
+      .setOption('legend', { position: 'bottom' })
+      .setOption('titleTextStyle', { color: WARNA.navyPass, fontSize: 14, bold: true })
+      .setOption('pointSize', 4)
+      .build();
+    sheet.insertChart(c);
+    jumlah++;
+  }
+  h = barisBlokDashboard_(sheet, 'Prep List');
+  if (h) {
+    buat(Charts.ChartType.BAR, [sheet.getRange(h + 2, 1, 11, 1), sheet.getRange(h + 2, 3, 11, 1)], h + 1, GRAFIK_DASHBOARD.prep,
+      { legend: { position: 'none' } });
+  }
+  h = barisBlokDashboard_(sheet, 'Kepatuhan');
+  if (h) {
+    buat(Charts.ChartType.COLUMN, [sheet.getRange(h + 2, 1, BARIS_TABEL_KEPATUHAN + 1, 1),
+      sheet.getRange(h + 2, 6, BARIS_TABEL_KEPATUHAN + 1, 2)], h + 1, GRAFIK_DASHBOARD.kepatuhan, {});
+  }
+  catatan.push('Grafik Dashboard dipasang: ' + jumlah + ' grafik');
 }
 
 /** Menambahkan baris yang kunci kolom A-nya belum ada. Baris lama tidak disentuh. */
