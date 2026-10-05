@@ -1,13 +1,14 @@
 /* InventoryKu — frontend (Tahap 1: kerangka PWA dan akses; Tahap 2: form Stock;
    Tahap 3: Riwayat, pemeriksaan, dan koreksi; Tahap 4: laporan PDF;
-   5 Oktober 2026: tombol Keluar, keluar otomatis, hapus staff, PDF stock per kategori).
+   5 Oktober 2026: tombol Keluar, keluar otomatis, hapus staff, PDF stock per kategori;
+   Tahap 5: form Waste dan Suhu; Tahap 6: Prep List, resep, masa simpan).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.6.0';
+  var VERSI_APLIKASI = '0.7.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -338,7 +339,8 @@
     tambah: '<path d="M12 5v14M5 12h14"/>',
     sampah: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/><path d="M10.5 11v5.5M13.5 11v5.5"/>',
     termometer: '<path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>',
-    jam: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'
+    jam: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    resep: '<path d="M3.5 11.5h17"/><path d="M5 11.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M9 4.5c-1 1.2 1 2.3 0 3.5M13 4.5c-1 1.2 1 2.3 0 3.5"/>'
   };
 
   /** Ikon kecil 16 px untuk tanda status. */
@@ -1072,6 +1074,7 @@
     { pola: /^\/stock$/, menu: 'beranda', layar: layarStock },
     { pola: /^\/waste$/, menu: 'beranda', layar: layarWaste },
     { pola: /^\/suhu$/, menu: 'beranda', layar: layarSuhu },
+    { pola: /^\/prep$/, menu: 'beranda', layar: layarPrep },
     { pola: /^\/riwayat(?:\?(.*))?$/, menu: 'riwayat', layar: layarRiwayat },
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
@@ -1080,7 +1083,10 @@
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
     { pola: /^\/pengaturan\/staff\/([^/]+)(\/pin)?$/, menu: 'pengaturan', pengelola: true, layar: layarStaffDetail },
     { pola: /^\/pengaturan\/penerima$/, menu: 'pengaturan', pengelola: true, layar: layarPenerima },
-    { pola: /^\/pengaturan\/outlet$/, menu: 'pengaturan', pengelola: true, layar: layarOutletJadwal }
+    { pola: /^\/pengaturan\/outlet$/, menu: 'pengaturan', pengelola: true, layar: layarOutletJadwal },
+    { pola: /^\/pengaturan\/resep$/, menu: 'pengaturan', pengelola: true, layar: layarResep },
+    { pola: /^\/pengaturan\/resep-baru$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah },
+    { pola: /^\/pengaturan\/resep\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah }
   ];
 
   function jalankanRute() {
@@ -1940,7 +1946,8 @@
         data = Object.assign({}, data, {
           form: (data.form || []).map(function (f) {
             return Object.assign({}, f, { status: 'belum', lengkap: false, detail: null, terakhir: null });
-          })
+          }),
+          masaSimpan: null
         });
       }
       if (data.namaOutlet) outlet.textContent = data.namaOutlet;
@@ -1950,7 +1957,7 @@
       var form = data.form || [];
       gambarTiket(form);
       gambarKemajuan(form);
-      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || []);
+      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
@@ -2038,8 +2045,11 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan) {
       kosongkan(bawah);
+      // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
+      var simpan = barisMasaSimpan(masaSimpan);
+      if (simpan) bawah.appendChild(simpan);
       var baris = barisAntrean();
       if (baris) bawah.appendChild(baris);
       if (!sesiKini().pengguna.pengelola) return;
@@ -2116,7 +2126,7 @@
    * ===================================================================== */
 
   /** Form yang sudah punya layar isi. */
-  var LAYAR_FORM = { STOCK: '#/stock', WASTE: '#/waste', SUHU: '#/suhu' };
+  var LAYAR_FORM = { STOCK: '#/stock', WASTE: '#/waste', SUHU: '#/suhu', PREP: '#/prep' };
 
   function antreanForm(formId, tanggal) {
     var p = penggunaKini();
@@ -2178,6 +2188,31 @@
       if (segarkanAntrean) segarkanAntrean();
       return terkirim;
     });
+  }
+
+  /**
+   * Masa simpan di Beranda (tampilan Bagian 5.2): "Lewat masa simpan" (tanda
+   * Masalah) dan "Habis besok" (tanda Perlu ditinjau), tiap baris dengan
+   * "Catat sebagai waste". Tidak tampil jika keduanya kosong.
+   */
+  function barisMasaSimpan(ms) {
+    if (!ms || (!(ms.lewat || []).length && !(ms.habisBesok || []).length)) return null;
+    var daftar = el('ul', { class: 'daftar daftar-masa-simpan', 'aria-label': 'Masa simpan barang jadi' });
+    function baris(x, lewat) {
+      daftar.appendChild(el('li', { class: 'baris-tetap' }, [
+        el('span', { class: 'baris-tetap-teks daftar-baris-isi' }, [
+          tandaStatus(lewat ? 'masalah' : 'tinjau', lewat ? 'Lewat masa simpan' : 'Habis besok'),
+          el('span', { class: 'daftar-baris-ket', text: teksMasaSimpan(x, lewat) })
+        ]),
+        tombol('Catat sebagai waste', 'kedua', {
+          'aria-label': 'Catat ' + x.item + ' sebagai waste',
+          onclick: function () { catatSebagaiWaste(x.item); }
+        })
+      ]));
+    }
+    (ms.lewat || []).forEach(function (x) { baris(x, true); });
+    (ms.habisBesok || []).forEach(function (x) { baris(x, false); });
+    return daftar;
   }
 
   /** Baris ringkas di Beranda: "2 isian menunggu kirim" / "1 isian gagal kirim". */
@@ -3864,6 +3899,598 @@
   }
 
   /* =======================================================================
+   * Bersama untuk Tahap 6: pilih item dari daftar (Prep List dan Resep)
+   * ===================================================================== */
+
+  /**
+   * Lembar "ketik beberapa huruf, pilih dari daftar" (tampilan Bagian 5.3).
+   * opsi: { judul, daftar: [{ nama, ... }], ket(it) → teks, pilih(it),
+   *         kosong: teks jika daftar kosong }
+   */
+  function bukaPilihItem(opsi) {
+    var daftar = opsi.daftar || [];
+    var kCari = kolomIsian({ label: 'Cari item', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+    var hasil = el('div', { class: 'daftar daftar-pilih-item', role: 'list' });
+    function saring() {
+      var q = kCari.input.value.trim().toLowerCase();
+      kosongkan(hasil);
+      var cocok = daftar.filter(function (it) { return !q || it.nama.toLowerCase().indexOf(q) >= 0; });
+      if (!cocok.length) {
+        hasil.appendChild(kotakKosong(daftar.length ? 'Tidak ada item dengan nama itu.' : opsi.kosong));
+        return;
+      }
+      cocok.slice(0, 60).forEach(function (it) {
+        hasil.appendChild(el('button', { type: 'button', class: 'daftar-baris', role: 'listitem',
+          onclick: function () { lembar.tutup(); opsi.pilih(it); } }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: it.nama }),
+            el('span', { class: 'daftar-baris-ket', text: opsi.ket(it) })
+          ]),
+          ikon('tambah')
+        ]));
+      });
+    }
+    kCari.input.addEventListener('input', saring);
+    saring();
+    var lembar = bukaLembar({ judul: opsi.judul, isi: [kCari.wadah, hasil], aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+    return lembar;
+  }
+
+  /** "Sauce bolognese: sekitar 1,5 liter lewat masa simpan (baik sampai 4 Okt)." (tampilan Bagian 7) */
+  function teksMasaSimpan(x, lewat) {
+    return x.item + ': sekitar ' + formatAngka(x.qty) + (x.satuan ? ' ' + x.satuan : '') +
+      (lewat ? ' lewat masa simpan' : ' habis besok') + (x.baikSampai ? ' (baik sampai ' + tanggalPendek(x.baikSampai) + ')' : '') + '.';
+  }
+
+  /**
+   * Jalan pintas "Catat sebagai waste" (Bagian 5.3): item itu masuk draft
+   * Waste dengan kategori Expired sudah terpilih, lalu form Waste dibuka.
+   */
+  function catatSebagaiWaste(item) {
+    var d = bacaDraftWaste();
+    var ada = d.baris.filter(function (b) { return b.item === item && b.kategori === 'Expired'; })[0];
+    if (!d.baris.length) d.tanggal = tanggalIso(new Date());
+    if (!ada) {
+      ada = { id: buatId(), item: item, kategori: 'Expired', qty: '', alasan: '' };
+      d.baris.push(ada);
+    }
+    Draft.simpan('waste', { tanggal: d.tanggal, shift: d.shift, baris: d.baris, terbuka: ada.id, sid: d.sid });
+    location.hash = '#/waste';
+  }
+
+  /* =======================================================================
+   * Form Prep List (spesifikasi sistem Bagian 5.3, tampilan Bagian 5.3)
+   * ===================================================================== */
+
+  var JUMLAH_RESEP_CEPAT = [{ nilai: '0.5', label: '½' }, { nilai: '1', label: '1' }, { nilai: '1.5', label: '1½' }, { nilai: '2', label: '2' }];
+
+  /**
+   * Draft per pengguna: { tanggal, shift, baris: [{ id, item, jumlah, ketik,
+   * qty, keterangan }], sid }. jumlah: jumlah resep (teks); ketik: true jika
+   * diketik di kolom, bukan dipilih dari tombol cepat.
+   */
+  function bacaDraftPrep() {
+    var d = Draft.baca('prep');
+    var data = d && d.data ? d.data : {};
+    return {
+      tanggal: data.tanggal || '',
+      shift: data.shift || '',
+      baris: Array.isArray(data.baris) ? data.baris : [],
+      sid: data.sid || '',
+      waktu: d ? d.waktu : null
+    };
+  }
+
+  /** Data prep di HP (resep ikut tersimpan). Tanggal lain tanpa sinyal: stock dianggap tidak bergerak sejak data itu. */
+  function dataPrepDariHp(tanggal) {
+    var c = Cache.baca('prep');
+    if (!c || !c.data || !c.data.item) return null;
+    if (c.data.tanggal === tanggal) return c.data;
+    return Object.assign({}, c.data, {
+      tanggal: tanggal,
+      kiriman: { jumlah: 0, terakhir: null, baris: [] },
+      nihil: null,
+      turunan: true
+    });
+  }
+
+  function layarPrep(k) {
+    aturJudul('Prep list');
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var draft = bacaDraftPrep();
+    var tanggal = tanggalDraft(draft.tanggal, pengelola);
+    var data = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+    var pembaru = []; // perbarui angka otomatis semua baris (peringatan bahan bergantung pada baris lain)
+
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var statusForm = el('div', { class: 'status-form' });
+    var wadahBaris = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolKirim = tombol('Kirim prep list', 'utama');
+    var tombolTambah = tombol('Tambah item', 'kedua', { 'aria-haspopup': 'dialog' });
+    tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
+
+    var gTanggal = pilihanTanggalIsian({ pengelola: pengelola, tanggal: tanggal, ganti: gantiTanggal });
+    var gShift = grupPilihan('Shift', SHIFT, draft.shift);
+    gShift.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        draft.shift = gShift.nilai();
+        gShift.galat('');
+        simpanDraft();
+      });
+    });
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
+      tautanKembali('Beranda', '#/'),
+      el('h1', { class: 'judul-layar', text: 'Prep List' }),
+      catatanDraft,
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+        gTanggal.wadah,
+        gShift.wadah,
+        el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
+      ]),
+      wadahBaris,
+      el('div', { class: 'deret-tambah' }, tombolTambah),
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
+    ]));
+
+    function simpanDraft() {
+      var waktu = Draft.simpan('prep', { tanggal: tanggal, shift: draft.shift, baris: draft.baris, sid: draft.sid });
+      catatanDraft.textContent = draft.baris.length && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktu && draft.baris.length) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    function infoItem(nama) {
+      var daftar = data && data.item || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return { nama: nama, satuan: '', stock: null };
+    }
+
+    function resepUntuk(nama) {
+      var daftar = data && data.resep || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].item.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return null;
+    }
+
+    /** Hasil pemeriksaan satu baris: { resep, jumlah, qty, salah: 'jumlah' | 'qty' | '' }. */
+    function periksa(b) {
+      var r = resepUntuk(b.item);
+      if (r) {
+        var j = bacaAngka(b.jumlah);
+        return { resep: r, jumlah: j, salah: j === null || isNaN(j) || !(j > 0) ? 'jumlah' : '' };
+      }
+      var q = bacaAngka(b.qty);
+      return { resep: null, qty: q, salah: q === null || isNaN(q) || !(q > 0) ? 'qty' : '' };
+    }
+
+    /**
+     * Bahan yang terpakai tiap baris dan peringatan stock tidak cukup: stock
+     * tercatat dibandingkan dengan kebutuhan baris itu ditambah baris di atasnya
+     * yang memakai bahan yang sama. { idBaris: [{ item, qty, satuan, teks }] }.
+     */
+    function hitungBahan() {
+      var pakai = {};
+      var hasil = {};
+      draft.baris.forEach(function (b) {
+        var h = periksa(b);
+        hasil[b.id] = [];
+        if (!h.resep || h.salah) return;
+        h.resep.bahan.forEach(function (x) {
+          var it = infoItem(x.item);
+          var qty = bulat3(h.jumlah * x.qty);
+          var kunci = x.item.toLowerCase();
+          var sebelum = pakai[kunci] || 0;
+          var total = bulat3(sebelum + qty);
+          pakai[kunci] = total;
+          var teks = '';
+          if (it.stock != null && total > it.stock) {
+            var tercatat = 'Stock ' + x.item + ' tercatat ' + formatAngka(it.stock) + ' ' + it.satuan;
+            teks = qty > it.stock
+              ? tercatat + ', resep ini butuh ' + formatAngka(qty) + ' ' + it.satuan + '.'
+              : tercatat + ', isian ini butuh ' + formatAngka(total) + ' ' + it.satuan + ' bersama item di atasnya.';
+          }
+          hasil[b.id].push({ item: x.item, qty: qty, satuan: it.satuan, teks: teks });
+        });
+      });
+      return hasil;
+    }
+
+    function perbaruiSemua() {
+      var bahan = hitungBahan();
+      pembaru.forEach(function (fn) { fn(bahan); });
+      perbaruiPenghitung();
+    }
+
+    function perbaruiPenghitung() {
+      var lengkap = draft.baris.filter(function (b) { return !periksa(b).salah; }).length;
+      penghitung.textContent = draft.baris.length
+        ? lengkap + ' dari ' + draft.baris.length + ' item lengkap'
+        : 'Belum ada item';
+    }
+
+    function hapusBaris(b) {
+      draft.baris = draft.baris.filter(function (x) { return x !== b; });
+      simpanDraft();
+      gambarBaris();
+      toast(b.item + ' dihapus dari isian.');
+    }
+
+    /** Isian satu baris; dipakai kartu (HP dan tablet) dan baris tabel (laptop dan desktop). */
+    function isianBaris(b, nomor) {
+      var it = infoItem(b.item);
+      var r = resepUntuk(b.item);
+      var x = { it: it, resep: r };
+      x.hapus = el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari isian',
+        onclick: function () { hapusBaris(b); } }, ikon('sampah'));
+      x.kKet = kolomIsian({ label: 'Keterangan', maxlength: 200, nilai: b.keterangan || '', bantuan: 'Tidak wajib.',
+        atribut: { 'data-kunci': b.id + '|keterangan' } });
+      x.kKet.input.addEventListener('input', function () {
+        b.keterangan = x.kKet.input.value;
+        simpanDraft();
+      });
+      x.galat = el('p', { class: 'kolom-galat' });
+
+      if (r) {
+        // Jumlah resep: tombol cepat ½, 1, 1½, 2, atau diketik di kolom terakhir.
+        var nama = 'jumlah-resep-' + (++nomorKolom);
+        var idLain = 'jumlah-lain-' + nomorKolom;
+        var radio = [];
+        var fs = el('fieldset', { class: 'pilihan-grup pilihan-jumlah-resep' }, [el('legend', { class: 'kolom-label', text: 'Jumlah resep' })]);
+        JUMLAH_RESEP_CEPAT.forEach(function (p) {
+          var i = el('input', { type: 'radio', name: nama, value: p.nilai, 'aria-label': p.label + ' resep' });
+          if (!b.ketik && b.jumlah === p.nilai) i.checked = true;
+          radio.push(i);
+          fs.appendChild(el('label', { class: 'pilihan' }, [i, el('span', { text: p.label, 'aria-hidden': 'true' })]));
+        });
+        var inLain = el('input', { class: 'isian isian-angka isian-jumlah-lain', id: idLain, type: 'text', inputmode: 'decimal',
+          autocomplete: 'off', placeholder: 'Lain', 'aria-label': 'Jumlah resep lain untuk ' + b.item, 'data-kunci': b.id + '|jumlah' });
+        if (b.ketik) inLain.value = b.jumlah || '';
+        fs.appendChild(el('span', { class: 'jumlah-lain' }, inLain));
+        radio.forEach(function (i) {
+          i.addEventListener('change', function () {
+            b.jumlah = i.value;
+            b.ketik = false;
+            inLain.value = '';
+            simpanDraft();
+            perbaruiSemua();
+          });
+        });
+        inLain.addEventListener('input', function () {
+          b.jumlah = inLain.value;
+          b.ketik = true;
+          radio.forEach(function (i) { i.checked = false; });
+          simpanDraft();
+          perbaruiSemua();
+        });
+        x.isian = el('div', { class: 'kolom' }, [fs, x.galat]);
+        x.inputUtama = inLain;
+        x.hasil = el('p', { class: 'otomatis hasil-prep' });
+        x.baik = el('p', { class: 'baik-sampai' });
+        x.bahan = el('p', { class: 'otomatis bahan-prep' });
+        x.peringatan = el('div', { class: 'wadah-peringatan' });
+        pembaru.push(function (semua) {
+          var h = periksa(b);
+          var salahKetik = b.ketik && h.jumlah !== null && (isNaN(h.jumlah) || !(h.jumlah > 0));
+          inLain.setAttribute('aria-invalid', salahKetik ? 'true' : 'false');
+          kosongkan(x.galat);
+          if (salahKetik) {
+            x.galat.appendChild(ikonStatus('masalah'));
+            x.galat.appendChild(el('span', { text: 'Isi angka lebih dari 0, misalnya 1,5.' }));
+          }
+          kosongkan(x.hasil);
+          kosongkan(x.baik);
+          kosongkan(x.bahan);
+          kosongkan(x.peringatan);
+          if (h.salah) {
+            x.hasil.textContent = 'Hasil per 1 resep ' + formatAngka(r.hasil) + ' ' + it.satuan + '. Pilih jumlah resep.';
+            return;
+          }
+          x.hasil.appendChild(document.createTextNode('Hasil '));
+          x.hasil.appendChild(el('strong', { class: 'angka-satuan', text: formatAngka(bulat3(h.jumlah * r.hasil)) + ' ' + it.satuan }));
+          if (r.masaSimpan != null) x.baik.textContent = (x.dalamTabel ? '' : 'Baik sampai ') + tanggalPendek(geserHari(tanggal, r.masaSimpan));
+          var daftar = semua[b.id] || [];
+          x.bahan.textContent = 'Bahan: ' + daftar.map(function (d) {
+            return d.item + ' ' + formatAngka(d.qty) + (d.satuan ? ' ' + d.satuan : '');
+          }).join(', ');
+          daftar.forEach(function (d) {
+            if (!d.teks) return;
+            x.peringatan.appendChild(el('p', { class: 'pesan-formulir tinjau peringatan' }, [ikon('info'), el('span', { text: d.teks })]));
+          });
+        });
+      } else {
+        var idQty = 'qty-prep-' + nomor;
+        var inQty = el('input', { class: 'isian isian-angka', id: idQty, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+          'data-kunci': b.id + '|qty' });
+        inQty.value = b.qty || '';
+        inQty.addEventListener('input', function () {
+          b.qty = inQty.value;
+          simpanDraft();
+          perbaruiSemua();
+        });
+        x.isian = el('div', { class: 'kolom' }, [
+          el('label', { class: 'kolom-label', for: idQty, text: 'Qty' }),
+          el('div', { class: 'baris-angka' }, [inQty, el('span', { class: 'satuan-tetap', text: it.satuan })]),
+          x.galat
+        ]);
+        x.inputUtama = inQty;
+        x.hasil = el('p', { class: 'otomatis', text: 'Tanpa resep: stock tidak bergerak.' });
+        pembaru.push(function () {
+          var h = periksa(b);
+          var salah = h.qty !== null && (isNaN(h.qty) || !(h.qty > 0));
+          inQty.setAttribute('aria-invalid', salah ? 'true' : 'false');
+          kosongkan(x.galat);
+          if (salah) {
+            x.galat.appendChild(ikonStatus('masalah'));
+            x.galat.appendChild(el('span', { text: 'Isi angka lebih dari 0, misalnya 2,5.' }));
+          }
+        });
+      }
+      return x;
+    }
+
+    function kartu(b, nomor) {
+      var x = isianBaris(b, nomor);
+      return el('article', { class: 'kartu-item', 'aria-label': b.item }, [
+        el('div', { class: 'kartu-item-kepala' }, [el('h2', { class: 'kartu-item-nama', text: b.item }), x.hapus]),
+        x.isian,
+        x.hasil, x.baik || null, x.bahan || null, x.peringatan || null,
+        x.kKet.wadah
+      ]);
+    }
+
+    function barisTabel(b, nomor) {
+      var x = isianBaris(b, nomor);
+      x.dalamTabel = true; // kolom Baik sampai: tanggalnya saja
+      x.kKet.wadah.querySelector('label').classList.add('sr');
+      var bantu = x.kKet.wadah.querySelector('.kolom-bantuan');
+      if (bantu) bantu.remove();
+      x.kKet.input.setAttribute('aria-label', 'Keterangan ' + b.item);
+      if (!x.resep) {
+        x.isian.querySelector('label').classList.add('sr');
+        x.inputUtama.setAttribute('aria-label', 'Qty ' + b.item);
+      } else {
+        x.isian.querySelector('legend').classList.add('sr');
+      }
+      return el('tr', {}, [
+        el('td', { class: 'angka', text: String(nomor) }),
+        el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: b.item })),
+        el('td', { class: 'sel-jumlah-prep' }, x.isian),
+        el('td', { class: 'otomatis sel-hasil-prep' }, [x.hasil, x.bahan || null, x.peringatan || null]),
+        el('td', { class: 'otomatis' }, x.baik || el('span', { text: '–' })),
+        el('td', { class: 'sel-alasan' }, x.kKet.wadah),
+        el('td', {}, x.hapus)
+      ]);
+    }
+
+    function gambarBaris() {
+      kosongkan(wadahBaris);
+      pembaru = [];
+      tulisPesan(pesan, '');
+      if (!draft.baris.length) {
+        wadahBaris.appendChild(kotakKosong('Belum ada item prep. Ketuk Tambah item untuk mencatat prep.'));
+        perbaruiPenghitung();
+        return;
+      }
+      if (mediaDesktop.matches) {
+        var badan = el('tbody');
+        draft.baris.forEach(function (b, i) { badan.appendChild(barisTabel(b, i + 1)); });
+        wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-prep' }, [
+          el('thead', {}, el('tr', {}, ['No', 'Item / Menu Prep', 'Jumlah resep atau Qty', 'Hasil dan bahan', 'Baik sampai', 'Keterangan', '']
+            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 ? 'angka' : null, text: j }); }))),
+          badan
+        ])));
+      } else {
+        var grid = el('div', { class: 'grid-item' });
+        draft.baris.forEach(function (b, i) { grid.appendChild(kartu(b, i + 1)); });
+        wadahBaris.appendChild(grid);
+      }
+      perbaruiSemua();
+    }
+
+    function tambahBaris(nama) {
+      var b = { id: buatId(), item: nama, jumlah: '', ketik: false, qty: '', keterangan: '' };
+      draft.baris.push(b);
+      simpanDraft();
+      gambarBaris();
+      if (!apakahSentuh()) {
+        var kolom = wadahBaris.querySelector('[data-kunci="' + b.id + '|' + (resepUntuk(nama) ? 'jumlah' : 'qty') + '"]');
+        if (kolom) kolom.focus();
+      }
+    }
+
+    tombolTambah.addEventListener('click', function () {
+      var daftar = (data && data.item || []).filter(function (it) { return it.aktif !== false; });
+      bukaPilihItem({
+        judul: 'Tambah item prep',
+        daftar: daftar,
+        kosong: 'Daftar item belum termuat. Periksa sinyal, lalu buka lagi.',
+        ket: function (it) {
+          var r = resepUntuk(it.nama);
+          return [it.kategori, it.satuan, r ? 'resep: hasil ' + formatAngka(r.hasil) + ' ' + it.satuan : 'tanpa resep'].filter(Boolean).join(' · ');
+        },
+        pilih: function (it) { tambahBaris(it.nama); }
+      });
+    });
+
+    function gambarStatus() {
+      kosongkan(statusForm);
+      if (!data) return;
+      var menunggu = antreanForm('PREP', tanggal);
+      var kirimMenunggu = menunggu.filter(function (e) { return e.aksi === 'kirimPrep'; });
+      var nihilMenunggu = menunggu.filter(function (e) { return e.aksi === 'tandaiNihil'; })[0] || null;
+      var kr = data.kiriman;
+      if (kr.jumlah) {
+        var t = kr.terakhir;
+        statusForm.appendChild(el('p', {}, [tandaStatus('baik', 'Terkirim'),
+          el('span', { class: 'kolom-bantuan', text: ' ' + kr.jumlah + ' kiriman' + (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') + '.' })]));
+        statusForm.appendChild(el('p', { class: 'kolom-bantuan lebar-penuh', text: 'Tercatat: ' + kr.baris.map(function (b) {
+          return b.item + ' ' + (b.jumlahResep != null
+            ? formatAngka(b.jumlahResep) + ' resep (' + formatAngka(b.hasil) + ' ' + b.satuan + ')'
+            : formatAngka(b.qty) + (b.satuan ? ' ' + b.satuan : '')) +
+            (b.baikSampai ? ', baik sampai ' + tanggalPendek(b.baikSampai) : '');
+        }).join('; ') + '.' }));
+      }
+      if (kirimMenunggu.length) statusForm.appendChild(tandaStatus('menunggu', kirimMenunggu.length + ' isian menunggu kirim'));
+      var nihil = bagianNihil({
+        formId: 'PREP',
+        namaForm: 'Prep list',
+        tanggal: tanggal,
+        nihil: data.nihil,
+        adaIsian: kr.jumlah > 0 || kirimMenunggu.length > 0,
+        menunggu: nihilMenunggu,
+        selesai: function (n) {
+          data.nihil = n;
+          gambarStatus();
+        }
+      });
+      if (nihil) statusForm.appendChild(nihil);
+    }
+
+    function gambar(d) {
+      data = d;
+      gambarStatus();
+      gambarBaris();
+    }
+
+    function gantiTanggal(baru) {
+      if (baru === tanggal) return;
+      tanggal = baru;
+      simpanDraft();
+      muat();
+    }
+
+    tombolKirim.addEventListener('click', function () {
+      if (tombolKirim.disabled) return;
+      tulisPesan(pesan, '');
+      if (!gShift.galat(draft.shift ? '' : 'Pilih shift.')) {
+        gShift.input[0].focus();
+        tulisPesan(pesan, 'Pilih shift: Pagi, Siang, atau Malam.', 'masalah');
+        return;
+      }
+      if (!draft.baris.length) {
+        tulisPesan(pesan, 'Tambah minimal satu item prep.', 'masalah');
+        return;
+      }
+      var salah = null;
+      draft.baris.forEach(function (b) {
+        var h = periksa(b);
+        if (h.salah && !salah) salah = { b: b, jenis: h.salah };
+      });
+      if (salah) {
+        tulisPesan(pesan, salah.jenis === 'jumlah' ? 'Isi jumlah resep untuk ' + salah.b.item + '.'
+          : 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.', 'masalah');
+        var kolom = wadahBaris.querySelector('[data-kunci="' + salah.b.id + '|' + salah.jenis + '"]');
+        if (kolom) kolom.focus();
+        return;
+      }
+      if (!draft.sid) draft.sid = buatId();
+      var baris = draft.baris.map(function (b) {
+        var h = periksa(b);
+        return h.resep
+          ? { item: b.item, jumlahResep: h.jumlah, qty: '', keterangan: String(b.keterangan || '').trim() }
+          : { item: b.item, jumlahResep: '', qty: h.qty, keterangan: String(b.keterangan || '').trim() };
+      });
+      // "Baik sampai" untuk label wadah, dihitung di HP (server menghitung ulang dengan resep yang berlaku).
+      var labelHp = draft.baris.map(function (b) {
+        var r = resepUntuk(b.item);
+        return r && r.masaSimpan != null ? { item: b.item, tanggal: geserHari(tanggal, r.masaSimpan) } : null;
+      }).filter(Boolean);
+      var isi = { submissionId: draft.sid, tanggal: tanggal, shift: draft.shift, waktuPerangkat: new Date().toISOString(), baris: baris };
+      var entri = { id: isi.submissionId, aksi: 'kirimPrep', isi: isi, formId: 'PREP',
+        judul: 'Prep list · ' + baris.length + ' item', tanggal: tanggal };
+      function teksLabel(daftar) {
+        return daftar.length ? 'Tulis di label wadah: ' + daftar.map(function (x) {
+          return x.item + ' baik sampai ' + tanggalPendek(x.tanggal);
+        }).join(', ') + '.' : '';
+      }
+      function kosongkanIsian() {
+        draft.baris = [];
+        draft.sid = buatId();
+        simpanDraft();
+      }
+      function keAntrean() {
+        simpanKeAntrean(entri);
+        kosongkanIsian();
+        gambarStatus();
+        gambarBaris();
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+        if (labelHp.length) tulisPesan(pesan, teksLabel(labelHp), 'info');
+      }
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(tombolKirim, true, 'Mengirim…');
+      jagaProses(panggilApi('kirimPrep', isi)).then(function (hasil) {
+        aturTombolProses(tombolKirim, false);
+        kosongkanIsian();
+        Cache.tulis('prep', hasil.form);
+        if (hasil.form.tanggal === tanggal) gambar(hasil.form);
+        else gambarBaris();
+        toast('Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui.');
+        var teks = ['Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui.'];
+        var label = teksLabel(hasil.baikSampai || []);
+        if (label) teks.push(label);
+        (hasil.peringatan || []).forEach(function (p) {
+          teks.push('Stock ' + p.item + ' sekarang tercatat ' + formatAngka(p.akhir) + (p.satuan ? ' ' + p.satuan : '') + '.');
+        });
+        if ((hasil.peringatan || []).length) teks.push('Minta Pengelola meluruskan stock jika angkanya keliru.');
+        tulisPesan(pesan, teks.join(' '), (hasil.peringatan || []).length ? 'tinjau' : 'baik');
+      }).catch(function (err) {
+        aturTombolProses(tombolKirim, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (err && err.sesiBerakhir) {
+          simpanKeAntrean(entri);
+          kosongkanIsian();
+          tanganiSesiBerakhir(err);
+          return;
+        }
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+
+    function muat() {
+      return muatData({
+        dariHp: function () { return dataPrepDariHp(tanggal); },
+        simpanHp: function (d) { Cache.tulis('prep', d); },
+        ambil: function () { return panggilApi('formPrep', { tanggal: tanggal }); },
+        gambar: function (d) {
+          if (d.tanggal === tanggal) gambar(d);
+        },
+        kerangka: function () {
+          kosongkan(wadahBaris).appendChild(kerangkaBaris(3));
+        },
+        galat: function (teks, cobaLagi) {
+          kosongkan(wadahBaris).appendChild(kotakGalat(teks, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      gambarBaris();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    gambarBaris();
+    muat();
+    segarkanLayar = muat;
+    segarkanAntrean = gambarStatus;
+  }
+
+  /* =======================================================================
    * Riwayat, pemeriksaan, dan koreksi (spesifikasi sistem Bagian 6,
    * tampilan Bagian 5.4). Dibangun umum dari daftar form di M_Form: form
    * yang Riwayat-nya sudah didaftarkan di server (RIWAYAT_FORM di Code.gs)
@@ -3989,7 +4616,9 @@
       ]));
       isi.push(' ');
     }
-    if (kol.jenis === 'angka') isi.push(angkaSatuan(v || 0, satuan));
+    if (kol.jikaAda && v == null && !kor) isi.push(el('span', { class: 'otomatis', text: '–' }));
+    else if (kol.jenis === 'tanggal') isi.push(el('span', { class: 'angka-satuan', text: v ? tanggalPendek(v) : '–' }));
+    else if (kol.jenis === 'angka') isi.push(angkaSatuan(v || 0, satuan));
     else if (kol.jenis === 'rupiah') isi.push(el('span', { class: 'angka-satuan', text: formatRupiah(v) }));
     else if (kol.jenis === 'status') isi.push(v ? tandaStatus(v === 'Normal' ? 'baik' : 'masalah', v === 'Normal' ? 'Normal' : 'Di luar standar') : '–');
     else isi.push(el('span', { text: v || '–' }));
@@ -4012,7 +4641,7 @@
       if (k === nama || k.ringkas === false) return;
       var v = b.nilai[k.kunci];
       var kor = b.koreksi && b.koreksi[k.kunci];
-      if (k.jenis === 'angka' && !v && !kor && !k.akhiran) return;
+      if (k.jenis === 'angka' && !v && !kor && (!k.akhiran || k.jikaAda)) return;
       if (k.jenis !== 'angka' && (v === '' || v == null)) return;
       // Status hanya ditulis jika bermasalah: "di luar standar".
       if (k.jenis === 'status') {
@@ -4812,6 +5441,17 @@
 
     function keteranganBaris(b) {
       var isi = [];
+      // Bahan prep (salinan resep saat prep dibuat); bahan yang Stock Akhir-nya minus ditandai.
+      if (b.rincian && b.rincian.length) {
+        var minus = b.rincian.filter(function (x) { return x.minus; });
+        isi.push(el('p', { class: 'kolom-bantuan rincian-bahan' }, ['Bahan: '].concat(b.rincian.map(function (x, i) {
+          var teks = (i ? ', ' : '') + x.item + ' ' + formatAngka(x.qty) + (x.satuan ? ' ' + x.satuan : '');
+          return x.minus ? el('span', { class: 'nilai-masalah', text: teks }) : teks;
+        }))));
+        if (minus.length) {
+          isi.push(el('p', {}, tandaStatus('masalah', 'Stock ' + minus.map(function (x) { return x.item; }).join(', ') + ' minus')));
+        }
+      }
       if (b.flag) {
         isi.push(el('p', { class: 'pesan-formulir tinjau catatan-flag' }, [ikon('bendera'),
           el('span', { text: 'Dilaporkan keliru oleh ' + b.flag.oleh + (b.flag.catatan ? ': ' + b.flag.catatan : '') })]));
@@ -4855,7 +5495,9 @@
             el('h3', { class: 'kartu-item-nama' }, namaItem(b)),
             b.satuan ? el('span', { class: 'kartu-item-satuan', text: b.satuan }) : null
           ]),
-          el('dl', { class: 'nilai-daftar' }, kolom.filter(function (k) { return k !== nama; }).map(function (k) {
+          el('dl', { class: 'nilai-daftar' }, kolom.filter(function (k) {
+            return k !== nama && !(k.jikaAda && b.nilai[k.kunci] == null && !(b.koreksi && b.koreksi[k.kunci]));
+          }).map(function (k) {
             return [el('dt', { text: k.label }), el('dd', {}, nilaiKolom(b, k))];
           })),
           keteranganBaris(b),
@@ -4973,7 +5615,8 @@
    * Stock, Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang server.
    */
   function bukaKoreksi(info, b, selesai) {
-    var kolom = (info.kolom || []).filter(function (k) { return k.koreksi; });
+    // Kolom "jikaAda" hanya untuk baris yang berisi (prep: jumlah resep atau Qty).
+    var kolom = (info.kolom || []).filter(function (k) { return k.koreksi && !(k.jikaAda && b.nilai[k.kunci] == null); });
     var nama = kolomNama(info.kolom || []);
     var namaBaris = nama ? b.nilai[nama.kunci] : '';
     var kolomIsi = kolom.map(function (k) {
@@ -4987,7 +5630,7 @@
         inputmode: k.jenis === 'angka' ? 'decimal' : null,
         kelas: k.jenis === 'angka' ? 'isian-angka' : null,
         nilai: k.jenis === 'angka' ? String(b.nilai[k.kunci] || 0).replace('.', ',') : (b.nilai[k.kunci] || ''),
-        bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.' : null
+        bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.' : (k.bantuan || null)
       });
       if (k.minus) {
         // Papan angka iPhone tidak punya tanda minus: tombol ± di samping kolom.
@@ -5010,7 +5653,8 @@
       b.flag ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('bendera'),
         el('span', { text: 'Dilaporkan ' + b.flag.oleh + ': ' + b.flag.catatan })]) : null
     ].concat(kolomIsi.map(function (x) { return x.kolom.wadah; })).concat([
-      info.gerakStock || info.formId === 'STOCK'
+      // Prep tanpa resep tidak menggerakkan stock.
+      (info.gerakStock || info.formId === 'STOCK') && !(info.formId === 'PREP' && b.nilai.jumlahResep == null)
         ? el('p', { class: 'kolom-bantuan', text: 'Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang. Nilai lama tetap tercatat.' })
         : el('p', { class: 'kolom-bantuan', text: 'Nilai lama tetap tercatat.' }),
       pesan
@@ -5563,6 +6207,14 @@
           ]),
           ikon('kanan')
         ]),
+        el('a', { class: 'daftar-baris', href: '#/pengaturan/resep' }, [
+          ikon('resep'),
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: 'Resep' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Barang jadi, hasil per resep, bahan, dan masa simpan untuk Prep List.' })
+          ]),
+          ikon('kanan')
+        ]),
         el('a', { class: 'daftar-baris', href: '#/pengaturan/outlet' }, [
           ikon('jam'),
           el('span', { class: 'daftar-baris-isi' }, [
@@ -5633,6 +6285,409 @@
       gambar: gambar,
       kerangka: function () {
         kosongkan(wadah).appendChild(kerangkaBaris(2));
+      },
+      galat: function (pesan, cobaLagi) {
+        kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
+      },
+      penanda: penanda
+    });
+  }
+
+  /* ---------- Resep (spesifikasi sistem Bagian 5.3, tampilan Bagian 5.7) ---------- */
+
+  function hrefResep(nama) {
+    return '#/pengaturan/resep/' + encodeURIComponent(nama);
+  }
+
+  /** "Rp 145.000 per resep · Rp 29.000 per liter", atau keterangan bahan yang belum punya harga. */
+  function teksBiayaResep(biaya, perSatuan, satuan, tanpaHarga) {
+    if (tanpaHarga.length) {
+      return 'Harga ' + tanpaHarga.join(', ') + ' belum diisi, jadi perkiraan biaya belum lengkap.';
+    }
+    return 'Perkiraan biaya satu resep ' + formatRupiah(biaya) +
+      (perSatuan != null ? ' · ' + formatRupiah(perSatuan) + ' per ' + (satuan || 'satuan') : '') + '.';
+  }
+
+  function layarResep(k) {
+    aturJudul('Resep');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var tambah = el('a', { class: 'tombol tombol-utama', href: '#/pengaturan/resep-baru' }, el('span', { class: 'tombol-teks', text: 'Tambah' }));
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Pengaturan', '#/pengaturan'),
+      el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Resep' }), tambah]),
+      el('p', { class: 'kartu-teks', text: 'Prep List diisi dalam jumlah resep. Stock barang jadi bertambah dan stock bahan berkurang otomatis.' }),
+      penanda,
+      wadah
+    ]));
+
+    function gambar(data) {
+      kosongkan(wadah);
+      var resep = data.resep || [];
+      if (!resep.length) {
+        wadah.appendChild(kotakKosong('Belum ada resep. Ketuk Tambah untuk membuat resep pertama.', 'resep'));
+        return;
+      }
+      wadah.appendChild(el('nav', { class: 'daftar', 'aria-label': 'Daftar resep' }, resep.map(function (r) {
+        var ket = [r.bahan.length + ' bahan'];
+        if (r.masaSimpan != null) ket.push('masa simpan ' + r.masaSimpan + ' hari');
+        if (r.hargaPerSatuan != null) ket.push(formatRupiah(r.hargaPerSatuan) + ' per ' + r.satuan);
+        return el('a', { class: 'daftar-baris' + (r.aktif ? '' : ' nonaktif'), href: hrefResep(r.itemHasil) }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: r.itemHasil + ', ' + formatAngka(r.hasil) + (r.satuan ? ' ' + r.satuan : '') }),
+            el('span', { class: 'daftar-baris-ket', text: ket.join(' · ') }),
+            !r.aktif || r.masalah.length ? el('span', { class: 'tanda-deret bungkus' }, [
+              r.aktif ? null : tandaStatus('menunggu', 'Nonaktif'),
+              r.masalah.length ? tandaStatus('tinjau', r.masalah[0]) : null
+            ]) : null
+          ]),
+          ikon('kanan')
+        ]);
+      })));
+    }
+
+    muatData({
+      kunciCache: 'resep',
+      ambil: function () { return panggilApi('daftarResep'); },
+      gambar: gambar,
+      kerangka: function () {
+        kosongkan(wadah).appendChild(kerangkaBaris(3));
+      },
+      galat: function (pesan, cobaLagi) {
+        kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
+      },
+      penanda: penanda
+    });
+  }
+
+  /**
+   * Buat dan ubah resep (tampilan Bagian 5.7): item hasil, hasil per 1 resep,
+   * masa simpan (opsional), daftar bahan (qty per 1 resep dalam satuan dasar
+   * tiap bahan), perkiraan biaya dari harga bahan, dan nonaktifkan. Item hasil
+   * resep yang sudah ada tidak bisa diganti. Isian tersimpan sebagai draft.
+   */
+  function layarResepUbah(k) {
+    var baru = !k.cocok[1];
+    var namaAwal = '';
+    if (!baru) {
+      try {
+        namaAwal = decodeURIComponent(k.cocok[1]);
+      } catch (err) {
+        namaAwal = k.cocok[1];
+      }
+    }
+    aturJudul(baru ? 'Resep baru' : namaAwal);
+    var kunciDraft = 'resep:' + (baru ? '+baru' : namaAwal.toLowerCase());
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var wadah = el('div');
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Resep', '#/pengaturan/resep'),
+      el('h1', { class: 'judul-layar', text: baru ? 'Resep baru' : namaAwal }),
+      catatanDraft,
+      penanda,
+      wadah
+    ]));
+
+    var data = null;
+    var isi = null; // { itemHasil, hasil, masaSimpan, bahan: [{ id, item, qty }] }
+    var resepKini = null;
+    var d = Draft.baca(kunciDraft);
+    if (d && d.data) {
+      isi = d.data;
+      catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(d.waktu).toISOString());
+    }
+
+    function simpanDraft() {
+      var waktu = Draft.simpan(kunciDraft, isi);
+      if (waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(waktu).toISOString());
+    }
+
+    function infoItem(nama) {
+      var daftar = data && data.item || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return { nama: nama, satuan: '', harga: null, aktif: true };
+    }
+
+    function cariResep(nama) {
+      var daftar = data && data.resep || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].itemHasil.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return null;
+    }
+
+    function dariResep(r) {
+      return {
+        itemHasil: r.itemHasil,
+        hasil: String(r.hasil).replace('.', ','),
+        masaSimpan: r.masaSimpan == null ? '' : String(r.masaSimpan),
+        bahan: r.bahan.map(function (b) { return { id: buatId(), item: b.item, qty: String(b.qty).replace('.', ',') }; })
+      };
+    }
+
+    function gambar(hasil, dariHp) {
+      data = hasil;
+      resepKini = baru ? null : cariResep(namaAwal);
+      kosongkan(wadah);
+      if (!baru && !resepKini) {
+        if (!dariHp) wadah.appendChild(kotakKosong('Resep ' + namaAwal + ' tidak ditemukan. Kembali ke daftar resep.', 'resep'));
+        return;
+      }
+      if (!isi) isi = baru ? { itemHasil: '', hasil: '', masaSimpan: '', bahan: [] } : dariResep(resepKini);
+      gambarIsian();
+    }
+
+    function gambarIsian() {
+      kosongkan(wadah);
+      var hasilItem = isi.itemHasil ? infoItem(isi.itemHasil) : null;
+      var satuanHasil = hasilItem ? hasilItem.satuan : '';
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+
+      // Item hasil
+      var bagianItem;
+      if (baru) {
+        var pilihHasil = tombol(isi.itemHasil ? 'Ganti item hasil' : 'Pilih item hasil', 'kedua', { 'aria-haspopup': 'dialog' });
+        pilihHasil.addEventListener('click', function () {
+          bukaPilihItem({
+            judul: 'Pilih item hasil',
+            daftar: (data.item || []).filter(function (it) { return it.aktif && !it.punyaResep; }),
+            kosong: 'Semua item aktif sudah punya resep.',
+            ket: function (it) { return [it.kategori, it.satuan].filter(Boolean).join(' · '); },
+            pilih: function (it) {
+              isi.itemHasil = it.nama;
+              isi.bahan = isi.bahan.filter(function (b) { return b.item.toLowerCase() !== it.nama.toLowerCase(); });
+              simpanDraft();
+              gambarIsian();
+            }
+          });
+        });
+        bagianItem = el('div', { class: 'kolom' }, [
+          el('span', { class: 'kolom-label', text: 'Item hasil' }),
+          isi.itemHasil ? el('p', { class: 'nilai-terpilih' }, [el('strong', { text: isi.itemHasil }),
+            el('span', { class: 'otomatis', text: ' · ' + [hasilItem.kategori, satuanHasil].filter(Boolean).join(' · ') })]) : null,
+          el('p', { class: 'kolom-bantuan', text: 'Barang jadi yang dibuat lewat Prep List. Harus terdaftar di daftar item.' }),
+          el('div', {}, pilihHasil)
+        ]);
+      } else {
+        bagianItem = el('div', { class: 'kolom' }, [
+          el('span', { class: 'kolom-label', text: 'Item hasil' }),
+          el('p', { class: 'nilai-terpilih' }, [el('strong', { text: isi.itemHasil }),
+            el('span', { class: 'otomatis', text: satuanHasil ? ' · ' + satuanHasil : '' })])
+        ]);
+      }
+
+      var kHasil = kolomIsian({ label: 'Hasil per 1 resep' + (satuanHasil ? ' (' + satuanHasil + ')' : ''), inputmode: 'decimal',
+        kelas: 'isian-angka', nilai: isi.hasil });
+      var kMasa = kolomIsian({ label: 'Masa simpan (hari)', inputmode: 'numeric', kelas: 'isian-angka', nilai: isi.masaSimpan,
+        bantuan: 'Tidak wajib. Berapa hari barang jadi masih baik dipakai sejak dibuat.', maxlength: 3 });
+      kHasil.input.addEventListener('input', function () { isi.hasil = kHasil.input.value; simpanDraft(); perbaruiBiaya(); });
+      kMasa.input.addEventListener('input', function () { isi.masaSimpan = kMasa.input.value; simpanDraft(); });
+
+      // Bahan
+      var daftarBahan = el('ul', { class: 'daftar daftar-bahan', 'aria-label': 'Bahan per 1 resep' });
+      var kolomBahan = [];
+      isi.bahan.forEach(function (b) {
+        var it = infoItem(b.item);
+        var id = 'bahan-' + (++nomorKolom);
+        var inQty = el('input', { class: 'isian isian-angka', id: id, type: 'text', inputmode: 'decimal', autocomplete: 'off' });
+        inQty.value = b.qty || '';
+        var galat = el('p', { class: 'kolom-galat' });
+        inQty.addEventListener('input', function () {
+          b.qty = inQty.value;
+          inQty.setAttribute('aria-invalid', 'false');
+          kosongkan(galat);
+          simpanDraft();
+          perbaruiBiaya();
+        });
+        kolomBahan.push({ b: b, input: inQty, galat: galat });
+        daftarBahan.appendChild(el('li', { class: 'baris-bahan' }, [
+          el('label', { class: 'baris-bahan-nama', for: id }, [
+            el('span', { class: 'daftar-baris-judul', text: b.item }),
+            el('span', { class: 'sr', text: ', jumlah per 1 resep' }),
+            it.aktif === false ? el('span', { class: 'blok' }, tandaStatus('tinjau', 'Nonaktif')) : null
+          ]),
+          el('div', { class: 'baris-angka' }, [inQty, el('span', { class: 'satuan-tetap', text: it.satuan })]),
+          el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari bahan',
+            onclick: function () {
+              isi.bahan = isi.bahan.filter(function (x) { return x !== b; });
+              simpanDraft();
+              gambarIsian();
+            } }, ikon('sampah')),
+          galat
+        ]));
+      });
+      var tambahBahan = tombol('Tambah bahan', 'kedua', { 'aria-haspopup': 'dialog' });
+      tambahBahan.insertBefore(ikon('tambah'), tambahBahan.lastChild);
+      tambahBahan.addEventListener('click', function () {
+        var sudah = {};
+        isi.bahan.forEach(function (b) { sudah[b.item.toLowerCase()] = true; });
+        if (isi.itemHasil) sudah[isi.itemHasil.toLowerCase()] = true;
+        bukaPilihItem({
+          judul: 'Tambah bahan',
+          daftar: (data.item || []).filter(function (it) { return it.aktif && !sudah[it.nama.toLowerCase()]; }),
+          kosong: 'Tidak ada item lain yang bisa menjadi bahan.',
+          ket: function (it) {
+            return [it.kategori, it.satuan, it.harga != null ? formatRupiah(it.harga) + ' per ' + it.satuan + (it.hargaDariResep ? ' (dari resep)' : '') : 'tanpa harga']
+              .filter(Boolean).join(' · ');
+          },
+          pilih: function (it) {
+            var b = { id: buatId(), item: it.nama, qty: '' };
+            isi.bahan.push(b);
+            simpanDraft();
+            gambarIsian();
+            var input = wadah.querySelectorAll('.daftar-bahan input');
+            if (input.length && !apakahSentuh()) input[input.length - 1].focus();
+          }
+        });
+      });
+      var biaya = el('p', { class: 'biaya-resep', 'aria-live': 'polite' });
+
+      function perbaruiBiaya() {
+        var total = 0;
+        var tanpa = [];
+        isi.bahan.forEach(function (b) {
+          var it = infoItem(b.item);
+          var q = bacaAngka(b.qty);
+          if (it.harga == null) tanpa.push(b.item);
+          else if (q > 0) total += q * it.harga;
+        });
+        var h = bacaAngka(isi.hasil);
+        if (!isi.bahan.length) {
+          biaya.textContent = 'Perkiraan biaya muncul setelah bahan ditambahkan.';
+          return;
+        }
+        biaya.textContent = teksBiayaResep(total, h > 0 ? total / h : null, satuanHasil, tanpa);
+      }
+      perbaruiBiaya();
+
+      var simpan = tombol('Simpan resep', 'utama');
+      simpan.addEventListener('click', function () {
+        if (simpan.disabled) return;
+        tulisPesan(pesan, '');
+        var ok = true;
+        var h = bacaAngka(isi.hasil);
+        if (!kHasil.galat(h === null ? 'Isi hasil per 1 resep.' : (isNaN(h) || !(h > 0) ? 'Isi angka lebih dari 0, misalnya 5.' : ''))) ok = false;
+        var masa = String(isi.masaSimpan || '').trim();
+        if (!kMasa.galat(masa !== '' && !/^\d{1,3}$/.test(masa) ? 'Isi jumlah hari dengan angka bulat, misalnya 3, atau kosongkan.' : '')) ok = false;
+        kolomBahan.forEach(function (x) {
+          var q = bacaAngka(x.b.qty);
+          var salah = q === null || isNaN(q) || !(q > 0);
+          x.input.setAttribute('aria-invalid', salah ? 'true' : 'false');
+          kosongkan(x.galat);
+          if (salah) {
+            ok = false;
+            x.galat.appendChild(ikonStatus('masalah'));
+            x.galat.appendChild(el('span', { text: 'Isi jumlah ' + x.b.item + ' per 1 resep, lebih dari 0.' }));
+          }
+        });
+        if (!isi.itemHasil) {
+          tulisPesan(pesan, 'Pilih item hasil.', 'masalah');
+          return;
+        }
+        if (!isi.bahan.length) {
+          tulisPesan(pesan, 'Tambah minimal satu bahan.', 'masalah');
+          return;
+        }
+        if (!ok) {
+          var salahPertama = wadah.querySelector('[aria-invalid="true"]');
+          if (salahPertama) salahPertama.focus();
+          return;
+        }
+        aturTombolProses(simpan, true, 'Menyimpan…');
+        panggilApi('simpanResep', {
+          baru: baru,
+          itemHasil: isi.itemHasil,
+          hasil: h,
+          masaSimpan: masa,
+          bahan: isi.bahan.map(function (b) { return { item: b.item, qty: bacaAngka(b.qty) }; })
+        }).then(function (hasil) {
+          Draft.hapus(kunciDraft);
+          Cache.tulis('resep', hasil);
+          toast('Resep ' + isi.itemHasil + ' tersimpan.');
+          location.hash = '#/pengaturan/resep';
+        }).catch(function (err) {
+          aturTombolProses(simpan, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesan, pesanGalat(err), 'masalah');
+        });
+      });
+
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [bagianItem, kHasil.wadah, kMasa.wadah]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+        el('h2', { class: 'kartu-judul', text: 'Bahan per 1 resep' }),
+        el('p', { class: 'kolom-bantuan', text: 'Jumlah tiap bahan dalam satuan dasarnya.' }),
+        isi.bahan.length ? daftarBahan : kotakKosong('Belum ada bahan. Ketuk Tambah bahan.'),
+        el('div', {}, tambahBahan),
+        biaya
+      ]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+        baru ? null : el('p', { class: 'pesan-formulir info' }, [ikon('info'),
+          el('span', { text: 'Perubahan berlaku untuk prep berikutnya. Catatan lama tidak berubah.' })]),
+        pesan,
+        el('div', {}, simpan)
+      ]));
+
+      if (!baru && resepKini) {
+        var tombolAktif = resepKini.aktif
+          ? tombol('Nonaktifkan', 'bahaya', { onclick: nonaktifkan })
+          : tombol('Aktifkan lagi', 'kedua', { onclick: aktifkan });
+        wadah.appendChild(el('section', { class: 'kartu' }, [
+          el('h2', { class: 'kartu-judul', text: 'Keadaan resep' }),
+          el('p', { class: 'kartu-teks', text: resepKini.aktif
+            ? 'Aktif. Prep List ' + resepKini.itemHasil + ' memakai resep ini.'
+            : 'Nonaktif. ' + resepKini.itemHasil + ' dicatat dengan Qty biasa di Prep List dan stock tidak bergerak.' }),
+          resepKini.masalah.length ? el('div', { class: 'tanda-deret bungkus' }, resepKini.masalah.map(function (m) {
+            return tandaStatus('tinjau', m);
+          })) : null,
+          tombolAktif
+        ]));
+      }
+    }
+
+    function nonaktifkan() {
+      var r = resepKini;
+      konfirmasi({
+        judul: 'Nonaktifkan resep ' + r.itemHasil + '?',
+        teks: r.itemHasil + ' dicatat dengan Qty biasa di Prep List dan stock tidak bergerak sampai resepnya aktif lagi. Catatan lama tidak berubah.',
+        teksYa: 'Nonaktifkan',
+        bahaya: true,
+        jalankan: function () { return panggilApi('aturResepAktif', { itemHasil: r.itemHasil, aktif: false }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Cache.tulis('resep', hasil);
+        gambar(hasil);
+        toast('Resep ' + r.itemHasil + ' dinonaktifkan.');
+      });
+    }
+
+    function aktifkan(e) {
+      var r = resepKini;
+      var t = e.currentTarget;
+      aturTombolProses(t, true, 'Menyimpan…');
+      panggilApi('aturResepAktif', { itemHasil: r.itemHasil, aktif: true }).then(function (hasil) {
+        Cache.tulis('resep', hasil);
+        gambar(hasil);
+        toast('Resep ' + r.itemHasil + ' aktif lagi.');
+      }).catch(function (err) {
+        aturTombolProses(t, false);
+        if (tanganiSesiBerakhir(err)) return;
+        toast(pesanGalat(err), 'masalah');
+      });
+    }
+
+    muatData({
+      kunciCache: 'resep',
+      ambil: function () { return panggilApi('daftarResep'); },
+      gambar: function (hasil, dariHp) {
+        // Isian yang sedang diketik tidak digambar ulang; hanya data pendukungnya diperbarui.
+        if (isi && data) {
+          data = hasil;
+          resepKini = baru ? null : cariResep(namaAwal);
+          return;
+        }
+        gambar(hasil, dariHp);
+      },
+      kerangka: function () {
+        kosongkan(wadah).appendChild(kerangkaBaris(4));
       },
       galat: function (pesan, cobaLagi) {
         kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));

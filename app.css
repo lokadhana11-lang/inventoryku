@@ -3281,6 +3281,170 @@ body.papan-ketik .bilah-kirim {
   50% { opacity: 0.35; }
 }
 
+/* =========================================================================
+ * Prep List dan Resep (spesifikasi tampilan Bagian 5.3 dan 5.7)
+ * ========================================================================= */
+
+/* Jumlah resep: tombol cepat ½, 1, 1½, 2 lalu kolom angka lain di ujung */
+.pilihan-jumlah-resep .pilihan {
+  flex: 1 1 44px;
+}
+
+.pilihan-jumlah-resep .pilihan span {
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.jumlah-lain {
+  flex: 1.5 1 64px;
+  min-width: 64px;
+  display: flex;
+}
+
+.jumlah-lain .isian {
+  width: 100%;
+  min-width: 0;
+}
+
+.hasil-prep strong {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
+.baik-sampai {
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.baik-sampai:empty,
+.bahan-prep:empty,
+.hasil-prep:empty {
+  display: none;
+}
+
+.bahan-prep,
+.rincian-bahan {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.tabel-prep td:not(:first-child) {
+  white-space: normal;
+}
+
+/* Label tersembunyi (.sr) berposisi absolut: tetap di dalam bingkai tabel supaya halaman tidak bergulir ke samping */
+.tabel-prep td:not(:nth-child(2)) {
+  position: relative;
+}
+
+.tabel-prep td.sel-jumlah-prep {
+  min-width: 330px;
+}
+
+.tabel-prep td.sel-alasan {
+  min-width: 180px;
+}
+
+.tabel-prep td.sel-hasil-prep {
+  min-width: 220px;
+  width: 300px;
+  max-width: 320px;
+  font-size: 14px;
+}
+
+.tabel-prep td.sel-hasil-prep > * + * {
+  margin-top: 4px;
+}
+
+.tabel-prep .kolom {
+  gap: 4px;
+}
+
+.tabel-prep .pilihan span {
+  min-height: 44px;
+}
+
+/* Beranda: masa simpan dengan tombol "Catat sebagai waste" */
+.daftar-masa-simpan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.daftar-masa-simpan .baris-tetap {
+  padding: 12px 12px 12px 16px;
+}
+
+.daftar-masa-simpan .daftar-baris-isi {
+  flex: 1 1 14em;
+}
+
+.daftar-masa-simpan .daftar-baris-ket {
+  color: var(--tinta);
+  font-size: 16px;
+}
+
+/* Resep: daftar bahan dan nilai terpilih */
+.nilai-terpilih {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.daftar-bahan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.baris-bahan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 200px) 48px;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--garis);
+}
+
+.baris-bahan:last-child {
+  border-bottom: 0;
+}
+
+.baris-bahan-nama {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.baris-bahan .kolom-galat {
+  grid-column: 1 / -1;
+}
+
+.baris-bahan .kolom-galat:empty {
+  display: none;
+}
+
+@media (max-width: 399px) {
+  .baris-bahan {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+  .baris-bahan .baris-angka {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .baris-bahan .tombol-ikon {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+.biaya-resep {
+  margin: 0;
+  font-weight: 500;
+}
+
+.daftar-baris.nonaktif .daftar-baris-judul {
+  color: var(--tinta-redup);
+}
+
 /* Kurangi gerak: semua geser, skala, goyang, pudar, dan denyut dimatikan.
    Perubahan langsung jadi; pesan teks tetap tampil. Indikator putar tetap ada. */
 @media (prefers-reduced-motion: reduce) {

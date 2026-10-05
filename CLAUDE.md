@@ -118,6 +118,17 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `riwayat` dan `detailKiriman` ditambah `gerakStock`; `riwayat.pilihan` ditambah `labelItem` (Item | Unit); `kolom[]` boleh
   berjenis `rupiah` dan `status` dan membawa `minus`, `akhiran`, `pilihan`, `ringkas`; `peristiwa[]` ditambah jenis
   `terlewat { tanggal, kurang: [teks], total }` (Suhu).
+- Aksi Tahap 6 (bertoken): `formPrep {tanggal}` → `{ tanggal, shift, item: [{ nama, kategori, satuan, aktif, stock }],
+  resep: [{ item, hasil, masaSimpan, bahan: [{ item, qty }] }], kiriman: { jumlah, terakhir, baris: [{ item, jumlahResep, hasil,
+  qty, satuan, baikSampai, oleh, waktu }] }, nihil }`; `kirimPrep {submissionId, tanggal, shift, waktuPerangkat, baris: [{ item,
+  jumlahResep, qty, keterangan }]}` → `{ sudahTerkirim, jumlah, form, baikSampai: [{ item, tanggal }], peringatan: [{ item, akhir,
+  satuan }] }`. `beranda` (semua role) ditambah `masaSimpan: { lewat: [{ item, satuan, qty, baikSampai }], habisBesok: [...] }`.
+  Khusus Pengelola: `daftarResep` → `{ resep: [{ itemHasil, satuan, hasil, masaSimpan, aktif, bahan: [{ item, qty, satuan, harga }],
+  biaya, hargaPerSatuan, tanpaHarga, masalah }], item: [{ nama, kategori, satuan, harga, hargaDariResep, aktif, punyaResep }] }`;
+  `simpanResep {baru, itemHasil, hasil, masaSimpan, bahan: [{ item, qty }]}` dan `aturResepAktif {itemHasil, aktif}` → jawaban
+  `daftarResep`; `aturItemAktif {nama, aktif}` → `{ item: { nama, aktif }, stock }` (belum dipakai layar; untuk Tahap 7).
+  `riwayat`/`detailKiriman`: `kolom[]` boleh berjenis `tanggal` dan membawa `jikaAda` dan `bantuan`; baris prep membawa
+  `rincian: [{ item, qty, satuan, minus }]`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -133,7 +144,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
 | 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0; rumus sesuai lokalitas di Code.gs v0.6.1, butir 93), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 6 | Prep List dan resep | Belum |
+| 6 | Prep List dan resep (Pengaturan → Resep, pengaman resep, form Prep List, Data_Prep/Data_PrepBahan, gerakan stock, koreksi jumlah resep, masa simpan di Beranda dan email, harga barang jadi dari resep, Riwayat, PDF, tab Harian_Prep, blok Prep List di Dashboard) | Kode selesai (Code.gs v0.7, aplikasi 0.7.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
 | 8 | Stock opname dan daftar belanja | Belum |
 | 9 | Form kustom | Belum |
@@ -255,7 +266,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 27. **Pengaturan → Staff dan PIN:** staff baru langsung dibuat dengan PIN. Nama tidak bisa diganti
     (nama dipakai sebagai `submitted_by`). Role dan keadaan akun sendiri tidak bisa diubah sendiri,
     supaya Pengelola tidak mengunci diri. Daftar staff memakai pola tabel lebar (kolom nama diam).
-    Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak 5 Oktober 2026 tiga: Staff dan PIN,
+    Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak Tahap 6 empat: Staff dan PIN, Resep,
     Penerima email, Outlet dan jadwal); bagian lain menyusul di tahapnya.
 28. **Penerima email** disimpan di `M_Outlet` kolom Email Penerima Laporan, dipisah koma; alamat
     ganda (huruf besar/kecil) dibuang.
@@ -637,3 +648,70 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     "Belum ada data." (`bolehDiberiRumus_`). Di akhir, `periksaSelRumus_` membaca kembali semua sel berumus di
     semua tab dan mencatat di log sel yang menampilkan `#ERROR!`, `#NAME?`, atau `#REF!` (atau "tidak ada
     yang …"). Rumus format bersyarat tidak bisa dibaca hasilnya oleh script, jadi tidak ikut diperiksa.
+
+### Tahap 6
+
+94. **Versi:** Code.gs v0.7, aplikasi 0.7.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js).
+95. **Satu resep per item hasil.** `M_Resep` satu baris per Item Hasil; bahan di `M_ResepBahan` dihubungkan lewat Item Hasil
+    (tanpa ID resep). Karena itu "satu item hasil hanya punya satu resep aktif" berlaku dengan sendirinya: item yang sudah punya
+    resep (aktif atau nonaktif) diubah lewat resep itu, dan Item Hasil resep yang sudah ada tidak bisa diganti. Jika baris ganda
+    diisi tangan, baris yang aktif dipakai. Menyimpan resep menulis ulang baris `M_ResepBahan` item itu (baris item lain tetap,
+    urutannya tidak berubah); master tidak dihapus, resep hanya dinonaktifkan. `M_Resep` dan `M_ResepBahan` masuk `KUNCI_MASTER`
+    (kunci Item Hasil), jadi dirapikan `setupSpreadsheet` seperti butir 79. Resep yang dipakai Prep List: aktif, hasil > 0, dan
+    punya bahan. Masa simpan: bilangan bulat 0–365 hari atau kosong. Bahan harus item aktif, tidak boleh ganda, tidak boleh item
+    hasilnya sendiri.
+96. **Resep melingkar** diperiksa server dari resep aktif (dengan resep yang disimpan sudah dipasang), saat menyimpan resep aktif
+    dan saat mengaktifkan lagi. Pesan: "Sauce dasar sudah memakai Sauce bolognese sebagai bahan." dan untuk jalur panjang
+    "..., lewat Sauce dasar." Resep nonaktif tidak ikut dihitung; mengaktifkan memeriksa lagi item dan bahan yang nonaktif.
+97. **Item yang masih dipakai resep aktif** (sebagai bahan atau hasil) tidak bisa dinonaktifkan: aksi `aturItemAktif` (Pengelola)
+    sudah memeriksanya di server, tetapi layar Pengaturan → Item baru dibangun di Tahap 7. Selama itu item dinonaktifkan di Sheet
+    dengan tangan; resep yang memakai item nonaktif ditandai "Perlu ditinjau" di Pengaturan → Resep.
+98. **Harga barang jadi** (Bagian 5.3): Harga Satuan kosong dihitung dari harga bahan satu resep aktif dibagi hasil per resep
+    (`lengkapiHargaResep_`, bahan barang jadi ikut dihitung dari resepnya; dibulatkan 2 angka di belakang koma). Jika ada bahan
+    tanpa harga, harganya tetap kosong. Dipakai estimasi waste (`formWaste`, `kirimWaste`, tersalin ke `Data_Waste` saat dicatat)
+    dan perkiraan biaya di Pengaturan → Resep. Penyesuaian stock tetap memakai Harga Satuan `M_Item` saja.
+99. **Data_Prep:** satu baris per item. Item beresep: Jumlah Resep, Hasil per 1 Resep, Hasil, Baik Sampai (tanggal + masa simpan,
+    kosong jika resep tanpa masa simpan), Qty kosong. Item tanpa resep: Qty saja (Hasil kosong, jadi stock tidak bergerak).
+    `Data_PrepBahan`: satu baris per bahan per baris prep (Jumlah Resep, Qty per 1 Resep, Qty Terpakai, Satuan), `prep_row_id` =
+    `row_id` baris `Data_Prep`, `submission_id` sama dengan kiriman prep. Resep yang dipakai: yang berlaku saat server menerima
+    kiriman. Kiriman dari antrean ditolak (Gagal kirim) jika resep berubah keadaan: item beresep tanpa jumlah resep ("... sekarang
+    punya resep") atau jumlah resep untuk item tanpa resep aktif. Urutan tab: tanggal terbaru, item, waktu kirim (PrepBahan: tanggal,
+    item hasil, item bahan). Setelah ditulis, `hitungUlangStock_` untuk item hasil dan semua bahan mulai tanggal prep. Pemeriksaan
+    (Tandai diperiksa, laporkan) hanya pada `Data_Prep`; status baris `Data_PrepBahan` tetap Terkirim.
+100. **Stock bahan tidak cukup:** di HP, tiap bahan dibandingkan dengan stock tercatat pada tanggal itu (dari `formPrep`), dengan
+    kebutuhan baris itu ditambah baris di atasnya yang memakai bahan yang sama ("Stock Tomat tercatat 1 kg, resep ini butuh 1,5
+    kg." / "... isian ini butuh 2 kg bersama item di atasnya."). Server tidak menolak; jawabannya memuat bahan yang Stock Akhir-nya
+    minus, ditulis di pesan setelah terkirim. Di Riwayat Prep, bahan yang Stock Akhir-nya minus pada tanggal itu ditulis merah
+    dengan tanda "Stock Tomat minus"; rekap Stock tetap menandai minus seperti Tahap 3.
+101. **Layar Prep List** (`#/prep`): Tanggal, Shift (wajib), "Tambah item" (lembar pencarian bersama `bukaPilihItem`, dipakai juga
+    Pengaturan → Resep). Item beresep: tombol ½, 1, 1½, 2 dan kolom "Lain" untuk angka yang diketik, lalu Hasil, "Baik sampai 8 Okt"
+    (tebal), Bahan, dan peringatan. Item tanpa resep: Qty dan "Tanpa resep: stock tidak bergerak." Keterangan opsional (200 huruf).
+    HP dan tablet: satu kartu per item (semua terbuka, tidak diringkas seperti Waste); laptop/desktop: tabel (No, Item, Jumlah resep
+    atau Qty, Hasil dan bahan, Baik sampai, Keterangan, hapus). Setelah terkirim, pesan di layar mengulang "Tulis di label wadah:
+    Sauce bolognese baik sampai 8 Okt." (juga saat masuk antrean, dihitung di HP). Draft `draft:prep`, jawaban `cache:prep`
+    (resep ikut tersimpan, jadi form bisa dibuka tanpa sinyal).
+102. **Koreksi Prep** (Riwayat): Jumlah Resep untuk baris beresep, Qty untuk baris tanpa resep (kolom `jikaAda`: kolom kosong tidak
+    tampil di kartu dan tidak bisa dikoreksi), dan Keterangan. Hasil dihitung ulang dari Hasil per 1 Resep yang tercatat di baris
+    itu; baris `Data_PrepBahan` dihitung ulang dari Qty per 1 Resep yang tersalin (bukan resep sekarang), dicatat di
+    `Log_Perubahan` (tab `Data_PrepBahan`), lalu stock item hasil dan bahan dihitung ulang mulai tanggal prep. Jumlah resep 0
+    membatalkan gerakan stock (seperti butir 50). `setelahKoreksi` kini menerima `(baris, pengguna, kini)`.
+103. **Masa simpan** (`masaSimpan_`): stock tercatat item pada tanggal itu dibagikan ke prep (Hasil > 0) mulai yang paling baru;
+    bagian dari prep dengan Baik Sampai sebelum tanggal itu = "Lewat masa simpan", Baik Sampai sama dengan tanggal itu = "Habis
+    besok" (hari ini hari terakhir baik dipakai, besok sudah tidak). Prep tanpa Baik Sampai ikut dihitung sebagai stock terbaru.
+    Satu baris per item; tanggal "baik sampai" yang ditulis adalah yang terbaru di bagian itu. Beranda (semua role): di bawah
+    pemberitahuan Pengelola, di atas baris antrean; tombol "Catat sebagai waste" menambah item itu ke draft Waste dengan kategori
+    Expired terpilih (Qty dikosongkan) lalu membuka `#/waste`. Email harian: bagian "Prep list" dan "Masa simpan".
+104. **Harian_Prep** (rumus A9): No, Item / Menu Prep, Nama Staff, Shift, Jumlah Resep, Hasil atau Qty, Satuan, Keterangan, urut
+    waktu kirim, lalu Diisi oleh dan Diperiksa oleh. **Dashboard blok Prep List** (26 baris, `TINGGI_BLOK_PREP`): ringkasan periode
+    B3 (catatan dan jumlah resep); total resep dan hasil per item per minggu (7 hari terakhir, 8–14, 15–21 hari lalu; hasil item
+    tanpa resep = Qty; paling banyak 10 item); pemakaian bahan selama periode B3 (10 terbanyak: qty dan jumlah catatan); beban
+    kerja per staff per shift (jumlah item prep). Nilai rupiah bahan terpakai menyusul di blok Nilai stock (Tahap 7).
+105. **PDF Prep List:** No, Item / Menu Prep (bahan ditulis kecil di bawahnya), Nama Staff, Shift, Jumlah Resep, Hasil atau Qty,
+    Satuan, Baik Sampai, Keterangan; kotak info "Jumlah item"; nama file `{tanggal}_Prep_list.pdf`.
+106. **Pengaturan → Resep** (`#/pengaturan/resep`, `#/pengaturan/resep-baru`, `#/pengaturan/resep/<item>`): daftar "Sauce
+    bolognese, 5 liter" (jumlah bahan, masa simpan, harga per satuan hasil; tanda Nonaktif dan Perlu ditinjau). Layar ubah: item
+    hasil (baru: pilih dari item aktif yang belum punya resep), hasil per 1 resep, masa simpan, bahan (qty dan satuan otomatis),
+    perkiraan biaya yang dihitung langsung dari harga item, catatan "Perubahan berlaku untuk prep berikutnya. Catatan lama tidak
+    berubah.", dan kartu Keadaan resep (Nonaktifkan dengan konfirmasi / Aktifkan lagi). Draft per resep `draft:resep:<item>` atau
+    `draft:resep:+baru`; jawaban `cache:resep`. Butuh sinyal untuk menyimpan.
+
