@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.8 (Tahap 7: Dashboard di aplikasi dan pengelolaan master)
+// InventoryKu Code.gs v0.8.1 (Tahap 7; perbaikan warna dan rumus tab Dashboard)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -49,7 +49,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.8';
+var VERSI_KODE = 'v0.8.1';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -6652,14 +6652,15 @@ function letStock_(ss) {
  */
 function rumusHarianStock_(ss) {
   var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
-  var hari = function (judul) { return 'XLOOKUP(1,cocok,' + K('Stock_Harian', judul) + ',0)'; };
+  // Rekap satu item pada satu tanggal dicari dengan FILTER, bukan XLOOKUP(1,(…)*(…),…):
+  // tanpa ARRAYFORMULA syarat ganda di XLOOKUP tidak dihitung sebagai larik dan hasilnya #N/A.
+  var hari = function (judul) { return 'IFERROR(INDEX(FILTER(' + K('Stock_Harian', judul) + ',shI=x,shT=tgl),1),0)'; };
   var akhirSH = K('Stock_Harian', 'Stock Akhir');
   var baris =
     'LAMBDA(grp,x,LET(' +
       'lt,MAXIFS(shT,shI,x,shT,"<="&tgl),' +
-      'cocok,(shI=x)*(shT=tgl),' +
       'ada,lt=tgl,' +
-      'lalu,IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),' + akhirSH + ',0)),' +
+      'lalu,IF(lt=0,0,IFERROR(INDEX(FILTER(' + akhirSH + ',shI=x,shT=lt),1),0)),' +
       'VSTACK(grp,HSTACK(ROWS(grp),x,' +
         'IF(ada,' + hari('Stock Awal') + ',lalu),' +
         'IF(ada,' + hari('Stock Masuk') + ',""),' +
@@ -6747,7 +6748,7 @@ function rumusDashboardStock_(ss) {
   var baris =
     'LAMBDA(grp,x,LET(' +
       'lt,MAXIFS(shT,shI,x),' +
-      'akhir,IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),' + K('Stock_Harian', 'Stock Akhir') + ',0)),' +
+      'akhir,IF(lt=0,0,IFERROR(INDEX(FILTER(' + K('Stock_Harian', 'Stock Akhir') + ',shI=x,shT=lt),1),0)),' +
       'mn,XLOOKUP(x,iN,iMin,""),' +
       'VSTACK(grp,HSTACK(x,akhir,XLOOKUP(x,iN,iS,""),' +
         'SUMIFS(' + K('Stock_Harian', 'Stock Masuk') + ',shI,x,' + periode + '),' +
@@ -6781,6 +6782,8 @@ function pasangBlokStockDashboard_(ss, catatan) {
     sheet.insertRowsBefore(8, TINGGI_BLOK_STOCK + 1);
     catatan.push('Dashboard: ruang tabel blok Stock Inventory disisipkan');
   }
+  var barisNilai = barisBlokDashboard_(sheet, 'Nilai stock');
+  polosIsiBlokDashboard_(sheet, 5, barisNilai > 5 ? barisNilai - 1 : 8 + TINGGI_BLOK_STOCK);
   var akhirTabel = 7 + TINGGI_BLOK_STOCK;
   var rentangKet = '$F$8:$F$' + akhirTabel;
   sheet.getRange(6, 1).setFormula(rumusLokal_('="Di bawah stok minimum: "&COUNTIF(' + rentangKet + ',"Perlu reorder")&' +
@@ -6961,10 +6964,29 @@ function ruangBlokDashboard_(sheet, judul, tinggi, catatan) {
   var barisBerikut = 0;
   for (var j = baris; j < kolA.length && berikut; j++) if (kolA[j] === berikut) { barisBerikut = j + 1; break; }
   if (barisBerikut && barisBerikut - baris < tinggi) {
-    sheet.insertRowsBefore(barisBerikut, tinggi - (barisBerikut - baris));
+    var tambah = tinggi - (barisBerikut - baris);
+    sheet.insertRowsBefore(barisBerikut, tambah);
+    barisBerikut += tambah;
     catatan.push('Dashboard: ruang blok ' + judul + ' disisipkan');
   }
+  polosIsiBlokDashboard_(sheet, baris, barisBerikut ? barisBerikut - 1 : baris + tinggi - 1);
   return baris;
+}
+
+/**
+ * Mengembalikan isi satu blok Dashboard (baris di bawah judul blok sampai
+ * barisAkhir, kolom A sampai H) ke latar polos dan teks biasa. Perlu karena
+ * baris yang disisipkan insertRowsBefore mewarisi format baris di posisi sisip,
+ * yaitu baris judul blok berikutnya: latar navy dan kolom A putih tebal,
+ * sehingga isi blok tidak terbaca. Dijalankan setiap setupSpreadsheet, jadi
+ * Dashboard yang sudah terlanjur navy ikut pulih. Pemanggil memasang lagi gaya
+ * baris ringkasan dan baris judul tabel sesudahnya; format angka tidak diubah.
+ */
+function polosIsiBlokDashboard_(sheet, barisJudul, barisAkhir) {
+  var akhir = Math.min(barisAkhir, sheet.getMaxRows());
+  if (akhir <= barisJudul) return;
+  sheet.getRange(barisJudul + 1, 1, akhir - barisJudul, 8)
+    .setBackground(null).setFontColor(null).setFontWeight(null);
 }
 
 function judulTabelDashboard_(rentang, judul) {
@@ -7233,7 +7255,7 @@ function letNilaiStock_(ss) {
     'ac,FILTER(' + K('M_Item', 'Aktif') + ',iN<>""),' +
     'kN,' + K('M_Kategori', 'Nama Kategori') + ',kU,' + K('M_Kategori', 'Urutan') + ',' +
     'rH,' + K('M_Resep', 'Item Hasil') + ',rA,' + K('M_Resep', 'Aktif') + ',' +
-    'ak,MAP(it,LAMBDA(x,LET(lt,MAXIFS(shT,shI,x,shT,"<="&TODAY()),IF(lt=0,0,XLOOKUP(1,(shI=x)*(shT=lt),shA,0))))),' +
+    'ak,MAP(it,LAMBDA(x,LET(lt,MAXIFS(shT,shI,x,shT,"<="&TODAY()),IF(lt=0,0,IFERROR(INDEX(FILTER(shA,shI=x,shT=lt),1),0))))),' +
     'ikut,ARRAYFORMULA(((ac=TRUE)+(ak<>0))>0),' +
     'ber,ARRAYFORMULA(ISNUMBER(hg)),' +
     'nv,ARRAYFORMULA(IF(ber,ak*hg,0)),' +
@@ -7261,12 +7283,15 @@ function pasangBlokNilaiDashboard_(ss, catatan) {
   judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
     ['Kategori', 'Nilai stock (Rp)', 'Bahan terpakai (Rp)', '', 'Belum punya harga', 'Kategori', 'Stock', 'Satuan']);
   sheet.getRange(h + 2, 1, 1, 8).setWrap(true);
+  // Nama di LET tidak membedakan huruf besar dan kecil: "ku" bertabrakan dengan kU (Urutan
+  // M_Kategori) dan rumusnya menjadi #NAME?. Karena itu nama di sini ditulis panjang.
   sheet.getRange(h + 3, 1).setFormula(rumusLokal_('=LET(' + L +
-    'ku,IFERROR(UNIQUE(FILTER(kt,((ikut*ber)+(bt<>0))>0)),""),' +
-    'IF(INDEX(ku,1,1)="","Belum ada item yang punya harga.",LET(' +
-      'ur,MAP(ku,LAMBDA(k,LET(u,IFERROR(XLOOKUP(k,kN,kU),""),IF(u="",999,u)))),' +
-      'ks,SORT(ku,ur,TRUE,ku,TRUE),' +
-      'ARRAY_CONSTRAIN(HSTACK(ks,MAP(ks,LAMBDA(k,SUMPRODUCT((kt=k)*ikut*nv))),MAP(ks,LAMBDA(k,SUMPRODUCT((kt=k)*bt)))),' +
+    'katAda,IFERROR(UNIQUE(FILTER(kt,((ikut*ber)+(bt<>0))>0)),""),' +
+    'IF(INDEX(katAda,1,1)="","Belum ada item yang punya harga.",LET(' +
+      'urut,MAP(katAda,LAMBDA(k,LET(u,IFERROR(XLOOKUP(k,kN,kU),""),IF(u="",999,u)))),' +
+      'katUrut,SORT(katAda,urut,TRUE,katAda,TRUE),' +
+      'ARRAY_CONSTRAIN(HSTACK(katUrut,MAP(katUrut,LAMBDA(k,SUMPRODUCT((kt=k)*ikut*nv))),' +
+      'MAP(katUrut,LAMBDA(k,SUMPRODUCT((kt=k)*bt)))),' +
       BARIS_TABEL_NILAI + ',3))))'));
   sheet.getRange(h + 3, 5).setFormula(rumusLokal_('=LET(' + L +
     'n,SUMPRODUCT(ikut*(ber=FALSE)),' +
@@ -7309,6 +7334,8 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
   [['STOCK', 'Stock'], ['SUHU', 'Suhu'], ['PREP', 'Prep list'], ['WASTE', 'Waste']].forEach(function (f, i) {
     sheet.getRange(h + 2, 2 + i).setFormula(rumusLokal_('=IFERROR(XLOOKUP("' + f[0] + '",' + fI + ',' + fN + '),"' + f[1] + '")'));
   });
+  // Nama di LET tidak membedakan huruf besar dan kecil: "st" dan "ua" bertabrakan dengan sT
+  // (Tanggal Data_Stock) dan uA (Aktif M_Unit), sehingga rumusnya #NAME?. Dipakai stForm dan unitAktif.
   sheet.getRange(awal, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
     'fI,' + fI + ',fA,' + K('M_Form', 'Aktif') + ',' +
     'nT,' + K('Data_Nihil', 'Tanggal') + ',nF,' + K('Data_Nihil', 'ID Form') + ',' +
@@ -7316,16 +7343,16 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
     tab('p', 'Data_Prep', 'Item / Menu Prep') + tab('w', 'Data_Waste', 'Item / Produk') +
     'uN,' + K('M_Unit', 'Nama Unit') + ',uA,' + K('M_Unit', 'Aktif') + ',' +
     'nu,IFERROR(ROWS(FILTER(uN,uN<>"",uA=TRUE)),0),' +
-    'ua,IFERROR(FILTER(uN,uN<>"",uA=TRUE),""),' +
-    'st,LAMBDA(id,dt,di,dd,IF(XLOOKUP(id,fI,fA,FALSE)<>TRUE,"–",IF(COUNTIFS(dt,dd,di,"<>")>0,"Terkirim",' +
+    'unitAktif,IFERROR(FILTER(uN,uN<>"",uA=TRUE),""),' +
+    'stForm,LAMBDA(id,dt,di,dd,IF(XLOOKUP(id,fI,fA,FALSE)<>TRUE,"–",IF(COUNTIFS(dt,dd,di,"<>")>0,"Terkirim",' +
       'IF(COUNTIFS(nT,dd,nF,id)>0,"Nihil","Belum diisi")))),' +
     'su,LAMBDA(dd,IF(XLOOKUP("SUHU",fI,fA,FALSE)<>TRUE,"–",IF(nu=0,"Tidak ada unit",LET(' +
-      'n,IFERROR(ROWS(UNIQUE(FILTER(ARRAYFORMULA(cI&"|"&cW),cT=dd,(cW="Opening")+(cW="Middle")+(cW="Closing"),ISNUMBER(MATCH(cI,ua,0))))),0),' +
+      'n,IFERROR(ROWS(UNIQUE(FILTER(ARRAYFORMULA(cI&"|"&cW),cT=dd,(cW="Opening")+(cW="Middle")+(cW="Closing"),ISNUMBER(MATCH(cI,unitAktif,0))))),0),' +
       'IF(n>=nu*3,"Terkirim",IF(n=0,"Belum diisi",n&" dari "&nu*3)))))),' +
     'bp,LAMBDA(dt,ds,dst,dd,IFERROR(ROWS(UNIQUE(FILTER(ds,dt=dd,ds<>"",dst<>"Diperiksa"))),0)),' +
     'hari,SEQUENCE(TODAY()-awalP+1,1,awalP,1),' +
     'isi,REDUCE(HSTACK(' + kosong_(8) + '),hari,LAMBDA(acc,d,LET(' +
-      'a,st("STOCK",sT,sI,d),b,su(d),c,st("PREP",pT,pI,d),e,st("WASTE",wT,wI,d),' +
+      'a,stForm("STOCK",sT,sI,d),b,su(d),c,stForm("PREP",pT,pI,d),e,stForm("WASTE",wT,wI,d),' +
       'VSTACK(acc,HSTACK(d,a,b,c,e,' +
         '(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi"),' +
         'bp(sT,sS,sSt,d)+bp(cT,cS,cSt,d)+bp(pT,pS,pSt,d)+bp(wT,wS,wSt,d),' +
