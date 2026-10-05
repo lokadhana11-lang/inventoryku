@@ -7,7 +7,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.5.1';
+  var VERSI_APLIKASI = '0.6.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -335,6 +335,9 @@
     opname: '<path d="M8 4.5h8v3H8z"/><path d="M16 5.5h2.5V21h-13V5.5H8"/><path d="m9 14 2 2 4-4.5"/>',
     hp: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
     keluar: '<path d="M13.5 4.5h-7v15h7"/><path d="M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+    tambah: '<path d="M12 5v14M5 12h14"/>',
+    sampah: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/><path d="M10.5 11v5.5M13.5 11v5.5"/>',
+    termometer: '<path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>',
     jam: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'
   };
 
@@ -1067,6 +1070,8 @@
   var RUTE = [
     { pola: /^\/$/, menu: 'beranda', layar: layarBeranda },
     { pola: /^\/stock$/, menu: 'beranda', layar: layarStock },
+    { pola: /^\/waste$/, menu: 'beranda', layar: layarWaste },
+    { pola: /^\/suhu$/, menu: 'beranda', layar: layarSuhu },
     { pola: /^\/riwayat(?:\?(.*))?$/, menu: 'riwayat', layar: layarRiwayat },
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
@@ -2111,7 +2116,7 @@
    * ===================================================================== */
 
   /** Form yang sudah punya layar isi. */
-  var LAYAR_FORM = { STOCK: '#/stock' };
+  var LAYAR_FORM = { STOCK: '#/stock', WASTE: '#/waste', SUHU: '#/suhu' };
 
   function antreanForm(formId, tanggal) {
     var p = penggunaKini();
@@ -2791,6 +2796,1074 @@
   }
 
   /* =======================================================================
+   * Bersama untuk form Tahap 5: tanggal isian, rupiah, angka suhu
+   * ===================================================================== */
+
+  /** "Rp 30.000" */
+  function formatRupiah(n) {
+    if (n === '' || n == null || !isFinite(n)) return '–';
+    return 'Rp ' + formatAngka(Math.round(n));
+  }
+
+  /** Angka suhu: boleh minus dan desimal ("-18", "−18", "3,5"). null = kosong, NaN = salah. */
+  function bacaAngkaSuhu(teks) {
+    var t = String(teks == null ? '' : teks).replace(/\s/g, '').replace('−', '-');
+    if (t === '' || t === '-') return null;
+    if (!/^-?\d+([.,]\d+)?$/.test(t)) return NaN;
+    return Number(t.replace(',', '.'));
+  }
+
+  /**
+   * Pilihan tanggal isian (tampilan Bagian 5.3): Hari ini / Kemarin; Pengelola
+   * punya "Tanggal lain". opsi: { pengelola, tanggal, ganti(tanggalBaru) }.
+   */
+  function pilihanTanggalIsian(opsi) {
+    var hariIni = tanggalIso(new Date());
+    var kemarin = geserHari(hariIni, -1);
+    var pilihan = ['Hari ini', 'Kemarin'].concat(opsi.pengelola ? ['Tanggal lain'] : []);
+    var nilai = opsi.tanggal === hariIni ? 'Hari ini' : (opsi.tanggal === kemarin ? 'Kemarin' : 'Tanggal lain');
+    var g = grupPilihan('Tanggal', pilihan, nilai);
+    var lain = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Tanggal lain' });
+    lain.value = opsi.tanggal;
+    lain.hidden = nilai !== 'Tanggal lain';
+    g.wadah.appendChild(lain);
+    g.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        var v = g.nilai();
+        lain.hidden = v !== 'Tanggal lain';
+        if (v === 'Hari ini') opsi.ganti(hariIni);
+        else if (v === 'Kemarin') opsi.ganti(kemarin);
+        else if (lain.value) opsi.ganti(lain.value);
+      });
+    });
+    lain.addEventListener('change', function () {
+      if (lain.value && lain.value <= hariIni) opsi.ganti(lain.value);
+    });
+    return g;
+  }
+
+  /** Tanggal draft yang masih boleh dipakai: kemarin untuk semua, tanggal lama hanya Pengelola; selebihnya hari ini. */
+  function tanggalDraft(tanggal, pengelola) {
+    var hariIni = tanggalIso(new Date());
+    var kemarin = geserHari(hariIni, -1);
+    return tanggal === kemarin || (pengelola && tanggal && tanggal <= hariIni) ? tanggal : hariIni;
+  }
+
+  /* =======================================================================
+   * Form Pencatatan Waste (spesifikasi sistem Bagian 5.4, tampilan 5.3)
+   * ===================================================================== */
+
+  var KATEGORI_WASTE = ['Expired', 'Rusak', 'Sisa Produksi', 'Kesalahan Order', 'Lainnya'];
+  var SHIFT = ['Pagi', 'Siang', 'Malam'];
+
+  /**
+   * Draft per pengguna: { tanggal, shift, baris: [{ id, item, kategori, qty,
+   * alasan }], terbuka (id baris yang sedang diisi), sid }.
+   */
+  function bacaDraftWaste() {
+    var d = Draft.baca('waste');
+    var data = d && d.data ? d.data : {};
+    return {
+      tanggal: data.tanggal || '',
+      shift: data.shift || '',
+      baris: Array.isArray(data.baris) ? data.baris : [],
+      terbuka: data.terbuka || '',
+      sid: data.sid || '',
+      waktu: d ? d.waktu : null
+    };
+  }
+
+  /** Data waste di HP. Untuk tanggal lain tanpa sinyal: daftar item yang sama, tanpa catatan. */
+  function dataWasteDariHp(tanggal) {
+    var c = Cache.baca('waste');
+    if (!c || !c.data || !c.data.item) return null;
+    if (c.data.tanggal === tanggal) return c.data;
+    return Object.assign({}, c.data, {
+      tanggal: tanggal,
+      kiriman: { jumlah: 0, terakhir: null, totalRp: 0, baris: [] },
+      nihil: null,
+      turunan: true
+    });
+  }
+
+  function layarWaste(k) {
+    aturJudul('Waste');
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var draft = bacaDraftWaste();
+    var tanggal = tanggalDraft(draft.tanggal, pengelola);
+    var data = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var statusForm = el('div', { class: 'status-form' });
+    var wadahBaris = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolKirim = tombol('Kirim waste', 'utama');
+    var tombolTambah = tombol('Tambah item', 'kedua', { 'aria-haspopup': 'dialog' });
+    tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
+
+    var gTanggal = pilihanTanggalIsian({ pengelola: pengelola, tanggal: tanggal, ganti: gantiTanggal });
+    var gShift = grupPilihan('Shift', SHIFT, draft.shift);
+    gShift.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        draft.shift = gShift.nilai();
+        gShift.galat('');
+        simpanDraft();
+      });
+    });
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
+      tautanKembali('Beranda', '#/'),
+      el('h1', { class: 'judul-layar', text: 'Pencatatan Waste' }),
+      catatanDraft,
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+        gTanggal.wadah,
+        gShift.wadah,
+        el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
+      ]),
+      wadahBaris,
+      el('div', { class: 'deret-tambah' }, tombolTambah),
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
+    ]));
+
+    function simpanDraft() {
+      var waktu = Draft.simpan('waste', { tanggal: tanggal, shift: draft.shift, baris: draft.baris, terbuka: draft.terbuka, sid: draft.sid });
+      catatanDraft.textContent = draft.baris.length && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktu && draft.baris.length) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    function infoItem(nama) {
+      var daftar = data && data.item || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama === nama) return daftar[i];
+      return { nama: nama, satuan: '', harga: null, kategori: '' };
+    }
+
+    /** Hasil pemeriksaan satu baris: { qty, salah: 'kategori' | 'qty' | 'alasan' | '' }. */
+    function periksa(b) {
+      var qty = bacaAngka(b.qty);
+      if (KATEGORI_WASTE.indexOf(b.kategori) < 0) return { qty: qty, salah: 'kategori' };
+      if (qty === null || isNaN(qty) || !(qty > 0)) return { qty: qty, salah: 'qty' };
+      if (b.kategori === 'Lainnya' && !String(b.alasan || '').trim()) return { qty: qty, salah: 'alasan' };
+      return { qty: qty, salah: '' };
+    }
+
+    function teksEstimasi(b) {
+      var it = infoItem(b.item);
+      var qty = bacaAngka(b.qty);
+      if (it.harga == null) return 'Harga satuan belum diisi Pengelola';
+      return formatRupiah(qty > 0 ? qty * it.harga : 0);
+    }
+
+    function perbaruiPenghitung() {
+      var lengkap = draft.baris.filter(function (b) { return !periksa(b).salah; }).length;
+      penghitung.textContent = draft.baris.length
+        ? lengkap + ' dari ' + draft.baris.length + ' item lengkap'
+        : 'Belum ada item';
+    }
+
+    function hapusBaris(b) {
+      draft.baris = draft.baris.filter(function (x) { return x !== b; });
+      if (draft.terbuka === b.id) draft.terbuka = '';
+      simpanDraft();
+      gambarBaris();
+      toast(b.item + ' dihapus dari isian.');
+    }
+
+    function bukaBaris(id) {
+      draft.terbuka = id;
+      simpanDraft();
+      gambarBaris();
+    }
+
+    /** Isian satu baris; dipakai kartu (HP dan tablet) dan baris tabel (laptop dan desktop). */
+    function isianBaris(b, nomor) {
+      var it = infoItem(b.item);
+      var gKat = grupPilihan('Kategori waste', KATEGORI_WASTE, b.kategori);
+      gKat.wadah.querySelector('fieldset').classList.add('pilihan-kategori-waste');
+      var idQty = 'qty-waste-' + nomor;
+      var inQty = el('input', { class: 'isian isian-angka', id: idQty, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+        'data-kunci': b.id + '|qty' });
+      inQty.value = b.qty || '';
+      var galatQty = el('p', { class: 'kolom-galat' });
+      var kAlasan = kolomIsian({ label: 'Alasan / keterangan', maxlength: 200, nilai: b.alasan || '',
+        atribut: { 'data-kunci': b.id + '|alasan' } });
+      var bantuanAlasan = el('p', { class: 'kolom-bantuan' });
+      kAlasan.wadah.insertBefore(bantuanAlasan, kAlasan.input);
+      var estimasi = el('span', { class: 'estimasi-angka' });
+
+      function perbarui() {
+        var h = periksa(b);
+        var qtySalah = h.qty !== null && (isNaN(h.qty) || !(h.qty > 0));
+        inQty.setAttribute('aria-invalid', qtySalah ? 'true' : 'false');
+        kosongkan(galatQty);
+        if (qtySalah) {
+          galatQty.appendChild(ikonStatus('masalah'));
+          galatQty.appendChild(el('span', { text: 'Isi angka lebih dari 0, misalnya 2,5.' }));
+        }
+        bantuanAlasan.textContent = b.kategori === 'Lainnya' ? 'Wajib diisi untuk kategori Lainnya.' : 'Tidak wajib.';
+        estimasi.textContent = teksEstimasi(b);
+        perbaruiPenghitung();
+      }
+      gKat.input.forEach(function (i) {
+        i.addEventListener('change', function () {
+          b.kategori = gKat.nilai();
+          gKat.galat('');
+          simpanDraft();
+          perbarui();
+        });
+      });
+      inQty.addEventListener('input', function () {
+        b.qty = inQty.value;
+        simpanDraft();
+        perbarui();
+      });
+      kAlasan.input.addEventListener('input', function () {
+        b.alasan = kAlasan.input.value;
+        if (kAlasan.input.value.trim()) kAlasan.galat('');
+        simpanDraft();
+        perbarui();
+      });
+      perbarui();
+      var hapus = el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari isian',
+        onclick: function () { hapusBaris(b); } }, ikon('sampah'));
+      return { it: it, gKat: gKat, inQty: inQty, idQty: idQty, galatQty: galatQty, kAlasan: kAlasan, estimasi: estimasi, hapus: hapus };
+    }
+
+    /** Ringkasan satu baris (HP dan tablet): item yang sudah diisi diringkas; ketuk untuk membuka. */
+    function barisRingkas(b) {
+      var it = infoItem(b.item);
+      var h = periksa(b);
+      var bagian = [b.kategori || 'Kategori belum dipilih'];
+      if (h.qty > 0) bagian.push(formatAngka(h.qty) + (it.satuan ? ' ' + it.satuan : ''));
+      if (h.qty > 0 && it.harga != null) bagian.push(formatRupiah(h.qty * it.harga));
+      return el('div', { class: 'kartu-item waste-ringkas' }, [
+        el('button', { type: 'button', class: 'waste-ringkas-tombol', 'aria-expanded': 'false',
+          'aria-label': b.item + ', ' + bagian.join(', ') + (h.salah ? ', belum lengkap' : '') + '. Ketuk untuk mengubah.',
+          onclick: function () { bukaBaris(b.id); } }, [
+          el('span', { class: 'kartu-item-nama', text: b.item }),
+          el('span', { class: 'waste-ringkas-ket', text: bagian.join(' · ') }),
+          h.salah ? tandaStatus('tinjau', 'Belum lengkap') : null
+        ]),
+        el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari isian',
+          onclick: function () { hapusBaris(b); } }, ikon('sampah'))
+      ]);
+    }
+
+    function kartuTerbuka(b, nomor) {
+      var x = isianBaris(b, nomor);
+      return el('article', { class: 'kartu-item', 'aria-label': b.item }, [
+        el('div', { class: 'kartu-item-kepala' }, [
+          el('h2', { class: 'kartu-item-nama', text: b.item }),
+          x.hapus
+        ]),
+        x.gKat.wadah,
+        el('div', { class: 'kolom' }, [
+          el('label', { class: 'kolom-label', for: x.idQty, text: 'Qty' }),
+          el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]),
+          x.galatQty
+        ]),
+        x.kAlasan.wadah,
+        el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Estimasi kerugian' }), x.estimasi]),
+        draft.baris.length > 1 ? tombol('Selesai', 'tautan', { onclick: function () { bukaBaris(''); } }) : null
+      ]);
+    }
+
+    function barisTabel(b, nomor) {
+      var x = isianBaris(b, nomor);
+      x.inQty.setAttribute('aria-label', 'Qty ' + b.item);
+      x.kAlasan.wadah.querySelector('label').classList.add('sr');
+      x.gKat.wadah.querySelector('legend').classList.add('sr');
+      return el('tr', {}, [
+        el('td', { class: 'angka', text: String(nomor) }),
+        el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: b.item })),
+        el('td', { class: 'sel-kategori-waste' }, x.gKat.wadah),
+        el('td', {}, [el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]), x.galatQty]),
+        el('td', { class: 'sel-alasan' }, x.kAlasan.wadah),
+        el('td', { class: 'angka otomatis' }, x.estimasi),
+        el('td', {}, x.hapus)
+      ]);
+    }
+
+    function gambarBaris() {
+      kosongkan(wadahBaris);
+      tulisPesan(pesan, '');
+      if (!draft.baris.length) {
+        wadahBaris.appendChild(kotakKosong('Belum ada item waste. Ketuk Tambah item untuk mencatat barang yang terbuang.'));
+        perbaruiPenghitung();
+        return;
+      }
+      if (mediaDesktop.matches) {
+        var badan = el('tbody');
+        draft.baris.forEach(function (b, i) { badan.appendChild(barisTabel(b, i + 1)); });
+        wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-waste' }, [
+          el('thead', {}, el('tr', {}, ['No', 'Item / Produk', 'Kategori waste', 'Qty', 'Alasan / keterangan', 'Estimasi kerugian', '']
+            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 || i === 5 ? 'angka' : null, text: j }); }))),
+          badan
+        ])));
+      } else {
+        var grid = el('div', { class: 'grid-item' });
+        // Di HP dan tablet hanya item yang sedang diisi yang terbuka; yang lain diringkas.
+        draft.baris.forEach(function (b, i) {
+          grid.appendChild(b.id === draft.terbuka ? kartuTerbuka(b, i + 1) : barisRingkas(b));
+        });
+        wadahBaris.appendChild(grid);
+      }
+      perbaruiPenghitung();
+    }
+
+    /** Lembar "Tambah item": ketik beberapa huruf, pilih dari daftar (tampilan Bagian 5.3). */
+    function bukaTambahItem() {
+      var daftar = data && data.item || [];
+      var kCari = kolomIsian({ label: 'Cari item', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+      var hasil = el('div', { class: 'daftar daftar-pilih-item', role: 'list' });
+      function saring() {
+        var q = kCari.input.value.trim().toLowerCase();
+        kosongkan(hasil);
+        var cocok = daftar.filter(function (it) { return !q || it.nama.toLowerCase().indexOf(q) >= 0; });
+        if (!cocok.length) {
+          hasil.appendChild(kotakKosong(daftar.length ? 'Tidak ada item dengan nama itu.' : 'Daftar item belum termuat. Periksa sinyal, lalu buka lagi.'));
+          return;
+        }
+        cocok.slice(0, 60).forEach(function (it) {
+          hasil.appendChild(el('button', { type: 'button', class: 'daftar-baris', role: 'listitem',
+            onclick: function () { tambahBaris(it.nama); lembar.tutup(); } }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: it.nama }),
+              el('span', { class: 'daftar-baris-ket', text: [it.kategori, it.satuan, it.harga != null ? formatRupiah(it.harga) + ' per ' + it.satuan : 'tanpa harga']
+                .filter(Boolean).join(' · ') })
+            ]),
+            ikon('tambah')
+          ]));
+        });
+      }
+      kCari.input.addEventListener('input', saring);
+      saring();
+      var lembar = bukaLembar({ judul: 'Tambah item waste', isi: [kCari.wadah, hasil], aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+    }
+
+    function tambahBaris(nama) {
+      var b = { id: buatId(), item: nama, kategori: '', qty: '', alasan: '' };
+      draft.baris.push(b);
+      draft.terbuka = b.id;
+      simpanDraft();
+      gambarBaris();
+      if (!apakahSentuh()) {
+        var gk = wadahBaris.querySelector('[data-kunci="' + b.id + '|qty"]');
+        if (gk) gk.focus();
+      }
+    }
+    tombolTambah.addEventListener('click', bukaTambahItem);
+
+    function gambarStatus() {
+      kosongkan(statusForm);
+      if (!data) return;
+      var menunggu = antreanForm('WASTE', tanggal);
+      var kirimMenunggu = menunggu.filter(function (e) { return e.aksi === 'kirimWaste'; });
+      var nihilMenunggu = menunggu.filter(function (e) { return e.aksi === 'tandaiNihil'; })[0] || null;
+      var kr = data.kiriman;
+      if (kr.jumlah) {
+        var t = kr.terakhir;
+        statusForm.appendChild(el('p', {}, [tandaStatus('baik', 'Terkirim'),
+          el('span', { class: 'kolom-bantuan', text: ' ' + kr.jumlah + ' kiriman' + (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') +
+            '. Estimasi kerugian ' + formatRupiah(kr.totalRp) + '.' })]));
+        statusForm.appendChild(el('p', { class: 'kolom-bantuan lebar-penuh', text: 'Tercatat: ' + kr.baris.map(function (b) {
+          return b.item + ' ' + formatAngka(b.qty) + (b.satuan ? ' ' + b.satuan : '') + ' (' + b.kategori.toLowerCase() + ')';
+        }).join(', ') + '.' }));
+      }
+      if (kirimMenunggu.length) statusForm.appendChild(tandaStatus('menunggu', kirimMenunggu.length + ' isian menunggu kirim'));
+      var nihil = bagianNihil({
+        formId: 'WASTE',
+        namaForm: 'Waste',
+        tanggal: tanggal,
+        nihil: data.nihil,
+        adaIsian: kr.jumlah > 0 || kirimMenunggu.length > 0,
+        menunggu: nihilMenunggu,
+        selesai: function (n) {
+          data.nihil = n;
+          gambarStatus();
+        }
+      });
+      if (nihil) statusForm.appendChild(nihil);
+    }
+
+    function gambar(d) {
+      data = d;
+      gambarStatus();
+      gambarBaris();
+    }
+
+    function gantiTanggal(baru) {
+      if (baru === tanggal) return;
+      tanggal = baru;
+      simpanDraft();
+      muat();
+    }
+
+    tombolKirim.addEventListener('click', function () {
+      if (tombolKirim.disabled) return;
+      tulisPesan(pesan, '');
+      if (!gShift.galat(draft.shift ? '' : 'Pilih shift.')) {
+        gShift.input[0].focus();
+        tulisPesan(pesan, 'Pilih shift: Pagi, Siang, atau Malam.', 'masalah');
+        return;
+      }
+      if (!draft.baris.length) {
+        tulisPesan(pesan, 'Tambah minimal satu item waste.', 'masalah');
+        return;
+      }
+      var salah = null;
+      draft.baris.forEach(function (b) {
+        var h = periksa(b);
+        if (h.salah && !salah) salah = { b: b, jenis: h.salah };
+      });
+      if (salah) {
+        var teks = salah.jenis === 'kategori' ? 'Pilih kategori waste untuk ' + salah.b.item + '.'
+          : (salah.jenis === 'qty' ? 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.'
+            : 'Tulis alasan untuk ' + salah.b.item + ', karena kategorinya Lainnya.');
+        if (!mediaDesktop.matches && draft.terbuka !== salah.b.id) bukaBaris(salah.b.id);
+        tulisPesan(pesan, teks, 'masalah');
+        var kunci = salah.jenis === 'kategori' ? null : salah.b.id + '|' + salah.jenis;
+        var kolom = kunci ? wadahBaris.querySelector('[data-kunci="' + kunci + '"]') : null;
+        if (kolom) kolom.focus();
+        return;
+      }
+      if (!draft.sid) draft.sid = buatId();
+      var baris = draft.baris.map(function (b) {
+        return { item: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() };
+      });
+      var isi = { submissionId: draft.sid, tanggal: tanggal, shift: draft.shift, waktuPerangkat: new Date().toISOString(), baris: baris };
+      var entri = { id: isi.submissionId, aksi: 'kirimWaste', isi: isi, formId: 'WASTE',
+        judul: 'Waste · ' + baris.length + ' item', tanggal: tanggal };
+      function kosongkanIsian() {
+        draft.baris = [];
+        draft.terbuka = '';
+        draft.sid = buatId();
+        simpanDraft();
+      }
+      function keAntrean() {
+        simpanKeAntrean(entri);
+        kosongkanIsian();
+        gambarStatus();
+        gambarBaris();
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+      }
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(tombolKirim, true, 'Mengirim…');
+      jagaProses(panggilApi('kirimWaste', isi)).then(function (hasil) {
+        aturTombolProses(tombolKirim, false);
+        kosongkanIsian();
+        Cache.tulis('waste', hasil.form);
+        if (hasil.form.tanggal === tanggal) gambar(hasil.form);
+        toast('Waste terkirim.');
+      }).catch(function (err) {
+        aturTombolProses(tombolKirim, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (err && err.sesiBerakhir) {
+          simpanKeAntrean(entri);
+          kosongkanIsian();
+          tanganiSesiBerakhir(err);
+          return;
+        }
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+
+    function muat() {
+      return muatData({
+        dariHp: function () { return dataWasteDariHp(tanggal); },
+        simpanHp: function (d) { Cache.tulis('waste', d); },
+        ambil: function () { return panggilApi('formWaste', { tanggal: tanggal }); },
+        gambar: function (d) {
+          if (d.tanggal === tanggal) gambar(d);
+        },
+        kerangka: function () {
+          kosongkan(wadahBaris).appendChild(kerangkaBaris(3));
+        },
+        galat: function (teks, cobaLagi) {
+          kosongkan(wadahBaris).appendChild(kotakGalat(teks, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      gambarBaris();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    gambarBaris();
+    muat();
+    segarkanLayar = muat;
+    segarkanAntrean = gambarStatus;
+  }
+
+  /* =======================================================================
+   * Form Pengecekan Suhu Chiller & Freezer (spesifikasi sistem Bagian 5.2,
+   * tampilan Bagian 5.3)
+   * ===================================================================== */
+
+  var WAKTU_CEK = ['Opening', 'Middle', 'Closing', 'Cek ulang'];
+  var WAKTU_CEK_WAJIB = ['Opening', 'Middle', 'Closing'];
+  var CEK_ULANG = 'Cek ulang';
+
+  /** Sama dengan statusSuhuNilai_ di Code.gs; status yang tersimpan tetap dihitung server. */
+  function suhuNormal(tipe, suhu, batas) {
+    return tipe === 'Freezer' ? suhu <= batas.freezerMaks : suhu >= batas.chillerMin && suhu <= batas.chillerMaks;
+  }
+
+  function teksBatasSuhu(tipe, batas) {
+    return tipe === 'Freezer'
+      ? 'Normal: ' + formatAngka(batas.freezerMaks) + ' °C atau lebih rendah'
+      : 'Normal: ' + formatAngka(batas.chillerMin) + ' sampai ' + formatAngka(batas.chillerMaks) + ' °C';
+  }
+
+  /** "4 °C", "−18 °C" */
+  function teksSuhu(n) {
+    return formatAngka(n) + ' °C';
+  }
+
+  /** Draft per pengguna: { tanggal, waktu, nilai: { waktu: { unit: { suhu, tindakan } } }, sid: { waktu: id } }. */
+  function bacaDraftSuhu() {
+    var d = Draft.baca('suhu');
+    var data = d && d.data ? d.data : {};
+    return {
+      tanggal: data.tanggal || '',
+      waktu: WAKTU_CEK.indexOf(data.waktu) >= 0 ? data.waktu : '',
+      nilai: data.nilai && typeof data.nilai === 'object' ? data.nilai : {},
+      sid: data.sid && typeof data.sid === 'object' ? data.sid : {},
+      waktuSimpan: d ? d.waktu : null
+    };
+  }
+
+  /** Data suhu di HP. Untuk tanggal lain tanpa sinyal: unit dan batas yang sama, tanpa pengecekan. */
+  function dataSuhuDariHp(tanggal) {
+    var c = Cache.baca('suhu');
+    if (!c || !c.data || !c.data.unit) return null;
+    if (c.data.tanggal === tanggal) return c.data;
+    return Object.assign({}, c.data, { tanggal: tanggal, isian: [], turunan: true });
+  }
+
+  function layarSuhu(k) {
+    aturJudul('Suhu');
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var draft = bacaDraftSuhu();
+    var tanggal = tanggalDraft(draft.tanggal, pengelola);
+    var data = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var statusForm = el('div', { class: 'status-form' });
+    var wadahUnit = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolKirim = tombol('Kirim suhu', 'utama');
+
+    var gTanggal = pilihanTanggalIsian({ pengelola: pengelola, tanggal: tanggal, ganti: gantiTanggal });
+    var gWaktu = grupPilihan('Waktu cek', WAKTU_CEK, draft.waktu);
+    gWaktu.wadah.querySelector('fieldset').classList.add('pilihan-waktu-cek');
+    gWaktu.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        draft.waktu = gWaktu.nilai();
+        gWaktu.galat('');
+        tulisPesan(pesan, '');
+        simpanDraft();
+        gambarUnit();
+      });
+    });
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
+      tautanKembali('Beranda', '#/'),
+      el('h1', { class: 'judul-layar', text: 'Pengecekan Suhu' }),
+      catatanDraft,
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+        gTanggal.wadah,
+        el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
+      ]),
+      gWaktu.wadah,
+      wadahUnit,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
+    ]));
+
+    function adaIsianDraft() {
+      return Object.keys(draft.nilai).some(function (w) {
+        return Object.keys(draft.nilai[w] || {}).some(function (u) {
+          var x = draft.nilai[w][u];
+          return x && bacaAngkaSuhu(x.suhu) !== null;
+        });
+      });
+    }
+
+    function simpanDraft() {
+      var waktu = Draft.simpan('suhu', { tanggal: tanggal, waktu: draft.waktu, nilai: draft.nilai, sid: draft.sid });
+      catatanDraft.textContent = adaIsianDraft() && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktuSimpan && adaIsianDraft()) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktuSimpan).toISOString());
+
+    function isianUnit(waktu, unit) {
+      draft.nilai[waktu] = draft.nilai[waktu] || {};
+      return draft.nilai[waktu][unit] || null;
+    }
+
+    /** Isian draft unit itu untuk waktu cek terpilih; Freezer mulai dengan tanda minus. */
+    function isianDraft(u) {
+      var x = isianUnit(draft.waktu, u.nama);
+      if (!x) {
+        x = { suhu: u.tipe === 'Freezer' ? '-' : '', tindakan: '' };
+        draft.nilai[draft.waktu][u.nama] = x;
+      }
+      return x;
+    }
+
+    /** Pengecekan yang tercatat di server dan yang masih di antrean HP, per unit, urut waktu. */
+    function catatanUnit(nama) {
+      var hasil = (data && data.isian || []).filter(function (r) { return r.unit === nama; })
+        .map(function (r) { return Object.assign({ antre: false }, r); });
+      antreanForm('SUHU', tanggal).forEach(function (e) {
+        if (e.aksi !== 'kirimSuhu' || !e.isi) return;
+        (e.isi.baris || []).forEach(function (b) {
+          if (b.unit !== nama) return;
+          var u = unitBernama(nama);
+          var suhu = bacaAngkaSuhu(b.suhu);
+          hasil.push({ unit: nama, waktuCek: e.isi.waktuCek, suhu: suhu, tindakan: b.tindakan,
+            status: u && data && suhu != null && !isNaN(suhu) && !suhuNormal(u.tipe, suhu, data.batas) ? 'Di Luar Standar' : 'Normal',
+            oleh: '', waktu: e.isi.waktuPerangkat, antre: true, gagal: e.status === 'gagal' });
+        });
+      });
+      return hasil.sort(function (a, b) { return String(a.waktu).localeCompare(String(b.waktu)); });
+    }
+
+    function unitBernama(nama) {
+      var daftar = data && data.unit || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama === nama) return daftar[i];
+      return null;
+    }
+
+    /** Waktu cek (Opening/Middle/Closing) yang sudah tercatat atau menunggu kirim untuk unit itu. */
+    function sudahDicek(nama, waktu) {
+      if (waktu === CEK_ULANG) return null;
+      var c = catatanUnit(nama);
+      for (var i = 0; i < c.length; i++) if (c[i].waktuCek === waktu) return c[i];
+      return null;
+    }
+
+    /** Pengecekan terakhir unit itu di luar standar: tawarkan cek ulang. */
+    function perluCekUlang(nama) {
+      var c = catatanUnit(nama);
+      return c.length > 0 && c[c.length - 1].status !== 'Normal';
+    }
+
+    /** Satu baris pengecekan tercatat: "Opening 07.10: 4 °C, normal · Rina". */
+    function barisCatatan(r) {
+      var luar = r.status !== 'Normal';
+      var teks = r.waktuCek + (r.waktu ? ' ' + jam(r.waktu) : '') + ': ';
+      return el('li', { class: 'catatan-suhu' + (r.waktuCek === CEK_ULANG ? ' cek-ulang' : '') }, [
+        el('span', {}, [
+          teks,
+          el('span', { class: 'angka-satuan' + (luar ? ' nilai-masalah' : ''), text: teksSuhu(r.suhu) }),
+          luar ? ', di luar standar' : ', normal',
+          r.antre ? '' : (r.oleh ? ' · ' + r.oleh : '')
+        ]),
+        r.antre ? tandaStatus(r.gagal ? 'masalah' : 'menunggu', r.gagal ? 'Gagal kirim' : 'Menunggu kirim') : null,
+        luar && r.tindakan ? el('span', { class: 'catatan-suhu-tindakan', text: 'Tindakan: ' + r.tindakan }) : null
+      ]);
+    }
+
+    function daftarCatatan(nama) {
+      var c = catatanUnit(nama);
+      if (!c.length) return null;
+      return el('ul', { class: 'daftar-catatan-suhu', 'aria-label': 'Tercatat hari ini' }, c.map(barisCatatan));
+    }
+
+    /** Hasil pemeriksaan isian satu unit: { suhu, salah: '' | 'angka' | 'tindakan', luar }. */
+    function periksa(u, x) {
+      var suhu = bacaAngkaSuhu(x.suhu);
+      if (suhu === null) return { suhu: null, salah: '', luar: false };
+      if (isNaN(suhu) || suhu < -60 || suhu > 60) return { suhu: suhu, salah: 'angka', luar: false };
+      var luar = !suhuNormal(u.tipe, suhu, data.batas);
+      return { suhu: suhu, salah: luar && !String(x.tindakan || '').trim() ? 'tindakan' : '', luar: luar };
+    }
+
+    /** Unit yang masih bisa diisi pada waktu cek terpilih. */
+    function unitTerbuka() {
+      if (!data || !draft.waktu) return [];
+      return data.unit.filter(function (u) { return !sudahDicek(u.nama, draft.waktu); });
+    }
+
+    function perbaruiPenghitung() {
+      if (!data) {
+        penghitung.textContent = '';
+        return;
+      }
+      if (!draft.waktu) {
+        penghitung.textContent = 'Pilih waktu cek';
+        return;
+      }
+      var buka = unitTerbuka();
+      var terisi = buka.filter(function (u) { return periksa(u, isianDraft(u)).suhu !== null; }).length;
+      penghitung.textContent = buka.length ? terisi + ' dari ' + buka.length + ' unit terisi' : 'Semua unit sudah dicek';
+    }
+
+    /** Kolom suhu dengan tombol ± (papan angka iPhone tidak punya tanda minus), status, dan tindakan korektif. */
+    function isianSuhu(u, nomor) {
+      var x = isianDraft(u);
+      var idSuhu = 'suhu-' + nomor;
+      var inSuhu = el('input', { class: 'isian isian-angka', id: idSuhu, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+        'data-kunci': u.nama + '|suhu' });
+      inSuhu.value = x.suhu || '';
+      var tombolTanda = el('button', { type: 'button', class: 'tombol-tanda', 'aria-label': 'Ganti tanda plus atau minus suhu ' + u.nama, text: '±' });
+      var galatSuhu = el('p', { class: 'kolom-galat' });
+      var status = el('div', { class: 'status-suhu', 'aria-live': 'polite' });
+      var kTindakan = kolomIsian({ label: 'Tindakan korektif', maxlength: 200, nilai: x.tindakan || '',
+        bantuan: 'Wajib diisi karena suhu di luar standar.', atribut: { 'data-kunci': u.nama + '|tindakan' } });
+      var akar = null; // kartu atau baris tabel, diberi tanda Masalah saat di luar standar
+
+      function perbarui() {
+        var h = periksa(u, x);
+        inSuhu.setAttribute('aria-invalid', h.salah === 'angka' ? 'true' : 'false');
+        kosongkan(galatSuhu);
+        if (h.salah === 'angka') {
+          galatSuhu.appendChild(ikonStatus('masalah'));
+          galatSuhu.appendChild(el('span', { text: 'Isi suhu berupa angka, misalnya 3,5 atau -18.' }));
+        }
+        kosongkan(status);
+        if (h.suhu !== null && h.salah !== 'angka') {
+          status.appendChild(h.luar ? tandaStatus('masalah', 'Di luar standar') : tandaStatus('baik', 'Normal'));
+        }
+        kTindakan.wadah.hidden = !h.luar;
+        if (akar) akar.classList.toggle('masalah', h.luar);
+        perbaruiPenghitung();
+      }
+      inSuhu.addEventListener('input', function () {
+        x.suhu = inSuhu.value;
+        simpanDraft();
+        perbarui();
+      });
+      tombolTanda.addEventListener('click', function () {
+        var t = String(inSuhu.value || '').replace('−', '-');
+        inSuhu.value = t.charAt(0) === '-' ? t.slice(1) : '-' + t;
+        x.suhu = inSuhu.value;
+        simpanDraft();
+        perbarui();
+        inSuhu.focus();
+      });
+      kTindakan.input.addEventListener('input', function () {
+        x.tindakan = kTindakan.input.value;
+        if (kTindakan.input.value.trim()) kTindakan.galat('');
+        simpanDraft();
+        perbarui();
+      });
+      return {
+        idSuhu: idSuhu,
+        inSuhu: inSuhu,
+        baris: el('div', { class: 'baris-angka baris-suhu' }, [tombolTanda, inSuhu, el('span', { class: 'satuan-tetap', text: '°C' })]),
+        galatSuhu: galatSuhu,
+        status: status,
+        kTindakan: kTindakan,
+        pasang: function (wadah) {
+          akar = wadah;
+          perbarui();
+        }
+      };
+    }
+
+    function tombolCekUlang(u) {
+      return tombol('Catat cek ulang', 'kedua', { onclick: function () { mulaiCekUlang(u.nama); } });
+    }
+
+    function mulaiCekUlang(nama) {
+      draft.waktu = CEK_ULANG;
+      gWaktu.input.forEach(function (i) { i.checked = i.value === CEK_ULANG; });
+      gWaktu.galat('');
+      simpanDraft();
+      gambarUnit();
+      var kolom = wadahUnit.querySelector('[data-kunci="' + nama.replace(/"/g, '\\"') + '|suhu"]');
+      if (kolom) kolom.focus();
+    }
+
+    function kartuUnit(u, nomor) {
+      var sudah = sudahDicek(u.nama, draft.waktu);
+      var kartu = el('article', { class: 'kartu-item kartu-suhu', 'aria-label': u.nama });
+      kartu.appendChild(el('div', { class: 'kartu-item-kepala' }, [
+        el('h2', { class: 'kartu-item-nama', text: u.nama }),
+        el('span', { class: 'kartu-item-satuan', text: u.tipe })
+      ]));
+      kartu.appendChild(el('p', { class: 'otomatis batas-suhu', text: teksBatasSuhu(u.tipe, data.batas) }));
+      var catatan = daftarCatatan(u.nama);
+      if (catatan) kartu.appendChild(catatan);
+      if (!draft.waktu) return kartu;
+      if (sudah) {
+        // Waktu cek ini sudah diisi: tampil sebagai teks, bukan kolom isian.
+        if (sudah.status !== 'Normal') kartu.classList.add('masalah');
+        if (perluCekUlang(u.nama)) kartu.appendChild(tombolCekUlang(u));
+        return kartu;
+      }
+      var x = isianSuhu(u, nomor);
+      kartu.appendChild(el('div', { class: 'kolom' }, [
+        el('label', { class: 'kolom-label', for: x.idSuhu, text: draft.waktu === CEK_ULANG ? 'Suhu cek ulang' : 'Suhu ' + draft.waktu }),
+        x.baris,
+        x.galatSuhu
+      ]));
+      kartu.appendChild(x.status);
+      kartu.appendChild(x.kTindakan.wadah);
+      x.pasang(kartu);
+      return kartu;
+    }
+
+    function barisTabelUnit(u, nomor) {
+      var sudah = draft.waktu ? sudahDicek(u.nama, draft.waktu) : null;
+      var catatan = daftarCatatan(u.nama);
+      var tr = el('tr', {}, [
+        el('td', { class: 'angka', text: String(nomor) }),
+        el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: u.nama })),
+        el('td', { text: u.tipe }),
+        el('td', { class: 'otomatis batas-suhu', text: teksBatasSuhu(u.tipe, data.batas).replace('Normal: ', '') }),
+        el('td', { class: 'otomatis tercatat' }, catatan || el('span', { text: '–' }))
+      ]);
+      if (!draft.waktu || sudah) {
+        var sel = el('td', { colspan: '2' });
+        if (sudah) {
+          sel.appendChild(el('span', { class: 'otomatis', text: draft.waktu + ' sudah diisi.' }));
+          if (sudah.status !== 'Normal') tr.classList.add('masalah');
+        }
+        if (draft.waktu && perluCekUlang(u.nama)) sel.appendChild(tombolCekUlang(u));
+        tr.appendChild(sel);
+        return tr;
+      }
+      var x = isianSuhu(u, nomor);
+      x.inSuhu.setAttribute('aria-label', 'Suhu ' + u.nama);
+      x.kTindakan.wadah.querySelector('label').classList.add('sr');
+      tr.appendChild(el('td', {}, [x.baris, x.galatSuhu, x.status]));
+      tr.appendChild(el('td', { class: 'sel-alasan' }, x.kTindakan.wadah));
+      x.pasang(tr);
+      return tr;
+    }
+
+    /** Centang pada tombol waktu cek yang sudah diisi untuk semua unit aktif. */
+    function tandaiWaktuCek() {
+      gWaktu.input.forEach(function (i) {
+        var span = i.nextSibling;
+        var w = i.value;
+        var selesai = data && data.unit.length && w !== CEK_ULANG &&
+          data.unit.every(function (u) { return sudahDicek(u.nama, w); });
+        kosongkan(span);
+        if (selesai) span.appendChild(ikon('centang'));
+        span.appendChild(document.createTextNode(w));
+        if (selesai) span.appendChild(el('span', { class: 'sr', text: ', sudah diisi' }));
+      });
+    }
+
+    function gambarUnit() {
+      kosongkan(wadahUnit);
+      if (!data) return;
+      tandaiWaktuCek();
+      if (!data.unit.length) {
+        wadahUnit.appendChild(kotakKosong('Belum ada unit chiller atau freezer yang aktif. Minta Pengelola menambah unit di tab M_Unit.'));
+        perbaruiPenghitung();
+        return;
+      }
+      if (draft.waktu) draft.nilai[draft.waktu] = draft.nilai[draft.waktu] || {};
+      if (mediaDesktop.matches) {
+        var badan = el('tbody');
+        data.unit.forEach(function (u, i) { badan.appendChild(barisTabelUnit(u, i + 1)); });
+        wadahUnit.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-suhu' }, [
+          el('thead', {}, el('tr', {}, ['No', 'Unit', 'Tipe', 'Batas normal', 'Tercatat hari ini', 'Suhu', 'Tindakan korektif']
+            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 ? 'angka' : null, text: j }); }))),
+          badan
+        ])));
+      } else {
+        var grid = el('div', { class: 'grid-item' });
+        data.unit.forEach(function (u, i) { grid.appendChild(kartuUnit(u, i + 1)); });
+        wadahUnit.appendChild(grid);
+      }
+      perbaruiPenghitung();
+    }
+
+    function gambarStatus() {
+      kosongkan(statusForm);
+      if (!data) return;
+      var total = data.unit.length * WAKTU_CEK_WAJIB.length;
+      var terisi = 0;
+      data.unit.forEach(function (u) {
+        WAKTU_CEK_WAJIB.forEach(function (w) {
+          if ((data.isian || []).some(function (r) { return r.unit === u.nama && r.waktuCek === w; })) terisi++;
+        });
+      });
+      var luar = (data.isian || []).filter(function (r) { return r.status !== 'Normal'; }).length;
+      if (total) {
+        statusForm.appendChild(el('p', {}, [
+          terisi >= total ? tandaStatus('baik', 'Terkirim') : null,
+          el('span', { class: 'kolom-bantuan', text: (terisi >= total ? ' ' : '') + terisi + ' dari ' + total + ' pengecekan' +
+            (luar ? ', ' + luar + ' di luar standar' : '') + '.' })
+        ]));
+      }
+      var menunggu = antreanForm('SUHU', tanggal).filter(function (e) { return e.aksi === 'kirimSuhu'; });
+      if (menunggu.length) statusForm.appendChild(tandaStatus('menunggu', menunggu.length + ' isian menunggu kirim'));
+    }
+
+    function gambar(d) {
+      data = d;
+      if (!draft.waktu) {
+        // Waktu cek awal: yang pertama belum lengkap untuk semua unit.
+        draft.waktu = WAKTU_CEK_WAJIB.filter(function (w) {
+          return !d.unit.every(function (u) { return sudahDicek(u.nama, w); });
+        })[0] || '';
+        gWaktu.input.forEach(function (i) { i.checked = i.value === draft.waktu; });
+      }
+      gambarStatus();
+      gambarUnit();
+    }
+
+    function gantiTanggal(baru) {
+      if (baru === tanggal) return;
+      tanggal = baru;
+      draft.nilai = {};
+      draft.sid = {};
+      simpanDraft();
+      muat();
+    }
+
+    tombolKirim.addEventListener('click', function () {
+      if (tombolKirim.disabled || !data) return;
+      tulisPesan(pesan, '');
+      var waktu = draft.waktu;
+      if (!gWaktu.galat(waktu ? '' : 'Pilih waktu cek.')) {
+        gWaktu.input[0].focus();
+        tulisPesan(pesan, 'Pilih waktu cek: Opening, Middle, Closing, atau Cek ulang.', 'masalah');
+        return;
+      }
+      var baris = [];
+      var salah = null;
+      unitTerbuka().forEach(function (u) {
+        var x = isianDraft(u);
+        var h = periksa(u, x);
+        if (h.salah && !salah) salah = { u: u, jenis: h.salah };
+        if (h.suhu !== null && !h.salah) baris.push({ unit: u.nama, suhu: h.suhu, tindakan: h.luar ? String(x.tindakan || '').trim() : '' });
+      });
+      if (salah) {
+        tulisPesan(pesan, salah.jenis === 'angka'
+          ? 'Suhu ' + salah.u.nama + ' harus angka, misalnya 3,5 atau -18.'
+          : 'Suhu ' + salah.u.nama + ' di luar standar. Tulis tindakan korektif sebelum mengirim.', 'masalah');
+        var kolom = wadahUnit.querySelector('[data-kunci="' + salah.u.nama.replace(/"/g, '\\"') + '|' + (salah.jenis === 'angka' ? 'suhu' : 'tindakan') + '"]');
+        if (salah.jenis === 'tindakan') {
+          var kt = kolom && kolom.closest('.kolom');
+          if (kt) {
+            var g = kt.querySelector('.kolom-galat');
+            kosongkan(g).appendChild(ikonStatus('masalah'));
+            g.appendChild(el('span', { text: 'Tulis tindakan korektif.' }));
+            kolom.setAttribute('aria-invalid', 'true');
+          }
+        }
+        if (kolom) kolom.focus();
+        return;
+      }
+      if (!baris.length) {
+        tulisPesan(pesan, unitTerbuka().length ? 'Isi suhu minimal untuk satu unit.' : 'Semua unit sudah dicek untuk ' + waktu + '. Pilih waktu cek lain.', 'masalah');
+        return;
+      }
+      if (!draft.sid[waktu]) draft.sid[waktu] = buatId();
+      var isi = { submissionId: draft.sid[waktu], tanggal: tanggal, waktuCek: waktu, waktuPerangkat: new Date().toISOString(), baris: baris };
+      var entri = { id: isi.submissionId, aksi: 'kirimSuhu', isi: isi, formId: 'SUHU', judul: 'Suhu · ' + waktu, tanggal: tanggal };
+      var luarDiHp = baris.filter(function (b) { return !suhuNormal(unitBernama(b.unit).tipe, b.suhu, data.batas); })
+        .map(function (b) { return b.unit; });
+      function kosongkanIsian() {
+        draft.nilai[waktu] = {};
+        draft.sid[waktu] = buatId();
+        simpanDraft();
+      }
+      function tawaranCekUlang(nama) {
+        if (!nama.length) return;
+        tulisPesan(pesan, 'Suhu ' + nama.join(', ') + ' di luar standar. Catat cek ulang setelah tindakan korektif.', 'tinjau');
+      }
+      function keAntrean() {
+        simpanKeAntrean(entri);
+        kosongkanIsian();
+        gambarStatus();
+        gambarUnit();
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+        tawaranCekUlang(luarDiHp);
+      }
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(tombolKirim, true, 'Mengirim…');
+      jagaProses(panggilApi('kirimSuhu', isi)).then(function (hasil) {
+        aturTombolProses(tombolKirim, false);
+        kosongkanIsian();
+        Cache.tulis('suhu', hasil.form);
+        if (hasil.form.tanggal === tanggal) gambar(hasil.form);
+        toast('Suhu terkirim.');
+        tawaranCekUlang(luarDiHp);
+      }).catch(function (err) {
+        aturTombolProses(tombolKirim, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (err && err.sesiBerakhir) {
+          simpanKeAntrean(entri);
+          kosongkanIsian();
+          tanganiSesiBerakhir(err);
+          return;
+        }
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+
+    function muat() {
+      return muatData({
+        dariHp: function () { return dataSuhuDariHp(tanggal); },
+        simpanHp: function (d) { Cache.tulis('suhu', d); },
+        ambil: function () { return panggilApi('formSuhu', { tanggal: tanggal }); },
+        gambar: function (d) {
+          if (d.tanggal === tanggal) gambar(d);
+        },
+        kerangka: function () {
+          kosongkan(wadahUnit).appendChild(kerangkaBaris(3));
+        },
+        galat: function (teks, cobaLagi) {
+          kosongkan(wadahUnit).appendChild(kotakGalat(teks, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      gambarUnit();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    muat();
+    segarkanLayar = muat;
+    segarkanAntrean = function () {
+      gambarStatus();
+      // Kolom yang sedang diketik tidak digambar ulang; daftar tercatat ikut diperbarui saat layar dimuat ulang.
+      if (!wadahUnit.contains(document.activeElement)) gambarUnit();
+    };
+  }
+
+  /* =======================================================================
    * Riwayat, pemeriksaan, dan koreksi (spesifikasi sistem Bagian 6,
    * tampilan Bagian 5.4). Dibangun umum dari daftar form di M_Form: form
    * yang Riwayat-nya sudah didaftarkan di server (RIWAYAT_FORM di Code.gs)
@@ -2890,7 +3963,7 @@
     var nama = formId;
     (d.daftarForm || []).forEach(function (f) { if (f.id === formId) nama = f.nama; });
     var adaPdf = (d.daftarForm || []).some(function (f) { return f.id === formId && f.adaPdf; });
-    return { formId: formId, namaForm: nama, adaPdf: adaPdf, kepala: d.kepala || [], kolom: d.kolom || [], kiriman: k };
+    return { formId: formId, namaForm: nama, adaPdf: adaPdf, kepala: d.kepala || [], kolom: d.kolom || [], gerakStock: !!d.gerakStock, kiriman: k };
   }
 
   /** Tanda status satu kiriman: Terkirim / Diperiksa, dilaporkan keliru, pernah dikoreksi. */
@@ -2904,17 +3977,21 @@
   /** Nilai satu kolom: nilai lama dicoret (jika pernah dikoreksi), nilai sekarang, angka asli. */
   function nilaiKolom(b, kol) {
     var v = b.nilai[kol.kunci];
-    var satuan = kol.satuan ? b.satuan : '';
+    var satuan = kol.satuan ? b.satuan : (kol.akhiran || '');
     var kor = b.koreksi && b.koreksi[kol.kunci];
     var isi = [];
     if (kor) {
+      var lama = kor.lama === '' || kor.lama == null ? null : Number(kor.lama);
       isi.push(el('del', { class: 'nilai-lama' }, [
         el('span', { class: 'sr', text: 'Nilai lama ' }),
-        kol.jenis === 'angka' ? formatAngka(kor.lama || 0) + (satuan ? ' ' + satuan : '') : (kor.lama || '–')
+        kol.jenis === 'angka' ? formatAngka(lama || 0) + (satuan ? ' ' + satuan : '')
+          : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama || '–'))
       ]));
       isi.push(' ');
     }
     if (kol.jenis === 'angka') isi.push(angkaSatuan(v || 0, satuan));
+    else if (kol.jenis === 'rupiah') isi.push(el('span', { class: 'angka-satuan', text: formatRupiah(v) }));
+    else if (kol.jenis === 'status') isi.push(v ? tandaStatus(v === 'Normal' ? 'baik' : 'masalah', v === 'Normal' ? 'Normal' : 'Di luar standar') : '–');
     else isi.push(el('span', { text: v || '–' }));
     if (b.asli && b.asli[kol.kunci]) isi.push(' ', el('span', { class: 'nilai-asli', text: '(' + b.asli[kol.kunci] + ')' }));
     return isi;
@@ -2932,11 +4009,16 @@
     if (nama) isi.push(el('span', { class: 'ringkas-nama', text: b.nilai[nama.kunci] || '–' }));
     var bagian = [];
     kolom.forEach(function (k) {
-      if (k === nama) return;
+      if (k === nama || k.ringkas === false) return;
       var v = b.nilai[k.kunci];
       var kor = b.koreksi && b.koreksi[k.kunci];
-      if (k.jenis === 'angka' && !v && !kor) return;
-      if (k.jenis !== 'angka' && !v) return;
+      if (k.jenis === 'angka' && !v && !kor && !k.akhiran) return;
+      if (k.jenis !== 'angka' && (v === '' || v == null)) return;
+      // Status hanya ditulis jika bermasalah: "di luar standar".
+      if (k.jenis === 'status') {
+        if (v !== 'Normal') bagian.push([el('span', { class: 'nilai-masalah', text: 'di luar standar' })]);
+        return;
+      }
       bagian.push([k.singkat + ' '].concat(nilaiKolom(b, k)));
     });
     if (bagian.length) {
@@ -3180,12 +4262,13 @@
         return { pilih: s, wadah: el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: id, text: label }), s]) };
       }
       var fKat = p.kategori.length ? pilihan('Kategori', pilih.kategori, p.kategori, 'Semua kategori') : null;
-      var fItem = p.item.length ? pilihan('Item', pilih.item, [], 'Semua item') : null;
+      var labelItem = p.labelItem || 'Item';
+      var fItem = p.item.length ? pilihan(labelItem, pilih.item, [], 'Semua ' + labelItem.toLowerCase()) : null;
       function isiItem() {
         if (!fItem) return;
         var kat = fKat ? fKat.pilih.value : '';
         var lama = fItem.pilih.value || pilih.item;
-        kosongkan(fItem.pilih).appendChild(el('option', { value: '', text: 'Semua item' }));
+        kosongkan(fItem.pilih).appendChild(el('option', { value: '', text: 'Semua ' + labelItem.toLowerCase() }));
         var ada = false;
         p.item.forEach(function (it) {
           if (kat && it.kategori !== kat) return;
@@ -3298,7 +4381,12 @@
       var ket = p.oleh + ', ' + jam(p.waktu);
       var namaIkon = 'nihil';
       var klik = null;
-      if (p.jenis === 'nihil') {
+      if (p.jenis === 'terlewat') {
+        // Suhu: pengecekan wajib yang tidak diisi pada tanggal itu (spesifikasi sistem Bagian 6.1).
+        namaIkon = 'termometer';
+        judul = [tandaStatus('tinjau', 'Terlewat'), ' ', el('span', { text: p.kurang.length + ' dari ' + p.total + ' pengecekan tidak diisi' })];
+        ket = p.kurang.join(', ') + '.';
+      } else if (p.jenis === 'nihil') {
         judul = [tandaStatus('menunggu', 'Nihil'), ' ', el('span', { text: 'Ditandai tidak ada isian' })];
       } else if (p.jenis === 'penyesuaian') {
         namaIkon = 'sesuaikan';
@@ -3450,7 +4538,8 @@
     /* ----- Detail (desktop: kolom kanan) ----- */
     function infoDetail(kr) {
       var f = formTerpilih() || {};
-      return { formId: data.formId, namaForm: f.nama || data.formId, adaPdf: !!f.adaPdf, kepala: data.kepala || [], kolom: data.kolom || [], kiriman: kr };
+      return { formId: data.formId, namaForm: f.nama || data.formId, adaPdf: !!f.adaPdf, kepala: data.kepala || [], kolom: data.kolom || [],
+        gerakStock: !!data.gerakStock, kiriman: kr };
     }
 
     function gambarDetailKanan() {
@@ -3741,20 +4830,21 @@
 
     if (desktop) {
       var kolLain = kolom.filter(function (k) { return k !== nama; });
+      var adaSatuan = kolom.some(function (k) { return k.satuan; });
       var badan = el('tbody');
       kr.baris.forEach(function (b, i) {
         badan.appendChild(el('tr', { class: b.flag ? 'dilaporkan' : null }, [
           el('td', { class: 'angka', text: String(i + 1) }),
           el('td', { class: 'nama-item' }, [namaItem(b)].concat(keteranganBaris(b), [aksiBaris(b)])),
-          kolLain.map(function (k) { return el('td', { class: k.jenis === 'angka' ? 'angka' : null }, nilaiKolom(b, k)); }),
-          el('td', { text: b.satuan || '' })
+          kolLain.map(function (k) { return el('td', { class: k.jenis === 'angka' || k.jenis === 'rupiah' ? 'angka' : null }, nilaiKolom(b, k)); }),
+          adaSatuan ? el('td', { text: b.satuan || '' }) : null
         ]));
       });
       wadah.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-detail' }, [
         el('thead', {}, el('tr', {}, [el('th', { scope: 'col', class: 'angka', text: 'No' }),
           el('th', { scope: 'col', text: nama ? nama.label : '' })]
-          .concat(kolLain.map(function (k) { return el('th', { scope: 'col', class: k.jenis === 'angka' ? 'angka' : null, text: k.label }); }))
-          .concat([el('th', { scope: 'col', text: 'Satuan' })]))),
+          .concat(kolLain.map(function (k) { return el('th', { scope: 'col', class: k.jenis === 'angka' || k.jenis === 'rupiah' ? 'angka' : null, text: k.label }); }))
+          .concat(adaSatuan ? [el('th', { scope: 'col', text: 'Satuan' })] : []))),
         badan
       ])));
     } else {
@@ -3887,13 +4977,31 @@
     var nama = kolomNama(info.kolom || []);
     var namaBaris = nama ? b.nilai[nama.kunci] : '';
     var kolomIsi = kolom.map(function (k) {
+      if (k.pilihan) {
+        // Pilihan tetap (kategori waste): tombol berjajar, bukan ketikan bebas.
+        var g = grupPilihan(k.label, k.pilihan, b.nilai[k.kunci] || '');
+        return { k: k, pilihan: g, kolom: { wadah: g.wadah } };
+      }
       var kI = kolomIsian({
-        label: k.label + (k.satuan && b.satuan ? ' (' + b.satuan + ')' : ''),
+        label: k.label + (k.satuan && b.satuan ? ' (' + b.satuan + ')' : (k.akhiran ? ' (' + k.akhiran + ')' : '')),
         inputmode: k.jenis === 'angka' ? 'decimal' : null,
         kelas: k.jenis === 'angka' ? 'isian-angka' : null,
         nilai: k.jenis === 'angka' ? String(b.nilai[k.kunci] || 0).replace('.', ',') : (b.nilai[k.kunci] || ''),
         bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.' : null
       });
+      if (k.minus) {
+        // Papan angka iPhone tidak punya tanda minus: tombol ± di samping kolom.
+        var tanda = el('button', { type: 'button', class: 'tombol-tanda', 'aria-label': 'Ganti tanda plus atau minus', text: '±' });
+        tanda.addEventListener('click', function () {
+          var t = String(kI.input.value || '').replace('−', '-');
+          kI.input.value = t.charAt(0) === '-' ? t.slice(1) : '-' + t;
+          kI.input.focus();
+        });
+        var deret = el('div', { class: 'baris-angka' });
+        kI.input.parentNode.insertBefore(deret, kI.input);
+        deret.appendChild(tanda);
+        deret.appendChild(kI.input);
+      }
       return { k: k, kolom: kI };
     });
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
@@ -3902,7 +5010,9 @@
       b.flag ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('bendera'),
         el('span', { text: 'Dilaporkan ' + b.flag.oleh + ': ' + b.flag.catatan })]) : null
     ].concat(kolomIsi.map(function (x) { return x.kolom.wadah; })).concat([
-      info.formId === 'STOCK' ? el('p', { class: 'kolom-bantuan', text: 'Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang. Nilai lama tetap tercatat.' }) : null,
+      info.gerakStock || info.formId === 'STOCK'
+        ? el('p', { class: 'kolom-bantuan', text: 'Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang. Nilai lama tetap tercatat.' })
+        : el('p', { class: 'kolom-bantuan', text: 'Nilai lama tetap tercatat.' }),
       pesan
     ]));
     function simpan(t, l) {
@@ -3910,8 +5020,22 @@
       var nilai = {};
       var ok = true;
       kolomIsi.forEach(function (x) {
+        if (x.pilihan) {
+          var p = x.pilihan.nilai();
+          ok = x.pilihan.galat(p ? '' : 'Pilih ' + x.k.label.toLowerCase() + '.') && ok;
+          nilai[x.k.kunci] = p;
+          return;
+        }
         var v = x.kolom.input.value;
-        if (x.k.jenis === 'angka') {
+        if (x.k.minus) {
+          var s = bacaAngkaSuhu(v);
+          if (s === null || isNaN(s)) {
+            ok = x.kolom.galat('Isi angka, misalnya 3,5 atau -18.') && ok;
+            return;
+          }
+          x.kolom.galat('');
+          nilai[x.k.kunci] = s;
+        } else if (x.k.jenis === 'angka') {
           var n = bacaAngka(v);
           if (n !== null && isNaN(n)) {
             ok = x.kolom.galat('Isi angka 0 atau lebih, misalnya 2,5.') && ok;
@@ -3930,7 +5054,7 @@
         l.sibuk(false);
         l.tutup();
         selesai(h.kiriman);
-        toast(info.formId === 'STOCK' ? 'Koreksi tersimpan. Stock dihitung ulang.' : 'Koreksi tersimpan.');
+        toast(info.gerakStock || info.formId === 'STOCK' ? 'Koreksi tersimpan. Stock dihitung ulang.' : 'Koreksi tersimpan.');
       }).catch(function (err) {
         l.sibuk(false);
         aturTombolProses(t, false);
