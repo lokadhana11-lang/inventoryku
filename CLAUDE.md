@@ -100,6 +100,12 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `tutupLaporan {formId, rowId}` → `{ kiriman }`. `beranda` untuk Pengelola ditambah `pemeriksaan:
   { dari, sampai, belumDiperiksa, dilaporkan, formBelum, formDilaporkan }`; `sesuaikanStock`
   ditambah `riwayatItem`.
+- Aksi Tahap 4 (bertoken): `infoLaporan` → `{ hariIni, form: [{ id, nama, adaPdf }] }`; `unduhPdf
+  {formId, tanggal}` → `{ namaFile, mime, data (base64) }`. Khusus Pengelola: `simpanPdfDrive {formId,
+  tanggal}` → `{ namaFile, lokasi }`. `beranda` menerima `alamatAplikasi` dan, untuk Pengelola,
+  menjawab juga `peringatanSistem: [teks]`. `riwayat.daftarForm[]` dan `detailKiriman` ditambah
+  `adaPdf`. Fungsi yang dijalankan dari editor atau trigger: `kirimLaporanHarian`, `buatCadangan`,
+  `pasangTrigger`, `kirimLaporanSekarang`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -111,8 +117,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 0 | Fondasi: spesifikasi dipindah, CLAUDE.md, halaman uji sambungan, `doPost`/`doGet`/`ping`, `setupSpreadsheet` | Selesai (config.js sudah diisi pemilik). Halaman uji sambungan dihapus di Tahap 1; aksi `ping` tetap |
 | 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai dan digabung (Code.gs v0.2, aplikasi 0.2.0) |
 | 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Kode selesai (Code.gs v0.3, aplikasi 0.3.0), diuji dengan API tiruan. Rumus Sheet belum bisa diuji di sini |
-| 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp). Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP |
-| 4 | Laporan PDF dan email harian, cadangan mingguan | Belum |
+| 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai dan digabung (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp) |
+| 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu | Belum |
 | 6 | Prep List dan resep | Belum |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
@@ -377,4 +383,71 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Manager. Laporkan kekeliruan supaya Pengelola mengoreksinya.").
 60. **Perbaikan bersama:** `tambahAnak` (app.js) kini meratakan daftar bersarang, sehingga komponen
     boleh mengembalikan daftar elemen.
+
+### Tahap 4
+
+61. **Template PDF per form** di `LAPORAN_PDF` (Code.gs): `{ judul, isi(tanggal) }`, dengan `isi`
+    mengembalikan `{ ada, info, tabel, catatan }`. Kepala ("InventoryKu · Outlet"), judul navy dengan
+    garis bawah, kotak info (Nama Outlet, Tanggal, ditambah info form), baris "Diisi oleh" dan
+    "Diperiksa oleh", dan kaki ("Dibuat … · InventoryKu") dibuat bersama oleh `htmlLaporan_`. Form
+    berikutnya cukup menambah satu entri. HTML diubah ke PDF dengan
+    `Utilities.newBlob(html, 'text/html').getAs('application/pdf')`; CSS-nya sederhana (tabel biasa,
+    Arial 9 pt, tanpa amber).
+62. **PDF Stock** meniru `Harian_Stock`: semua item aktif (ditambah item nonaktif yang bergerak hari
+    itu), dikelompokkan per kategori dengan baris judul kategori berlatar Baja, No mulai 1 di tiap
+    kategori. Gerakan nol dibiarkan kosong; item tanpa gerakan menampilkan Awal = Akhir. Stock Akhir
+    minus merah tebal (tanda − ikut tertulis); di bawah stok minimum diberi tanda `*` dengan
+    keterangan di bawah tabel (bukan warna saja). Stock Masuk yang diketik dalam satuan besar
+    ditulis kecil di bawah angkanya: "(2 dus)".
+63. **Diisi oleh** = nama pengisi kiriman hari itu dan jam kiriman terakhir. **Diperiksa oleh**
+    (Bagian 6.2): semua kiriman diperiksa → "Budi, 3 Okt 21.50" (pemeriksa terakhir); belum semua →
+    "2 dari 3 isian diperiksa"; tanpa kiriman → "Belum ada isian".
+64. **Tanggal tanpa data:** PDF Stock dibuat jika ada kiriman `Data_Stock` atau rekap `Stock_Harian`
+    pada tanggal itu; jika tidak: "Belum ada isian Stock pada Selasa, 15 September 2026. Pilih tanggal
+    lain." Tanggal masa depan ditolak. Semua role boleh mengunduh tanggal mana pun.
+65. **Nama file dan Drive:** unduhan `{YYYY-MM-DD}_{NamaForm}.pdf`; Drive
+    `Laporan Kitchen/{Nama Outlet}/{YYYY}/{MM Bulan}/{YYYY-MM-DD}_{NamaForm}_{HHmm}.pdf` (folder bulan
+    misalnya "10 Oktober", supaya urut dan terbaca). Spasi di nama form menjadi garis bawah
+    ("Prep_list"). Unduhan dikirim sebagai base64 di dalam JSON dan tidak membuat file di Drive.
+66. **Unduh PDF bersama** (`unduhPdf(opsi)` di app.js) → `{ tombol, pesan, reset() }`, dipakai
+    Laporan dan detail Riwayat. iPhone/iPad dikenali dari `userAgent` (iPhone/iPad/iPod, atau
+    Macintosh dengan `maxTouchPoints > 1`). Di iPhone/iPad dukungan berbagi file diperiksa dengan
+    `navigator.canShare({ files })` sebelum meminta PDF (jika tidak didukung, server tidak dipanggil
+    dan pesan cadangan tampil), lalu diperiksa lagi dengan file aslinya. Ketukan "Simpan PDF"
+    memanggil `navigator.share` sebagai perintah pertama; setelah lembar bagikan ditutup (berhasil
+    atau batal) tombol kembali "Unduh PDF". Ganti tanggal atau form juga mengembalikannya.
+    Petunjuk "Ketuk Simpan PDF, …" memakai pesan berjenis baru `info` (warna Menunggu).
+67. **Menu Laporan:** kartu "Laporan harian PDF" dengan pilihan tanggal (Hari ini, Kemarin, Tanggal
+    lain), pilihan form (tombol berjajar dari `M_Form`, bisa digeser), "Unduh PDF", dan untuk
+    Pengelola "Simpan ulang ke Drive" (hasilnya ditulis di bawah tombol beserta lokasi file). Form
+    yang laporannya belum dibangun menonaktifkan tombol dengan tulisan "Laporan PDF … dibangun di
+    tahap berikutnya, bersama formnya." Pilihan tersimpan per pengguna (`cache:laporan-pilihan`).
+    Daftar belanja dan Rekap bulanan menyusul di Tahap 8 dan 10.
+68. **Email harian** (`jalankanLaporanHarian_`, dipanggil `kirimLaporanHarian` dan
+    `kirimLaporanSekarang`) lewat `MailApp` (izin kirim saja), nama pengirim "InventoryKu", subjek
+    "Laporan harian {Outlet}, {Hari, tanggal}". Isi: status tiap form aktif menurut Bagian 5.8
+    (Terkirim, Nihil, Belum lengkap x dari y, Belum diisi; yang wajib dan belum diisi merah), Stock
+    Akhir minus, item di bawah stok minimum dengan saran order Bagian 9.2 (`saranOrder_`, dipakai
+    lagi di Tahap 8), jumlah isian belum diperiksa, baris dilaporkan keliru, permintaan reset PIN,
+    daftar lampiran, kegagalan cadangan, dan tautan aplikasi. Dilewati sampai tahapnya: suhu di luar
+    standar dan total waste (Tahap 5), masa simpan (Tahap 6), pengingat opname (Tahap 8). Lampiran:
+    PDF tiap form yang berstatus Terkirim dan punya template; tiap PDF juga disimpan ke Drive. PDF
+    yang gagal disimpan ke Drive tetap dilampirkan dan disebut di email.
+69. **Catatan kegagalan:** hasil laporan dan cadangan ditulis di `M_Konfigurasi` (`laporan_terakhir`,
+    `cadangan_terakhir`; baris dibuat otomatis, tanpa setupSpreadsheet). Nilai yang diawali "Gagal"
+    (tanpa penerima, kuota habis, email ditolak, salinan gagal) tampil di Beranda Pengelola sebagai
+    "Perlu perhatian". Kegagalan cadangan juga disebut di setiap email harian sampai cadangan
+    berikutnya berhasil.
+70. **Alamat aplikasi** untuk tautan di email terdeteksi dari HP Pengelola (aksi `beranda`, seperti
+    zona waktu) dan disimpan di `M_Konfigurasi` `alamat_aplikasi`; hanya ditulis jika berubah.
+71. **Trigger** (`pasangTrigger`, dijalankan dari editor): menghapus semua trigger milik script ini,
+    lalu memasang `kirimLaporanHarian` setiap hari pada jam closing + jeda (`nearMinute`, toleransi
+    Google sekitar 15 menit) dan `buatCadangan` setiap `hari_cadangan` pukul 03.00, keduanya dalam
+    zona waktu tersimpan. Jalankan ulang setelah mengubah jam closing, jeda, hari cadangan, atau zona
+    waktu. Jika laporan berjalan sebelum pukul 06.00, laporannya untuk hari kemarin.
+    `kirimLaporanSekarang` memakai data hari ini, subjek diawali "[Uji]", dan ikut menyimpan PDF ke
+    Drive.
+72. **Cadangan** bernama "Cadangan {nama spreadsheet} {YYYY-MM-DD HHmm}" di
+    `Laporan Kitchen/Cadangan/`. Empat salinan terbaru dengan awalan itu disimpan; yang lebih lama
+    dipindah ke tempat sampah Drive.
 

@@ -958,6 +958,7 @@ body.papan-ketik .layar {
 .pesan-formulir.masalah { color: var(--masalah-teks); background: var(--masalah-latar); }
 .pesan-formulir.baik { color: var(--baik-teks); background: var(--baik-latar); }
 .pesan-formulir.tinjau { color: var(--tinjau-teks); background: var(--tinjau-latar); }
+.pesan-formulir.info { color: var(--menunggu-teks); background: var(--menunggu-latar); }
 
 .catatan-draft {
   font-size: 14px;
@@ -2824,6 +2825,33 @@ body.papan-ketik .bilah-kirim {
 
   .riwayat-isi.dua-kolom .riwayat-detail:empty {
     display: block;
+  }
+}
+
+/* =========================================================================
+ * Laporan (spesifikasi tampilan Bagian 5.5)
+ * ========================================================================= */
+
+.laporan-kartu {
+  display: grid;
+  gap: 16px;
+}
+
+.laporan-kartu .kartu-judul {
+  margin-bottom: 0;
+}
+
+.laporan-kartu .pilihan-grup input[type='date'] {
+  flex: 1 1 100%;
+}
+
+.laporan-aksi .tombol {
+  flex: 1 1 200px;
+}
+
+@media (min-width: 600px) {
+  .laporan-aksi .tombol {
+    flex: 0 1 auto;
   }
 }
 
