@@ -595,6 +595,58 @@ body.papan-ketik .layar {
   .bar-pengguna:hover { background: var(--biru-malam); }
 }
 
+/* Menu nama pengguna: satu pilihan, "Keluar". Di bawah nama (bar desktop atau kepala Beranda). */
+.menu-pengguna {
+  position: fixed;
+  z-index: 45;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  border: 1px solid var(--garis);
+  border-radius: 10px;
+  background: var(--kertas);
+  color: var(--tinta);
+  animation: menu-muncul 150ms ease-out both;
+}
+
+.menu-pengguna-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 100ms ease-out, background-color 100ms ease-out;
+}
+
+.menu-pengguna-item:active {
+  transform: scale(0.98);
+  background: var(--kertas-tekan);
+}
+
+.menu-pengguna-item:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menu-pengguna-item:hover { background: var(--baja); }
+}
+
+@keyframes menu-muncul {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* =========================================================================
  * Komponen bersama (spesifikasi tampilan Bagian 6)
  * ========================================================================= */
@@ -1138,6 +1190,19 @@ body.papan-ketik .layar {
   outline-offset: 2px;
 }
 
+/* Staff nonaktif: di bawah staff aktif, teks Tinta Redup */
+.tabel tr.nonaktif td,
+.tabel tr.nonaktif .tabel-tombol {
+  color: var(--tinta-redup);
+}
+
+/* Hapus staff: paling bawah, terpisah dari tombol simpan */
+.bagian-hapus {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--garis);
+}
+
 .tanda-deret {
   display: flex;
   flex-wrap: nowrap;
@@ -1545,6 +1610,13 @@ body.papan-ketik .lembar-aksi {
 
 .pesan-login .putar {
   margin-top: 2px;
+}
+
+/* Setelah keluar otomatis: satu baris di atas pilihan nama */
+.keterangan-login {
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--teks-di-navy);
 }
 
 /* Papan angka PIN: 3 kolom, tombol 64 px */
@@ -2020,6 +2092,10 @@ body.papan-ketik .lembar-aksi {
     min-height: 0;
   }
   .beranda-kepala .sinyal {
+    display: none;
+  }
+  /* Di desktop, menu nama pengguna (Keluar) ada di bar atas pada semua layar. */
+  .beranda-pengguna {
     display: none;
   }
 }
@@ -2948,6 +3024,7 @@ body.papan-ketik .bilah-kirim {
   .peristiwa.tetap:active,
   .beranda-pengguna:active,
   .bar-pengguna:active,
+  .menu-pengguna-item:active,
   .tombol-kembali:active {
     transform: none !important;
   }

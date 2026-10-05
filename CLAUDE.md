@@ -67,15 +67,17 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Aksi tanpa token: `ping` → `{ namaSpreadsheet, waktuServer }`; `infoLogin` → `{ perluPemasangan,
   namaOutlet, staff: [{ nama, pengelola, punyaPin }] }`; `login {nama, pin}`, `pasang {kode,
   namaOutlet, nama, role, pin, zonaWaktu}`, `pulihkan {kode, nama, pin}` → `{ token,
-  berlakuSampai, pengguna: { nama, role, pengelola }, namaOutlet }`; `lupaPin {nama}` →
+  berlakuSampai, pengguna: { nama, role, pengelola }, namaOutlet, keluarOtomatisMenit }`; `lupaPin {nama}` →
   `{ sudahAda, waktu }`; `keluar {token}` → `{}`.
 - Aksi bertoken: `beranda {tanggal}` → `{ pengguna, namaOutlet, tanggal, form: [{ id, nama, jenis,
   wajib, status: belum|sebagian|terkirim|nihil, lengkap, detail, terakhir: { oleh, waktu } }],
-  permintaanReset (khusus Pengelola): [{ nama, waktu }] }`.
+  permintaanReset (khusus Pengelola): [{ nama, waktu }], keluarOtomatisMenit }`.
 - Aksi khusus Pengelola: `daftarStaff` → `{ staff: [{ nama, role, pengelola, aktif, punyaPin,
   permintaanReset, terkunci }] }`; `tambahStaff {nama, role, pin}`, `ubahStaff {nama, role?,
   aktif?}` → `{ staff }`; `aturPin {nama, pin}` → `{ staff, sesiBaru? }`; `bacaPenerima` dan
-  `simpanPenerima {email: []}` → `{ email: [] }`.
+  `simpanPenerima {email: []}` → `{ email: [] }`. Sejak 5 Oktober 2026: `hapusStaff {nama}` →
+  `{ staff }`; `bacaOutletJadwal` dan `simpanOutletJadwal {keluarOtomatisMenit: 5|10|15|30}` →
+  `{ keluarOtomatisMenit }`.
 - Aksi Tahap 2 (bertoken): `formStock {tanggal}` → `{ tanggal, kategori: [nama], item: [{ nama,
   kategori, satuan, satuanBesar, isiSatuanBesar, stokMin, awal, masuk, keluar, hasilPrep,
   dipakaiPrep, waste, penyesuaian, akhir }], kiriman: { jumlah, terakhir }, nihil }`;
@@ -100,12 +102,13 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `tutupLaporan {formId, rowId}` → `{ kiriman }`. `beranda` untuk Pengelola ditambah `pemeriksaan:
   { dari, sampai, belumDiperiksa, dilaporkan, formBelum, formDilaporkan }`; `sesuaikanStock`
   ditambah `riwayatItem`.
-- Aksi Tahap 4 (bertoken): `infoLaporan` → `{ hariIni, form: [{ id, nama, adaPdf }] }`; `unduhPdf
-  {formId, tanggal}` → `{ namaFile, mime, data (base64) }`. Khusus Pengelola: `simpanPdfDrive {formId,
+- Aksi Tahap 4 (bertoken): `infoLaporan` → `{ hariIni, form: [{ id, nama, adaPdf, kategori? }] }`
+  (`kategori: [nama]` hanya pada form yang bisa diunduh per kategori, yaitu Stock); `unduhPdf
+  {formId, tanggal, kategori?}` → `{ namaFile, mime, data (base64) }`. Khusus Pengelola: `simpanPdfDrive {formId,
   tanggal}` → `{ namaFile, lokasi }`. `beranda` menerima `alamatAplikasi` dan, untuk Pengelola,
   menjawab juga `peringatanSistem: [teks]`. `riwayat.daftarForm[]` dan `detailKiriman` ditambah
   `adaPdf`. Fungsi yang dijalankan dari editor atau trigger: `kirimLaporanHarian`, `buatCadangan`,
-  `pasangTrigger`, `kirimLaporanSekarang`.
+  `pasangTrigger`, `kirimLaporanSekarang`, dan (5 Oktober 2026) `ujiPemisahHalamanPdf`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -115,10 +118,11 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | Tahap | Isi | Status |
 |---|---|---|
 | 0 | Fondasi: spesifikasi dipindah, CLAUDE.md, halaman uji sambungan, `doPost`/`doGet`/`ping`, `setupSpreadsheet` | Selesai (config.js sudah diisi pemilik). Halaman uji sambungan dihapus di Tahap 1; aksi `ping` tetap |
-| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna, Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai dan digabung (Code.gs v0.2, aplikasi 0.2.0) |
+| 1 | Kerangka PWA dan akses (manifest, service worker, pemasangan pertama, login PIN, sesi, Ganti pengguna (kini Keluar), Lupa PIN, role, zona waktu, Pengaturan → Staff dan Penerima Email, pola tata letak dan gerak) | Kode selesai dan digabung (Code.gs v0.2, aplikasi 0.2.0) |
 | 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Kode selesai (Code.gs v0.3, aplikasi 0.3.0), diuji dengan API tiruan. Rumus Sheet belum bisa diuji di sini |
 | 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai dan digabung (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp) |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
+| 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.1, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu | Belum |
 | 6 | Prep List dan resep | Belum |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
@@ -242,7 +246,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 27. **Pengaturan → Staff dan PIN:** staff baru langsung dibuat dengan PIN. Nama tidak bisa diganti
     (nama dipakai sebagai `submitted_by`). Role dan keadaan akun sendiri tidak bisa diubah sendiri,
     supaya Pengelola tidak mengunci diri. Daftar staff memakai pola tabel lebar (kolom nama diam).
-    Pengaturan hanya menampilkan dua bagian yang sudah dibangun; bagian lain menyusul di tahapnya.
+    Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak 5 Oktober 2026 tiga: Staff dan PIN,
+    Penerima email, Outlet dan jadwal); bagian lain menyusul di tahapnya.
 28. **Penerima email** disimpan di `M_Outlet` kolom Email Penerima Laporan, dipisah koma; alamat
     ganda (huruf besar/kecil) dibuang.
 29. **Penyimpanan di HP** (localStorage): `inventoryku:sesi`, `inventoryku:infoLogin`, dan per
@@ -451,3 +456,73 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `Laporan Kitchen/Cadangan/`. Empat salinan terbaru dengan awalan itu disimpan; yang lebih lama
     dipindah ke tempat sampah Drive.
 
+### Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6, spesifikasi sistem 5 Oktober)
+
+73. **Tombol Keluar** (dulu "Ganti pengguna"). Ketukan nama pengguna membuka menu kecil (`role=menu`)
+    tepat di bawah nama, berisi satu pilihan "Keluar"; pilihan itu membuka konfirmasi "Keluar dari
+    akun Rina?" dengan "Batal" dan "Keluar" (plus pesan antrean jika ada isian di HP). HP dan tablet:
+    nama di kepala Beranda; desktop (≥ 1.024 px): nama di bar atas pada semua layar, dan nama di
+    kepala Beranda disembunyikan supaya tidak ada dua menu. Menu tertutup oleh Escape, ketukan di
+    luar, ketukan kedua pada nama, guliran, ubah ukuran, dan pindah layar; tanpa bayangan, muncul
+    dengan pudar 150 ms (mati saat "kurangi gerak"). `keluar()` di app.js dipakai tombol Keluar dan
+    keluar otomatis: sesi di server dihapus jika ada sinyal, token dihapus dari HP, draft, antrean,
+    dan data tersimpan per pengguna tetap.
+74. **Keluar otomatis** dihitung di HP. `inventoryku:terakhirDipakai` (ms) dan
+    `inventoryku:keluarOtomatisMenit` disimpan per perangkat, bukan per pengguna. Yang dihitung
+    "dipakai": `pointerdown`, `touchstart`, `keydown`, `input`, `wheel`, `scroll` (ditangkap di
+    `document`); waktu ditulis ke HP paling sering tiap 5 detik. Pemeriksaan: tiap 10 detik, saat
+    `visibilitychange` (tampil lagi), `pageshow`, `focus`, saat aplikasi dibuka (sesi yang sudah
+    terlalu lama diam langsung keluar dengan keterangan), dan sebelum ketukan dicatat (ketukan
+    pertama setelah HP dinyalakan tidak menghidupkan sesi lagi). Hitungan berhenti lewat
+    `jagaProses(janji)` selama mengirim isian yang dimulai pengguna (Kirim stock, Tidak ada hari ini,
+    Kirim ulang di lembar Isian di HP) dan membuat PDF (Unduh PDF, Simpan ulang ke Drive), lalu mulai
+    dari nol. Pengiriman antrean otomatis di latar (tiap menit, saat sinyal kembali) tidak menahan
+    hitungan, supaya isian yang terus gagal karena sinyal lemah tidak membuat sesi tidak pernah
+    habis. Keterangan di Login: satu baris berikon info, warna Teks di Navy, di atas "Pilih nama";
+    hilang saat nama dipilih, tidak muncul lagi lewat "Ganti nama". Form tanpa draft (lembar koreksi,
+    laporan kekeliruan) yang terbuka saat keluar otomatis ditutup tanpa disimpan.
+75. **Lama keluar otomatis** di `M_Konfigurasi` baris `keluar_otomatis_menit` (teks, nilai awal "5";
+    nilai kosong atau selain 5/10/15/30 dibaca 5). Dikirim saat login, pemasangan, pemulihan, dan di
+    setiap jawaban `beranda` (perubahan dari Pengelola sampai ke perangkat lain tanpa login ulang).
+    **Pengaturan → Outlet dan jadwal** (`#/pengaturan/outlet`) baru berisi pilihan "Keluar otomatis
+    setelah tidak dipakai" (tombol berjajar 5/10/15/30 menit), keterangan "Berlaku untuk semua pengguna
+    di semua perangkat.", dan tombol "Simpan" (nonaktif sampai pilihan berubah). Nama outlet, zona
+    waktu, jam closing, dan jadwal opname menyusul di tahapnya.
+76. **Hapus staff.** Kolom `Dihapus` (waktu) di `M_Staff`. `bacaStaff_()` melewati baris yang Dihapus
+    berisi, jadi staff itu hilang dari Login, Pengaturan, sesi, dan pencarian nama, dan namanya boleh
+    dipakai staff baru (baris baru). Selama kolom belum ada (setupSpreadsheet belum dijalankan ulang),
+    semua staff dianggap belum dihapus dan `hapusStaff` menolak dengan petunjuk menjalankan
+    setupSpreadsheet. Hapus: kolom Dihapus diisi waktu, hash PIN dan Permintaan Reset PIN dikosongkan,
+    hitungan salah PIN dibuang; ditolak untuk staff aktif ("Nonaktifkan dulu untuk bisa menghapus.")
+    dan untuk Staff (role diperiksa server). Pilihan "Pengisi" di filter Riwayat tetap memuat nama
+    yang dihapus (isian lamanya masih ada). **Pengelola aktif terakhir** (aktif, punya PIN, Head
+    Kitchen/Manager) tidak bisa dinonaktifkan atau diubah menjadi Staff; diperiksa sebelum aturan
+    "akun sendiri", sehingga pesannya menjelaskan sebabnya. Daftar staff diurutkan server: aktif dulu,
+    lalu nonaktif (teks Tinta Redup), masing-masing abjad. Di layar ubah staff, bagian paling bawah
+    (dipisah garis): tombol "Hapus" (bahaya) untuk staff nonaktif, atau tulisan "Nonaktifkan dulu untuk
+    bisa menghapus." untuk staff aktif; tidak tampil untuk akun sendiri. Setelah dihapus, layar kembali
+    ke daftar dengan pesan "Rina dihapus dari daftar staff.". Sakelar Aktif/Nonaktif di Bagian 5.7
+    tetap berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan lagi" yang sudah ada sejak
+    Tahap 1; fungsinya sama.
+77. **PDF stock per kategori.** Menu Laporan: saat form Stock dipilih, `<select>` "Kategori" (bentuk
+    sama dengan layar isi Stock) di bawah pilihan form, nilai awal "Semua kategori", lalu kategori
+    aktif menurut urutan `M_Kategori` (dari `infoLaporan`); pilihannya ikut tersimpan di
+    `cache:laporan-pilihan`; mengganti kategori mengembalikan tombol iPhone ke "Unduh PDF". Server:
+    `LAPORAN_PDF.STOCK.perKategori`; `buatPdf_(idForm, tanggal, { kategori })` memeriksa kategori aktif.
+    Satu kategori: nama file `{tanggal}_Stock_{Kategori}.pdf` (spasi jadi garis bawah), kotak info
+    "Kategori: Protein", tanpa baris judul kategori, "Diisi oleh/Diperiksa oleh" hanya dari kiriman
+    kategori itu; kategori tanpa rekap dan tanpa kiriman pada tanggal itu ditolak: "Belum ada isian
+    Stock kategori Sayur pada …. Pilih tanggal atau kategori lain." Semua kategori: kategori tanpa
+    rekap pada tanggal itu dilewati (berlaku juga untuk PDF harian dan email); jika ada kiriman tetapi
+    tidak ada gerakan sama sekali, tabel bertuliskan "Tidak ada gerakan stock pada tanggal ini.".
+    **Pemisah halaman:** `htmlLaporan_` menerima `isi.bagian: [{ info, tabel }]`; bagian kedua dan
+    seterusnya dibungkus `<div class="halaman-baru">` (`page-break-before:always`) dengan kepala, judul,
+    kotak info, dan baris judul tabel diulang; Diisi/Diperiksa oleh, catatan, dan kaki sekali di akhir.
+    Dukungannya pada `getAs('application/pdf')` belum bisa diuji di sini, jadi bawaannya **cadangan**
+    Bagian 9.1 (satu tabel bersambung dengan baris judul kategori). Satu halaman per kategori aktif
+    hanya jika Script Property `PDF_PEMISAH_HALAMAN` = `ya`; `ujiPemisahHalamanPdf()` (dari editor)
+    membuat PDF uji 3 bagian di `Laporan Kitchen/Uji pemisah halaman PDF.pdf`, menghitung halamannya
+    dari isi PDF, lalu mengisi property itu ("ya" untuk 3 halaman, "tidak" untuk 1); jika jumlahnya
+    tidak terbaca, pemilik memeriksa filenya dan mengisi property sendiri. Unduh dari Riwayat, Simpan
+    ulang ke Drive, PDF harian, dan lampiran email selalu satu file Stock berisi semua kategori.
+78. **Versi:** Code.gs v0.5.1, aplikasi 0.5.1 (perbaikan di atas Tahap 4, belum Tahap 5).
