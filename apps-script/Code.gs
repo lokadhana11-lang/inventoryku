@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.5.2 (Tahap 4 + perubahan 5 Oktober 2026)
+// InventoryKu Code.gs v0.5.3 (Tahap 4 + perubahan 5 Oktober 2026)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -39,7 +39,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.5.2';
+var VERSI_KODE = 'v0.5.3';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -564,7 +564,7 @@ function tulisKonfigurasi_(kunci, nilai, keterangan) {
     konf.sheet.getRange(baris, 2).setValue(nilai);
     if (keterangan != null) konf.sheet.getRange(baris, 3).setValue(keterangan);
   } else {
-    konf.sheet.getRange(konf.sheet.getLastRow() + 1, 1, 1, 3).setValues([[kunci, nilai, keterangan || '']]);
+    konf.sheet.getRange(barisBaruMaster_(konf.sheet, 1, 1), 1, 1, 3).setValues([[kunci, nilai, keterangan || '']]);
   }
 }
 
@@ -654,62 +654,81 @@ function buatKodePemasangan() {
   console.log('Kode Pemasangan baru sudah dibuat. Lihat tab M_Konfigurasi, baris kode_pemasangan.');
 }
 
-/* ---------- Baris terakhir yang terisi (tab master berkotak centang) ---------- */
+/* ---------- Baris baru: tepat di bawah baris terakhir yang kolom kuncinya terisi ---------- */
 
-/**
- * Baris berisi data: ada sel yang tidak kosong dan bukan FALSE. Kotak centang
- * yang tidak dicentang menyimpan FALSE, jadi getLastRow() menghitungnya sebagai
- * isi; baris yang hanya berisi kotak centang kosong tidak dianggap terisi.
+/*
+ * Kotak centang yang tidak dicentang menyimpan FALSE, dan dropdown bisa berisi
+ * pilihan tanpa baris itu punya data. getLastRow() menghitung keduanya sebagai
+ * isi, sehingga baris baru dulu tertulis jauh di bawah. Karena itu setiap tab
+ * yang ditulis aplikasi punya kolom kunci yang selalu terisi pada baris data:
+ * Nama (M_Staff), Satuan (M_Satuan), ID Form (M_Form), Kunci (M_Konfigurasi),
+ * Tanggal (Stock_Harian dan semua tab Data), Waktu (Log_Perubahan). Baris
+ * yang kolom kuncinya kosong bukan data.
  */
-function barisBerisi_(baris) {
-  return baris.some(function (v) { return v !== '' && v !== false && v != null; });
+
+function kunciTerisi_(v) {
+  return v !== false && v != null && String(v).trim() !== '';
 }
 
-/** Nomor baris terakhir yang berisi data (1 = hanya baris judul). */
-function barisTerakhirBerisi_(sheet) {
+/** Nomor baris terakhir yang kolom kuncinya (nomor kolom) terisi; 1 = hanya baris judul. */
+function barisKunciTerakhir_(sheet, kolomKunci) {
   var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow < 2 || lastCol < 1) return 1;
-  var nilai = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  if (lastRow < 2) return 1;
+  var nilai = sheet.getRange(2, kolomKunci, lastRow - 1, 1).getValues();
   for (var i = nilai.length - 1; i >= 0; i--) {
-    if (barisBerisi_(nilai[i])) return i + 2;
+    if (kunciTerisi_(nilai[i][0])) return i + 2;
   }
   return 1;
 }
 
-/** Nomor baris untuk menulis n baris baru tepat di bawah baris terakhir yang berisi data. */
-function barisBaruMaster_(sheet, n) {
-  var mulai = barisTerakhirBerisi_(sheet) + 1;
+/** Nomor baris untuk n baris baru di tab master; baris ditambah jika tab penuh. */
+function barisBaruMaster_(sheet, kolomKunci, n) {
+  var mulai = barisKunciTerakhir_(sheet, kolomKunci) + 1;
   var maks = sheet.getMaxRows();
   if (mulai + n - 1 > maks) sheet.insertRowsAfter(maks, mulai + n - 1 - maks);
   return mulai;
 }
 
 /**
- * Merapikan M_Staff: semua baris staff (baris yang berisi data) dipindah ke
- * atas berurutan mulai baris 2, tanpa mengubah urutan dan isinya; isi baris
- * kosong di antaranya dan di bawahnya (kotak centang FALSE) dikosongkan.
- * Validasi kotak centang dan format tetap. Staff yang dulu tertulis jauh di
- * bawah (karena getLastRow() menghitung kotak centang) kembali terlihat.
- * Mengembalikan jumlah baris staff yang berpindah. Dipanggil di dalam kunci.
+ * Merapikan tab master: semua baris yang kolom kuncinya terisi dipindah ke
+ * atas berurutan mulai baris 2, tanpa mengubah urutan dan isinya. Isi baris
+ * lain (kolom kunci kosong: kotak centang FALSE, pilihan dropdown tanpa data)
+ * dikosongkan; validasi dan format tetap. Mengembalikan { pindah, dibersihkan }:
+ * jumlah baris data yang berpindah dan jumlah baris tanpa kunci yang berisi
+ * sesuatu selain FALSE. Dipanggil di dalam kunci (atau dari setupSpreadsheet).
  */
-function rapikanMStaff_() {
-  var sheet = ambilTab_('M_Staff');
+function rapikanTabMaster_(sheet, kolomKunci) {
+  var hasil = { pindah: 0, dibersihkan: 0 };
   var lastRow = sheet.getLastRow();
   var lebar = sheet.getLastColumn();
-  if (lastRow < 2 || lebar < 1) return 0;
+  if (lastRow < 2 || lebar < 1) return hasil;
   var semua = sheet.getRange(2, 1, lastRow - 1, lebar).getValues();
-  var isi = [];
-  var pindah = 0;
+  var data = [];
   semua.forEach(function (b, i) {
-    if (!barisBerisi_(b)) return;
-    if (i !== isi.length) pindah++;
-    isi.push(b);
+    if (kunciTerisi_(b[kolomKunci - 1])) {
+      if (i !== data.length) hasil.pindah++;
+      data.push(b);
+    } else if (b.some(function (v) { return v !== false && kunciTerisi_(v); })) {
+      hasil.dibersihkan++;
+    }
   });
-  if (isi.length === lastRow - 1) return 0; // sudah rapat, tidak ada baris kosong berisi FALSE
-  if (pindah) sheet.getRange(2, 1, isi.length, lebar).setValues(isi);
-  sheet.getRange(isi.length + 2, 1, lastRow - 1 - isi.length, lebar).clearContent();
-  return pindah;
+  if (data.length === semua.length) return hasil; // sudah rapat, tanpa baris kosong
+  if (hasil.pindah) sheet.getRange(2, 1, data.length, lebar).setValues(data);
+  sheet.getRange(data.length + 2, 1, semua.length - data.length, lebar).clearContent();
+  return hasil;
+}
+
+/** Kolom kunci tab master yang ditulis aplikasi (judul kolom). */
+var KUNCI_MASTER = {
+  M_Staff: 'Nama',
+  M_Satuan: 'Satuan',
+  M_Form: 'ID Form',
+  M_Konfigurasi: 'Kunci'
+};
+
+function kolomKunciMaster_(sheet) {
+  var judul = KUNCI_MASTER[sheet.getName()];
+  return posisiKolom_(sheet, { k: judul }).k;
 }
 
 /* ---------- Menulis M_Staff ---------- */
@@ -721,19 +740,20 @@ function tulisStaff_(info, staff, ubah) {
 }
 
 /**
- * Staff baru ditulis tepat di bawah baris staff terakhir. M_Staff dirapikan
- * dulu, supaya staff lama yang tertulis jauh di bawah ikut naik. Nomor baris
- * di info tidak berlaku lagi sesudah ini (pemanggil membaca ulang M_Staff).
+ * Staff baru ditulis tepat di bawah baris terakhir yang kolom Nama-nya terisi.
+ * M_Staff dirapikan dulu, supaya staff lama yang tertulis jauh di bawah ikut
+ * naik. Nomor baris di info tidak berlaku lagi sesudah ini (pemanggil membaca
+ * ulang M_Staff).
  */
 function tambahBarisStaff_(info, isi) {
-  rapikanMStaff_();
+  rapikanTabMaster_(info.sheet, info.kol.nama);
   var lebar = info.sheet.getLastColumn();
   var baris = [];
   for (var i = 0; i < lebar; i++) baris.push('');
   Object.keys(isi).forEach(function (kunci) {
     baris[info.kol[kunci] - 1] = isi[kunci];
   });
-  var nomor = barisBaruMaster_(info.sheet, 1);
+  var nomor = barisBaruMaster_(info.sheet, info.kol.nama, 1);
   info.sheet.getRange(nomor, 1, 1, lebar).setValues([baris]);
   return nomor;
 }
@@ -1364,13 +1384,15 @@ function susunBaris_(tabel, isi) {
 }
 
 /**
- * Nomor baris pertama untuk menulis n baris baru di bawah data. Tab baru
- * hanya punya 1.000 baris; jika kurang, baris ditambah di dalam rentang
- * (sebelum baris terakhir), supaya format, aturan warna, dan filter ikut
- * melebar. Baris kosong yang tersisa di tengah hilang saat tab diurutkan.
+ * Nomor baris pertama untuk menulis n baris baru di tab Data, Stock_Harian,
+ * atau Log_Perubahan: tepat di bawah baris terakhir yang kolom A-nya (Tanggal,
+ * atau Waktu di log) terisi. Tab baru hanya punya 1.000 baris; jika kurang,
+ * baris ditambah di dalam rentang (sebelum baris terakhir), supaya format,
+ * aturan warna, dan filter ikut melebar. Baris kosong yang tersisa di tengah
+ * hilang saat tab diurutkan.
  */
 function barisTulis_(sheet, n) {
-  var akhirData = sheet.getLastRow();
+  var akhirData = barisKunciTerakhir_(sheet, 1);
   var maks = sheet.getMaxRows();
   if (akhirData + n <= maks) return akhirData + 1;
   sheet.insertRowsAfter(Math.max(1, maks - 1), n + 500);
@@ -3753,17 +3775,24 @@ function setupSpreadsheet() {
       catatan: catatan
     });
 
-    // 3. Nilai awal (hanya baris yang belum ada).
+    // 3. Tab master yang ditulis aplikasi dirapikan: baris data yang tertulis jauh di bawah
+    //    (di bawah kotak centang atau dropdown kosong) naik ke atas. Lalu nilai awal
+    //    (hanya baris yang belum ada), tepat di bawah baris terakhir yang kuncinya terisi.
+    Object.keys(KUNCI_MASTER).forEach(function (nama) {
+      var tab = ss.getSheetByName(nama);
+      var r = rapikanTabMaster_(tab, kolomKunciMaster_(tab));
+      if (r.pindah) catatan.push(nama + ' dirapikan: ' + r.pindah + ' baris dipindah ke atas');
+      if (r.dibersihkan) {
+        catatan.push('Peringatan: ' + nama + ': ' + r.dibersihkan + ' baris tanpa ' + KUNCI_MASTER[nama] +
+          ' (hanya kotak centang atau pilihan dropdown) dikosongkan');
+      }
+    });
     isiBarisAwal_(ss.getSheetByName('M_Satuan'), SATUAN_AWAL.map(function (s) {
       return [s[0], s[1], true];
     }), 'M_Satuan', catatan);
     isiBarisAwal_(ss.getSheetByName('M_Form'), FORM_BAWAAN, 'M_Form', catatan);
     isiKonfigurasiAwal_(ss.getSheetByName('M_Konfigurasi'), catatan);
 
-    // M_Staff: staff yang tertulis jauh di bawah (di bawah kotak centang kosong) dinaikkan.
-    SS_ = ss;
-    var naik = rapikanMStaff_();
-    if (naik) catatan.push('M_Staff dirapikan: ' + naik + ' baris staff dipindah ke bawah staff sebelumnya');
 
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
     pasangRumusHarianStock_(ss, catatan);
@@ -4283,7 +4312,7 @@ function isiBarisAwal_(sheet, baris, label, catatan) {
     return !ada[String(b[0]).trim().toLowerCase()];
   });
   if (!tambah.length) return;
-  sheet.getRange(barisBaruMaster_(sheet, tambah.length), 1, tambah.length, tambah[0].length).setValues(tambah);
+  sheet.getRange(barisBaruMaster_(sheet, kolomKunciMaster_(sheet), tambah.length), 1, tambah.length, tambah[0].length).setValues(tambah);
   catatan.push(label + ': ' + tambah.length + ' baris awal ditambahkan');
 }
 
@@ -4293,7 +4322,7 @@ function isiKonfigurasiAwal_(sheet, catatan) {
     return !ada[b[0].toLowerCase()];
   });
   if (!tambah.length) return;
-  sheet.getRange(sheet.getLastRow() + 1, 1, tambah.length, 3).setValues(tambah);
+  sheet.getRange(barisBaruMaster_(sheet, kolomKunciMaster_(sheet), tambah.length), 1, tambah.length, 3).setValues(tambah);
   catatan.push('M_Konfigurasi: ' + tambah.map(function (b) { return b[0]; }).join(', ') + ' ditambahkan');
 }
 
