@@ -160,7 +160,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0; rumus sesuai lokalitas di Code.gs v0.6.1, butir 93), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 6 | Prep List dan resep (Pengaturan → Resep, pengaman resep, form Prep List, Data_Prep/Data_PrepBahan, gerakan stock, koreksi jumlah resep, masa simpan di Beranda dan email, harga barang jadi dari resep, Riwayat, PDF, tab Harian_Prep, blok Prep List di Dashboard) | Kode selesai (Code.gs v0.7, aplikasi 0.7.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
+| 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Perbaikan warna dan rumus tab Dashboard di Code.gs v0.8.1 (butir 118–121). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 8 | Stock opname dan daftar belanja | Belum |
 | 9 | Form kustom | Belum |
 | 10 | Rekap bulanan | Belum |
@@ -802,4 +802,28 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     (24 uji server: master, aturan nonaktif, nilai stock, Perlu perhatian, grafik, outlet dan jadwal, penolakan Staff, rumus
     seimbang dan bisa diubah ke gaya titik koma), dan frontend di Chromium dengan API tiruan yang memanggil `doPost` asli (16 uji
     alur dan delapan ukuran layar Bagian 4.6 tanpa gulir ke samping, teks terpotong, atau galat konsol).
+
+### Perbaikan tab Dashboard di Sheet (Code.gs v0.8.1, 5 Oktober 2026)
+
+118. **Versi:** Code.gs v0.8.1; aplikasi tetap 0.8.0 (frontend tidak berubah). Yang berubah hanya yang dijalankan
+    `setupSpreadsheet`, jadi cukup tempel Code.gs dan jalankan `setupSpreadsheet`; deploy versi baru tidak wajib.
+119. **Isi blok Dashboard polos.** `insertRowsBefore` memberi baris baru format baris di posisi sisip, yaitu baris judul blok
+    berikutnya (latar navy, kolom A putih tebal), sehingga isi blok yang diberi ruang tampil navy dan tidak terbaca (terlihat di
+    sheet pemilik). `ruangBlokDashboard_` dan `pasangBlokStockDashboard_` kini memanggil `polosIsiBlokDashboard_` setiap
+    `setupSpreadsheet`: baris di bawah judul blok sampai sebelum judul blok berikutnya (kolom A–H) kembali tanpa latar, warna teks
+    bawaan, dan tidak tebal; gaya baris ringkasan dan baris judul tabel dipasang lagi sesudahnya oleh fungsi bloknya. Format angka
+    dan format bersyarat tidak disentuh. Dashboard yang sudah terlanjur navy pulih saat `setupSpreadsheet` dijalankan ulang. Blok
+    Stock opname (belum dibangun) tidak disentuh.
+120. **Dua aturan rumus Sheet**, dari galat di sheet pemilik. (a) `XLOOKUP(1,(…)*(…),…)` di luar ARRAYFORMULA tidak menghitung
+    syarat gandanya sebagai larik dan hasilnya #N/A; rekap satu item pada satu tanggal kini dicari dengan
+    `IFERROR(INDEX(FILTER(kolom,shI=x,shT=tgl),1),0)` (rumus `Harian_Stock`, blok Stock Inventory, `letNilaiStock_`). (b) Nama di
+    LET dan LAMBDA tidak membedakan huruf besar dan kecil: `ku`/`kU`, `st`/`sT`, dan `ua`/`uA` membuat rumus #NAME? (tabel per
+    kategori blok Nilai stock, tabel blok Kepatuhan). Nama pengganti: `katAda`, `urut`, `katUrut`, `stForm`, `unitAktif`. Rumus
+    baru harus bebas dari kedua pola itu. `periksaSelRumus_` hanya membaca sel berumus, jadi galat di sel hasil limpahan
+    (misalnya #N/A di kolom Stock Akhir) tidak tercatat di log.
+121. **Uji v0.8.1** (di luar repo): fungsi pemasang tab Dashboard dan Harian dijalankan di Node dengan tiruan Sheet yang meniru
+    pewarisan format `insertRowsBefore`, pada tata letak Tahap 0, tata letak sekarang, dan sheet yang sudah terlanjur navy: tidak
+    ada sel isi blok berformat judul, judul blok dan format angka tetap, tidak ada penyisipan saat dijalankan ulang, 46 rumus
+    seimbang dan tanpa nama ganda. Hasil rumus di Google Sheets tetap belum bisa diuji di sini.
+
 
