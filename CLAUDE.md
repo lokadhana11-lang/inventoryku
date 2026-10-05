@@ -132,7 +132,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai dan digabung (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp) |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
 | 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
-| 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
+| 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0; rumus sesuai lokalitas di Code.gs v0.6.1, butir 93), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 6 | Prep List dan resep | Belum |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
 | 8 | Stock opname dan daftar belanja | Belum |
@@ -623,3 +623,17 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     (`LAYAR_FORM`). Laporan PDF Waste dan Suhu otomatis aktif di menu Laporan dan detail Riwayat karena terdaftar di
     `LAPORAN_PDF`.
 
+### Perbaikan rumus sesuai lokalitas spreadsheet (Code.gs v0.6.1)
+
+93. **Rumus mengikuti lokalitas file.** Di spreadsheet berlokalitas desimal koma (misalnya Indonesia),
+    rumus dari `setFormula` diurai dengan pemisah argumen `;`, desimal `,`, dan pemisah kolom array `\`,
+    sehingga rumus bergaya en-US (koma) tampil `#ERROR!` "Error mengurai formula". Rumus di Code.gs tetap
+    ditulis bergaya en-US; `setupSpreadsheet` menentukan gaya yang diterima file dengan rumus uji
+    `=IF(TRUE,SUM(1.5,COLUMNS({1,2})),0)` di tab sementara (`deteksiGayaRumus_`, tab dihapus lagi), lalu
+    semua rumus sel dan rumus format bersyarat ditulis lewat `rumusLokal_` / `ubahGayaRumus_` (teks dalam
+    `"…"` dan nama tab dalam `'…'` tidak diubah). Lokalitas file tidak diubah. Rumus kotak info tab Harian
+    (B3 Nama Outlet, B5 Tanggal) kini ditulis ulang setiap `setupSpreadsheet`, seperti A9; sel kotak info dan
+    A9 hanya ditimpa jika kosong, berumus, bernilai galat (`#ERROR!` dan sejenisnya), atau berisi teks bawaan
+    "Belum ada data." (`bolehDiberiRumus_`). Di akhir, `periksaSelRumus_` membaca kembali semua sel berumus di
+    semua tab dan mencatat di log sel yang menampilkan `#ERROR!`, `#NAME?`, atau `#REF!` (atau "tidak ada
+    yang …"). Rumus format bersyarat tidak bisa dibaca hasilnya oleh script, jadi tidak ikut diperiksa.
