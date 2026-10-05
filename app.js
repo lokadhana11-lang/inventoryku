@@ -6971,13 +6971,16 @@
     var data = null;
     var itemKini = null;
     var isi = null; // { nama, kategori, satuan, besar, satuanBesar, isi, harga, stokMin, stokMaks }
+    var diketik = false; // isian sudah diubah pengguna (draft)
     var d = Draft.baca(kunciDraft);
     if (d && d.data) {
       isi = d.data;
+      diketik = true;
       catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(d.waktu).toISOString());
     }
 
     function simpanDraft() {
+      diketik = true;
       var waktu = Draft.simpan(kunciDraft, isi);
       if (waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(waktu).toISOString());
     }
@@ -7263,7 +7266,10 @@
               bukaSesuaikanStock({ item: it, tercatat: it.stock || 0 }, function (hasil) {
                 if (hasil.riwayatItem && itemKini) {
                   itemKini.stock = hasil.riwayatItem.tercatat;
-                  gambarIsian();
+                  itemKini.punyaCatatan = true; // satuan dasar dan nama kini terkunci
+                  itemKini.bisaGantiNama = false;
+                  if (!diketik) isi = null;
+                  gambar(data);
                 }
               }, 'Stok pembuka');
             }
@@ -7277,12 +7283,14 @@
       ambil: function () { return panggilApi('daftarItem'); },
       gambar: function (hasil, dariHp) {
         // Isian yang sedang diketik tidak digambar ulang; hanya data pendukungnya diperbarui.
-        if (isi && data) {
+        if (isi && data && diketik) {
           data = hasil;
           var baruKini = baru ? null : cari(namaAwal);
           if (baruKini) itemKini = baruKini;
           return;
         }
+        // Belum ada yang diketik: gambar ulang dengan data server (stock, kunci nama dan satuan).
+        isi = null;
         gambar(hasil, dariHp);
       },
       kerangka: function () {

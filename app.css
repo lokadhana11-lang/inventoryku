@@ -879,6 +879,14 @@ body.papan-ketik .layar {
   border-color: var(--masalah-teks);
 }
 
+/* Isian yang terkunci (nama atau satuan yang sudah dipakai catatan): berlatar Baja, teks Tinta Redup */
+.isian[readonly],
+.isian:disabled {
+  background: var(--baja);
+  color: var(--tinta-redup);
+  opacity: 1;
+}
+
 .isian-pin {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.2em;

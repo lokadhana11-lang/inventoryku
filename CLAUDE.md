@@ -126,9 +126,24 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Khusus Pengelola: `daftarResep` → `{ resep: [{ itemHasil, satuan, hasil, masaSimpan, aktif, bahan: [{ item, qty, satuan, harga }],
   biaya, hargaPerSatuan, tanpaHarga, masalah }], item: [{ nama, kategori, satuan, harga, hargaDariResep, aktif, punyaResep }] }`;
   `simpanResep {baru, itemHasil, hasil, masaSimpan, bahan: [{ item, qty }]}` dan `aturResepAktif {itemHasil, aktif}` → jawaban
-  `daftarResep`; `aturItemAktif {nama, aktif}` → `{ item: { nama, aktif }, stock }` (belum dipakai layar; untuk Tahap 7).
+  `daftarResep`; `aturItemAktif {nama, aktif}` → jawaban `daftarItem` ditambah `diubah: { nama, aktif }` (sejak Tahap 7).
   `riwayat`/`detailKiriman`: `kolom[]` boleh berjenis `tanggal` dan membawa `jikaAda` dan `bantuan`; baris prep membawa
   `rincian: [{ item, qty, satuan, minus }]`.
+- Aksi Tahap 7 (semua khusus Pengelola): `dashboard {tanggal}` → `{ tanggal, ringkas: { formLengkap, formWajib, belumDiperiksa,
+  suhuLuar, bawahMinimum, wasteRp, wasteCatatan, nilaiStock }, nilaiStock: { total, jumlahItem, perKategori: [{ kategori, nilai,
+  jumlahItem }], tanpaHarga: [{ nama, kategori, satuan, stock, aktif }] }, perhatian: [{ jenis, tingkat: masalah|tinjau|menunggu,
+  judul, ket, data }], grafikWaste: { hari: [{ tanggal, rp, catatan }] }, grafikSuhu: { batas, jumlah, luar, unit: [{ nama, tipe,
+  nonaktif?, cek: [{ waktuCek, suhu, luar, tindakan, oleh, waktu }] }] }, alamatSheet }`; `daftarItem` → `{ hariIni, item: [{ nama,
+  kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, aktif, stock, punyaCatatan, bisaGantiNama, resepAktif,
+  dipakaiResep }], kategori: [{ nama, aktif }], satuan: [{ satuan, jenis, aktif }] }`; `simpanItem {baru, namaLama, nama, kategori,
+  satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks}` → `daftarItem` + `disimpan`; `daftarKategoriSatuan` → `{ kategori:
+  [{ nama, urutan, aktif, jumlahItem, jumlahItemAktif }], satuan: [{ satuan, jenis, aktif, jumlahItem, jumlahItemAktif }],
+  jenisSatuan }`; `simpanKategori {baru, namaLama, nama}`, `aturKategoriAktif {nama, aktif}`, `urutKategori {urutan: [nama]}`,
+  `simpanSatuan {baru, satuanLama, satuan, jenis}`, `aturSatuanAktif {satuan, aktif}` → jawaban `daftarKategoriSatuan` (simpan:
+  + `disimpan`); `daftarUnit` → `{ unit: [{ nama, tipe, aktif, punyaCatatan }], batas }`; `simpanUnit {baru, namaLama, nama, tipe}`,
+  `aturUnitAktif {nama, aktif}` → jawaban `daftarUnit`. `bacaOutletJadwal` kini → `{ namaOutlet, zonaWaktu, jamClosing,
+  jedaLaporanMenit, jadwalOpname, hariCadangan, keluarOtomatisMenit, perluPasangTrigger }`; `simpanOutletJadwal` menerima field
+  mana pun dari daftar itu (hanya yang dikirim yang ditulis) dan menjawab sama ditambah `jadwalBerubah`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -145,7 +160,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0; rumus sesuai lokalitas di Code.gs v0.6.1, butir 93), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 6 | Prep List dan resep (Pengaturan → Resep, pengaman resep, form Prep List, Data_Prep/Data_PrepBahan, gerakan stock, koreksi jumlah resep, masa simpan di Beranda dan email, harga barang jadi dari resep, Riwayat, PDF, tab Harian_Prep, blok Prep List di Dashboard) | Kode selesai (Code.gs v0.7, aplikasi 0.7.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
+| 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 8 | Stock opname dan daftar belanja | Belum |
 | 9 | Form kustom | Belum |
 | 10 | Rekap bulanan | Belum |
@@ -266,8 +281,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 27. **Pengaturan → Staff dan PIN:** staff baru langsung dibuat dengan PIN. Nama tidak bisa diganti
     (nama dipakai sebagai `submitted_by`). Role dan keadaan akun sendiri tidak bisa diubah sendiri,
     supaya Pengelola tidak mengunci diri. Daftar staff memakai pola tabel lebar (kolom nama diam).
-    Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak Tahap 6 empat: Staff dan PIN, Resep,
-    Penerima email, Outlet dan jadwal); bagian lain menyusul di tahapnya.
+    Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak Tahap 7: Staff dan PIN, Penerima email,
+    Item, Resep, Unit, Kategori dan satuan, Outlet dan jadwal); Form menyusul di Tahap 9.
 28. **Penerima email** disimpan di `M_Outlet` kolom Email Penerima Laporan, dipisah koma; alamat
     ganda (huruf besar/kecil) dibuang.
 29. **Penyimpanan di HP** (localStorage): `inventoryku:sesi`, `inventoryku:infoLogin`, dan per
@@ -664,8 +679,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dan saat mengaktifkan lagi. Pesan: "Sauce dasar sudah memakai Sauce bolognese sebagai bahan." dan untuk jalur panjang
     "..., lewat Sauce dasar." Resep nonaktif tidak ikut dihitung; mengaktifkan memeriksa lagi item dan bahan yang nonaktif.
 97. **Item yang masih dipakai resep aktif** (sebagai bahan atau hasil) tidak bisa dinonaktifkan: aksi `aturItemAktif` (Pengelola)
-    sudah memeriksanya di server, tetapi layar Pengaturan → Item baru dibangun di Tahap 7. Selama itu item dinonaktifkan di Sheet
-    dengan tangan; resep yang memakai item nonaktif ditandai "Perlu ditinjau" di Pengaturan → Resep.
+    memeriksanya di server; sejak Tahap 7 dipakai Pengaturan → Item (butir 112). Resep yang memakai item nonaktif (misalnya
+    dinonaktifkan di Sheet dengan tangan) ditandai "Perlu ditinjau" di Pengaturan → Resep.
 98. **Harga barang jadi** (Bagian 5.3): Harga Satuan kosong dihitung dari harga bahan satu resep aktif dibagi hasil per resep
     (`lengkapiHargaResep_`, bahan barang jadi ikut dihitung dari resepnya; dibulatkan 2 angka di belakang koma). Jika ada bahan
     tanpa harga, harganya tetap kosong. Dipakai estimasi waste (`formWaste`, `kirimWaste`, tersalin ke `Data_Waste` saat dicatat)
@@ -714,4 +729,77 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     perkiraan biaya yang dihitung langsung dari harga item, catatan "Perubahan berlaku untuk prep berikutnya. Catatan lama tidak
     berubah.", dan kartu Keadaan resep (Nonaktifkan dengan konfirmasi / Aktifkan lagi). Draft per resep `draft:resep:<item>` atau
     `draft:resep:+baru`; jawaban `cache:resep`. Butuh sinyal untuk menyimpan.
+
+### Tahap 7
+
+107. **Versi:** Code.gs v0.8, aplikasi 0.8.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js).
+108. **Menu Dashboard** (`#/dashboard`, aksi `dashboard`, satu panggilan; jawaban terakhir di `cache:dashboard`). Tanggal = tanggal
+    perangkat (tidak boleh lewat hari ini menurut server). Angka ringkas berupa enam ubin: Form terisi (x dari y, aturan Bagian 5.8),
+    Belum diperiksa (kiriman, 31 hari seperti Beranda), Suhu di luar standar (pengecekan hari ini, termasuk cek ulang), Di bawah stok
+    minimum (item aktif), Total waste (Rp hari ini), dan Nilai stock (ketuk: lembar per kategori, total, dan daftar "Belum punya
+    harga" yang membuka item itu di Pengaturan). "Satu baris" berlaku di desktop; HP dua kolom, tablet tiga kolom (lebar 320 px
+    tidak muat enam ubin). Tombol "Stock opname" (Bagian 5.6) menyusul di Tahap 8.
+109. **Perlu perhatian** disusun server (`perhatianDashboard_`), urut tingkat: Masalah (unit yang pengecekan terakhirnya hari ini
+    masih di luar standar, Stock Akhir minus, lewat masa simpan, laporan/cadangan gagal), Perlu ditinjau (baris dilaporkan keliru,
+    permintaan reset PIN, di bawah stok minimum dengan saran order, habis besok, jadwal yang menunggu `pasangTrigger`), Menunggu
+    (form wajib belum lengkap, isian belum diperiksa, item belum punya harga). Suhu yang sudah dibereskan dengan cek ulang normal
+    tidak masuk daftar (tetap terlihat di grafik). Ketukan: suhu → `#/suhu`; minus dan di bawah minimum → lembar daftar item yang
+    membuka riwayat per item (Sesuaikan stock); masa simpan → lembar dengan "Catat sebagai waste"; laporan dan belum diperiksa →
+    Riwayat dengan filter (seperti Beranda); reset PIN → layar PIN; form belum lengkap → Beranda; jadwal → Outlet dan jadwal; tanpa
+    harga → lembar nilai stock.
+110. **Grafik** (SVG buatan sendiri, tanpa animasi, ringkasan teks di atasnya). Waste: `viewBox` 700×120 dengan
+    `preserveAspectRatio="none"` (hanya persegi, jadi tidak terdistorsi), batang Biru Malam, hari tanpa nilai rupiah tidak punya
+    batang (hari yang punya waste tetapi harganya kosong: tanpa batang, detail "harga item belum diisi"); tujuh tombol transparan
+    menutupi kolom dan nama hari (lebar sasaran ±41 px di layar 320 px, lebih kecil dari 44 px karena tujuh kolom; tingginya 148 px);
+    ketukan menandai kolom (latar Baja) dan menulis tanggal, nilai, dan jumlah catatan. Suhu: unit aktif (urutan `M_Unit`) ditambah
+    unit nonaktif yang punya isian hari itu; pita normal (latar Baik, tepi Baik) di jalur garis; titik lingkaran Biru Malam, di luar
+    standar segitiga Masalah, memakai status yang tersimpan; skala Chiller batas ± 4 °C, Freezer batas −12 sampai +4 (−30 sampai −14);
+    di luar skala ditaruh di tepi. Penanda adalah SVG kecil yang diletakkan dengan `left: %` (lingkaran tidak gepeng). Di bawah
+    480 px pita turun ke baris kedua. Ketuk baris: daftar jam, suhu, status, pengisi, dan tindakan.
+111. **Nilai stock** (`nilaiStock_` dan blok Nilai stock di Sheet, cara hitung sama): Stock Akhir terkini × Harga Satuan di `M_Item`
+    sekarang. Dihitung: item aktif, dan item nonaktif yang stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah.
+    Harga barang jadi dari resep (butir 98) tidak dipakai di sini supaya aplikasi dan Sheet sama; barang jadi tanpa harga muncul di
+    daftar "belum punya harga". Stock minus ikut dihitung apa adanya (nilainya minus). Nilai bahan terpakai (hanya di Sheet) =
+    (Stock Keluar + Dipakai Prep) × harga, untuk item yang tidak punya baris aktif di `M_Resep`, dalam periode B3.
+112. **Pengaturan → Item** (`#/pengaturan/item`, `-baru`, `/<nama>`): daftar per kategori (urutan kategori) lalu kelompok Nonaktif,
+    dengan pencarian; tanda Nonaktif, Belum punya harga, Kategori nonaktif. Layar ubah: nama, kategori dan satuan dasar (`<select>`;
+    pilihan nonaktif hanya tampil jika itu nilai sekarang), sakelar "Datang dalam kemasan besar" (`role=switch`, kata Ya/Tidak) dengan
+    kalimat "1 [dus] berisi [12] botol", harga (2 angka di belakang koma), stok minimum, stok maksimum. Draft `draft:item:<nama>` /
+    `draft:item:+baru`, jawaban `cache:item`. Nama hanya bisa diganti selama item belum punya catatan stock (Stock_Harian, semua
+    sumber gerakan termasuk prep tanpa resep, Data_Opname) dan belum dirujuk resep apa pun; satuan dasar terkunci setelah ada
+    catatan stock (keduanya tampil terkunci berlatar Baja; server juga menolak). Isian yang belum diketik digambar ulang dengan data
+    server. Kartu Stock (stock hari ini, "Riwayat stock" → lembar riwayat per item dan Sesuaikan stock) dan kartu Keadaan item:
+    Nonaktifkan dengan konfirmasi (stock belum nol: peringatan Perlu ditinjau di konfirmasi, tetap boleh), atau keterangan "Tidak
+    bisa dinonaktifkan: masih dipakai resep …" dengan tombol Buka resep. Setelah item baru tersimpan, layar item itu terbuka dengan
+    lembar "Isi stok pembuka sekarang?" (Nanti / Isi stok pembuka) yang membuka Sesuaikan stock (tanggal hari ini) dengan alasan
+    Stok pembuka sudah terpilih. Item baru langsung aktif, ditulis lewat `tambahBarisMaster_` (butir 79; `M_Item`, `M_Kategori`,
+    `M_Unit` kini juga di `KUNCI_MASTER` dan ikut dirapikan setupSpreadsheet).
+113. **Kategori dan satuan** (`#/pengaturan/kategori`): kategori dengan tombol naik/turun (urutan lokal, lalu "Simpan urutan"
+    menulis Urutan 1..n untuk semua kategori; ditolak jika daftar berubah); kategori baru di urutan terakhir. Satuan dikelompokkan per
+    jenis. Nama kategori dan satuan hanya bisa diganti selama belum dipakai item (huruf besar/kecil selalu boleh di server). Kategori
+    atau satuan (dasar maupun besar) yang masih dipakai item aktif tidak bisa dinonaktifkan, supaya item tidak hilang dari form
+    tanpa disadari. Ubah dan keadaan lewat lembar.
+114. **Unit** (`#/pengaturan/unit`): daftar menurut urutan `M_Unit` (unit baru di bawah; tidak ada pengatur urutan), ubah lewat
+    lembar. Nama terkunci setelah unit punya catatan di `Data_Suhu`; tipe boleh diganti (catatan lama menyimpan tipe dan statusnya).
+    Unit nonaktif tidak tampil di form Suhu dan tidak dihitung kelengkapan.
+115. **Outlet dan jadwal** kini lengkap: nama outlet, zona waktu (WIB/WITA/WIT, ditambah zona tersimpan dan zona perangkat bila
+    berbeda; juga dipasang sebagai zona spreadsheet), jam closing (`<input type=time>`), jeda laporan (menit 0–240, dengan perkiraan
+    jam laporan), jadwal stock opname (mingguan/bulanan; dipakai Tahap 8), hari cadangan, keluar otomatis. Satu tombol Simpan,
+    hanya field yang berubah dikirim. Mengubah zona waktu, jam closing, jeda, atau hari cadangan mengisi `M_Konfigurasi`
+    `pasang_trigger` = "Perlu dijalankan …"; selama itu Beranda dan Dashboard Pengelola menampilkan peringatan dan layar ini menulis
+    "Jadwal sudah diubah, tetapi trigger belum dipasang ulang…". `pasangTrigger` menulis "Terpasang …" sehingga peringatan hilang.
+116. **Tab Dashboard di Sheet.** Pemilih periode B3 sudah ada (7 hari, 30 hari, Bulan berjalan). Baru: blok **Nilai stock**
+    (20 baris, `TINGGI_BLOK_NILAI`: ringkasan nilai, jumlah tanpa harga, dan bahan terpakai; per kategori nilai stock dan bahan
+    terpakai, 15 baris; daftar item belum punya harga, 15 baris), blok **Kepatuhan** (36 baris: satu baris per hari periode B3,
+    lama ke baru, status Stock/Suhu/Prep list/Waste menurut Bagian 5.8 — Suhu "x dari y" dengan unit aktif sekarang, form yang
+    disembunyikan "–" — jumlah form belum lengkap, kiriman belum diperiksa, baris dilaporkan keliru; judul kolom form dari `M_Form`;
+    form kustom menyusul di Tahap 9), dan ringkasan **Keadaan item** di G7:H10 blok Stock. **Grafik** (EmbeddedChart, kolom J, di
+    kanan tabel bloknya, dibuat ulang setiap setupSpreadsheet menurut judulnya): Keadaan item stock (pai, warna makna status),
+    Nilai stock per kategori (batang), Estimasi kerugian waste per bulan (kolom), Rata-rata suhu per unit 7 hari terakhir (garis,
+    baris dan kolom ditukar), Jumlah resep per item 7 hari terakhir (batang), Kepatuhan per hari (kolom). Blok Stock opname dan
+    grafiknya menyusul di Tahap 8. Rumus ditulis gaya en-US lewat `rumusLokal_`; operasi larik di dalam LET dibungkus ARRAYFORMULA.
+117. **Uji Tahap 7** (di luar repo): Code.gs dijalankan di Node dengan tiruan SpreadsheetApp/Utilities/Properties/Lock/Charts
+    (24 uji server: master, aturan nonaktif, nilai stock, Perlu perhatian, grafik, outlet dan jadwal, penolakan Staff, rumus
+    seimbang dan bisa diubah ke gaya titik koma), dan frontend di Chromium dengan API tiruan yang memanggil `doPost` asli (16 uji
+    alur dan delapan ukuran layar Bagian 4.6 tanpa gulir ke samping, teks terpotong, atau galat konsol).
 
