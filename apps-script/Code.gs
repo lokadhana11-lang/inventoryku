@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.5 (Tahap 4)
+// InventoryKu Code.gs v0.5.1 (Tahap 4 + perubahan 5 Oktober 2026)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -23,6 +23,10 @@
  *                        koreksi berantai, Log_Perubahan.
  * - Tahap 4            : laporan PDF (unduh, simpan ke Drive), email laporan
  *                        harian, cadangan mingguan, trigger.
+ * - 5 Oktober 2026     : tombol Keluar dan keluar otomatis (lamanya di
+ *                        M_Konfigurasi, Pengaturan → Outlet dan jadwal), hapus
+ *                        staff nonaktif (kolom Dihapus di M_Staff), PDF stock
+ *                        per kategori.
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - pasangTrigger      : dijalankan dari editor; memasang kedua trigger.
@@ -31,9 +35,11 @@
  *                        membuat semua tab. Aman dijalankan ulang.
  * - buatKodePemasangan : dijalankan dari editor saat tidak ada Pengelola yang
  *                        bisa masuk; membuat Kode Pemasangan baru.
+ * - ujiPemisahHalamanPdf : dijalankan dari editor; menguji apakah konversi PDF
+ *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.5';
+var VERSI_KODE = 'v0.5.1';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -65,6 +71,11 @@ var AKSI_ = {
   tambahStaff: { jalankan: aksiTambahStaff_, pengelola: true },
   ubahStaff: { jalankan: aksiUbahStaff_, pengelola: true },
   aturPin: { jalankan: aksiAturPin_, pengelola: true },
+  hapusStaff: { jalankan: aksiHapusStaff_, pengelola: true,
+    pesan: 'Menghapus staff hanya bisa dilakukan Head Kitchen atau Manager.' },
+  bacaOutletJadwal: { jalankan: aksiBacaOutletJadwal_, pengelola: true },
+  simpanOutletJadwal: { jalankan: aksiSimpanOutletJadwal_, pengelola: true,
+    pesan: 'Pengaturan outlet dan jadwal hanya bisa diubah Head Kitchen atau Manager.' },
   bacaPenerima: { jalankan: aksiBacaPenerima_, pengelola: true },
   simpanPenerima: { jalankan: aksiSimpanPenerima_, pengelola: true },
   formStock: { jalankan: aksiFormStock_ },
@@ -306,16 +317,41 @@ var KOLOM_STAFF = {
   reset: 'Permintaan Reset PIN'
 };
 
-/** Membaca M_Staff: { sheet, kol, daftar: [{ baris, nama, role, hash, aktif, reset }] }. */
-function bacaStaff_() {
+/**
+ * Kolom Dihapus (waktu). Ditambahkan setupSpreadsheet sejak v0.5.1; selama
+ * belum ada, semua staff dianggap belum dihapus dan aksi hapus menolak.
+ */
+var KOLOM_STAFF_DIHAPUS = 'Dihapus';
+
+/** Nomor kolom berjudul tertentu, atau 0 jika belum ada. */
+function posisiKolomOpsional_(sheet, judul) {
+  var lastCol = sheet.getLastColumn();
+  var baris = lastCol ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  for (var c = 0; c < baris.length; c++) {
+    if (String(baris[c]).trim() === judul) return c + 1;
+  }
+  return 0;
+}
+
+/**
+ * Membaca M_Staff: { sheet, kol, daftar: [{ baris, nama, role, hash, aktif, reset }] }.
+ * Staff yang dihapus (kolom Dihapus berisi) tidak ikut di daftar: ia hilang dari
+ * Login, Pengaturan, dan sesi, dan namanya boleh dipakai staff baru (Bagian 5.1).
+ * Namanya tetap terbaca di Riwayat, PDF, dan Log_Perubahan karena di tab Data
+ * nama disimpan sebagai teks. termasukDihapus: true hanya untuk pilihan
+ * Pengisi di filter Riwayat.
+ */
+function bacaStaff_(termasukDihapus) {
   var sheet = ambilTab_('M_Staff');
   var kol = posisiKolom_(sheet, KOLOM_STAFF);
+  kol.dihapus = posisiKolomOpsional_(sheet, KOLOM_STAFF_DIHAPUS);
   var daftar = [];
   var lastRow = sheet.getLastRow();
   if (lastRow >= 2) {
     sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues().forEach(function (r, i) {
       var nama = rapikanTeks_(r[kol.nama - 1]);
       if (!nama) return;
+      if (!termasukDihapus && kol.dihapus && String(r[kol.dihapus - 1] == null ? '' : r[kol.dihapus - 1]).trim() !== '') return;
       var aktif = r[kol.aktif - 1];
       var reset = r[kol.reset - 1];
       daftar.push({
@@ -434,7 +470,8 @@ function buatSesi_(staff) {
     token: token,
     berlakuSampai: new Date(sampai).toISOString(),
     pengguna: dataPengguna_(staff),
-    namaOutlet: namaOutlet_()
+    namaOutlet: namaOutlet_(),
+    keluarOtomatisMenit: keluarOtomatisMenit_()
   };
 }
 
@@ -531,6 +568,23 @@ function tulisKonfigurasi_(kunci, nilai, keterangan) {
   }
 }
 
+/**
+ * Keluar otomatis (spesifikasi sistem Bagian 7.2): lamanya dalam menit, dari
+ * M_Konfigurasi baris keluar_otomatis_menit. Nilai yang kosong atau tidak sah
+ * dibaca sebagai nilai awal 5 menit. Dihitung di perangkat; server hanya
+ * menyimpan dan mengirimkannya saat login dan di Beranda.
+ */
+var PILIHAN_KELUAR_OTOMATIS = [5, 10, 15, 30];
+var KELUAR_OTOMATIS_AWAL = 5;
+var KETERANGAN_KELUAR_OTOMATIS = 'Aplikasi keluar sendiri setelah sekian menit tidak dipakai: 5, 10, 15, atau 30. ' +
+  'Diubah Pengelola di Pengaturan → Outlet dan jadwal.';
+
+function keluarOtomatisMenit_(nilai) {
+  if (arguments.length === 0) nilai = bacaKonfigurasi_().nilai.keluar_otomatis_menit;
+  var n = Number(String(nilai == null ? '' : nilai).trim());
+  return PILIHAN_KELUAR_OTOMATIS.indexOf(n) >= 0 ? n : KELUAR_OTOMATIS_AWAL;
+}
+
 /** Zona waktu sistem: yang terdeteksi saat pemasangan, atau zona spreadsheet. */
 function zonaWaktu_() {
   var zona = String(bacaKonfigurasi_().nilai.zona_waktu || '').trim();
@@ -620,11 +674,11 @@ function tambahBarisStaff_(info, isi) {
   return nomor;
 }
 
-/** Daftar staff untuk Pengaturan → Staff dan PIN. */
+/** Daftar staff untuk Pengaturan → Staff dan PIN: staff aktif lebih dulu, lalu yang nonaktif; masing-masing urut abjad. */
 function ringkasStaff_(daftar) {
   var props = PropertiesService.getScriptProperties();
   return daftar.slice().sort(function (a, b) {
-    return a.nama.localeCompare(b.nama, 'id');
+    return (b.aktif ? 1 : 0) - (a.aktif ? 1 : 0) || a.nama.localeCompare(b.nama, 'id');
   }).map(function (s) {
     return {
       nama: s.nama,
@@ -768,7 +822,7 @@ function aksiPulihkan_(body) {
   });
 }
 
-/** Ganti pengguna: menghapus sesi yang dikirim. Tidak gagal jika sesi sudah habis. */
+/** Keluar (tombol Keluar dan keluar otomatis): menghapus sesi yang dikirim. Tidak gagal jika sesi sudah habis. */
 function aksiKeluar_(body) {
   if (typeof body.token === 'string' && body.token.length >= 20 && body.token.length <= 100) {
     PropertiesService.getScriptProperties().deleteProperty(kunciSesi_(body.token));
@@ -804,7 +858,8 @@ function aksiBeranda_(body, pengguna) {
     pengguna: pengguna,
     namaOutlet: namaOutlet_(),
     tanggal: tanggal,
-    form: kelengkapanForm_(tanggal)
+    form: kelengkapanForm_(tanggal),
+    keluarOtomatisMenit: keluarOtomatisMenit_()
   };
   if (pengguna.pengelola) {
     hasil.permintaanReset = bacaStaff_().daftar.filter(function (s) {
@@ -1002,19 +1057,56 @@ function aksiTambahStaff_(body) {
   });
 }
 
-/** Ubah role atau aktif/nonaktif. Akun sendiri tidak bisa diubah di sini. */
+/**
+ * Ubah role atau aktif/nonaktif. Akun sendiri tidak bisa diubah di sini, dan
+ * Pengelola aktif yang terakhir tidak bisa dinonaktifkan atau dijadikan Staff,
+ * supaya selalu ada yang bisa mengelola sistem (Bagian 5.1).
+ */
 function aksiUbahStaff_(body, pengguna) {
   return denganKunci_(function () {
     var info = bacaStaff_();
     var staff = cariStaff_(info.daftar, body.nama);
     if (!staff) throw galatPengguna_('Staff tidak ditemukan. Muat ulang daftar staff.');
-    if (samaNama_(staff.nama, pengguna.nama)) {
-      throw galatPengguna_('Role dan keadaan akunmu sendiri diubah oleh Head Kitchen atau Manager lain.');
-    }
     var ubah = {};
     if (body.role != null && periksaRole_(body.role) !== staff.role) ubah.role = body.role;
     if (typeof body.aktif === 'boolean' && body.aktif !== staff.aktif) ubah.aktif = body.aktif;
+    var lepasPengelola = ubah.aktif === false || (ubah.role && !apakahPengelola_(ubah.role));
+    if (lepasPengelola && staff.aktif && apakahPengelola_(staff.role)) {
+      var adaLain = info.daftar.some(function (s) {
+        return s !== staff && s.aktif && s.hash && apakahPengelola_(s.role);
+      });
+      if (!adaLain) {
+        throw galatPengguna_(staff.nama + ' adalah Head Kitchen atau Manager aktif yang terakhir. ' +
+          'Tambah atau aktifkan Head Kitchen atau Manager lain dulu, supaya selalu ada yang bisa mengelola sistem.');
+      }
+    }
+    if (samaNama_(staff.nama, pengguna.nama)) {
+      throw galatPengguna_('Role dan keadaan akunmu sendiri diubah oleh Head Kitchen atau Manager lain.');
+    }
     tulisStaff_(info, staff, ubah);
+    return { staff: ringkasStaff_(bacaStaff_().daftar) };
+  });
+}
+
+/**
+ * Hapus staff (Bagian 5.1): hanya staff yang sudah nonaktif. Barisnya tetap
+ * ada di M_Staff: kolom Dihapus diisi waktunya, hash PIN dikosongkan, dan
+ * permintaan reset PIN miliknya ditutup. Pemilik Sheet bisa memulihkannya
+ * dengan mengosongkan kolom Dihapus (staff kembali nonaktif, PIN dibuat ulang).
+ */
+function aksiHapusStaff_(body, pengguna) {
+  return denganKunci_(function () {
+    var info = bacaStaff_();
+    if (!info.kol.dihapus) {
+      throw galatPengguna_('Kolom Dihapus belum ada di tab M_Staff. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+    }
+    var staff = cariStaff_(info.daftar, body.nama);
+    if (!staff) throw galatPengguna_('Staff tidak ditemukan. Muat ulang daftar staff.');
+    if (staff.aktif || samaNama_(staff.nama, pengguna.nama)) {
+      throw galatPengguna_('Nonaktifkan dulu untuk bisa menghapus.');
+    }
+    tulisStaff_(info, staff, { dihapus: new Date(), pin: '', reset: '' });
+    PropertiesService.getScriptProperties().deleteProperty(kunciGagalPin_(staff.nama));
     return { staff: ringkasStaff_(bacaStaff_().daftar) };
   });
 }
@@ -1040,6 +1132,23 @@ function aksiAturPin_(body, pengguna) {
       hasil.sesiBaru = { token: sesi.token, berlakuSampai: sesi.berlakuSampai };
     }
     return hasil;
+  });
+}
+
+/* ---------- Outlet dan jadwal (baru berisi lama keluar otomatis) ---------- */
+
+function aksiBacaOutletJadwal_() {
+  return { keluarOtomatisMenit: keluarOtomatisMenit_() };
+}
+
+function aksiSimpanOutletJadwal_(body) {
+  var n = Number(body.keluarOtomatisMenit);
+  if (PILIHAN_KELUAR_OTOMATIS.indexOf(n) < 0) {
+    throw galatPengguna_('Pilih 5, 10, 15, atau 30 menit.');
+  }
+  return denganKunci_(function () {
+    tulisKonfigurasi_('keluar_otomatis_menit', String(n), KETERANGAN_KELUAR_OTOMATIS);
+    return { keluarOtomatisMenit: n };
   });
 }
 
@@ -2115,7 +2224,13 @@ function pilihanFilter_(def) {
       return { nama: master[k].nama, kategori: master[k].kategori };
     }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   }
-  hasil.pengisi = bacaStaff_().daftar.map(function (s) { return s.nama; }).sort(function (a, b) {
+  // Termasuk staff yang sudah dihapus: isian lamanya tetap ada di Riwayat.
+  var sudah = {};
+  hasil.pengisi = bacaStaff_(true).daftar.map(function (s) { return s.nama; }).filter(function (n) {
+    if (sudah[n.toLowerCase()]) return false;
+    sudah[n.toLowerCase()] = true;
+    return true;
+  }).sort(function (a, b) {
     return a.localeCompare(b, 'id');
   });
   return hasil;
@@ -2460,14 +2575,32 @@ var HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 /**
  * Template PDF per form. Form lain (Waste, Suhu, Prep, form kustom) cukup
- * menambah satu entri: { judul, isi(tanggal) }. isi mengembalikan
- * { ada: bool (ada isian pada tanggal itu), info: [[label, nilai]],
- *   tabel: html tabel, catatan: [teks] }. Kepala, kotak info, baris
- * "Diisi oleh"/"Diperiksa oleh", dan kaki dibuat bersama oleh htmlLaporan_.
+ * menambah satu entri: { judul, isi(tanggal, opsi) }. isi mengembalikan
+ * { ada: bool (ada isian pada tanggal itu), pesanKosong (opsional),
+ *   info: [[label, nilai]], tabel: html tabel, catatan: [teks] }, atau
+ * bagian: [{ info, tabel }] untuk laporan yang tiap bagiannya mulai di
+ * halaman baru dengan kepala diulang. Kepala, kotak info, baris "Diisi
+ * oleh"/"Diperiksa oleh", dan kaki dibuat bersama oleh htmlLaporan_.
+ * perKategori: true berarti form ini bisa diunduh untuk satu kategori.
  */
 var LAPORAN_PDF = {
-  STOCK: { judul: 'Form Stock Inventory Harian', isi: isiPdfStock_ }
+  STOCK: { judul: 'Form Stock Inventory Harian', isi: isiPdfStock_, perKategori: true }
 };
+
+/**
+ * Pemisah halaman PDF (Bagian 9.1 butir 4). Dukungan page-break-before pada
+ * Utilities.newBlob(html).getAs('application/pdf') belum dipastikan, jadi
+ * bawaannya cadangan: PDF stock semua kategori satu tabel bersambung dengan
+ * baris judul kategori. Jalankan ujiPemisahHalamanPdf di editor; jika
+ * pemisah dipatuhi, Script Property PDF_PEMISAH_HALAMAN diisi "ya" dan tiap
+ * kategori mulai di halaman baru dengan kepala laporan diulang.
+ */
+var PROP_PEMISAH_HALAMAN = 'PDF_PEMISAH_HALAMAN';
+
+function pemisahHalamanPdf_() {
+  return String(PropertiesService.getScriptProperties().getProperty(PROP_PEMISAH_HALAMAN) || '')
+    .trim().toLowerCase() === 'ya';
+}
 
 function escHtml_(teks) {
   return String(teks == null ? '' : teks).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -2514,11 +2647,17 @@ function namaFileForm_(nama) {
 /**
  * Diisi oleh dan Diperiksa oleh (Bagian 6.2) dari kiriman satu tanggal.
  * Semua kiriman diperiksa → pemeriksa terakhir dan waktunya; belum semua →
- * "2 dari 3 isian diperiksa".
+ * "2 dari 3 isian diperiksa". kategori (PDF stock satu kategori): hanya
+ * kiriman kategori itu.
  */
-function ringkasPengisian_(idForm, tanggal) {
+function ringkasPengisian_(idForm, tanggal, kategori) {
   var def = defRiwayat_(idForm);
   var kiriman = def ? kirimanRiwayat_(def, { dari: tanggal, sampai: tanggal }, filterRiwayat_({})) : [];
+  if (kategori) {
+    kiriman = kiriman.filter(function (k) {
+      return String(k.kepala.kategori || '').split(', ').some(function (x) { return samaNama_(x, kategori); });
+    });
+  }
   var hasil = { jumlah: kiriman.length, diisi: 'Belum ada isian', diperiksa: 'Belum ada isian' };
   if (!kiriman.length) return hasil;
   var nama = [];
@@ -2544,11 +2683,18 @@ function ringkasPengisian_(idForm, tanggal) {
 }
 
 /**
- * Isi PDF Stock (Bagian 9.1 butir 4, tata letak Harian_Stock Bagian 8.3):
- * rekap Stock_Harian tanggal itu, dikelompokkan per kategori. Item tanpa
- * gerakan menampilkan Awal = Akhir = rekap terakhir sebelumnya.
+ * Isi PDF Stock (Bagian 9.1 butir 2 dan 4, tata letak Harian_Stock Bagian
+ * 8.3): rekap Stock_Harian tanggal itu, dikelompokkan per kategori. Item
+ * tanpa gerakan menampilkan Awal = Akhir = rekap terakhir sebelumnya.
+ * opsi.kategori: nama satu kategori aktif (PDF hanya berisi kategori itu,
+ * namanya di kotak info), atau kosong untuk semua kategori. Semua kategori:
+ * kategori tanpa rekap pada tanggal itu dilewati; dengan pemisah halaman
+ * tiap kategori satu bagian (halaman baru, kepala diulang), tanpa pemisah
+ * satu tabel bersambung dengan baris judul kategori.
  */
-function isiPdfStock_(tanggal) {
+function isiPdfStock_(tanggal, opsi) {
+  opsi = opsi || {};
+  var pilihKat = rapikanTeks_(opsi.kategori);
   var master = bacaItem_();
   var kategori = bacaKategori_();
   var rekap = bacaRekap_();
@@ -2561,30 +2707,34 @@ function isiPdfStock_(tanggal) {
     if (r) adaRekap = true;
     if (!m.aktif && !r) return; // item nonaktif hanya tampil jika bergerak hari itu
     var kat = (r && r.kategori) || m.kategori || 'Tanpa kategori';
-    (perKat[kat.toLowerCase()] = perKat[kat.toLowerCase()] || { nama: kat, item: [] }).item.push({
-      m: m, pos: posisiStock_(rekap.item[k], tanggal), asli: asli[k + '|' + tanggal] || ''
-    });
+    var grup = perKat[kat.toLowerCase()] = perKat[kat.toLowerCase()] || { nama: kat, item: [], adaRekap: false };
+    if (r) grup.adaRekap = true;
+    grup.item.push({ m: m, pos: posisiStock_(rekap.item[k], tanggal), asli: asli[k + '|' + tanggal] || '' });
   });
-  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, ss_().getSpreadsheetTimeZone(), []);
+  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, ss_().getSpreadsheetTimeZone(), ['Kategori']);
   var urutKat = kategori.map(function (k) { return k.nama.toLowerCase(); });
-  var kunciKat = Object.keys(perKat).sort(function (a, b) {
+  var kunciKat = Object.keys(perKat).filter(function (k) { return perKat[k].adaRekap; }).sort(function (a, b) {
     var ia = urutKat.indexOf(a);
     var ib = urutKat.indexOf(b);
     return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib) || a.localeCompare(b, 'id');
   });
+  var ada = kiriman.length > 0 || adaRekap;
+  if (pilihKat) {
+    var kunci = pilihKat.toLowerCase();
+    var grupPilih = perKat[kunci];
+    ada = !!(grupPilih && grupPilih.adaRekap) || kiriman.some(function (x) { return samaNama_(x['Kategori'], pilihKat); });
+    kunciKat = grupPilih ? [kunci] : [];
+  }
 
-  var sel = function (n) { return '<td class="angka">' + (n ? angkaId_(n) : '') + '</td>'; };
   var adaMin = false;
-  var baris = [];
-  kunciKat.forEach(function (k) {
-    var grup = perKat[k];
-    baris.push('<tr class="kategori"><td colspan="11">' + escHtml_(grup.nama) + '</td></tr>');
-    grup.item.sort(function (a, b) { return a.m.nama.localeCompare(b.m.nama, 'id'); }).forEach(function (x, i) {
+  var sel = function (n) { return '<td class="angka">' + (n ? angkaId_(n) : '') + '</td>'; };
+  function barisKategori(grup) {
+    return grup.item.sort(function (a, b) { return a.m.nama.localeCompare(b.m.nama, 'id'); }).map(function (x, i) {
       var p = x.pos;
       var minus = p.akhir < 0;
       var diBawah = !minus && x.m.stokMin != null && p.akhir < x.m.stokMin;
       if (diBawah) adaMin = true;
-      baris.push('<tr>' +
+      return '<tr>' +
         '<td class="angka">' + (i + 1) + '</td>' +
         '<td>' + escHtml_(x.m.nama) + '</td>' +
         '<td class="angka">' + angkaId_(p.awal) + '</td>' +
@@ -2593,34 +2743,72 @@ function isiPdfStock_(tanggal) {
         sel(p.hasilPrep) + sel(p.keluar) + sel(p.dipakaiPrep) + sel(p.waste) + sel(p.penyesuaian) +
         '<td class="angka akhir' + (minus ? ' masalah' : '') + '">' + angkaId_(p.akhir) + (diBawah ? ' *' : '') + '</td>' +
         '<td>' + escHtml_(x.m.satuan) + '</td>' +
-        '</tr>');
-    });
-  });
+        '</tr>';
+    }).join('');
+  }
   var judul = ['No', 'Nama Item', 'Stock Awal', 'Stock Masuk', 'Hasil Prep', 'Stock Keluar', 'Dipakai Prep',
     'Waste', 'Penyesuaian', 'Stock Akhir', 'Satuan'];
-  var tabel = '<table class="data"><colgroup><col style="width:4%"><col style="width:18%">' +
-    '<col span="8" style="width:9%"><col style="width:6%"></colgroup><thead><tr>' +
-    judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
-    (baris.length ? baris.join('') : '<tr><td colspan="11">Belum ada item aktif.</td></tr>') + '</tbody></table>';
+  function tabel(isiBaris, kosong) {
+    return '<table class="data"><colgroup><col style="width:4%"><col style="width:18%">' +
+      '<col span="8" style="width:9%"><col style="width:6%"></colgroup><thead><tr>' +
+      judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (isiBaris || '<tr><td colspan="11">' + kosong + '</td></tr>') + '</tbody></table>';
+  }
+
+  var bagian;
+  if (pilihKat || pemisahHalamanPdf_()) {
+    // Satu bagian per kategori; nama kategori di kotak info (tanpa baris judul kategori).
+    bagian = kunciKat.map(function (k) {
+      return { info: [['Kategori', perKat[k].nama]], tabel: tabel(barisKategori(perKat[k]), '') };
+    });
+  } else {
+    // Cadangan: satu tabel bersambung dengan baris judul kategori.
+    bagian = [{
+      info: [['Kategori', 'Semua kategori']],
+      tabel: tabel(kunciKat.map(function (k) {
+        return '<tr class="kategori"><td colspan="11">' + escHtml_(perKat[k].nama) + '</td></tr>' + barisKategori(perKat[k]);
+      }).join(''), 'Tidak ada gerakan stock pada tanggal ini.')
+    }];
+  }
+  if (!bagian.length) {
+    bagian = [{ info: [['Kategori', 'Semua kategori']], tabel: tabel('', 'Tidak ada gerakan stock pada tanggal ini.') }];
+  }
   var catatan = [];
   if (adaMin) catatan.push('* Stock Akhir di bawah stok minimum.');
   catatan.push('Stock Akhir minus ditulis merah tebal. Angka dalam kurung: Stock Masuk yang diketik dalam satuan besar.');
   return {
-    ada: kiriman.length > 0 || adaRekap,
-    info: [['Kategori', 'Semua kategori']],
-    tabel: tabel,
+    ada: ada,
+    kategori: pilihKat,
+    pesanKosong: pilihKat
+      ? 'Belum ada isian Stock kategori ' + pilihKat + ' pada ' + tanggalPanjangId_(tanggal) + '. Pilih tanggal atau kategori lain.'
+      : '',
+    bagian: bagian,
     catatan: catatan
   };
 }
 
-/** Dokumen HTML lengkap satu laporan: kepala, kotak info, tabel, Diisi/Diperiksa oleh, kaki. */
+/**
+ * Dokumen HTML lengkap satu laporan: kepala, kotak info, tabel, Diisi/Diperiksa
+ * oleh, kaki. Laporan dengan isi.bagian: tiap bagian setelah yang pertama
+ * mulai di halaman baru (page-break-before) dengan kepala, judul, dan kotak
+ * info diulang; baris judul tabel ikut diulang karena tiap bagian punya tabel
+ * sendiri. Diisi/Diperiksa oleh dan kaki hanya di akhir.
+ */
 function htmlLaporan_(idForm, tanggal, isi) {
   var t = LAPORAN_PDF[idForm];
   var outlet = namaOutlet_();
-  var p = ringkasPengisian_(idForm, tanggal);
+  var p = ringkasPengisian_(idForm, tanggal, isi.kategori);
   var w = WARNA_PDF;
   var dibuat = Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH.mm');
-  var info = [['Nama Outlet', outlet], ['Tanggal', tanggalPanjangId_(tanggal)]].concat(isi.info || []);
+  var bagian = isi.bagian || [{ info: isi.info, tabel: isi.tabel }];
+  var kepala = function (b) {
+    var info = [['Nama Outlet', outlet], ['Tanggal', tanggalPanjangId_(tanggal)]].concat(b.info || []);
+    return '<div class="kepala">InventoryKu · ' + escHtml_(outlet) + '</div>' +
+      '<h1>' + escHtml_(t.judul) + '</h1>' +
+      '<table class="info">' + info.map(function (r) {
+        return '<tr><td class="label">' + escHtml_(r[0]) + '</td><td class="nilai">' + escHtml_(r[1]) + '</td></tr>';
+      }).join('') + '</table>';
+  };
   return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
     'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:' + w.tinta + ';margin:0}' +
     '.kepala,.kaki{color:' + w.tintaRedup + ';font-size:8pt}' +
@@ -2638,13 +2826,11 @@ function htmlLaporan_(idForm, tanggal, isi) {
     '.masalah{color:' + w.masalah + ';font-weight:bold}.kecil{font-size:7pt;color:' + w.tintaRedup + '}' +
     'table.bawah{margin-top:12px}table.bawah td{padding:2px 14px 2px 0}table.bawah td.label{color:' + w.tintaRedup + '}' +
     '.catatan{color:' + w.tintaRedup + ';font-size:8pt;margin:6px 0 0 0}' +
+    '.halaman-baru{page-break-before:always;break-before:page}' +
     '</style></head><body>' +
-    '<div class="kepala">InventoryKu · ' + escHtml_(outlet) + '</div>' +
-    '<h1>' + escHtml_(t.judul) + '</h1>' +
-    '<table class="info">' + info.map(function (r) {
-      return '<tr><td class="label">' + escHtml_(r[0]) + '</td><td class="nilai">' + escHtml_(r[1]) + '</td></tr>';
-    }).join('') + '</table>' +
-    isi.tabel +
+    bagian.map(function (b, i) {
+      return (i ? '<div class="halaman-baru">' : '<div>') + kepala(b) + b.tabel + '</div>';
+    }).join('') +
     (isi.catatan || []).map(function (c) { return '<p class="catatan">' + escHtml_(c) + '</p>'; }).join('') +
     '<table class="bawah">' +
       '<tr><td class="label">Diisi oleh</td><td>' + escHtml_(p.diisi) + '</td></tr>' +
@@ -2656,22 +2842,30 @@ function htmlLaporan_(idForm, tanggal, isi) {
 
 /**
  * Membuat PDF satu form pada satu tanggal: { blob, namaFile, namaForm }.
- * Nama file {YYYY-MM-DD}_{NamaForm}.pdf (Bagian 9.1). Tanggal tanpa isian
- * ditolak dengan pesan yang bisa ditampilkan.
+ * Nama file {YYYY-MM-DD}_{NamaForm}.pdf; stock satu kategori
+ * {YYYY-MM-DD}_Stock_{NamaKategori}.pdf (Bagian 9.1). opsi.kategori hanya
+ * berlaku untuk form yang perKategori dan harus kategori aktif. Tanggal tanpa
+ * isian ditolak dengan pesan yang bisa ditampilkan.
  */
-function buatPdf_(idForm, tanggal) {
+function buatPdf_(idForm, tanggal, opsi) {
   idForm = rapikanTeks_(idForm).toUpperCase();
   var t = LAPORAN_PDF[idForm];
   var namaForm = namaFormDari_(idForm);
   if (!t) throw galatPengguna_('Laporan PDF ' + namaForm + ' dibangun di tahap berikutnya, bersama formnya.');
   if (!tanggalSah_(tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
   if (tanggal > hariIni_()) throw galatPengguna_('Tanggal masa depan belum punya isian.');
-  var isi = t.isi(tanggal);
-  if (!isi.ada) {
-    throw galatPengguna_('Belum ada isian ' + namaForm + ' pada ' + tanggalPanjangId_(tanggal) +
-      '. Pilih tanggal lain.');
+  var kategori = t.perKategori ? rapikanTeks_(opsi && opsi.kategori) : '';
+  if (kategori) {
+    var cocok = bacaKategori_().filter(function (k) { return samaNama_(k.nama, kategori); })[0];
+    if (!cocok) throw galatPengguna_('Kategori ' + kategori + ' tidak ada atau sudah nonaktif. Muat ulang layar Laporan.');
+    kategori = cocok.nama;
   }
-  var namaFile = tanggal + '_' + namaFileForm_(namaForm) + '.pdf';
+  var isi = t.isi(tanggal, { kategori: kategori });
+  if (!isi.ada) {
+    throw galatPengguna_(isi.pesanKosong || ('Belum ada isian ' + namaForm + ' pada ' + tanggalPanjangId_(tanggal) +
+      '. Pilih tanggal lain.'));
+  }
+  var namaFile = tanggal + '_' + namaFileForm_(namaForm) + (kategori ? '_' + namaFileForm_(kategori) : '') + '.pdf';
   var blob = Utilities.newBlob(htmlLaporan_(idForm, tanggal, isi), 'text/html', namaFile + '.html')
     .getAs('application/pdf').setName(namaFile);
   return { blob: blob, namaFile: namaFile, namaForm: namaForm };
@@ -2707,19 +2901,32 @@ function simpanPdfKeDrive_(pdf, tanggal) {
   };
 }
 
-/** Form untuk menu Laporan: form aktif, dan apakah laporan PDF-nya sudah dibangun. */
+/**
+ * Form untuk menu Laporan: form aktif, apakah laporan PDF-nya sudah dibangun,
+ * dan (form yang bisa per kategori, yaitu Stock) daftar kategori aktif
+ * menurut urutan M_Kategori.
+ */
 function aksiInfoLaporan_() {
+  var kategori = null;
   return {
     hariIni: hariIni_(),
     form: bacaDaftarForm_().filter(function (f) { return f.aktif; }).map(function (f) {
-      return { id: f.id, nama: f.nama, adaPdf: !!LAPORAN_PDF[f.id] };
+      var hasil = { id: f.id, nama: f.nama, adaPdf: !!LAPORAN_PDF[f.id] };
+      if (LAPORAN_PDF[f.id] && LAPORAN_PDF[f.id].perKategori) {
+        kategori = kategori || bacaKategori_().map(function (k) { return k.nama; });
+        hasil.kategori = kategori;
+      }
+      return hasil;
     })
   };
 }
 
-/** Unduh PDF (semua role): isi PDF dikirim ke aplikasi sebagai base64. Tidak menambah file di Drive. */
+/**
+ * Unduh PDF (semua role): isi PDF dikirim ke aplikasi sebagai base64. Tidak
+ * menambah file di Drive. kategori (opsional, Stock): satu kategori saja.
+ */
 function aksiUnduhPdf_(body) {
-  var pdf = buatPdf_(body.formId, String(body.tanggal || ''));
+  var pdf = buatPdf_(body.formId, String(body.tanggal || ''), { kategori: body.kategori });
   return {
     namaFile: pdf.namaFile,
     mime: 'application/pdf',
@@ -2727,11 +2934,49 @@ function aksiUnduhPdf_(body) {
   };
 }
 
-/** Simpan ulang ke Drive (khusus Pengelola), misalnya setelah ada koreksi. */
+/** Simpan ulang ke Drive (khusus Pengelola), misalnya setelah ada koreksi. Selalu semua kategori, seperti PDF harian. */
 function aksiSimpanPdfDrive_(body) {
   var tanggal = String(body.tanggal || '');
   var pdf = buatPdf_(body.formId, tanggal);
   return simpanPdfKeDrive_(pdf, tanggal);
+}
+
+/**
+ * Jalankan dari editor Apps Script: menguji apakah konversi HTML ke PDF
+ * mematuhi page-break-before. Membuat PDF uji 3 bagian (tiap bagian seharusnya
+ * di halaman sendiri) di folder Laporan Kitchen, lalu menghitung halamannya.
+ * 3 halaman: PDF_PEMISAH_HALAMAN = "ya" (PDF stock semua kategori satu
+ * halaman per kategori). 1 halaman: "tidak" (cadangan, satu tabel
+ * bersambung). Jumlah halaman tidak terbaca: buka file ujinya dan isi Script
+ * Property itu sendiri (Project Settings → Script Properties).
+ */
+function ujiPemisahHalamanPdf() {
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    'body{font-family:Arial,Helvetica,sans-serif}.halaman-baru{page-break-before:always;break-before:page}' +
+    '</style></head><body>' +
+    '<div><h1>Bagian 1 dari 3</h1><p>Uji pemisah halaman InventoryKu. Jika pemisah dipatuhi, tiap bagian ada di halaman sendiri.</p></div>' +
+    '<div class="halaman-baru"><h1>Bagian 2 dari 3</h1></div>' +
+    '<div class="halaman-baru"><h1>Bagian 3 dari 3</h1></div>' +
+    '</body></html>';
+  var nama = 'Uji pemisah halaman PDF.pdf';
+  var pdf = Utilities.newBlob(html, 'text/html', 'uji.html').getAs('application/pdf').setName(nama);
+  var halaman = (pdf.getDataAsString('ISO-8859-1').match(/\/Type\s*\/Page(?![A-Za-z])/g) || []).length;
+  cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN).createFile(pdf);
+  var props = PropertiesService.getScriptProperties();
+  var lokasi = FOLDER_LAPORAN + '/' + nama;
+  if (halaman === 3) {
+    props.setProperty(PROP_PEMISAH_HALAMAN, 'ya');
+    console.log('Pemisah halaman DIPATUHI (3 halaman). PDF stock semua kategori kini satu halaman per kategori. ' +
+      'Periksa juga file ' + lokasi + ' di Drive.');
+  } else if (halaman === 1) {
+    props.setProperty(PROP_PEMISAH_HALAMAN, 'tidak');
+    console.log('Pemisah halaman TIDAK dipatuhi (1 halaman). PDF stock semua kategori tetap satu tabel bersambung ' +
+      'dengan baris judul kategori; unduh per kategori untuk laporan terpisah. File uji: ' + lokasi + '.');
+  } else {
+    console.log('Jumlah halaman tidak terbaca (' + halaman + '). Buka ' + lokasi + ' di Drive. Jika isinya 3 halaman, ' +
+      'buka Project Settings → Script Properties dan tambahkan PDF_PEMISAH_HALAMAN dengan nilai ya.');
+  }
+  return halaman;
 }
 
 /* ---------- Catatan kegagalan (terlihat Pengelola di M_Konfigurasi dan Beranda) ---------- */
@@ -3207,7 +3452,8 @@ var TAB_MASTER = [
       k_('Role', 'teks', { pilihan: ['Staff', 'Head Kitchen', 'Manager'] }),
       k_('PIN (hash)'),
       k_('Aktif', null, { centang: true }),
-      k_('Permintaan Reset PIN', 'waktu')
+      k_('Permintaan Reset PIN', 'waktu'),
+      k_('Dihapus', 'waktu')
     ]
   },
   {
@@ -3377,7 +3623,8 @@ function konfigurasiAwal_() {
     ['suhu_chiller_maks', '5', 'Batas atas suhu normal Chiller (°C).'],
     ['suhu_freezer_maks', '-18', 'Freezer normal jika suhunya sama dengan atau lebih rendah dari angka ini (°C).'],
     ['jadwal_opname', 'mingguan', 'Jadwal stock opname: mingguan atau bulanan.'],
-    ['hari_cadangan', 'Minggu', 'Hari salinan cadangan mingguan dibuat (dini hari).']
+    ['hari_cadangan', 'Minggu', 'Hari salinan cadangan mingguan dibuat (dini hari).'],
+    ['keluar_otomatis_menit', String(KELUAR_OTOMATIS_AWAL), KETERANGAN_KELUAR_OTOMATIS]
   ];
 }
 

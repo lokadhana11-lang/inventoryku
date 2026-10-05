@@ -1,12 +1,13 @@
 /* InventoryKu — frontend (Tahap 1: kerangka PWA dan akses; Tahap 2: form Stock;
-   Tahap 3: Riwayat, pemeriksaan, dan koreksi; Tahap 4: laporan PDF).
+   Tahap 3: Riwayat, pemeriksaan, dan koreksi; Tahap 4: laporan PDF;
+   5 Oktober 2026: tombol Keluar, keluar otomatis, hapus staff, PDF stock per kategori).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.5.0';
+  var VERSI_APLIKASI = '0.5.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -332,7 +333,9 @@
     sesuaikan: '<path d="M12 4v16M5 20h14"/><path d="M5 7.5h14"/><path d="M5 7.5 2.5 14h5zM19 7.5 16.5 14h5z"/>',
     nihil: '<circle cx="12" cy="12" r="8.5"/><path d="M6 18 18 6"/>',
     opname: '<path d="M8 4.5h8v3H8z"/><path d="M16 5.5h2.5V21h-13V5.5H8"/><path d="m9 14 2 2 4-4.5"/>',
-    hp: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>'
+    hp: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
+    keluar: '<path d="M13.5 4.5h-7v15h7"/><path d="M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+    jam: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'
   };
 
   /** Ikon kecil 16 px untuk tanda status. */
@@ -978,7 +981,8 @@
     var tombolBar = $('#bar-pengguna');
     kosongkan(tombolBar);
     if (p) {
-      tombolBar.setAttribute('aria-label', p.nama + ', ganti pengguna');
+      tombolBar.setAttribute('aria-label', p.nama + ', menu pengguna');
+      tombolBar.setAttribute('aria-expanded', 'false');
       tambahAnak(tombolBar, [ikon('pengguna'), el('span', { text: p.nama }), ikon('bawah')]);
     }
     aturMenuAktif(menuAktif, true);
@@ -1070,7 +1074,8 @@
     { pola: /^\/pengaturan$/, menu: 'pengaturan', pengelola: true, layar: layarPengaturan },
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
     { pola: /^\/pengaturan\/staff\/([^/]+)(\/pin)?$/, menu: 'pengaturan', pengelola: true, layar: layarStaffDetail },
-    { pola: /^\/pengaturan\/penerima$/, menu: 'pengaturan', pengelola: true, layar: layarPenerima }
+    { pola: /^\/pengaturan\/penerima$/, menu: 'pengaturan', pengelola: true, layar: layarPenerima },
+    { pola: /^\/pengaturan\/outlet$/, menu: 'pengaturan', pengelola: true, layar: layarOutletJadwal }
   ];
 
   function jalankanRute() {
@@ -1096,6 +1101,7 @@
     }
 
     if (lembarKini) lembarKini.tutup(true);
+    tutupMenuPengguna();
     kosongkan($('#lembar-wadah')); // lembar yang sedang menutup langsung hilang
     nomorLayar++;
     bersihkanLayar();
@@ -1141,19 +1147,48 @@
     kirimAntrean();
   }
 
-  /** Keluar di HP saja (sesi dihapus), lalu kembali ke layar Login. */
-  function keluarLokal(pesan) {
+  /** Sesi baru dari login, pemasangan pertama, atau pemulihan akses. */
+  function simpanSesiBaru(data) {
+    Sesi.tulis({
+      token: data.token,
+      berlakuSampai: data.berlakuSampai,
+      pengguna: data.pengguna,
+      namaOutlet: data.namaOutlet
+    });
+    simpanMenitKeluarOtomatis(data.keluarOtomatisMenit);
+    catatDipakai(true);
+  }
+
+  /**
+   * Keluar di HP saja (sesi dihapus), lalu kembali ke layar Login. Draft,
+   * antrean kirim, dan data tersimpan milik pengguna itu tetap di HP.
+   * keterangan: baris di atas pilihan nama (setelah keluar otomatis).
+   */
+  function keluarLokal(pesan, keterangan) {
     Sesi.hapus();
     nomorLayar++;
     bersihkanLayar();
     if (lembarKini) lembarKini.tutup(true);
+    tutupMenuPengguna();
     kosongkanLayar();
     menuAktif = null;
-    mulaiMasuk(pesan);
+    mulaiMasuk(pesan, keterangan);
   }
 
-  /** "Ganti pengguna": mengeluarkan pengguna saat ini dan kembali ke layar Login. */
-  function bukaGantiPengguna() {
+  /**
+   * Keluar (spesifikasi sistem Bagian 7.2): token dihapus dari HP, dan sesinya
+   * di server ikut dihapus jika ada sinyal. Dipakai tombol Keluar dan keluar otomatis.
+   */
+  function keluar(keterangan) {
+    var sesi = Simpan.baca(AWALAN + 'sesi');
+    if (sesi && sesi.token) {
+      panggilApi('keluar', { token: sesi.token }).catch(function () { /* sesi tetap habis sendiri */ });
+    }
+    keluarLokal('', keterangan);
+  }
+
+  /** Konfirmasi tombol "Keluar" (tampilan Bagian 7). */
+  function bukaKeluar() {
     var sesi = Sesi.baca();
     if (!sesi) return;
     var nama = sesi.pengguna.nama;
@@ -1168,16 +1203,175 @@
       aksi: [
         { teks: 'Batal', jenis: 'kedua' },
         {
-          teks: 'Ganti pengguna',
+          teks: 'Keluar',
           jenis: 'utama',
           klik: function (t, l) {
-            panggilApi('keluar', { token: sesi.token }).catch(function () { /* sesi tetap habis sendiri */ });
             l.tutup(true);
-            keluarLokal('');
+            keluar('');
           }
         }
       ]
     });
+  }
+
+  /* ---------- Menu nama pengguna: satu pilihan, "Keluar" ----------
+   * HP dan tablet: nama di kepala Beranda. Desktop: nama di bar atas, di semua
+   * layar (spesifikasi tampilan Bagian 4.3 dan 5.2). */
+  var menuPenggunaKini = null;
+
+  function tutupMenuPengguna(kembalikanFokus) {
+    var m = menuPenggunaKini;
+    if (!m) return;
+    menuPenggunaKini = null;
+    m.asal.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', m.diLuar, true);
+    document.removeEventListener('keydown', m.tombolKeyboard, true);
+    window.removeEventListener('resize', m.tutup);
+    window.removeEventListener('scroll', m.tutup, true);
+    m.elemen.remove();
+    if (kembalikanFokus && document.contains(m.asal)) m.asal.focus({ preventScroll: true });
+  }
+
+  function bukaMenuPengguna(e) {
+    var asal = e.currentTarget;
+    var tadi = menuPenggunaKini;
+    tutupMenuPengguna();
+    if (tadi && tadi.asal === asal) return; // ketukan kedua menutup menu
+    var sesi = Sesi.baca();
+    if (!sesi) return;
+    var item = el('button', { type: 'button', class: 'menu-pengguna-item', role: 'menuitem' }, [
+      ikon('keluar'),
+      el('span', { text: 'Keluar' })
+    ]);
+    var menu = el('div', { class: 'menu-pengguna', role: 'menu', 'aria-label': 'Menu ' + sesi.pengguna.nama }, item);
+    item.addEventListener('click', function () {
+      tutupMenuPengguna();
+      bukaKeluar();
+    });
+    document.body.appendChild(menu);
+
+    // Di bawah nama: rata kanan di bar desktop, rata kiri di kepala Beranda; selalu di dalam layar.
+    var r = asal.getBoundingClientRect();
+    var lebarLayar = document.documentElement.clientWidth;
+    var lebar = menu.offsetWidth;
+    var kiri = asal.classList.contains('bar-pengguna') ? r.right - lebar : r.left;
+    menu.style.left = Math.max(8, Math.min(kiri, lebarLayar - lebar - 8)) + 'px';
+    menu.style.top = Math.round(r.bottom + 4) + 'px';
+
+    var m = {
+      asal: asal,
+      elemen: menu,
+      tutup: function () { tutupMenuPengguna(); },
+      diLuar: function (ev) {
+        if (!menu.contains(ev.target) && !asal.contains(ev.target)) tutupMenuPengguna();
+      },
+      tombolKeyboard: function (ev) {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          tutupMenuPengguna(true);
+        } else if (ev.key === 'Tab') {
+          tutupMenuPengguna();
+        }
+      }
+    };
+    menuPenggunaKini = m;
+    asal.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', m.diLuar, true);
+    document.addEventListener('keydown', m.tombolKeyboard, true);
+    window.addEventListener('resize', m.tutup);
+    window.addEventListener('scroll', m.tutup, true);
+    item.focus({ preventScroll: true });
+  }
+
+  /* =======================================================================
+   * Keluar otomatis (spesifikasi sistem Bagian 7.2, tampilan Bagian 5.1).
+   * Dihitung di perangkat dari ketukan, klik, ketikan, dan guliran. Jam
+   * terakhir dipakai disimpan di HP, sehingga saat aplikasi dibuka lagi dari
+   * latar belakang atau layar HP dinyalakan lagi, selisihnya tetap terhitung.
+   * Selama aplikasi mengirim isian atau membuat PDF, hitungan berhenti, lalu
+   * mulai lagi dari nol setelah proses itu selesai. Lamanya (menit) datang
+   * dari server saat login dan di Beranda, dan disimpan di HP supaya tetap
+   * berlaku saat offline.
+   * ===================================================================== */
+
+  var PILIHAN_KELUAR_OTOMATIS = [5, 10, 15, 30];
+  var KELUAR_OTOMATIS_AWAL = 5;
+  var KUNCI_MENIT_KELUAR = AWALAN + 'keluarOtomatisMenit';
+  var KUNCI_TERAKHIR_DIPAKAI = AWALAN + 'terakhirDipakai';
+  var terakhirDipakai = 0; // ms, salinan di memori
+  var terakhirDitulis = 0;
+  var prosesBerjalan = 0;
+
+  function menitKeluarOtomatis() {
+    var n = Number(Simpan.baca(KUNCI_MENIT_KELUAR));
+    return PILIHAN_KELUAR_OTOMATIS.indexOf(n) >= 0 ? n : KELUAR_OTOMATIS_AWAL;
+  }
+
+  function simpanMenitKeluarOtomatis(n) {
+    n = Number(n);
+    if (PILIHAN_KELUAR_OTOMATIS.indexOf(n) >= 0) Simpan.tulis(KUNCI_MENIT_KELUAR, n);
+  }
+
+  function teksKeluarOtomatis(menit) {
+    return 'Keluar otomatis karena ' + menit + ' menit tidak dipakai. Isian yang belum dikirim tetap tersimpan.';
+  }
+
+  /** Aplikasi dipakai sekarang. Ditulis ke HP paling sering tiap 5 detik (memori selalu terbaru). */
+  function catatDipakai(paksa) {
+    var kini = Date.now();
+    terakhirDipakai = kini;
+    if (paksa || kini - terakhirDitulis >= 5000) {
+      terakhirDitulis = kini;
+      Simpan.tulis(KUNCI_TERAKHIR_DIPAKAI, kini);
+    }
+  }
+
+  /** Proses yang menahan hitungan (mengirim isian, membuat PDF). Mengembalikan janji yang sama. */
+  function jagaProses(janji) {
+    prosesBerjalan++;
+    catatDipakai(true);
+    var selesai = function () {
+      prosesBerjalan = Math.max(0, prosesBerjalan - 1);
+      catatDipakai(true); // hitungan mulai lagi dari nol
+    };
+    janji.then(selesai, selesai);
+    return janji;
+  }
+
+  /** Ada sesi dan aplikasi sudah tidak dipakai selama waktu yang diatur. */
+  function sudahDiam() {
+    if (prosesBerjalan > 0 || !Sesi.baca()) return false;
+    var terakhir = Math.max(Number(Simpan.baca(KUNCI_TERAKHIR_DIPAKAI)) || 0, terakhirDipakai);
+    if (!terakhir) {
+      catatDipakai(true);
+      return false;
+    }
+    return Date.now() - terakhir >= menitKeluarOtomatis() * 60000;
+  }
+
+  function keluarOtomatis() {
+    keluar(teksKeluarOtomatis(menitKeluarOtomatis()));
+  }
+
+  /** Diperiksa tiap 10 detik, saat aplikasi kembali dari latar belakang, dan sebelum ketukan dicatat. */
+  function periksaDiam() {
+    if ($('#aplikasi').hidden || !sudahDiam()) return false;
+    keluarOtomatis();
+    return true;
+  }
+
+  function pasangKeluarOtomatis() {
+    var dipakai = function () {
+      if ($('#aplikasi').hidden) return;
+      // Ketukan setelah lama diam (misalnya HP baru dinyalakan) tidak menghidupkan sesi lagi.
+      if (!periksaDiam()) catatDipakai(false);
+    };
+    ['pointerdown', 'keydown', 'wheel', 'touchstart', 'input', 'scroll'].forEach(function (jenis) {
+      document.addEventListener(jenis, dipakai, { capture: true, passive: true });
+    });
+    setInterval(periksaDiam, 10000);
+    window.addEventListener('pageshow', periksaDiam);
+    window.addEventListener('focus', periksaDiam);
   }
 
   /* =======================================================================
@@ -1187,13 +1381,13 @@
   var login = null; // keadaan layar Login yang sedang tampil
   var ketikLoginKini = null; // pendengar keyboard layar Login yang terpasang
 
-  function mulaiMasuk(pesan) {
+  function mulaiMasuk(pesan, keterangan) {
     tampilMode('masuk');
     var info = Simpan.baca(AWALAN + 'infoLogin');
     if (info && !info.perluPemasangan) {
-      gambarLogin(info, pesan, true);
+      gambarLogin(info, pesan, true, keterangan);
     } else {
-      gambarLogin(null, pesan, true);
+      gambarLogin(null, pesan, true, keterangan);
     }
     ambilInfoLogin();
   }
@@ -1234,15 +1428,16 @@
 
   /**
    * Layar Login: pilih nama (tombol besar), lalu PIN di papan angka.
-   * Setelah angka keenam, login langsung diproses.
+   * Setelah angka keenam, login langsung diproses. keterangan: satu baris di
+   * atas pilihan nama setelah keluar otomatis; hilang setelah nama dipilih.
    */
-  function gambarLogin(info, pesanAwal, memuat) {
+  function gambarLogin(info, pesanAwal, memuat, keterangan) {
     var wadah = $('#masuk');
     wadah.className = 'masuk';
     kosongkan(wadah);
     aturJudulDokumen('Masuk');
 
-    var keadaan = { info: info, nama: '', pin: '', sibuk: false };
+    var keadaan = { info: info, nama: '', pin: '', sibuk: false, keterangan: keterangan || '' };
     var merek = merekLogin(info ? info.namaOutlet : '');
     var kiri = el('div', { class: 'login-kiri' }, merek.wadah);
     var kanan = el('div', { class: 'login-kanan' });
@@ -1273,6 +1468,15 @@
       return (keadaan.info && keadaan.info.staff || []).filter(function (s) { return s.punyaPin; });
     }
 
+    /** "Keluar otomatis karena 5 menit tidak dipakai. …" di atas pilihan nama. */
+    function tambahKeterangan() {
+      if (!keadaan.keterangan) return;
+      kanan.appendChild(el('p', { class: 'pesan-login keterangan-login', role: 'status' }, [
+        ikon('info'),
+        el('span', { text: keadaan.keterangan })
+      ]));
+    }
+
     /* ----- Langkah 1: pilih nama ----- */
     function tampilNama() {
       keadaan.nama = '';
@@ -1281,6 +1485,7 @@
       kosongkan(kiri).appendChild(merek.wadah);
       kiri.appendChild(pesan);
       kosongkan(kanan);
+      tambahKeterangan();
       kanan.appendChild(el('div', { class: 'deret-tombol' }, [
         el('p', { class: 'login-label', text: 'Pilih nama' }),
         penanda
@@ -1301,6 +1506,7 @@
           onclick: function () {
             if (keadaan.sibuk) return;
             tulisPesanLogin('');
+            keadaan.keterangan = '';
             tampilPin(s.nama);
           }
         }, [
@@ -1404,12 +1610,7 @@
         login = null;
         document.removeEventListener('keydown', ketikKeyboard);
         ketikLoginKini = null;
-        Sesi.tulis({
-          token: data.token,
-          berlakuSampai: data.berlakuSampai,
-          pengguna: data.pengguna,
-          namaOutlet: data.namaOutlet
-        });
+        simpanSesiBaru(data);
         masukAplikasi();
       }).catch(function (err) {
         aturSibuk(false);
@@ -1478,6 +1679,7 @@
           return;
         }
         kosongkan(kanan);
+        tambahKeterangan();
         kanan.appendChild(el('div', { class: 'deret-tombol' }, el('p', { class: 'login-label', text: 'Pilih nama' })));
         tulisPesanLogin(teks, 'masalah');
         kanan.appendChild(tombol('Coba lagi', 'kedua', {
@@ -1582,12 +1784,7 @@
         zonaWaktu: zona
       }).then(function (data) {
         Simpan.hapus(AWALAN + 'infoLogin');
-        Sesi.tulis({
-          token: data.token,
-          berlakuSampai: data.berlakuSampai,
-          pengguna: data.pengguna,
-          namaOutlet: data.namaOutlet
-        });
+        simpanSesiBaru(data);
         masukAplikasi('Pemasangan selesai. Selamat datang, ' + data.pengguna.nama + '.');
       }).catch(function (err) {
         aturTombolProses(kirim, false);
@@ -1664,12 +1861,7 @@
         nama: gNama.nilai(),
         pin: kPin.input.value
       }).then(function (data) {
-        Sesi.tulis({
-          token: data.token,
-          berlakuSampai: data.berlakuSampai,
-          pengguna: data.pengguna,
-          namaOutlet: data.namaOutlet
-        });
+        simpanSesiBaru(data);
         masukAplikasi('PIN baru tersimpan. Selamat datang, ' + data.pengguna.nama + '.');
       }).catch(function (err) {
         aturTombolProses(kirim, false);
@@ -1710,9 +1902,10 @@
         el('button', {
           type: 'button',
           class: 'beranda-pengguna',
-          'aria-haspopup': 'dialog',
-          'aria-label': sesi.pengguna.nama + ', ganti pengguna',
-          onclick: bukaGantiPengguna
+          'aria-haspopup': 'menu',
+          'aria-expanded': 'false',
+          'aria-label': sesi.pengguna.nama + ', menu pengguna',
+          onclick: bukaMenuPengguna
         }, [ikon('pengguna'), namaPengguna, ikon('bawah')]),
         penanda
       ]),
@@ -1747,6 +1940,7 @@
       }
       if (data.namaOutlet) outlet.textContent = data.namaOutlet;
       if (!dariHp && data.pengguna) perbaruiPengguna(data.pengguna, data.namaOutlet);
+      if (!dariHp) simpanMenitKeluarOtomatis(data.keluarOtomatisMenit);
 
       var form = data.form || [];
       gambarTiket(form);
@@ -2055,7 +2249,7 @@
               return Object.assign({}, e, { status: 'menunggu', pesan: '' });
             }));
             l.tutup();
-            kirimAntrean().then(function (n) {
+            jagaProses(kirimAntrean()).then(function (n) {
               var sisa = Antrean.daftar(p.nama).length;
               if (!n && sisa) toast('Belum terkirim. Periksa sinyal, lalu ketuk Kirim ulang.', 'masalah');
             });
@@ -2101,7 +2295,7 @@
         return;
       }
       aturTombolProses(t, true, 'Menyimpan…');
-      panggilApi('tandaiNihil', isi).then(function (hasil) {
+      jagaProses(panggilApi('tandaiNihil', isi)).then(function (hasil) {
         toast(opsi.namaForm + ' ditandai nihil untuk ' + kapan + '.');
         opsi.selesai(hasil.nihil);
       }).catch(function (err) {
@@ -2541,7 +2735,7 @@
         return;
       }
       aturTombolProses(tombolKirim, true, 'Mengirim…');
-      panggilApi('kirimStock', isi).then(function (hasil) {
+      jagaProses(panggilApi('kirimStock', isi)).then(function (hasil) {
         aturTombolProses(tombolKirim, false);
         kosongkanKategori(kat);
         terapkanJawaban(hasil.form);
@@ -3994,7 +4188,7 @@
         return;
       }
       aturTombolProses(t, true, 'Membuat PDF…');
-      panggilApi(opsi.aksi || 'unduhPdf', opsi.minta()).then(function (h) {
+      jagaProses(panggilApi(opsi.aksi || 'unduhPdf', opsi.minta())).then(function (h) {
         aturTombolProses(t, false);
         var blob = blobDariBase64(h.data, h.mime);
         if (ios) {
@@ -4027,7 +4221,8 @@
 
   /* =======================================================================
    * Laporan (spesifikasi tampilan Bagian 5.5): pilih tanggal, pilih form,
-   * "Unduh PDF". Pengelola: "Simpan ulang ke Drive".
+   * untuk Stock pilih kategori, lalu "Unduh PDF". Pengelola: "Simpan ulang
+   * ke Drive" (selalu semua kategori, seperti PDF harian).
    * ===================================================================== */
 
   function layarLaporan(k) {
@@ -4036,12 +4231,13 @@
     var hariIni = tanggalIso(new Date());
     var kemarin = geserHari(hariIni, -1);
     var simpanan = Cache.baca('laporan-pilihan');
-    var pilih = Object.assign({ formId: '', tanggal: hariIni }, simpanan && simpanan.data ? simpanan.data : {});
+    var pilih = Object.assign({ formId: '', tanggal: hariIni, kategori: '' }, simpanan && simpanan.data ? simpanan.data : {});
     if (!pilih.tanggal || pilih.tanggal > hariIni) pilih.tanggal = hariIni;
     var data = null;
 
     var penanda = el('span', { class: 'memperbarui', role: 'status' });
     var wadahForm = el('div');
+    var wadahKategori = el('div');
     var keterangan = el('p', { class: 'pesan-formulir', role: 'status' });
 
     var nilaiAwal = pilih.tanggal === hariIni ? 'Hari ini' : (pilih.tanggal === kemarin ? 'Kemarin' : 'Tanggal lain');
@@ -4052,7 +4248,11 @@
     gTanggal.wadah.appendChild(tanggalLain);
 
     var unduh = unduhPdf({
-      minta: function () { return { formId: pilih.formId, tanggal: pilih.tanggal }; }
+      minta: function () {
+        var isi = { formId: pilih.formId, tanggal: pilih.tanggal };
+        if (kategoriForm().length && pilih.kategori) isi.kategori = pilih.kategori;
+        return isi;
+      }
     });
     var tombolDrive = pengelola ? tombol('Simpan ulang ke Drive', 'kedua') : null;
     var pesanDrive = el('p', { class: 'pesan-formulir', role: 'status' });
@@ -4064,6 +4264,7 @@
         el('h2', { class: 'kartu-judul', text: 'Laporan harian PDF' }),
         gTanggal.wadah,
         wadahForm,
+        wadahKategori,
         keterangan,
         el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol, tombolDrive]),
         unduh.pesan,
@@ -4077,6 +4278,32 @@
 
     function formKini() {
       return (data && data.form || []).filter(function (f) { return f.id === pilih.formId; })[0] || null;
+    }
+
+    /** Kategori aktif untuk form yang bisa diunduh per kategori (Stock); kosong untuk form lain. */
+    function kategoriForm() {
+      var f = formKini();
+      return f && f.adaPdf && Array.isArray(f.kategori) ? f.kategori : [];
+    }
+
+    /** Pilihan "Kategori" (bentuknya sama dengan di layar isi Stock), hanya untuk form Stock. */
+    function gambarKategori() {
+      kosongkan(wadahKategori);
+      var daftar = kategoriForm();
+      if (!daftar.length) return;
+      if (pilih.kategori && daftar.indexOf(pilih.kategori) < 0) pilih.kategori = '';
+      var pilihKat = el('select', { class: 'isian', id: 'laporan-kategori' }, [el('option', { value: '', text: 'Semua kategori' })]
+        .concat(daftar.map(function (n) { return el('option', { value: n, text: n }); })));
+      pilihKat.value = pilih.kategori;
+      pilihKat.addEventListener('change', function () {
+        pilih.kategori = pilihKat.value;
+        simpanPilihan();
+        aturKeadaan();
+      });
+      wadahKategori.appendChild(el('div', { class: 'kolom' }, [
+        el('label', { class: 'kolom-label', for: 'laporan-kategori', text: 'Kategori' }),
+        pilihKat
+      ]));
     }
 
     function aturKeadaan() {
@@ -4124,11 +4351,13 @@
           i.addEventListener('change', function () {
             pilih.formId = daftar[n].id;
             simpanPilihan();
+            gambarKategori();
             aturKeadaan();
           });
         });
         wadahForm.appendChild(g.wadah);
       }
+      gambarKategori();
       aturKeadaan();
     }
 
@@ -4141,7 +4370,7 @@
           return;
         }
         aturTombolProses(tombolDrive, true, 'Menyimpan…');
-        panggilApi('simpanPdfDrive', { formId: pilih.formId, tanggal: pilih.tanggal }).then(function (h) {
+        jagaProses(panggilApi('simpanPdfDrive', { formId: pilih.formId, tanggal: pilih.tanggal })).then(function (h) {
           aturTombolProses(tombolDrive, false);
           tulisPesan(pesanDrive, 'Tersimpan di Drive: ' + h.lokasi + '/' + h.namaFile, 'baik');
           toast('PDF tersimpan di Drive.');
@@ -4197,7 +4426,7 @@
           ikon('staff'),
           el('span', { class: 'daftar-baris-isi' }, [
             el('span', { class: 'daftar-baris-judul', text: 'Staff dan PIN' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan.' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan, hapus.' }),
             jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
           ]),
           ikon('kanan')
@@ -4209,9 +4438,83 @@
             el('span', { class: 'daftar-baris-ket', text: 'Alamat yang menerima laporan harian.' })
           ]),
           ikon('kanan')
+        ]),
+        el('a', { class: 'daftar-baris', href: '#/pengaturan/outlet' }, [
+          ikon('jam'),
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: 'Outlet dan jadwal' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Keluar otomatis setelah tidak dipakai.' })
+          ]),
+          ikon('kanan')
         ])
       ])
     ]));
+  }
+
+  /* ---------- Outlet dan jadwal (baru berisi keluar otomatis; isian lain menyusul di tahapnya) ---------- */
+
+  function layarOutletJadwal(k) {
+    aturJudul('Outlet dan jadwal');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var dipilih = 0; // menit yang dipilih tetapi belum disimpan
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Pengaturan', '#/pengaturan'),
+      el('h1', { class: 'judul-layar', text: 'Outlet dan jadwal' }),
+      penanda,
+      wadah
+    ]));
+
+    function label(n) {
+      return n + ' menit';
+    }
+
+    function gambar(data) {
+      var kini = Number(data.keluarOtomatisMenit) || KELUAR_OTOMATIS_AWAL;
+      simpanMenitKeluarOtomatis(kini);
+      kosongkan(wadah);
+      var g = grupPilihan('Keluar otomatis setelah tidak dipakai', PILIHAN_KELUAR_OTOMATIS.map(label), label(dipilih || kini));
+      var simpan = tombol('Simpan', 'utama', { disabled: !dipilih || dipilih === kini });
+      g.input.forEach(function (i) {
+        i.addEventListener('change', function () {
+          dipilih = parseInt(g.nilai(), 10);
+          simpan.disabled = dipilih === kini;
+        });
+      });
+      simpan.addEventListener('click', function () {
+        if (simpan.disabled) return;
+        var menit = dipilih;
+        aturTombolProses(simpan, true, 'Menyimpan…');
+        panggilApi('simpanOutletJadwal', { keluarOtomatisMenit: menit }).then(function (hasil) {
+          dipilih = 0;
+          Cache.tulis('outlet-jadwal', hasil);
+          gambar(hasil);
+          toast('Keluar otomatis setelah ' + hasil.keluarOtomatisMenit + ' menit tidak dipakai.');
+        }).catch(function (err) {
+          aturTombolProses(simpan, false);
+          if (tanganiSesiBerakhir(err)) return;
+          g.galat(pesanGalat(err));
+        });
+      });
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+        g.wadah,
+        el('p', { class: 'kolom-bantuan', text: 'Berlaku untuk semua pengguna di semua perangkat.' }),
+        el('div', {}, simpan)
+      ]));
+    }
+
+    muatData({
+      kunciCache: 'outlet-jadwal',
+      ambil: function () { return panggilApi('bacaOutletJadwal'); },
+      gambar: gambar,
+      kerangka: function () {
+        kosongkan(wadah).appendChild(kerangkaBaris(2));
+      },
+      galat: function (pesan, cobaLagi) {
+        kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
+      },
+      penanda: penanda
+    });
   }
 
   /* ---------- Staff dan PIN ---------- */
@@ -4251,7 +4554,7 @@
       }
       var badan = el('tbody');
       staff.forEach(function (s) {
-        var baris = el('tr', { class: 'bisa-diketuk' }, [
+        var baris = el('tr', { class: 'bisa-diketuk' + (s.aktif ? '' : ' nonaktif') }, [
           el('td', {}, el('button', {
             type: 'button',
             class: 'tabel-tombol',
@@ -4361,7 +4664,7 @@
     });
   }
 
-  /** Satu staff: PIN, role, aktif. Dari pemberitahuan Beranda, lembar reset PIN langsung terbuka. */
+  /** Satu staff: PIN, role, aktif, hapus. Dari pemberitahuan Beranda, lembar reset PIN langsung terbuka. */
   function layarStaffDetail(k) {
     var nama = '';
     try {
@@ -4458,6 +4761,11 @@
             : 'Nonaktif. ' + s.nama + ' tidak tampil di layar Login. Isian lamanya tetap tersimpan.' }),
           tombolAktif
         ]));
+
+        // Hapus (tampilan Bagian 5.7): paling bawah, terpisah, hanya untuk staff nonaktif.
+        wadah.appendChild(el('div', { class: 'bagian-hapus' }, s.aktif
+          ? el('p', { class: 'kolom-bantuan', text: 'Nonaktifkan dulu untuk bisa menghapus.' })
+          : tombol('Hapus', 'bahaya', { onclick: hapusStaff })));
       }
 
       if (bukaPinLangsung && !lembarPinSudah && !lembarKini) {
@@ -4479,6 +4787,24 @@
         Cache.tulis('staff', hasil);
         gambar(hasil);
         toast(s.nama + ' dinonaktifkan.');
+      });
+    }
+
+    function hapusStaff() {
+      var s = staffKini;
+      konfirmasi({
+        judul: 'Hapus ' + s.nama + ' dari daftar staff?',
+        teks: 'Namanya tetap tampil di riwayat. Tindakan ini tidak bisa dibatalkan dari aplikasi.',
+        teksYa: 'Hapus',
+        teksProses: 'Menghapus…',
+        bahaya: true,
+        jalankan: function () { return panggilApi('hapusStaff', { nama: s.nama }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Cache.tulis('staff', hasil);
+        hapusPermintaanDiBeranda(s.nama);
+        location.hash = '#/pengaturan/staff';
+        toast(s.nama + ' dihapus dari daftar staff.');
       });
     }
 
@@ -4745,6 +5071,8 @@
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible' || $('#aplikasi').hidden) return;
+      // Dibuka lagi dari latar belakang atau layar HP dinyalakan lagi: periksa keluar otomatis dulu.
+      if (periksaDiam()) return;
       if (!Sesi.baca()) {
         keluarLokal(PESAN.sesiBerakhir);
         return;
@@ -4753,9 +5081,13 @@
         if (!n && segarkanLayar) segarkanLayar();
       });
     });
-    $('#bar-pengguna').addEventListener('click', bukaGantiPengguna);
+    $('#bar-pengguna').addEventListener('click', bukaMenuPengguna);
+    pasangKeluarOtomatis();
 
-    if (Sesi.baca()) {
+    if (Sesi.baca() && sudahDiam()) {
+      // Aplikasi dibuka lagi setelah lama tidak dipakai.
+      keluarOtomatis();
+    } else if (Sesi.baca()) {
       tampilMode('aplikasi');
       gambarMenu();
       if (!location.hash) gantiAlamat('#/');
