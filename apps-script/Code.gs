@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.4 (Tahap 3)
+// InventoryKu Code.gs v0.5 (Tahap 4)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -21,13 +21,19 @@
  * - Tahap 3            : Riwayat (catatan, rekap harian, riwayat per item),
  *                        Laporkan kekeliruan, Tandai diperiksa, buka kunci,
  *                        koreksi berantai, Log_Perubahan.
+ * - Tahap 4            : laporan PDF (unduh, simpan ke Drive), email laporan
+ *                        harian, cadangan mingguan, trigger.
+ * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
+ * - buatCadangan       : dijalankan trigger mingguan.
+ * - pasangTrigger      : dijalankan dari editor; memasang kedua trigger.
+ * - kirimLaporanSekarang : dijalankan dari editor untuk menguji email dan PDF.
  * - setupSpreadsheet   : dijalankan dari editor; menyimpan ID spreadsheet dan
  *                        membuat semua tab. Aman dijalankan ulang.
  * - buatKodePemasangan : dijalankan dari editor saat tidak ada Pengelola yang
  *                        bisa masuk; membuat Kode Pemasangan baru.
  */
 
-var VERSI_KODE = 'v0.4';
+var VERSI_KODE = 'v0.5';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -76,7 +82,11 @@ var AKSI_ = {
   koreksi: { jalankan: aksiKoreksi_, pengelola: true,
     pesan: 'Koreksi hanya bisa dilakukan Head Kitchen atau Manager. Laporkan kekeliruan supaya Pengelola mengoreksinya.' },
   tutupLaporan: { jalankan: aksiTutupLaporan_, pengelola: true,
-    pesan: 'Menutup laporan kekeliruan hanya bisa dilakukan Head Kitchen atau Manager.' }
+    pesan: 'Menutup laporan kekeliruan hanya bisa dilakukan Head Kitchen atau Manager.' },
+  infoLaporan: { jalankan: aksiInfoLaporan_ },
+  unduhPdf: { jalankan: aksiUnduhPdf_ },
+  simpanPdfDrive: { jalankan: aksiSimpanPdfDrive_, pengelola: true,
+    pesan: 'Simpan ulang ke Drive hanya bisa dilakukan Head Kitchen atau Manager.' }
 };
 
 /**
@@ -805,8 +815,27 @@ function aksiBeranda_(body, pengguna) {
       return { nama: s.nama, waktu: s.reset.toISOString() };
     });
     hasil.pemeriksaan = ringkasPemeriksaan_();
+    hasil.peringatanSistem = peringatanSistem_();
+    simpanAlamatAplikasi_(body.alamatAplikasi);
   }
   return hasil;
+}
+
+/**
+ * Alamat aplikasi untuk tautan di email harian (Bagian 10), terdeteksi dari
+ * HP Pengelola seperti zona waktu. Hanya ditulis jika berubah.
+ */
+function simpanAlamatAplikasi_(alamat) {
+  alamat = String(alamat || '');
+  if (!/^https:\/\/[^\s"'<>]{4,200}$/.test(alamat)) return;
+  try {
+    if (String(bacaKonfigurasi_().nilai.alamat_aplikasi || '') === alamat) return;
+    denganKunci_(function () {
+      tulisKonfigurasi_('alamat_aplikasi', alamat, 'Terisi otomatis saat Pengelola membuka aplikasi. Dipakai untuk tautan di email harian.');
+    });
+  } catch (err) {
+    console.error('Alamat aplikasi tidak tersimpan: ' + err);
+  }
 }
 
 /** Form di M_Form: [{ id, nama, jenis, jadwal, urutan, aktif }], urut menurut Urutan. */
@@ -2114,7 +2143,8 @@ function aksiRiwayat_(body) {
     sampai: r.sampai,
     tampilan: 'catatan',
     daftarForm: daftar.map(function (x) {
-      return { id: x.id, nama: x.nama, adaRiwayat: !!defRiwayat_(x.id), stock: !!(defRiwayat_(x.id) || {}).stock };
+      return { id: x.id, nama: x.nama, adaRiwayat: !!defRiwayat_(x.id), stock: !!(defRiwayat_(x.id) || {}).stock,
+        adaPdf: !!LAPORAN_PDF[x.id] };
     }),
     kepala: [],
     kolom: [],
@@ -2156,7 +2186,7 @@ function aksiDetailKiriman_(body) {
   if (!k) throw galatPengguna_('Isian tidak ditemukan. Kembali ke Riwayat, lalu muat ulang.');
   var nama = idForm;
   bacaDaftarForm_().forEach(function (f) { if (f.id === idForm) nama = f.nama; });
-  return { formId: idForm, namaForm: nama, kepala: infoKepala_(def), kolom: infoKolom_(def), kiriman: k };
+  return { formId: idForm, namaForm: nama, adaPdf: !!LAPORAN_PDF[idForm], kepala: infoKepala_(def), kolom: infoKolom_(def), kiriman: k };
 }
 
 /**
@@ -2402,6 +2432,609 @@ function ringkasPemeriksaan_() {
     if (nLapor && !hasil.formDilaporkan) hasil.formDilaporkan = f.id;
   });
   return hasil;
+}
+
+/* =========================================================================
+ * Tahap 4: laporan PDF, email harian, cadangan mingguan
+ * (spesifikasi sistem Bagian 9.1, 9.4, 10; tampilan Bagian 2 dan 5.5)
+ * ========================================================================= */
+
+/** Folder induk di Drive pemilik script: Laporan Kitchen/{Outlet}/{Tahun}/{Bulan}/ dan Laporan Kitchen/Cadangan/. */
+var FOLDER_LAPORAN = 'Laporan Kitchen';
+var FOLDER_CADANGAN = 'Cadangan';
+var JUMLAH_CADANGAN = 4;
+
+/** Warna PDF (tampilan Bagian 2): navy menggantikan hijau form Word; amber tidak dipakai. */
+var WARNA_PDF = {
+  navy: '#0B1F3A',
+  tinta: '#0F1B2D',
+  tintaRedup: '#4A5A72',
+  garis: '#C5CEDA',
+  baja: '#F3F5F8',
+  masalah: '#B42318'
+};
+
+var BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus',
+  'September', 'Oktober', 'November', 'Desember'];
+var HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+/**
+ * Template PDF per form. Form lain (Waste, Suhu, Prep, form kustom) cukup
+ * menambah satu entri: { judul, isi(tanggal) }. isi mengembalikan
+ * { ada: bool (ada isian pada tanggal itu), info: [[label, nilai]],
+ *   tabel: html tabel, catatan: [teks] }. Kepala, kotak info, baris
+ * "Diisi oleh"/"Diperiksa oleh", dan kaki dibuat bersama oleh htmlLaporan_.
+ */
+var LAPORAN_PDF = {
+  STOCK: { judul: 'Form Stock Inventory Harian', isi: isiPdfStock_ }
+};
+
+function escHtml_(teks) {
+  return String(teks == null ? '' : teks).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Angka format Indonesia untuk PDF dan email: 1250.5 → "1.250,5"; minus memakai tanda −. */
+function angkaId_(n) {
+  if (n == null || !isFinite(n)) return '–';
+  var r = bulat_(n);
+  var bagian = String(Math.abs(r)).split('.');
+  var bulat = bagian[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (r < 0 ? '−' : '') + bulat + (bagian[1] ? ',' + bagian[1] : '');
+}
+
+/** "Minggu, 4 Oktober 2026" dari "2026-10-04". */
+function tanggalPanjangId_(tanggal) {
+  var p = String(tanggal).split('-');
+  var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])));
+  return HARI_ID[d.getUTCDay()] + ', ' + Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1] + ' ' + p[0];
+}
+
+function jamId_(tanggalWaktu) {
+  return tanggalWaktu ? Utilities.formatDate(tanggalWaktu, zonaWaktu_(), 'HH.mm') : '';
+}
+
+/** "3 Okt 21.50" (seperti "Diperiksa Budi, 3 Okt 21.50" di aplikasi). */
+function waktuPendekId_(tanggalWaktu) {
+  var t = Utilities.formatDate(tanggalWaktu, zonaWaktu_(), 'yyyy-MM-dd HH.mm');
+  return Number(t.slice(8, 10)) + ' ' + BULAN_ID[Number(t.slice(5, 7)) - 1].slice(0, 3) + ' ' + t.slice(11);
+}
+
+function namaFormDari_(idForm) {
+  var nama = idForm;
+  bacaDaftarForm_().forEach(function (f) { if (f.id === idForm) nama = f.nama; });
+  return nama;
+}
+
+/** Nama form yang aman untuk nama file: "Prep list" → "Prep_list". */
+function namaFileForm_(nama) {
+  return String(nama).replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'Form';
+}
+
+/**
+ * Diisi oleh dan Diperiksa oleh (Bagian 6.2) dari kiriman satu tanggal.
+ * Semua kiriman diperiksa → pemeriksa terakhir dan waktunya; belum semua →
+ * "2 dari 3 isian diperiksa".
+ */
+function ringkasPengisian_(idForm, tanggal) {
+  var def = defRiwayat_(idForm);
+  var kiriman = def ? kirimanRiwayat_(def, { dari: tanggal, sampai: tanggal }, filterRiwayat_({})) : [];
+  var hasil = { jumlah: kiriman.length, diisi: 'Belum ada isian', diperiksa: 'Belum ada isian' };
+  if (!kiriman.length) return hasil;
+  var nama = [];
+  var terakhir = '';
+  var diperiksa = 0;
+  var cek = null;
+  kiriman.slice().reverse().forEach(function (k) {
+    if (nama.indexOf(k.oleh) < 0) nama.push(k.oleh);
+    if (k.waktu && k.waktu > terakhir) terakhir = k.waktu;
+    if (k.status === STATUS_DIPERIKSA) {
+      diperiksa++;
+      if (k.diperiksa && (!cek || String(k.diperiksa.waktu) > String(cek.waktu))) cek = k.diperiksa;
+    }
+  });
+  hasil.diisi = nama.join(', ') + (terakhir ? ', terakhir ' + jamId_(new Date(terakhir)) : '');
+  if (diperiksa === kiriman.length && cek) {
+    hasil.diperiksa = cek.oleh + (cek.waktu ? ', ' + waktuPendekId_(new Date(cek.waktu)) : '');
+  } else {
+    hasil.diperiksa = diperiksa + ' dari ' + kiriman.length + ' isian diperiksa';
+  }
+  hasil.semuaDiperiksa = diperiksa === kiriman.length;
+  return hasil;
+}
+
+/**
+ * Isi PDF Stock (Bagian 9.1 butir 4, tata letak Harian_Stock Bagian 8.3):
+ * rekap Stock_Harian tanggal itu, dikelompokkan per kategori. Item tanpa
+ * gerakan menampilkan Awal = Akhir = rekap terakhir sebelumnya.
+ */
+function isiPdfStock_(tanggal) {
+  var master = bacaItem_();
+  var kategori = bacaKategori_();
+  var rekap = bacaRekap_();
+  var asli = masukAsliPerHari_(tanggal, tanggal);
+  var adaRekap = false;
+  var perKat = {};
+  Object.keys(master).forEach(function (k) {
+    var m = master[k];
+    var r = (rekap.item[k] || []).filter(function (x) { return x.tanggal === tanggal; })[0];
+    if (r) adaRekap = true;
+    if (!m.aktif && !r) return; // item nonaktif hanya tampil jika bergerak hari itu
+    var kat = (r && r.kategori) || m.kategori || 'Tanpa kategori';
+    (perKat[kat.toLowerCase()] = perKat[kat.toLowerCase()] || { nama: kat, item: [] }).item.push({
+      m: m, pos: posisiStock_(rekap.item[k], tanggal), asli: asli[k + '|' + tanggal] || ''
+    });
+  });
+  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, ss_().getSpreadsheetTimeZone(), []);
+  var urutKat = kategori.map(function (k) { return k.nama.toLowerCase(); });
+  var kunciKat = Object.keys(perKat).sort(function (a, b) {
+    var ia = urutKat.indexOf(a);
+    var ib = urutKat.indexOf(b);
+    return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib) || a.localeCompare(b, 'id');
+  });
+
+  var sel = function (n) { return '<td class="angka">' + (n ? angkaId_(n) : '') + '</td>'; };
+  var adaMin = false;
+  var baris = [];
+  kunciKat.forEach(function (k) {
+    var grup = perKat[k];
+    baris.push('<tr class="kategori"><td colspan="11">' + escHtml_(grup.nama) + '</td></tr>');
+    grup.item.sort(function (a, b) { return a.m.nama.localeCompare(b.m.nama, 'id'); }).forEach(function (x, i) {
+      var p = x.pos;
+      var minus = p.akhir < 0;
+      var diBawah = !minus && x.m.stokMin != null && p.akhir < x.m.stokMin;
+      if (diBawah) adaMin = true;
+      baris.push('<tr>' +
+        '<td class="angka">' + (i + 1) + '</td>' +
+        '<td>' + escHtml_(x.m.nama) + '</td>' +
+        '<td class="angka">' + angkaId_(p.awal) + '</td>' +
+        '<td class="angka">' + (p.masuk ? angkaId_(p.masuk) : '') +
+          (x.asli ? '<br><span class="kecil">(' + escHtml_(x.asli) + ')</span>' : '') + '</td>' +
+        sel(p.hasilPrep) + sel(p.keluar) + sel(p.dipakaiPrep) + sel(p.waste) + sel(p.penyesuaian) +
+        '<td class="angka akhir' + (minus ? ' masalah' : '') + '">' + angkaId_(p.akhir) + (diBawah ? ' *' : '') + '</td>' +
+        '<td>' + escHtml_(x.m.satuan) + '</td>' +
+        '</tr>');
+    });
+  });
+  var judul = ['No', 'Nama Item', 'Stock Awal', 'Stock Masuk', 'Hasil Prep', 'Stock Keluar', 'Dipakai Prep',
+    'Waste', 'Penyesuaian', 'Stock Akhir', 'Satuan'];
+  var tabel = '<table class="data"><colgroup><col style="width:4%"><col style="width:18%">' +
+    '<col span="8" style="width:9%"><col style="width:6%"></colgroup><thead><tr>' +
+    judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (baris.length ? baris.join('') : '<tr><td colspan="11">Belum ada item aktif.</td></tr>') + '</tbody></table>';
+  var catatan = [];
+  if (adaMin) catatan.push('* Stock Akhir di bawah stok minimum.');
+  catatan.push('Stock Akhir minus ditulis merah tebal. Angka dalam kurung: Stock Masuk yang diketik dalam satuan besar.');
+  return {
+    ada: kiriman.length > 0 || adaRekap,
+    info: [['Kategori', 'Semua kategori']],
+    tabel: tabel,
+    catatan: catatan
+  };
+}
+
+/** Dokumen HTML lengkap satu laporan: kepala, kotak info, tabel, Diisi/Diperiksa oleh, kaki. */
+function htmlLaporan_(idForm, tanggal, isi) {
+  var t = LAPORAN_PDF[idForm];
+  var outlet = namaOutlet_();
+  var p = ringkasPengisian_(idForm, tanggal);
+  var w = WARNA_PDF;
+  var dibuat = Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH.mm');
+  var info = [['Nama Outlet', outlet], ['Tanggal', tanggalPanjangId_(tanggal)]].concat(isi.info || []);
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:' + w.tinta + ';margin:0}' +
+    '.kepala,.kaki{color:' + w.tintaRedup + ';font-size:8pt}' +
+    '.kepala{margin-bottom:6px}.kaki{margin-top:14px;border-top:1px solid ' + w.garis + ';padding-top:4px}' +
+    'h1{font-size:15pt;color:' + w.navy + ';margin:0 0 8px 0;padding-bottom:4px;border-bottom:2px solid ' + w.navy + '}' +
+    'table{border-collapse:collapse}' +
+    'table.info{margin-bottom:10px}table.info td{padding:2px 14px 2px 0;vertical-align:top}' +
+    'table.info td.label{color:' + w.tintaRedup + '}table.info td.nilai{font-weight:bold}' +
+    'table.data{width:100%;table-layout:fixed}' +
+    'table.data th{background:' + w.navy + ';color:#FFFFFF;font-weight:bold;padding:4px 3px;border:1px solid ' + w.garis +
+      ';text-align:center;font-size:8pt}' +
+    'table.data td{padding:3px;border:1px solid ' + w.garis + ';vertical-align:top;word-wrap:break-word}' +
+    'td.angka{text-align:right}td.akhir{font-weight:bold}' +
+    'tr.kategori td{background:' + w.baja + ';color:' + w.tinta + ';font-weight:bold;text-align:left}' +
+    '.masalah{color:' + w.masalah + ';font-weight:bold}.kecil{font-size:7pt;color:' + w.tintaRedup + '}' +
+    'table.bawah{margin-top:12px}table.bawah td{padding:2px 14px 2px 0}table.bawah td.label{color:' + w.tintaRedup + '}' +
+    '.catatan{color:' + w.tintaRedup + ';font-size:8pt;margin:6px 0 0 0}' +
+    '</style></head><body>' +
+    '<div class="kepala">InventoryKu · ' + escHtml_(outlet) + '</div>' +
+    '<h1>' + escHtml_(t.judul) + '</h1>' +
+    '<table class="info">' + info.map(function (r) {
+      return '<tr><td class="label">' + escHtml_(r[0]) + '</td><td class="nilai">' + escHtml_(r[1]) + '</td></tr>';
+    }).join('') + '</table>' +
+    isi.tabel +
+    (isi.catatan || []).map(function (c) { return '<p class="catatan">' + escHtml_(c) + '</p>'; }).join('') +
+    '<table class="bawah">' +
+      '<tr><td class="label">Diisi oleh</td><td>' + escHtml_(p.diisi) + '</td></tr>' +
+      '<tr><td class="label">Diperiksa oleh</td><td>' + escHtml_(p.diperiksa) + '</td></tr>' +
+    '</table>' +
+    '<div class="kaki">Dibuat ' + escHtml_(dibuat) + ' · InventoryKu</div>' +
+    '</body></html>';
+}
+
+/**
+ * Membuat PDF satu form pada satu tanggal: { blob, namaFile, namaForm }.
+ * Nama file {YYYY-MM-DD}_{NamaForm}.pdf (Bagian 9.1). Tanggal tanpa isian
+ * ditolak dengan pesan yang bisa ditampilkan.
+ */
+function buatPdf_(idForm, tanggal) {
+  idForm = rapikanTeks_(idForm).toUpperCase();
+  var t = LAPORAN_PDF[idForm];
+  var namaForm = namaFormDari_(idForm);
+  if (!t) throw galatPengguna_('Laporan PDF ' + namaForm + ' dibangun di tahap berikutnya, bersama formnya.');
+  if (!tanggalSah_(tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  if (tanggal > hariIni_()) throw galatPengguna_('Tanggal masa depan belum punya isian.');
+  var isi = t.isi(tanggal);
+  if (!isi.ada) {
+    throw galatPengguna_('Belum ada isian ' + namaForm + ' pada ' + tanggalPanjangId_(tanggal) +
+      '. Pilih tanggal lain.');
+  }
+  var namaFile = tanggal + '_' + namaFileForm_(namaForm) + '.pdf';
+  var blob = Utilities.newBlob(htmlLaporan_(idForm, tanggal, isi), 'text/html', namaFile + '.html')
+    .getAs('application/pdf').setName(namaFile);
+  return { blob: blob, namaFile: namaFile, namaForm: namaForm };
+}
+
+function cariAtauBuatFolder_(induk, nama) {
+  var ada = induk.getFoldersByName(nama);
+  return ada.hasNext() ? ada.next() : induk.createFolder(nama);
+}
+
+/** Folder Laporan Kitchen/{Nama Outlet}/{Tahun}/{MM Bulan} untuk satu tanggal. */
+function folderLaporan_(tanggal) {
+  var p = tanggal.split('-');
+  var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
+  var outlet = cariAtauBuatFolder_(akar, (namaOutlet_() || 'Outlet').replace(/[\\/]+/g, '-'));
+  var tahun = cariAtauBuatFolder_(outlet, p[0]);
+  return cariAtauBuatFolder_(tahun, p[1] + ' ' + BULAN_ID[Number(p[1]) - 1]);
+}
+
+/**
+ * Menyimpan PDF ke Drive: {YYYY-MM-DD}_{NamaForm}_{HHmm}.pdf. Jam di nama file
+ * mencegah tabrakan saat disimpan ulang (Bagian 9.1 butir 5).
+ */
+function simpanPdfKeDrive_(pdf, tanggal) {
+  var folder = folderLaporan_(tanggal);
+  var jam = Utilities.formatDate(new Date(), zonaWaktu_(), 'HHmm');
+  var nama = pdf.namaFile.replace(/\.pdf$/, '') + '_' + jam + '.pdf';
+  folder.createFile(pdf.blob.copyBlob().setName(nama));
+  var p = tanggal.split('-');
+  return {
+    namaFile: nama,
+    lokasi: [FOLDER_LAPORAN, namaOutlet_() || 'Outlet', p[0], p[1] + ' ' + BULAN_ID[Number(p[1]) - 1]].join('/')
+  };
+}
+
+/** Form untuk menu Laporan: form aktif, dan apakah laporan PDF-nya sudah dibangun. */
+function aksiInfoLaporan_() {
+  return {
+    hariIni: hariIni_(),
+    form: bacaDaftarForm_().filter(function (f) { return f.aktif; }).map(function (f) {
+      return { id: f.id, nama: f.nama, adaPdf: !!LAPORAN_PDF[f.id] };
+    })
+  };
+}
+
+/** Unduh PDF (semua role): isi PDF dikirim ke aplikasi sebagai base64. Tidak menambah file di Drive. */
+function aksiUnduhPdf_(body) {
+  var pdf = buatPdf_(body.formId, String(body.tanggal || ''));
+  return {
+    namaFile: pdf.namaFile,
+    mime: 'application/pdf',
+    data: Utilities.base64Encode(pdf.blob.getBytes())
+  };
+}
+
+/** Simpan ulang ke Drive (khusus Pengelola), misalnya setelah ada koreksi. */
+function aksiSimpanPdfDrive_(body) {
+  var tanggal = String(body.tanggal || '');
+  var pdf = buatPdf_(body.formId, tanggal);
+  return simpanPdfKeDrive_(pdf, tanggal);
+}
+
+/* ---------- Catatan kegagalan (terlihat Pengelola di M_Konfigurasi dan Beranda) ---------- */
+
+function waktuSekarangId_() {
+  return Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH:mm');
+}
+
+function catatStatusSistem_(kunci, teks, keterangan) {
+  try {
+    tulisKonfigurasi_(kunci, teks, keterangan);
+  } catch (err) {
+    console.error('Status ' + kunci + ' tidak bisa dicatat: ' + err);
+  }
+}
+
+/** Untuk Beranda Pengelola: email laporan atau cadangan terakhir yang gagal. */
+function peringatanSistem_() {
+  var nilai = bacaKonfigurasi_().nilai;
+  var hasil = [];
+  var lap = String(nilai.laporan_terakhir || '');
+  var cad = String(nilai.cadangan_terakhir || '');
+  if (/^Gagal/.test(lap)) hasil.push('Laporan harian: ' + lap);
+  if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
+  return hasil;
+}
+
+/* ---------- Email laporan harian (Bagian 10) ---------- */
+
+/** Saran order (Bagian 9.2): Stok Maksimum − Stock Akhir, dibulatkan ke atas ke satuan besar. */
+function saranOrder_(m, akhir) {
+  if (m.stokMaks == null || !(m.stokMaks > akhir)) return '';
+  var butuh = bulat_(m.stokMaks - akhir);
+  if (m.satuanBesar && m.isiSatuanBesar > 0) {
+    var besar = Math.ceil(butuh / m.isiSatuanBesar);
+    return besar + ' ' + m.satuanBesar + ' (' + angkaId_(besar * m.isiSatuanBesar) + ' ' + m.satuan + ')';
+  }
+  return angkaId_(butuh) + ' ' + m.satuan;
+}
+
+/** Stock pada akhir tanggal itu: item minus dan item di bawah stok minimum (item aktif). */
+function ringkasStockHari_(tanggal) {
+  var master = bacaItem_();
+  var rekap = bacaRekap_();
+  var minus = [];
+  var belanja = [];
+  Object.keys(master).sort().forEach(function (k) {
+    var m = master[k];
+    if (!m.aktif) return;
+    var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
+    if (akhir < 0) minus.push({ m: m, akhir: akhir });
+    if (m.stokMin != null && akhir < m.stokMin) belanja.push({ m: m, akhir: akhir, saran: saranOrder_(m, akhir) });
+  });
+  var urut = function (a, b) {
+    return a.m.kategori.localeCompare(b.m.kategori, 'id') || a.m.nama.localeCompare(b.m.nama, 'id');
+  };
+  return { minus: minus.sort(urut), belanja: belanja.sort(urut) };
+}
+
+function teksStatusForm_(f) {
+  if (f.status === 'terkirim') {
+    return 'Terkirim' + (f.detail ? ' (' + f.detail + ')' : '') +
+      (f.terakhir ? ', terakhir ' + f.terakhir.oleh + ' ' + jamId_(new Date(f.terakhir.waktu)) : '');
+  }
+  if (f.status === 'nihil') return 'Nihil (ditandai ' + (f.terakhir ? f.terakhir.oleh : '') + ')';
+  if (f.status === 'sebagian') return 'Belum lengkap: ' + f.detail;
+  return f.wajib ? 'Belum diisi' : 'Belum diisi (tidak wajib hari ini)';
+}
+
+/** Isi email laporan harian sebagai HTML sederhana (tanpa amber, Bagian 2). */
+function htmlEmailHarian_(d) {
+  var w = WARNA_PDF;
+  var bagian = function (judul, isi) {
+    return '<h2 style="font-size:15px;color:' + w.navy + ';margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid ' +
+      w.garis + '">' + escHtml_(judul) + '</h2>' + isi;
+  };
+  var daftar = function (baris) {
+    return '<ul style="margin:0;padding-left:18px">' + baris.map(function (b) {
+      return '<li style="margin:2px 0">' + b + '</li>';
+    }).join('') + '</ul>';
+  };
+  var html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:' + w.tinta + ';max-width:640px">' +
+    '<div style="background:' + w.navy + ';color:#FFFFFF;padding:14px 16px">' +
+      '<div style="font-size:18px;font-weight:bold">Laporan harian ' + escHtml_(d.outlet) + '</div>' +
+      '<div style="color:#A9B8CF">' + escHtml_(tanggalPanjangId_(d.tanggal)) + '</div></div>';
+
+  html += bagian('Form hari ini', daftar(d.form.map(function (f) {
+    var belum = f.status === 'belum' || f.status === 'sebagian';
+    var gaya = belum && f.wajib ? 'color:' + w.masalah + ';font-weight:bold' : '';
+    return '<b>' + escHtml_(f.nama) + '</b>: <span style="' + gaya + '">' + escHtml_(teksStatusForm_(f)) + '</span>';
+  })));
+
+  var stock = [];
+  if (d.stock.minus.length) {
+    stock.push('<p style="margin:6px 0 2px"><b style="color:' + w.masalah + '">Stock Akhir minus (' + d.stock.minus.length + ')</b></p>' +
+      daftar(d.stock.minus.map(function (x) {
+        return escHtml_(x.m.nama) + ': <span style="color:' + w.masalah + ';font-weight:bold">' +
+          angkaId_(x.akhir) + ' ' + escHtml_(x.m.satuan) + '</span>';
+      })));
+  }
+  if (d.stock.belanja.length) {
+    stock.push('<p style="margin:6px 0 2px"><b>Di bawah stok minimum (' + d.stock.belanja.length + ')</b></p>' +
+      daftar(d.stock.belanja.map(function (x) {
+        return escHtml_(x.m.nama) + ': ' + angkaId_(x.akhir) + ' ' + escHtml_(x.m.satuan) +
+          ' (minimum ' + angkaId_(x.m.stokMin) + ')' + (x.saran ? ', saran order ' + escHtml_(x.saran) : '');
+      })));
+  }
+  html += bagian('Stock', stock.length ? stock.join('') : '<p style="margin:0">Tidak ada Stock Akhir minus dan semua stock di atas batas minimum.</p>');
+
+  var periksa = [];
+  if (d.pemeriksaan.belumDiperiksa) periksa.push(d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa (31 hari terakhir)');
+  if (d.pemeriksaan.dilaporkan) periksa.push(d.pemeriksaan.dilaporkan + ' baris dilaporkan keliru');
+  d.reset.forEach(function (n) { periksa.push(escHtml_(n) + ' meminta reset PIN'); });
+  html += bagian('Untuk Head Kitchen dan Manager', periksa.length ? daftar(periksa) :
+    '<p style="margin:0">Semua isian sudah diperiksa. Tidak ada laporan kekeliruan atau permintaan reset PIN.</p>');
+
+  var lampiran = d.pdf.map(function (p) { return escHtml_(p.namaFile) + (p.drive ? '' : ' (gagal disimpan ke Drive)'); });
+  html += bagian('Lampiran', lampiran.length ? daftar(lampiran) : '<p style="margin:0">Tidak ada form yang terisi hari ini, jadi tidak ada PDF.</p>');
+
+  var masalah = d.masalah.slice();
+  if (d.cadanganGagal) masalah.push('Cadangan mingguan: ' + d.cadanganGagal);
+  if (masalah.length) {
+    html += bagian('Perlu perhatian', daftar(masalah.map(function (m) {
+      return '<span style="color:' + w.masalah + '">' + escHtml_(m) + '</span>';
+    })));
+  }
+  html += '<p style="margin:20px 0 0">' + (d.alamat
+    ? '<a href="' + escHtml_(d.alamat) + '" style="color:' + w.navy + ';font-weight:bold">Buka InventoryKu</a>'
+    : 'Buka InventoryKu dari HP untuk melihat rinciannya.') + '</p>' +
+    '<p style="color:' + w.tintaRedup + ';font-size:12px;margin:12px 0 0">Email otomatis dari InventoryKu, dikirim setelah closing.</p></div>';
+  return html;
+}
+
+/**
+ * Laporan harian (Bagian 9.1 butir 1 dan Bagian 10): PDF tiap form yang
+ * terisi hari itu disimpan ke Drive, lalu satu email ke penerima di M_Outlet.
+ * Butir yang sumbernya belum dibangun (suhu di luar standar, waste, masa
+ * simpan, pengingat opname) dilewati sampai tahapnya. Hasil dan kegagalan
+ * dicatat di M_Konfigurasi (laporan_terakhir).
+ * opsi: { tanggal, uji: bool }.
+ */
+function jalankanLaporanHarian_(opsi) {
+  SS_ = null;
+  opsi = opsi || {};
+  var tanggal = opsi.tanggal || hariIni_();
+  var masalah = [];
+  var hasil = { tanggal: tanggal, pdf: [], penerima: [], terkirim: false };
+  try {
+    var form = kelengkapanForm_(tanggal);
+    form.forEach(function (f) {
+      if (f.status !== 'terkirim' || !LAPORAN_PDF[f.id]) return;
+      try {
+        var pdf = buatPdf_(f.id, tanggal);
+        var x = { namaFile: pdf.namaFile, blob: pdf.blob, drive: false };
+        try {
+          simpanPdfKeDrive_(pdf, tanggal);
+          x.drive = true;
+        } catch (err) {
+          console.error('PDF ' + f.id + ' gagal disimpan ke Drive: ' + (err && err.stack ? err.stack : err));
+          masalah.push('PDF ' + pdf.namaFile + ' gagal disimpan ke Drive: ' + (err && err.message ? err.message : err));
+        }
+        hasil.pdf.push(x);
+      } catch (err) {
+        console.error('PDF ' + f.id + ' gagal dibuat: ' + (err && err.stack ? err.stack : err));
+        masalah.push('PDF ' + f.nama + ' gagal dibuat: ' + (err && err.message ? err.message : err));
+      }
+    });
+
+    var konf = bacaKonfigurasi_().nilai;
+    var cadangan = String(konf.cadangan_terakhir || '');
+    var data = {
+      outlet: namaOutlet_() || 'Outlet',
+      tanggal: tanggal,
+      form: form,
+      stock: ringkasStockHari_(tanggal),
+      pemeriksaan: ringkasPemeriksaan_(),
+      reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).map(function (s) { return s.nama; }),
+      pdf: hasil.pdf,
+      masalah: masalah,
+      cadanganGagal: /^Gagal/.test(cadangan) ? cadangan : '',
+      alamat: /^https:\/\//.test(String(konf.alamat_aplikasi || '')) ? String(konf.alamat_aplikasi) : ''
+    };
+    var penerima = bacaDaftarEmail_();
+    hasil.penerima = penerima;
+    if (!penerima.length) throw new Error('belum ada penerima email. Tambahkan di Pengaturan → Penerima email.');
+    var sisa = MailApp.getRemainingDailyQuota();
+    if (sisa < penerima.length) throw new Error('kuota email harian Gmail habis (sisa ' + sisa + ').');
+    hasil.html = htmlEmailHarian_(data);
+    MailApp.sendEmail({
+      to: penerima.join(','),
+      subject: (opsi.uji ? '[Uji] ' : '') + 'Laporan harian ' + data.outlet + ', ' + tanggalPanjangId_(tanggal),
+      htmlBody: hasil.html,
+      name: 'InventoryKu',
+      attachments: hasil.pdf.map(function (p) { return p.blob; })
+    });
+    hasil.terkirim = true;
+    catatStatusSistem_('laporan_terakhir', 'Terkirim ' + waktuSekarangId_() + ' untuk ' + tanggal + ' ke ' +
+      penerima.length + ' penerima, ' + hasil.pdf.length + ' PDF' + (masalah.length ? '. Masalah: ' + masalah.join('; ') : '') + '.',
+      'Diisi otomatis oleh laporan harian. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola.');
+  } catch (err) {
+    console.error('Laporan harian gagal: ' + (err && err.stack ? err.stack : err));
+    hasil.galat = err && err.message ? err.message : String(err);
+    catatStatusSistem_('laporan_terakhir', 'Gagal ' + waktuSekarangId_() + ' untuk ' + tanggal + ': ' + hasil.galat,
+      'Diisi otomatis oleh laporan harian. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola.');
+  }
+  return hasil;
+}
+
+/**
+ * Dijalankan trigger harian (dipasang pasangTrigger). Jika trigger terlambat
+ * sampai lewat tengah malam, laporan tetap untuk hari kemarin.
+ */
+function kirimLaporanHarian() {
+  SS_ = null;
+  var jam = Number(Utilities.formatDate(new Date(), zonaWaktu_(), 'H'));
+  var tanggal = jam < 6 ? geserTanggal_(hariIni_(), -1) : hariIni_();
+  return jalankanLaporanHarian_({ tanggal: tanggal });
+}
+
+/**
+ * Jalankan dari editor Apps Script untuk menguji email dan PDF tanpa
+ * menunggu malam. Memakai data hari ini; subjek email diawali "[Uji]".
+ * Hasilnya tertulis di log eksekusi.
+ */
+function kirimLaporanSekarang() {
+  var h = jalankanLaporanHarian_({ tanggal: null, uji: true });
+  console.log(h.terkirim
+    ? 'Email terkirim ke ' + h.penerima.join(', ') + ' dengan ' + h.pdf.length + ' PDF (' +
+      h.pdf.map(function (p) { return p.namaFile; }).join(', ') + ').'
+    : 'Email gagal: ' + h.galat + '. Lihat baris laporan_terakhir di M_Konfigurasi.');
+}
+
+/* ---------- Cadangan mingguan (Bagian 9.4) ---------- */
+
+/**
+ * Menyalin seluruh spreadsheet ke Laporan Kitchen/Cadangan/ dengan tanggal di
+ * namanya, menyimpan 4 salinan terakhir, dan membuang yang lebih lama ke
+ * tempat sampah Drive. Hasil dicatat di M_Konfigurasi (cadangan_terakhir);
+ * kegagalan disebut di email harian berikutnya.
+ */
+function buatCadangan() {
+  SS_ = null;
+  var ket = 'Diisi otomatis oleh cadangan mingguan. Baris yang diawali "Gagal" disebut di email harian dan Beranda Pengelola.';
+  try {
+    var ss = ss_();
+    var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
+    var folder = cariAtauBuatFolder_(akar, FOLDER_CADANGAN);
+    var awalan = 'Cadangan ' + ss.getName() + ' ';
+    var nama = awalan + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmm');
+    DriveApp.getFileById(ss.getId()).makeCopy(nama, folder);
+    var salinan = [];
+    var it = folder.getFiles();
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.getName().indexOf(awalan) === 0) salinan.push(f);
+    }
+    salinan.sort(function (a, b) { return b.getDateCreated().getTime() - a.getDateCreated().getTime(); });
+    var buang = salinan.slice(JUMLAH_CADANGAN);
+    buang.forEach(function (f) { f.setTrashed(true); });
+    catatStatusSistem_('cadangan_terakhir', 'Berhasil ' + waktuSekarangId_() + ': ' + nama +
+      (buang.length ? '. ' + buang.length + ' salinan lama dibuang.' : '.'), ket);
+    console.log('Cadangan dibuat: ' + nama);
+  } catch (err) {
+    console.error('Cadangan gagal: ' + (err && err.stack ? err.stack : err));
+    catatStatusSistem_('cadangan_terakhir', 'Gagal ' + waktuSekarangId_() + ': ' + (err && err.message ? err.message : err), ket);
+  }
+}
+
+/* ---------- Trigger ---------- */
+
+var HARI_TRIGGER = {
+  minggu: 'SUNDAY', senin: 'MONDAY', selasa: 'TUESDAY', rabu: 'WEDNESDAY',
+  kamis: 'THURSDAY', jumat: 'FRIDAY', "jum'at": 'FRIDAY', sabtu: 'SATURDAY'
+};
+var JAM_CADANGAN = 3; // dini hari
+
+/**
+ * Jalankan dari editor Apps Script (sekali, dan setiap kali jam closing,
+ * jeda laporan, hari cadangan, atau zona waktu diubah). Menghapus semua
+ * trigger lama milik script ini, lalu memasang trigger harian (jam closing +
+ * jeda dari M_Konfigurasi) dan trigger cadangan mingguan (hari_cadangan,
+ * pukul 03.00), dalam zona waktu yang tersimpan.
+ */
+function pasangTrigger() {
+  SS_ = null;
+  var konf = bacaKonfigurasi_().nilai;
+  var zona = zonaWaktu_();
+  var closing = String(konf.jam_closing || '21:30').match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!closing) throw new Error('jam_closing di M_Konfigurasi harus berbentuk jj:mm, misalnya 21:30.');
+  var jeda = Number(konf.jeda_laporan_menit);
+  if (!isFinite(jeda) || jeda < 0) jeda = 45;
+  var menit = (Number(closing[1]) * 60 + Number(closing[2]) + jeda) % (24 * 60);
+  var hari = HARI_TRIGGER[String(konf.hari_cadangan || 'Minggu').trim().toLowerCase()];
+  if (!hari) throw new Error('hari_cadangan di M_Konfigurasi harus nama hari, misalnya Minggu.');
+
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('kirimLaporanHarian').timeBased()
+    .atHour(Math.floor(menit / 60)).nearMinute(menit % 60).everyDays(1).inTimezone(zona).create();
+  ScriptApp.newTrigger('buatCadangan').timeBased()
+    .onWeekDay(ScriptApp.WeekDay[hari]).atHour(JAM_CADANGAN).inTimezone(zona).create();
+  var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
+  console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
+    ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00.');
 }
 
 /* =========================================================================

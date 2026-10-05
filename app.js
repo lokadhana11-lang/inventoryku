@@ -1,12 +1,12 @@
 /* InventoryKu — frontend (Tahap 1: kerangka PWA dan akses; Tahap 2: form Stock;
-   Tahap 3: Riwayat, pemeriksaan, dan koreksi).
+   Tahap 3: Riwayat, pemeriksaan, dan koreksi; Tahap 4: laporan PDF).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.4.0';
+  var VERSI_APLIKASI = '0.5.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -28,7 +28,8 @@
     pinHarus6: 'PIN harus 6 angka.',
     pinTidakSama: 'Ulangi PIN tidak sama dengan PIN. Ketik ulang.',
     lupaPinTerkirim: 'Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager.',
-    memperbarui: 'Memperbarui…'
+    memperbarui: 'Memperbarui…',
+    iphoneTidakBisaSimpan: 'iPhone ini belum bisa menyimpan file dari aplikasi. Buka alamat website di Safari, lalu unduh dari sana.'
   };
 
   /* =======================================================================
@@ -675,13 +676,13 @@
     });
   }
 
-  /** Pesan di dalam formulir. jenis: masalah | baik | tinjau. */
+  /** Pesan di dalam formulir. jenis: masalah | baik | tinjau | info (petunjuk netral). */
   function tulisPesan(wadah, teks, jenis) {
     kosongkan(wadah);
-    wadah.className = wadah.className.replace(/\b(masalah|baik|tinjau)\b/g, '').trim();
+    wadah.className = wadah.className.replace(/\b(masalah|baik|tinjau|info)\b/g, '').trim();
     if (!teks) return;
     wadah.classList.add(jenis || 'masalah');
-    wadah.appendChild(ikon(jenis === 'baik' ? 'centang' : (jenis === 'tinjau' ? 'info' : 'seru')));
+    wadah.appendChild(ikon(jenis === 'baik' ? 'centang' : (jenis === 'tinjau' || jenis === 'info' ? 'info' : 'seru')));
     wadah.appendChild(el('span', { text: teks }));
   }
 
@@ -1064,7 +1065,7 @@
     { pola: /^\/stock$/, menu: 'beranda', layar: layarStock },
     { pola: /^\/riwayat(?:\?(.*))?$/, menu: 'riwayat', layar: layarRiwayat },
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
-    { pola: /^\/laporan$/, menu: 'laporan', layar: layarBelumDibangun('Laporan') },
+    { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
     { pola: /^\/dashboard$/, menu: 'dashboard', pengelola: true, layar: layarBelumDibangun('Dashboard') },
     { pola: /^\/pengaturan$/, menu: 'pengaturan', pengelola: true, layar: layarPengaturan },
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
@@ -1750,7 +1751,7 @@
       var form = data.form || [];
       gambarTiket(form);
       gambarKemajuan(form);
-      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null);
+      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || []);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
@@ -1838,13 +1839,22 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan) {
       kosongkan(bawah);
       var baris = barisAntrean();
       if (baris) bawah.appendChild(baris);
       if (!sesiKini().pengguna.pengelola) return;
       var periksa = barisPemeriksaan(pemeriksaan);
       if (periksa) bawah.insertBefore(periksa, bawah.firstChild);
+      // Email laporan harian atau cadangan mingguan yang gagal (Tahap 4).
+      if (peringatan && peringatan.length) {
+        bawah.insertBefore(el('div', { class: 'daftar', role: 'group', 'aria-label': 'Peringatan sistem' }, peringatan.map(function (p) {
+          return el('div', { class: 'daftar-baris peristiwa tetap' }, el('span', { class: 'daftar-baris-isi' }, [
+            tandaStatus('masalah', 'Perlu perhatian'),
+            el('span', { class: 'daftar-baris-ket', text: p + ' Rinciannya di tab M_Konfigurasi.' })
+          ]));
+        })), bawah.firstChild);
+      }
       if (!permintaan.length) return;
       var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemberitahuan' });
       permintaan.forEach(function (p) {
@@ -1866,7 +1876,8 @@
       return muatData({
         kunciCache: 'beranda',
         ambil: function () {
-          return panggilApi('beranda', { tanggal: tanggalIso(new Date()) });
+          // Alamat aplikasi untuk tautan di email harian (server hanya menyimpannya dari Pengelola).
+          return panggilApi('beranda', { tanggal: tanggalIso(new Date()), alamatAplikasi: location.origin + location.pathname });
         },
         gambar: gambar,
         kerangka: kerangka,
@@ -2684,7 +2695,8 @@
     if (!k) return null;
     var nama = formId;
     (d.daftarForm || []).forEach(function (f) { if (f.id === formId) nama = f.nama; });
-    return { formId: formId, namaForm: nama, kepala: d.kepala || [], kolom: d.kolom || [], kiriman: k };
+    var adaPdf = (d.daftarForm || []).some(function (f) { return f.id === formId && f.adaPdf; });
+    return { formId: formId, namaForm: nama, adaPdf: adaPdf, kepala: d.kepala || [], kolom: d.kolom || [], kiriman: k };
   }
 
   /** Tanda status satu kiriman: Terkirim / Diperiksa, dilaporkan keliru, pernah dikoreksi. */
@@ -3243,8 +3255,8 @@
 
     /* ----- Detail (desktop: kolom kanan) ----- */
     function infoDetail(kr) {
-      var nama = (formTerpilih() || {}).nama || data.formId;
-      return { formId: data.formId, namaForm: nama, kepala: data.kepala || [], kolom: data.kolom || [], kiriman: kr };
+      var f = formTerpilih() || {};
+      return { formId: data.formId, namaForm: f.nama || data.formId, adaPdf: !!f.adaPdf, kepala: data.kepala || [], kolom: data.kolom || [], kiriman: kr };
     }
 
     function gambarDetailKanan() {
@@ -3471,6 +3483,13 @@
       buka.insertBefore(ikon('bukaKunci'), buka.lastChild);
       aksiKiriman.appendChild(buka);
     }
+    // Unduh PDF tanggal tersebut (spesifikasi sistem Bagian 6.1), semua role.
+    var unduh = info.adaPdf ? unduhPdf({
+      jenis: 'kedua',
+      label: 'Unduh PDF ' + info.namaForm + ' ' + tanggalPendek(kr.tanggal),
+      minta: function () { return { formId: info.formId, tanggal: kr.tanggal }; }
+    }) : null;
+    if (unduh) aksiKiriman.appendChild(unduh.tombol);
 
     wadah.appendChild(el('section', { class: 'kartu detail-kepala', 'aria-label': 'Kotak info' }, [
       el('h2', { class: 'kartu-judul', text: info.namaForm + (kepala ? ' · ' + kepala : '') }),
@@ -3478,7 +3497,8 @@
       el('p', { class: 'otomatis', text: 'Diisi ' + kr.oleh + '. ' + waktuKirim + '. ' + kr.jumlahBaris + ' baris.' }),
       el('div', { class: 'tanda-deret bungkus' }, tandaUtama),
       terkunci && opsi.pengelola ? el('p', { class: 'kolom-bantuan' }, [ikon('kunci'), ' Terkunci karena sudah diperiksa. Buka kunci untuk mengoreksi.']) : null,
-      aksiKiriman.childNodes.length ? aksiKiriman : null
+      aksiKiriman.childNodes.length ? aksiKiriman : null,
+      unduh ? unduh.pesan : null
     ]));
 
     function aksiBaris(b) {
@@ -3897,6 +3917,250 @@
         { teks: 'Batal', jenis: 'kedua' },
         { teks: 'Simpan penyesuaian', jenis: 'utama', klik: simpan }
       ]
+    });
+  }
+
+  /* =======================================================================
+   * Unduh PDF bersama (spesifikasi sistem Bagian 9.1, tampilan Bagian 5.5).
+   * Dipakai menu Laporan, detail Riwayat, dan semua unduhan PDF berikutnya
+   * (laporan selisih opname, daftar belanja, rekap bulanan).
+   * ===================================================================== */
+
+  /** iPhone dan iPad dikenali dari perangkatnya, termasuk iPad yang mengaku sebagai Mac. */
+  function apakahIos() {
+    var ua = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    return /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  }
+
+  /** Lembar bagikan dengan file (Web Share API) didukung? */
+  function bisaBagikanFile(file) {
+    try {
+      if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function' || typeof File !== 'function') return false;
+      return !!navigator.canShare({ files: [file || new File(['%PDF'], 'uji.pdf', { type: 'application/pdf' })] });
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function blobDariBase64(data, mime) {
+    var biner = window.atob(data);
+    var isi = new Uint8Array(biner.length);
+    for (var i = 0; i < biner.length; i++) isi[i] = biner.charCodeAt(i);
+    return new Blob([isi], { type: mime || 'application/pdf' });
+  }
+
+  /**
+   * Tombol "Unduh PDF". opsi: { aksi (bawaan 'unduhPdf'), minta() → isi
+   * permintaan, jenis, label }. Server menjawab { namaFile, mime, data (base64) }.
+   * Android, laptop, desktop: file langsung tersimpan, lalu "PDF diunduh.".
+   * iPhone dan iPad: dua langkah. PDF diambil dulu, tombol berganti menjadi
+   * "Simpan PDF"; ketukan berikutnya langsung membuka lembar bagikan tanpa
+   * menunggu apa pun. Tanpa dukungan berbagi file: pesan cadangan, tanpa
+   * tombol "Simpan PDF". Hasil: { tombol, pesan, reset() }.
+   */
+  function unduhPdf(opsi) {
+    var ios = apakahIos();
+    var t = tombol('Unduh PDF', opsi.jenis || 'utama', opsi.label ? { 'aria-label': opsi.label } : null);
+    var pesan = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite' });
+    var file = null;
+
+    function reset() {
+      file = null;
+      aturTombolProses(t, false);
+      gantiTeksTombol(t, 'Unduh PDF');
+      t.classList.remove('siap-simpan');
+      tulisPesan(pesan, '');
+    }
+
+    t.addEventListener('click', function () {
+      if (t.disabled) return;
+      if (file) {
+        // Langsung di dalam ketukan: iPhone hanya membuka lembar bagikan dari ketukan pengguna.
+        var f = file;
+        var selesai = function () {
+          if (file === f) reset();
+        };
+        navigator.share({ files: [f] }).then(selesai, selesai);
+        return;
+      }
+      tulisPesan(pesan, '');
+      if (ios && !bisaBagikanFile()) {
+        tulisPesan(pesan, PESAN.iphoneTidakBisaSimpan, 'tinjau');
+        return;
+      }
+      if (navigator.onLine === false) {
+        tulisPesan(pesan, PESAN.tidakAdaSinyal, 'masalah');
+        return;
+      }
+      aturTombolProses(t, true, 'Membuat PDF…');
+      panggilApi(opsi.aksi || 'unduhPdf', opsi.minta()).then(function (h) {
+        aturTombolProses(t, false);
+        var blob = blobDariBase64(h.data, h.mime);
+        if (ios) {
+          var siap = new File([blob], h.namaFile, { type: h.mime || 'application/pdf' });
+          if (!bisaBagikanFile(siap)) {
+            tulisPesan(pesan, PESAN.iphoneTidakBisaSimpan, 'tinjau');
+            return;
+          }
+          file = siap;
+          gantiTeksTombol(t, 'Simpan PDF');
+          t.classList.add('siap-simpan');
+          tulisPesan(pesan, 'Ketuk Simpan PDF, lalu pilih Save to Files.', 'info');
+          return;
+        }
+        var url = URL.createObjectURL(blob);
+        var a = el('a', { href: url, download: h.namaFile, hidden: true });
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        toast('PDF diunduh.');
+      }).catch(function (err) {
+        aturTombolProses(t, false);
+        if (tanganiSesiBerakhir(err)) return;
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+    return { tombol: t, pesan: pesan, reset: reset };
+  }
+
+  /* =======================================================================
+   * Laporan (spesifikasi tampilan Bagian 5.5): pilih tanggal, pilih form,
+   * "Unduh PDF". Pengelola: "Simpan ulang ke Drive".
+   * ===================================================================== */
+
+  function layarLaporan(k) {
+    aturJudul('Laporan');
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var hariIni = tanggalIso(new Date());
+    var kemarin = geserHari(hariIni, -1);
+    var simpanan = Cache.baca('laporan-pilihan');
+    var pilih = Object.assign({ formId: '', tanggal: hariIni }, simpanan && simpanan.data ? simpanan.data : {});
+    if (!pilih.tanggal || pilih.tanggal > hariIni) pilih.tanggal = hariIni;
+    var data = null;
+
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadahForm = el('div');
+    var keterangan = el('p', { class: 'pesan-formulir', role: 'status' });
+
+    var nilaiAwal = pilih.tanggal === hariIni ? 'Hari ini' : (pilih.tanggal === kemarin ? 'Kemarin' : 'Tanggal lain');
+    var gTanggal = grupPilihan('Tanggal', ['Hari ini', 'Kemarin', 'Tanggal lain'], nilaiAwal);
+    var tanggalLain = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Tanggal lain' });
+    tanggalLain.value = pilih.tanggal;
+    tanggalLain.hidden = nilaiAwal !== 'Tanggal lain';
+    gTanggal.wadah.appendChild(tanggalLain);
+
+    var unduh = unduhPdf({
+      minta: function () { return { formId: pilih.formId, tanggal: pilih.tanggal }; }
+    });
+    var tombolDrive = pengelola ? tombol('Simpan ulang ke Drive', 'kedua') : null;
+    var pesanDrive = el('p', { class: 'pesan-formulir', role: 'status' });
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      el('h1', { class: 'judul-layar', text: 'Laporan' }),
+      penanda,
+      el('section', { class: 'kartu laporan-kartu', 'aria-label': 'Laporan harian PDF' }, [
+        el('h2', { class: 'kartu-judul', text: 'Laporan harian PDF' }),
+        gTanggal.wadah,
+        wadahForm,
+        keterangan,
+        el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol, tombolDrive]),
+        unduh.pesan,
+        pengelola ? pesanDrive : null
+      ])
+    ]));
+
+    function simpanPilihan() {
+      Cache.tulis('laporan-pilihan', pilih);
+    }
+
+    function formKini() {
+      return (data && data.form || []).filter(function (f) { return f.id === pilih.formId; })[0] || null;
+    }
+
+    function aturKeadaan() {
+      unduh.reset();
+      tulisPesan(pesanDrive, '');
+      var f = formKini();
+      var bisa = !!(f && f.adaPdf);
+      unduh.tombol.disabled = !bisa;
+      if (tombolDrive) tombolDrive.disabled = !bisa;
+      if (!data) tulisPesan(keterangan, '');
+      else if (!f) tulisPesan(keterangan, 'Belum ada form yang tampil. Pengelola mengatur form di Pengaturan.', 'tinjau');
+      else if (!bisa) tulisPesan(keterangan, 'Laporan PDF ' + f.nama + ' dibangun di tahap berikutnya, bersama formnya.', 'tinjau');
+      else tulisPesan(keterangan, '');
+    }
+
+    function gantiTanggal(baru) {
+      if (!baru || baru > hariIni) return;
+      pilih.tanggal = baru;
+      simpanPilihan();
+      aturKeadaan();
+    }
+    gTanggal.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        var v = gTanggal.nilai();
+        tanggalLain.hidden = v !== 'Tanggal lain';
+        if (v === 'Hari ini') gantiTanggal(hariIni);
+        else if (v === 'Kemarin') gantiTanggal(kemarin);
+        else gantiTanggal(tanggalLain.value);
+      });
+    });
+    tanggalLain.addEventListener('change', function () { gantiTanggal(tanggalLain.value); });
+
+    function gambar(d) {
+      data = d;
+      var daftar = d.form || [];
+      if (!daftar.some(function (f) { return f.id === pilih.formId; })) {
+        var pertama = daftar.filter(function (f) { return f.adaPdf; })[0] || daftar[0];
+        pilih.formId = pertama ? pertama.id : '';
+      }
+      kosongkan(wadahForm);
+      if (daftar.length) {
+        var g = grupPilihan('Form', daftar.map(function (f) { return f.nama; }), (formKini() || {}).nama);
+        g.wadah.querySelector('fieldset').classList.add('pilihan-gulir');
+        g.input.forEach(function (i, n) {
+          i.addEventListener('change', function () {
+            pilih.formId = daftar[n].id;
+            simpanPilihan();
+            aturKeadaan();
+          });
+        });
+        wadahForm.appendChild(g.wadah);
+      }
+      aturKeadaan();
+    }
+
+    if (tombolDrive) {
+      tombolDrive.addEventListener('click', function () {
+        if (tombolDrive.disabled) return;
+        tulisPesan(pesanDrive, '');
+        if (navigator.onLine === false) {
+          tulisPesan(pesanDrive, PESAN.tidakAdaSinyal, 'masalah');
+          return;
+        }
+        aturTombolProses(tombolDrive, true, 'Menyimpan…');
+        panggilApi('simpanPdfDrive', { formId: pilih.formId, tanggal: pilih.tanggal }).then(function (h) {
+          aturTombolProses(tombolDrive, false);
+          tulisPesan(pesanDrive, 'Tersimpan di Drive: ' + h.lokasi + '/' + h.namaFile, 'baik');
+          toast('PDF tersimpan di Drive.');
+        }).catch(function (err) {
+          aturTombolProses(tombolDrive, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesanDrive, pesanGalat(err), 'masalah');
+        });
+      });
+    }
+
+    aturKeadaan();
+    muatData({
+      kunciCache: 'laporan',
+      ambil: function () { return panggilApi('infoLaporan'); },
+      gambar: gambar,
+      kerangka: function () { kosongkan(wadahForm).appendChild(kerangkaBaris(1)); },
+      galat: function (pesan, cobaLagi) { kosongkan(wadahForm).appendChild(kotakGalat(pesan, cobaLagi)); },
+      penanda: penanda
     });
   }
 
