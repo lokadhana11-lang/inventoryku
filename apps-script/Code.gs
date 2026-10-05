@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.6 (Tahap 5)
+// InventoryKu Code.gs v0.6.1 (Tahap 5, rumus sesuai lokalitas spreadsheet)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -39,7 +39,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.6';
+var VERSI_KODE = 'v0.6.1';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -4381,6 +4381,9 @@ function setupSpreadsheet() {
       }
     });
 
+    // Cara menulis rumus yang diterima file ini (lokalitas berdesimal koma memakai titik koma).
+    GAYA_RUMUS_ = deteksiGayaRumus_(ss, catatan);
+
     // 2. Susun tiap tab.
     siapkanDashboard_(ss, ss.getSheetByName('Dashboard'), catatan);
     TAB_HARIAN.forEach(function (def) {
@@ -4443,6 +4446,9 @@ function setupSpreadsheet() {
     hapusLembarBawaanKosong_(ss, catatan);
 
     SpreadsheetApp.flush();
+
+    // 6. Baca kembali semua sel berumus dan catat yang galat.
+    periksaSelRumus_(ss, catatan);
   } finally {
     kunci.releaseLock();
   }
@@ -4450,6 +4456,142 @@ function setupSpreadsheet() {
   catatan.push('Selesai. ID spreadsheet tersimpan di Script Properties.');
   catatan.push('Kode Pemasangan ada di tab M_Konfigurasi (baris kode_pemasangan).');
   console.log('InventoryKu ' + VERSI_KODE + ' setupSpreadsheet:\n- ' + catatan.join('\n- '));
+}
+
+/* ---------- Rumus sesuai lokalitas spreadsheet ---------- */
+
+/**
+ * Rumus di file ini ditulis dengan gaya en-US: pemisah argumen koma, desimal
+ * titik, pemisah kolom array koma. Spreadsheet berlokalitas desimal koma
+ * (misalnya Indonesia) mengurai rumus dari script dengan pemisah argumen titik
+ * koma, desimal koma, dan pemisah kolom array "\", sehingga rumus gaya en-US
+ * menjadi "Error mengurai formula". setupSpreadsheet menentukan gaya yang
+ * diterima file dengan rumus uji, lalu semua rumus (sel dan format bersyarat)
+ * ditulis lewat rumusLokal_. Lokalitas file tidak diubah.
+ */
+var GAYA_RUMUS_ = null; // 'koma' (en-US) atau 'titikKoma'
+
+/** Rumus uji: argumen, angka desimal, dan array sekaligus. Hasilnya 3,5 jika terurai. */
+var RUMUS_UJI_ = '=IF(TRUE,SUM(1.5,COLUMNS({1,2})),0)';
+
+/** Nilai tampilan sel berumus yang dilaporkan pemeriksaan di akhir setupSpreadsheet. */
+var GALAT_RUMUS_ = ['#ERROR!', '#NAME?', '#REF!'];
+
+/**
+ * Menulis rumus uji di tab sementara dengan gaya en-US, lalu gaya titik koma,
+ * dan mengembalikan gaya pertama yang terurai. Tab sementara selalu dihapus.
+ */
+function deteksiGayaRumus_(ss, catatan) {
+  var lokal = ss.getSpreadsheetLocale();
+  var uji = ss.insertSheet('InventoryKu_uji_rumus_' + new Date().getTime());
+  try {
+    var sel = uji.getRange(1, 1);
+    var gaya = ['koma', 'titikKoma'];
+    for (var i = 0; i < gaya.length; i++) {
+      sel.setFormula(ubahGayaRumus_(RUMUS_UJI_, gaya[i]));
+      SpreadsheetApp.flush();
+      if (sel.getValue() === 3.5) {
+        catatan.push('Lokalitas spreadsheet ' + lokal + ': rumus ditulis dengan ' + (gaya[i] === 'koma'
+          ? 'pemisah koma dan desimal titik'
+          : 'pemisah titik koma, desimal koma, dan pemisah kolom array \\'));
+        return gaya[i];
+      }
+    }
+  } finally {
+    ss.deleteSheet(uji);
+  }
+  catatan.push('Peringatan: lokalitas spreadsheet ' + lokal + ': rumus uji tidak terurai dengan pemisah koma ' +
+    'maupun titik koma; rumus ditulis dengan pemisah koma. Lihat pemeriksaan rumus di bawah.');
+  return 'koma';
+}
+
+/** Mengubah rumus gaya en-US ke gaya yang diterima file ini (lihat GAYA_RUMUS_). */
+function rumusLokal_(rumus) {
+  if (!GAYA_RUMUS_) GAYA_RUMUS_ = deteksiGayaRumus_(ss_(), []);
+  return ubahGayaRumus_(rumus, GAYA_RUMUS_);
+}
+
+/**
+ * Mengubah rumus gaya en-US ke gaya titik koma: koma pemisah argumen → ";",
+ * koma di dalam array {…} → "\" (titik koma pemisah baris array tetap ";"),
+ * titik desimal pada angka → ",". Teks di dalam "…" dan nama tab di dalam '…'
+ * tidak diubah, begitu juga titik pada nama fungsi (misalnya T.TEST).
+ */
+function ubahGayaRumus_(rumus, gaya) {
+  if (gaya !== 'titikKoma') return rumus;
+  var hasil = '';
+  var kutip = null;
+  var array = 0;
+  for (var i = 0; i < rumus.length; i++) {
+    var c = rumus.charAt(i);
+    if (kutip) {
+      if (c === kutip) kutip = null; // "" dan '' di dalam kutip: tutup lalu buka lagi
+      hasil += c;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      kutip = c;
+    } else if (c === '{') {
+      array++;
+    } else if (c === '}') {
+      array = Math.max(0, array - 1);
+    } else if (c === ',') {
+      c = array > 0 ? '\\' : ';';
+    } else if (c === '.' && /[0-9]/.test(rumus.charAt(i + 1))) {
+      // Titik desimal hanya jika angka di depannya tidak menempel pada nama (huruf, _, $).
+      var j = i - 1;
+      while (j >= 0 && /[0-9]/.test(rumus.charAt(j))) j--;
+      if (j < 0 || !/[A-Za-z_$.]/.test(rumus.charAt(j))) c = ',';
+    }
+    hasil += c;
+  }
+  return hasil;
+}
+
+/**
+ * Sel yang boleh diberi rumus oleh setupSpreadsheet: kosong, berumus, berisi
+ * nilai galat, atau berisi teks bawaan tata letak. Teks lain tidak ditimpa.
+ */
+function bolehDiberiRumus_(sel, catatan, teksBawaan) {
+  if (sel.getFormula()) return true;
+  var nilai = sel.getDisplayValue();
+  if (nilai === '' || nilai === teksBawaan || /^#(ERROR!|NAME\?|REF!|N\/A|VALUE!|DIV\/0!|NUM!|NULL!)$/.test(nilai)) {
+    return true;
+  }
+  catatan.push('Peringatan: ' + sel.getSheet().getName() + '!' + sel.getA1Notation() +
+    ' berisi teks lain; rumus tidak dipasang.');
+  return false;
+}
+
+/**
+ * Membaca kembali semua sel berumus di semua tab dan mencatat sel yang
+ * menampilkan #ERROR!, #NAME?, atau #REF!.
+ */
+function periksaSelRumus_(ss, catatan) {
+  var jumlah = 0;
+  var galat = [];
+  ss.getSheets().forEach(function (sheet) {
+    if (sheet.getLastRow() === 0) return;
+    var rentang = sheet.getDataRange();
+    var rumus = rentang.getFormulas();
+    var tampil = null;
+    for (var b = 0; b < rumus.length; b++) {
+      for (var k = 0; k < rumus[b].length; k++) {
+        if (!rumus[b][k]) continue;
+        jumlah++;
+        tampil = tampil || rentang.getDisplayValues();
+        if (GALAT_RUMUS_.indexOf(tampil[b][k]) >= 0) {
+          galat.push(sheet.getName() + '!' + hurufKolom_(k + 1) + (b + 1) + ' ' + tampil[b][k]);
+        }
+      }
+    }
+  });
+  if (galat.length) {
+    catatan.push('Peringatan: ' + galat.length + ' dari ' + jumlah + ' sel berumus galat:\n    ' + galat.join('\n    '));
+  } else {
+    catatan.push('Pemeriksaan rumus: ' + jumlah + ' sel berumus, tidak ada yang menampilkan ' +
+      GALAT_RUMUS_.join(', ') + '.');
+  }
 }
 
 /* ---------- Tab berbentuk tabel (Data, Master, Log) ---------- */
@@ -4526,7 +4668,7 @@ function siapkanTabTabel_(ss, sheet, def, opsi) {
 function pasangPitaTanggal_(sheet) {
   var rentang = sheet.getRange(2, 1, Math.max(1, sheet.getMaxRows() - 1), sheet.getMaxColumns());
   pasangAturanWarna_(sheet, [SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($A2),ISEVEN(INT($A2)))')
+    .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($A2),ISEVEN(INT($A2)))'))
     .setBackground(WARNA.baja)
     .setRanges([rentang])
     .build()]);
@@ -4651,10 +4793,8 @@ function siapkanHarian_(ss, sheet, def, catatan) {
       sheet.getRange(baris[0], 1).setValue(baris[1]).setFontColor(WARNA.tintaRedup);
     });
 
-    sheet.getRange(HARIAN.barisOutlet, 2).setFormula('=IF(M_Outlet!A2="","",M_Outlet!A2)')
-      .setFontWeight('bold');
+    sheet.getRange(HARIAN.barisOutlet, 2).setFontWeight('bold');
     sheet.getRange(HARIAN.barisTanggal, 2)
-      .setFormula('=IF(B' + HARIAN.barisPilihTanggal + '="",TODAY(),B' + HARIAN.barisPilihTanggal + ')')
       .setNumberFormat(FORMAT.tanggal).setFontWeight('bold').setHorizontalAlignment('left');
 
     gayaSelPilihan_(pilihTanggal);
@@ -4676,6 +4816,17 @@ function siapkanHarian_(ss, sheet, def, catatan) {
       .setFontColor(WARNA.tintaRedup).setFontStyle('italic');
     sheet.setColumnWidths(1, lebar, 120);
     catatan.push('Tata letak dibuat: ' + sheet.getName());
+  }
+
+  // Rumus kotak info ditulis ulang tiap kali (hanya jika selnya kosong, berumus, atau galat),
+  // supaya rumus yang tidak sah untuk lokalitas file ikut diperbaiki.
+  var selOutlet = sheet.getRange(HARIAN.barisOutlet, 2);
+  if (bolehDiberiRumus_(selOutlet, catatan)) {
+    selOutlet.setFormula(rumusLokal_('=IF(M_Outlet!A2="","",M_Outlet!A2)'));
+  }
+  var selTanggal = sheet.getRange(HARIAN.barisTanggal, 2);
+  if (bolehDiberiRumus_(selTanggal, catatan)) {
+    selTanggal.setFormula(rumusLokal_('=IF(B' + HARIAN.barisPilihTanggal + '="",TODAY(),B' + HARIAN.barisPilihTanggal + ')'));
   }
 
   // Dropdown pemilih (dipasang ulang tiap kali, tidak mengubah isi sel).
@@ -4839,12 +4990,8 @@ function pasangRumusHarianStock_(ss, catatan) {
   var sheet = ss.getSheetByName('Harian_Stock');
   var mulai = HARIAN.barisJudulTabel + 1;
   var sel = sheet.getRange(mulai, 1);
-  var isiLama = String(sel.getFormula() || sel.getValue() || '');
-  if (isiLama && isiLama !== 'Belum ada data.' && isiLama.charAt(0) !== '=') {
-    catatan.push('Peringatan: A' + mulai + ' di Harian_Stock berisi teks lain; rumus stock tidak dipasang.');
-    return;
-  }
-  sel.setFormula(rumusHarianStock_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  if (!bolehDiberiRumus_(sel, catatan, 'Belum ada data.')) return;
+  sel.setFormula(rumusLokal_(rumusHarianStock_(ss))).setFontStyle('normal').setFontColor(WARNA.tinta);
   var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
   sheet.getRange(mulai, 3, tinggi, 8).setNumberFormat(FORMAT.angka);
   sheet.getRange(mulai, 1, tinggi, 1).setNumberFormat(FORMAT.bulat).setHorizontalAlignment('right');
@@ -4861,14 +5008,14 @@ function pasangRumusHarianStock_(ss, catatan) {
   var akhir = sheet.getRange(mulai, 10, tinggi, 1);
   pasangAturanWarna_(sheet, [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND($A' + mulai + '="",$B' + mulai + '<>"",$C' + mulai + '="")')
+      .whenFormulaSatisfied(rumusLokal_('=AND($A' + mulai + '="",$B' + mulai + '<>"",$C' + mulai + '="")'))
       .setBackground(WARNA.baja).setBold(true).setRanges([semua]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '<0)')
+      .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '<0)'))
       .setFontColor(WARNA.masalah).setBold(true).setRanges([akhir]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '>=0,$J' +
-        mulai + '<' + cariMin + ')')
+      .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($A' + mulai + '),ISNUMBER($J' + mulai + '),$J' + mulai + '>=0,$J' +
+        mulai + '<' + cariMin + ')'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([akhir]).build()
   ]);
   catatan.push('Rumus stock dipasang: Harian_Stock');
@@ -4922,24 +5069,24 @@ function pasangBlokStockDashboard_(ss, catatan) {
   }
   var akhirTabel = 7 + TINGGI_BLOK_STOCK;
   var rentangKet = '$F$8:$F$' + akhirTabel;
-  sheet.getRange(6, 1).setFormula('="Di bawah stok minimum: "&COUNTIF(' + rentangKet + ',"Perlu reorder")&' +
-    '" item · Stock akhir minus: "&COUNTIF(' + rentangKet + ',"Stock akhir minus")&" item · Masuk dan keluar: "&$B$3')
+  sheet.getRange(6, 1).setFormula(rumusLokal_('="Di bawah stok minimum: "&COUNTIF(' + rentangKet + ',"Perlu reorder")&' +
+    '" item · Stock akhir minus: "&COUNTIF(' + rentangKet + ',"Stock akhir minus")&" item · Masuk dan keluar: "&$B$3'))
     .setFontStyle('normal').setFontColor(WARNA.tinta);
   sheet.getRange(7, 1, 1, 6).setValues([['Item', 'Stock Akhir', 'Satuan', 'Masuk', 'Keluar', 'Keterangan']])
     .setFontWeight('bold').setFontColor(WARNA.tintaRedup).setBackground(WARNA.baja);
-  sheet.getRange(8, 1).setFormula(rumusDashboardStock_(ss));
+  sheet.getRange(8, 1).setFormula(rumusLokal_(rumusDashboardStock_(ss)));
   sheet.getRange(8, 2, TINGGI_BLOK_STOCK, 1).setNumberFormat(FORMAT.angka);
   sheet.getRange(8, 4, TINGGI_BLOK_STOCK, 2).setNumberFormat(FORMAT.angka);
   var tabel = sheet.getRange(8, 1, TINGGI_BLOK_STOCK, 6);
   pasangAturanWarna_(sheet, [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND($A8<>"",$B8="")')
+      .whenFormulaSatisfied(rumusLokal_('=AND($A8<>"",$B8="")'))
       .setBackground(WARNA.baja).setBold(true).setRanges([tabel]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=$F8="Stock akhir minus"')
+      .whenFormulaSatisfied(rumusLokal_('=$F8="Stock akhir minus"'))
       .setFontColor(WARNA.masalah).setBold(true).setRanges([tabel]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=$F8="Perlu reorder"')
+      .whenFormulaSatisfied(rumusLokal_('=$F8="Perlu reorder"'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([tabel]).build()
   ]);
   catatan.push('Rumus stock dipasang: Dashboard (blok Stock Inventory)');
@@ -4960,16 +5107,11 @@ function bawahHarian_(ss, tab, lebar) {
       'HSTACK("","Diperiksa oleh",IF(olehCek="","Belum diperiksa",olehCek&", "&jamCek),' + kosong_(lebar - 3) + ')),';
 }
 
-/** Sel A9 tab Harian: dipasang hanya jika masih kosong, "Belum ada data.", atau rumus. */
+/** Sel A9 tab Harian: dipasang hanya jika masih kosong, "Belum ada data.", rumus, atau galat. */
 function selRumusHarian_(sheet, catatan) {
   var mulai = HARIAN.barisJudulTabel + 1;
   var sel = sheet.getRange(mulai, 1);
-  var isiLama = String(sel.getFormula() || sel.getValue() || '');
-  if (isiLama && isiLama !== 'Belum ada data.' && isiLama.charAt(0) !== '=') {
-    catatan.push('Peringatan: A' + mulai + ' di ' + sheet.getName() + ' berisi teks lain; rumus tidak dipasang.');
-    return null;
-  }
-  return sel;
+  return bolehDiberiRumus_(sel, catatan, 'Belum ada data.') ? sel : null;
 }
 
 /**
@@ -4996,14 +5138,14 @@ function pasangRumusHarianWaste_(ss, catatan) {
   var sel = selRumusHarian_(sheet, catatan);
   if (!sel) return;
   var mulai = sel.getRow();
-  sel.setFormula(rumusHarianWaste_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  sel.setFormula(rumusLokal_(rumusHarianWaste_(ss))).setFontStyle('normal').setFontColor(WARNA.tinta);
   var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
   sheet.getRange(mulai, 1, tinggi, 1).setNumberFormat(FORMAT.bulat).setHorizontalAlignment('right');
   sheet.getRange(mulai, 6, tinggi, 1).setNumberFormat(FORMAT.angka);
   sheet.getRange(mulai, 9, tinggi, 1).setNumberFormat(FORMAT.rupiah);
   pasangAturanWarna_(sheet, [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=$H' + mulai + '="Total estimasi kerugian"')
+      .whenFormulaSatisfied(rumusLokal_('=$H' + mulai + '="Total estimasi kerugian"'))
       .setBackground(WARNA.baja).setBold(true).setRanges([sheet.getRange(mulai, 1, tinggi, 9)]).build()
   ]);
   catatan.push('Rumus waste dipasang: Harian_Waste');
@@ -5059,19 +5201,19 @@ function pasangRumusHarianSuhu_(ss, catatan) {
   var sel = selRumusHarian_(sheet, catatan);
   if (!sel) return;
   var mulai = sel.getRow();
-  sel.setFormula(rumusHarianSuhu_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  sel.setFormula(rumusLokal_(rumusHarianSuhu_(ss))).setFontStyle('normal').setFontColor(WARNA.tinta);
   var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
   sheet.getRange(mulai, 3, tinggi, 4).setNumberFormat(FORMAT.suhu).setHorizontalAlignment('right');
   if (sheet.getMaxColumns() < 12) sheet.insertColumnsAfter(sheet.getMaxColumns(), 12 - sheet.getMaxColumns());
   sheet.hideColumns(9, 4);
   var aturan = [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND($A' + mulai + '="",LEFT($B' + mulai + ',9)="Cek ulang")')
+      .whenFormulaSatisfied(rumusLokal_('=AND($A' + mulai + '="",LEFT($B' + mulai + ',9)="Cek ulang")'))
       .setFontColor(WARNA.tintaRedup).setRanges([sheet.getRange(mulai, 1, tinggi, 2)]).build()
   ];
   ['I', 'J', 'K', 'L'].forEach(function (bantu, i) {
     aturan.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=$' + bantu + mulai + '=TRUE')
+      .whenFormulaSatisfied(rumusLokal_('=$' + bantu + mulai + '=TRUE'))
       .setFontColor(WARNA.masalah).setBold(true).setRanges([sheet.getRange(mulai, 3 + i, tinggi, 1)]).build());
   });
   pasangAturanWarna_(sheet, aturan);
@@ -5135,18 +5277,18 @@ function pasangBlokWasteDashboard_(ss, catatan) {
       'MAP(u,LAMBDA(x,SUMIFS(' + wQ + ',' + wI + ',x,' + periode + '))),' +
       'MAP(u,LAMBDA(x,SUMIFS(' + wE + ',' + wI + ',x,' + periode + ')))),2,FALSE,4,FALSE),5,4)),';
 
-  sheet.getRange(h + 1, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
     '"Total estimasi kerugian: "&TEXT(SUMIFS(' + wE + ',' + periode + '),"""Rp ""#,##0")&" · "&' +
-    'COUNTIFS(' + periode + ',' + wI + ',"<>")&" catatan · Periode: "&$B$3)')
+    'COUNTIFS(' + periode + ',' + wI + ',"<>")&" catatan · Periode: "&$B$3)'))
     .setFontStyle('normal').setFontColor(WARNA.tinta);
 
   judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
     ['Kategori Waste', 'Catatan', 'Estimasi (Rp)', '', '5 item paling sering', 'Catatan', 'Qty', 'Estimasi (Rp)']);
-  sheet.getRange(h + 3, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+  sheet.getRange(h + 3, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
     'k,VSTACK(' + KATEGORI_WASTE.map(function (x) { return '"' + x + '"'; }).join(',') + '),' +
-    'HSTACK(k,MAP(k,LAMBDA(x,COUNTIFS(' + wK + ',x,' + periode + '))),MAP(k,LAMBDA(x,SUMIFS(' + wE + ',' + wK + ',x,' + periode + ')))))');
-  sheet.getRange(h + 3, 5).setFormula('=LET(' + AWAL_PERIODE_ + top +
-    'IF(INDEX(u,1,1)="","Belum ada waste.",top))');
+    'HSTACK(k,MAP(k,LAMBDA(x,COUNTIFS(' + wK + ',x,' + periode + '))),MAP(k,LAMBDA(x,SUMIFS(' + wE + ',' + wK + ',x,' + periode + ')))))'));
+  sheet.getRange(h + 3, 5).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ + top +
+    'IF(INDEX(u,1,1)="","Belum ada waste.",top))'));
   sheet.getRange(h + 3, 2, 5, 1).setNumberFormat(FORMAT.bulat);
   sheet.getRange(h + 3, 3, 5, 1).setNumberFormat(FORMAT.rupiah);
   sheet.getRange(h + 3, 6, 5, 1).setNumberFormat(FORMAT.bulat);
@@ -5155,16 +5297,16 @@ function pasangBlokWasteDashboard_(ss, catatan) {
 
   judulTabelDashboard_(sheet.getRange(h + 9, 1, 1, 8),
     ['Bulan', 'Estimasi (Rp)', '', '', 'Qty per minggu', '7 hari terakhir', '8–14 hari lalu', '15–21 hari lalu']);
-  sheet.getRange(h + 10, 1).setFormula('=LET(m,MAP(SEQUENCE(6),LAMBDA(i,EDATE(DATE(YEAR(TODAY()),MONTH(TODAY()),1),i-6))),' +
-    'HSTACK(m,MAP(m,LAMBDA(x,SUMIFS(' + wE + ',' + wT + ',">="&x,' + wT + ',"<"&EDATE(x,1))))))');
+  sheet.getRange(h + 10, 1).setFormula(rumusLokal_('=LET(m,MAP(SEQUENCE(6),LAMBDA(i,EDATE(DATE(YEAR(TODAY()),MONTH(TODAY()),1),i-6))),' +
+    'HSTACK(m,MAP(m,LAMBDA(x,SUMIFS(' + wE + ',' + wT + ',">="&x,' + wT + ',"<"&EDATE(x,1))))))'));
   sheet.getRange(h + 10, 1, 6, 1).setNumberFormat('mmm yyyy');
   sheet.getRange(h + 10, 2, 6, 1).setNumberFormat(FORMAT.rupiah);
   var minggu = function (a, b) {
     return 'MAP(CHOOSECOLS(top,1),LAMBDA(x,SUMIFS(' + wQ + ',' + wI + ',x,' + wT + ',">="&(TODAY()-' + b + '),' + wT + ',"<="&(TODAY()-' + a + '))))';
   };
-  sheet.getRange(h + 10, 5).setFormula('=LET(' + AWAL_PERIODE_ + top +
+  sheet.getRange(h + 10, 5).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ + top +
     'IF(INDEX(u,1,1)="","Belum ada waste.",HSTACK(MAP(CHOOSECOLS(top,1),LAMBDA(x,x&" ("&XLOOKUP(x,' + wI + ',' + wU + ',"")&")")),' +
-    minggu(0, 6) + ',' + minggu(7, 13) + ',' + minggu(14, 20) + ')))');
+    minggu(0, 6) + ',' + minggu(7, 13) + ',' + minggu(14, 20) + ')))'));
   sheet.getRange(h + 10, 6, 5, 3).setNumberFormat(FORMAT.angka);
   catatan.push('Rumus waste dipasang: Dashboard (blok Waste)');
 }
@@ -5185,16 +5327,16 @@ function pasangBlokSuhuDashboard_(ss, catatan) {
   var periode = sT + ',">="&awalP,' + sT + ',"<="&TODAY()';
   var unit = 'u,IFERROR(ARRAY_CONSTRAIN(FILTER(' + uN + ',' + uN + '<>"",' + uA + '=TRUE),10,1),""),';
 
-  sheet.getRange(h + 1, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
     'n,COUNTIFS(' + periode + ',' + sSt + ',"Di Luar Standar"),' +
-    'IF(n=0,"Semua pengecekan normal","Pengecekan di luar standar: "&n)&" · "&COUNTIFS(' + periode + ',' + sU + ',"<>")&" pengecekan · Periode: "&$B$3)')
+    'IF(n=0,"Semua pengecekan normal","Pengecekan di luar standar: "&n)&" · "&COUNTIFS(' + periode + ',' + sU + ',"<>")&" pengecekan · Periode: "&$B$3)'))
     .setFontStyle('normal').setFontColor(WARNA.tinta);
 
   judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
     ['Unit', 'Tipe', 'Pengecekan', 'Di luar standar', 'Rata-rata (°C)', 'Terendah (°C)', 'Tertinggi (°C)', 'Terakhir (°C)']);
   var per = function (rumus) { return 'MAP(u,LAMBDA(x,' + rumus + '))'; };
   var ada = 'COUNTIFS(' + sU + ',x,' + periode + ')';
-  sheet.getRange(h + 3, 1).setFormula('=LET(' + AWAL_PERIODE_ + unit +
+  sheet.getRange(h + 3, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ + unit +
     'IF(INDEX(u,1,1)="","Belum ada unit aktif.",HSTACK(u,' +
       per('XLOOKUP(x,' + uN + ',' + uT + ',"")') + ',' +
       per(ada) + ',' +
@@ -5202,21 +5344,21 @@ function pasangBlokSuhuDashboard_(ss, catatan) {
       per('IF(' + ada + '=0,"",ROUND(AVERAGEIFS(' + sS + ',' + sU + ',x,' + periode + '),1))') + ',' +
       per('IF(' + ada + '=0,"",MINIFS(' + sS + ',' + sU + ',x,' + periode + '))') + ',' +
       per('IF(' + ada + '=0,"",MAXIFS(' + sS + ',' + sU + ',x,' + periode + '))') + ',' +
-      per('IFERROR(INDEX(FILTER(' + sS + ',' + sU + '=x,' + sTs + '=MAXIFS(' + sTs + ',' + sU + ',x)),1),"")') + ')))');
+      per('IFERROR(INDEX(FILTER(' + sS + ',' + sU + '=x,' + sTs + '=MAXIFS(' + sTs + ',' + sU + ',x)),1),"")') + ')))'));
   sheet.getRange(h + 3, 3, 10, 2).setNumberFormat(FORMAT.bulat);
   sheet.getRange(h + 3, 5, 10, 4).setNumberFormat(FORMAT.suhu);
 
   sheet.getRange(h + 14, 1).setValue('Rata-rata per hari (°C)');
-  sheet.getRange(h + 14, 2).setFormula('=MAP(SEQUENCE(1,7,-6),LAMBDA(i,TODAY()+i))');
+  sheet.getRange(h + 14, 2).setFormula(rumusLokal_('=MAP(SEQUENCE(1,7,-6),LAMBDA(i,TODAY()+i))'));
   sheet.getRange(h + 14, 1, 1, 8).setFontWeight('bold').setFontColor(WARNA.tintaRedup).setBackground(WARNA.baja);
   sheet.getRange(h + 14, 2, 1, 7).setNumberFormat('d mmm');
-  sheet.getRange(h + 15, 1).setFormula('=LET(' + unit +
+  sheet.getRange(h + 15, 1).setFormula(rumusLokal_('=LET(' + unit +
     'IF(INDEX(u,1,1)="","Belum ada unit aktif.",HSTACK(u,MAKEARRAY(ROWS(u),7,LAMBDA(r,c,' +
-      'IFERROR(ROUND(AVERAGEIFS(' + sS + ',' + sU + ',INDEX(u,r,1),' + sT + ',TODAY()-7+c),1),""))))))');
+      'IFERROR(ROUND(AVERAGEIFS(' + sS + ',' + sU + ',INDEX(u,r,1),' + sT + ',TODAY()-7+c),1),""))))))'));
   sheet.getRange(h + 15, 2, 10, 7).setNumberFormat(FORMAT.suhu);
   pasangAturanWarna_(sheet, [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND(ISNUMBER($D' + (h + 3) + '),$D' + (h + 3) + '>0)')
+      .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($D' + (h + 3) + '),$D' + (h + 3) + '>0)'))
       .setFontColor(WARNA.masalah).setBold(true).setRanges([sheet.getRange(h + 3, 4, 10, 1)]).build()
   ]);
   catatan.push('Rumus suhu dipasang: Dashboard (blok Suhu Chiller & Freezer)');
