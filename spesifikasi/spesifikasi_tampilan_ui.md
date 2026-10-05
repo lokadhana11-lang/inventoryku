@@ -5,7 +5,10 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.5, 4 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.6, 5 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.5: tombol "Keluar" dan pesan keluar otomatis (Bagian 5.1 dan
+> 5.2), hapus staff yang sudah nonaktif (Bagian 5.7), dan pilihan kategori saat mengunduh
+> PDF stock (Bagian 5.5).
 > Perubahan sejak versi 1.4: cara menyimpan PDF di iPhone dan iPad (Bagian 5.5).
 > Perubahan sejak versi 1.3: tampilan untuk tablet dan aturan supaya layar tidak terpotong
 > (Bagian 4.6), aturan gerak yang ringan (Bagian 8), rel tiket sebagai garis kemajuan
@@ -83,7 +86,8 @@ ditunjukkan dengan garis tipis dan beda warna latar.
 **Laporan PDF dan tab Harian di spreadsheet**
 
 Keduanya memakai navy supaya seragam dengan website, menggantikan hijau tua di form Word.
-Tata letaknya tetap mengikuti form Word.
+Tata letaknya tetap mengikuti form Word. Di PDF stock yang berisi semua kategori, tiap
+kategori mulai di halaman baru (aturannya di spesifikasi sistem, Bagian 9.1).
 
 | Bagian | Di form Word (lama) | Di PDF dan tab Harian (baru) |
 |---|---|---|
@@ -181,7 +185,9 @@ aturan ini.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Di kiri bar: ikon buku dan nama aplikasi. Di kanan: nama pengguna dengan menu keluar.
+Di kiri bar: ikon buku dan nama aplikasi. Di kanan: nama pengguna. Klik nama itu untuk
+membuka menu berisi satu pilihan, "Keluar". Karena bar ini ada di semua layar, tombol
+"Keluar" bisa dicapai dari layar mana pun.
 
 Titik lebar hanya dua: **600 px** (kartu form menjadi dua kolom) dan **1.024 px** (bar
 navigasi pindah ke atas, tabel menggantikan kartu, dua kolom di Dashboard dan Riwayat).
@@ -303,6 +309,10 @@ Satu-satunya layar yang sepenuhnya navy.
 - Jika permintaan untuk nama itu sudah ada: "Permintaan sudah dikirim pukul 08.10."
 - **Pulihkan akses Pengelola:** tautan kecil di bagian paling bawah layar, hanya untuk
   keadaan darurat saat tidak ada Pengelola yang bisa masuk. Meminta Kode Pemasangan baru.
+- **Setelah keluar otomatis:** di atas pilihan nama tampil satu baris keterangan: "Keluar
+  otomatis karena 5 menit tidak dipakai. Isian yang belum dikirim tetap tersimpan."
+  Angka menitnya mengikuti pengaturan. Keterangan hilang setelah sebuah nama dipilih.
+  Tidak ada hitung mundur atau peringatan sebelum keluar.
 - Di tablet dan desktop, isi layar Login berada di tengah dengan lebar maksimal 420 px.
   Latar navy tetap memenuhi layar.
 
@@ -353,10 +363,11 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Status di tiket** mengikuti aturan kelengkapan: "Belum diisi", "Terkirim", atau
   "Nihil" untuk form yang ditandai tidak ada hari ini. Tiket Suhu menampilkan kemajuan,
   misalnya "7 dari 9 pengecekan".
-- **Nama pengguna dan Ganti pengguna.** Di kepala navy, di bawah nama outlet, tampil nama
-  yang sedang masuk. Ketuk untuk membuka pilihan "Ganti pengguna". Jika masih ada isian
-  di antrean: "2 isian Rina belum terkirim. Isian tetap tersimpan dan dikirim saat Rina
-  masuk lagi."
+- **Nama pengguna dan Keluar.** Di kepala navy, di bawah nama outlet, tampil nama yang
+  sedang masuk, dengan ikon panah kecil supaya terlihat bisa diketuk. Ketuk untuk membuka
+  pilihan "Keluar". Jika masih ada isian di antrean: "2 isian Rina belum terkirim. Isian
+  tetap tersimpan dan dikirim saat Rina masuk lagi." Tombol ini sebelumnya bernama
+  "Ganti pengguna".
 - **Masa simpan.** Di bawah tiket, untuk semua role: daftar "Lewat masa simpan" (tanda
   Masalah) dan "Habis besok" (tanda Perlu ditinjau), tiap baris dengan tombol "Catat
   sebagai waste". Daftar tidak tampil jika kosong.
@@ -511,6 +522,11 @@ Satu-satunya layar yang sepenuhnya navy.
 ### 5.5 Laporan
 
 - Pilih tanggal, pilih form, tombol "Unduh PDF".
+- **Kategori (hanya untuk form Stock).** Begitu form Stock dipilih, muncul pilihan ketiga
+  berlabel "Kategori". Nilai awalnya "Semua kategori"; di bawahnya daftar kategori yang
+  aktif. Pilih satu kategori untuk mengunduh PDF yang hanya berisi kategori itu. Bentuk
+  pilihannya sama dengan pilihan kategori di layar isi stock. Untuk form lain, pilihan
+  ini tidak tampil.
 - Saat PDF dibuat: tombol berubah menjadi "Membuat PDF…" dengan indikator putar.
 - **Di Android, laptop, dan desktop:** begitu PDF siap, file langsung tersimpan ke folder
   unduhan dan muncul pesan "PDF diunduh."
@@ -588,6 +604,25 @@ Satu-satunya layar yang sepenuhnya navy.
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
 - Staff yang meminta reset PIN diberi tanda Perlu ditinjau di daftar Staff.
+
+**Pengaturan → Staff dan PIN:**
+
+- Staff aktif tampil lebih dulu. Staff nonaktif tampil di bawahnya dengan tanda "Nonaktif"
+  dan teks Tinta Redup.
+- Layar ubah staff punya sakelar "Aktif" / "Nonaktif".
+- **Hapus.** Tombol "Hapus" hanya tampil di layar ubah staff yang sudah nonaktif, di bagian
+  paling bawah, berwarna Masalah, terpisah dari tombol simpan. Untuk staff yang masih
+  aktif, di tempat itu tertulis: "Nonaktifkan dulu untuk bisa menghapus."
+- Hapus meminta konfirmasi: "Hapus Rina dari daftar staff? Namanya tetap tampil di riwayat.
+  Tindakan ini tidak bisa dibatalkan dari aplikasi." Tombolnya "Hapus" dan "Batal".
+- Setelah dihapus, nama itu hilang dari daftar dan muncul pesan "Rina dihapus dari daftar
+  staff."
+
+**Pengaturan → Outlet dan jadwal:**
+
+- Selain nama outlet, zona waktu, jam closing, dan jadwal stock opname, ada pilihan
+  "Keluar otomatis setelah tidak dipakai": 5, 10, 15, atau 30 menit. Nilai awalnya 5 menit.
+  Di bawahnya satu baris keterangan: "Berlaku untuk semua pengguna di semua perangkat."
 
 **Pengaturan → Item:**
 
@@ -735,7 +770,12 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Tandai nihil | Tombol "Tidak ada hari ini", lalu "Waste ditandai nihil untuk hari ini." |
 | Tawaran cek ulang | "Suhu Chiller 2 di luar standar. Catat cek ulang setelah tindakan korektif." |
 | Masa simpan | "Sauce bolognese: sekitar 1,5 liter lewat masa simpan (baik sampai 4 Okt)." |
-| Ganti pengguna | "Keluar dari akun Rina?" dengan tombol "Ganti pengguna" |
+| Keluar | "Keluar dari akun Rina?" dengan tombol "Keluar" dan "Batal" |
+| Keluar otomatis (di layar Login) | "Keluar otomatis karena 5 menit tidak dipakai. Isian yang belum dikirim tetap tersimpan." |
+| Hapus staff | "Hapus Rina dari daftar staff? Namanya tetap tampil di riwayat. Tindakan ini tidak bisa dibatalkan dari aplikasi." |
+| Staff dihapus | "Rina dihapus dari daftar staff." |
+| Staff masih aktif | "Nonaktifkan dulu untuk bisa menghapus." |
+| Pilihan kategori di Laporan | Label "Kategori", nilai awal "Semua kategori" |
 | Tanggal ditolak | "Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini." |
 | Opname tersimpan | "Opname tersimpan. 3 item diluruskan." |
 | Kemajuan hari ini | "1 dari 4 form terisi" |
@@ -841,7 +881,7 @@ di tiap kartu setiap kali layar dibuka, dan gerak hiasan yang berulang tanpa hen
 
 ## 11. Keputusan yang Sudah Ditetapkan
 
-Ditetapkan pemilik sistem pada 3 dan 4 Oktober 2026. Tidak ada butir terbuka.
+Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 
 | Topik | Keputusan |
 |---|---|
@@ -857,3 +897,7 @@ Ditetapkan pemilik sistem pada 3 dan 4 Oktober 2026. Tidak ada butir terbuka.
 | Momen selesai | Rel menyala penuh dan tulisan "Semua form hari ini sudah terisi" |
 | Grafik di Dashboard aplikasi | Dua grafik kecil: waste 7 hari terakhir dan suhu hari ini (Bagian 5.6) |
 | Unduh PDF di iPhone dan iPad | Dua langkah: "Unduh PDF", lalu "Simpan PDF" lewat lembar bagikan (Bagian 5.5) |
+| Tombol keluar | Bernama "Keluar", di menu nama pengguna: kepala Beranda di HP dan tablet, bar atas di desktop |
+| Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
+| Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
+| PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |

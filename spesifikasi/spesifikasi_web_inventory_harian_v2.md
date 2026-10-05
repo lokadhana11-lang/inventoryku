@@ -14,6 +14,8 @@
 > Disesuaikan dengan spesifikasi tampilan versi 1.4: tampilan untuk tablet, kemajuan hari
 > ini di Beranda, dan dua grafik kecil di Dashboard aplikasi.
 > Ditambah aturan unduh PDF di iPhone dan iPad (Bagian 9.1).
+> Diperbarui 5 Oktober 2026: tombol Keluar dan keluar otomatis (Bagian 7.2), hapus staff
+> yang sudah nonaktif (Bagian 5.1), dan PDF stock per kategori (Bagian 9.1).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -79,7 +81,9 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Role | Dua tingkat: **Staff** dan **Pengelola** (Head Kitchen, Manager) |
 | Hak Staff | Mengisi form (Stock Inventory, Suhu, Prep List, Waste, dan form kustom yang aktif), melihat riwayat, melaporkan kekeliruan, dan mengunduh laporan PDF per form |
 | Hak Pengelola | Mengakses dan mengubah seluruh sistem |
-| Login | PIN 6 angka, dibuat oleh Manager/Head Kitchen. Sesi berlaku 12 jam. Ada tombol "Ganti pengguna" untuk HP yang dipakai bergantian. |
+| Login | PIN 6 angka, dibuat oleh Manager/Head Kitchen. Sesi berlaku paling lama 12 jam. Ada tombol "Keluar" untuk perangkat yang dipakai bergantian. |
+| Keluar otomatis | Aplikasi keluar sendiri setelah 5 menit tidak dipakai, untuk semua role. Lamanya bisa diubah Pengelola. Isian yang belum dikirim tidak hilang (Bagian 7.2). |
+| Menghapus staff | Hanya untuk staff yang sudah nonaktif. Namanya hilang dari aplikasi, tetapi tetap terbaca di riwayat (Bagian 5.1). |
 | Tanggal isian | Staff boleh mengisi untuk hari ini dan kemarin. Tanggal lebih lama hanya Pengelola. Tanggal masa depan ditolak. |
 | PWA | Perlu |
 | Jam closing | 21:30 |
@@ -102,7 +106,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Gerakan barang | Setiap gerakan dicatat sekali, di form asalnya: barang datang di Stock Masuk, prep di Prep List, barang terbuang di Form Waste, pemakaian langsung di Stock Keluar |
 | Resep | Pengelola mengisi Master Resep. Prep List diisi dalam jumlah resep; stock barang jadi bertambah dan stock bahan berkurang otomatis (Bagian 5.3). |
 | Satuan | Satu item satu satuan dasar, tanpa konversi umum (kg ke gr). Satuan besar opsional per item untuk barang datang, misalnya 1 dus = 12 botol (Bagian 5.1). |
-| Kategori stock | Dikelola Pengelola. Form, tab Harian, dan PDF stock tersusun per kategori. |
+| Kategori stock | Dikelola Pengelola. Form, tab Harian, dan PDF stock tersusun per kategori. PDF stock bisa diunduh untuk satu kategori saja (Bagian 9.1). |
 | Nominal waste | Estimasi kerugian (Rp) = qty × harga satuan. Harga satuan diisi Pengelola di master Item. |
 | Waste dan stock | Waste punya form sendiri dan langsung mengurangi stock. Stock Keluar yang diketik staff hanya pemakaian langsung, di luar prep dan waste. |
 | Koreksi data | Hanya oleh Pengelola. Staff tidak bisa mengubah data setelah submit. |
@@ -284,7 +288,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 |---|---|---|
 | `M_Outlet` | Nama Outlet, Email Penerima Laporan (bisa lebih dari satu) | Nama di form dan laporan, penerima email |
 | `M_Unit` | Nama Unit, Tipe (Chiller/Freezer), Aktif | Dropdown unit, validasi suhu |
-| `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
+| `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
 | `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang |
 | `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
@@ -292,7 +296,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Form` | ID Form, Nama, Jenis (bawaan / kustom), Keterangan, Jadwal (harian / hari tertentu / sewaktu-waktu), Urutan, Aktif | Daftar form yang tampil di Beranda, Riwayat, dan Laporan |
 | `M_FormKolom` | ID Form, Urutan, Label, Jenis Kolom, Pilihan, Wajib, Bagian (kepala / baris), Aktif | Susunan kolom tiap form kustom |
 | `M_Satuan` | Satuan, Jenis (Berat / Isi / Hitungan / Kemasan), Aktif | Daftar satuan yang sah |
-| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan | Trigger terjadwal, validasi suhu, pengingat opname |
+| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis |
 
 **Daftar satuan awal** (diisi `setupSpreadsheet`; Pengelola bisa menambah):
 
@@ -323,9 +327,26 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 **Aturan menonaktifkan master:**
 
 - Master tidak pernah dihapus, hanya dinonaktifkan, supaya riwayat tetap terbaca.
+  Satu-satunya yang punya tombol "Hapus" adalah staff, dengan aturan di bawah.
 - Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif.
 - Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan.
 - Satuan dasar sebuah item tidak bisa diganti setelah item itu punya catatan stock.
+
+**Menonaktifkan dan menghapus staff:**
+
+- **Staff nonaktif** tidak tampil di layar Login dan tidak bisa masuk. Ia masih tampil di
+  Pengaturan → Staff dengan tanda "Nonaktif" dan bisa diaktifkan lagi.
+- Pengelola aktif yang terakhir tidak bisa dinonaktifkan, supaya selalu ada yang bisa
+  mengelola sistem.
+- **Menghapus staff** hanya bisa dilakukan pada staff yang sudah nonaktif. Staff yang
+  dihapus hilang dari Pengaturan → Staff dan dari layar Login.
+- Barisnya **tetap ada** di `M_Staff`: kolom Dihapus diisi waktunya dan hash PIN-nya
+  dikosongkan. Karena itu nama staff tersebut tetap terbaca di Riwayat, laporan PDF, dan
+  `Log_Perubahan`. Permintaan reset PIN miliknya ditutup.
+- Hapus tidak bisa dibatalkan dari aplikasi. Pemilik Sheet bisa memulihkannya dengan
+  mengosongkan kolom Dihapus; staff itu kembali sebagai staff nonaktif dan PIN-nya harus
+  dibuat ulang.
+- Nama yang sama boleh dipakai untuk staff baru. Staff baru itu menjadi akun tersendiri.
 
 ### 5.2 Form Pengecekan Suhu Chiller & Freezer
 
@@ -740,7 +761,7 @@ misalnya "2 dari 3 isian diperiksa".
 | Melihat dashboard di aplikasi dan membuka dashboard di Google Sheets | Tidak | Ya |
 | Membuat, mengubah, menyembunyikan, dan menghapus form (Pengaturan → Form) | Tidak | Ya |
 | Mengganti nama outlet | Tidak | Ya |
-| Mengelola staff dan PIN | Tidak | Ya |
+| Mengelola staff dan PIN, termasuk menonaktifkan dan menghapus staff | Tidak | Ya |
 | Mengatur penerima email | Tidak | Ya |
 | Mengelola master data (item, resep, unit, kategori, satuan) dan konfigurasi | Tidak | Ya |
 
@@ -753,9 +774,25 @@ Role diperiksa di **server** pada setiap permintaan, bukan hanya disembunyikan d
 - Staff memilih nama, memasukkan PIN, lalu server mengembalikan token sesi beserta role.
 - PIN disimpan sebagai hash, bukan angka aslinya.
 - Lima kali salah PIN berturut-turut mengunci akun staff tersebut selama 15 menit.
-- Token sesi berlaku 12 jam; setelah habis, staff login ulang.
-- **HP yang dipakai bergantian.** Tombol "Ganti pengguna" di Beranda mengeluarkan pengguna
-  saat ini dan kembali ke layar Login. Draft dan antrean kirim disimpan per pengguna.
+- Token sesi berlaku paling lama 12 jam; setelah habis, staff login ulang.
+- **Tombol "Keluar".** Tombol ini mengeluarkan pengguna saat ini dan kembali ke layar
+  Login: token dihapus dari perangkat. Tombol tersedia untuk semua role di semua ukuran
+  layar (letaknya di spesifikasi tampilan). Draft dan antrean kirim disimpan per pengguna.
+  Tombol ini sebelumnya bernama "Ganti pengguna".
+- **Keluar otomatis.** Jika aplikasi tidak dipakai selama 5 menit, aplikasi keluar sendiri
+  dengan cara yang sama seperti tombol "Keluar", lalu layar Login menampilkan alasannya.
+  Aturannya:
+  - "Tidak dipakai" berarti tidak ada ketukan, klik, ketikan, atau guliran di aplikasi.
+  - Dihitung di perangkat. Saat aplikasi dibuka lagi dari latar belakang atau layar HP
+    dinyalakan lagi, aplikasi membandingkan jam sekarang dengan jam terakhir dipakai.
+  - Berlaku untuk semua role, dengan atau tanpa sinyal.
+  - Hitungan tidak berjalan selama aplikasi sedang mengirim isian atau membuat PDF, dan
+    mulai lagi dari nol setelah proses itu selesai.
+  - Isian yang sedang diketik tersimpan sebagai draft milik pengguna itu dan tampil lagi
+    setelah ia login. Isian di antrean tetap menunggu sesuai aturan di bawah.
+  - Lamanya disimpan di `M_Konfigurasi` dan bisa diubah Pengelola dari Pengaturan:
+    5, 10, 15, atau 30 menit. Nilai awalnya 5 menit. Nilai ini ikut dikirim saat login
+    dan disimpan di perangkat, supaya tetap berlaku saat offline.
 - **Antrean dan sesi.** Isian di antrean selalu dikirim atas nama pengisinya. Jika sesinya
   sudah habis saat sinyal kembali, isian menunggu sampai pengguna itu login lagi, dan
   aplikasi menampilkan pengingatnya. Isian tidak pernah hilang karena sesi habis.
@@ -927,6 +964,10 @@ PDF **tidak** dibuat pada setiap submit: lambat, file menumpuk, dan nama file be
 2. **Unduh oleh pengguna.** Staff dan Pengelola memilih tanggal dan form di menu Laporan,
    lalu menekan "Unduh PDF". Server mengirim isi PDF ke aplikasi. Tombol yang sama
    tersedia di menu Riwayat. Unduhan ini tidak menambah file baru di Drive.
+   - **Stock per kategori.** Untuk form Stock, pengguna juga memilih kategori: "Semua
+     kategori" atau satu kategori. Jika satu kategori dipilih, PDF hanya berisi item
+     kategori itu. Daftar pilihannya adalah kategori yang aktif, menurut urutannya di
+     `M_Kategori`. Tombol unduh di menu Riwayat selalu mengunduh semua kategori.
    - **Android, laptop, dan desktop:** browser langsung menyimpan PDF sebagai file di
      folder unduhan.
    - **iPhone dan iPad:** unduhan biasa (tautan unduh atau jendela baru) tidak dipakai.
@@ -944,7 +985,8 @@ PDF **tidak** dibuat pada setiap submit: lambat, file menumpuk, dan nama file be
    - **Jika berbagi file tidak didukung** (iPhone lama), aplikasi menampilkan pesan agar
      pengguna membuka alamat website di Safari dan mengunduh dari sana. Di Safari,
      unduhan biasa berjalan normal.
-   - Nama file: `{YYYY-MM-DD}_{NamaForm}.pdf`.
+   - Nama file: `{YYYY-MM-DD}_{NamaForm}.pdf`. Untuk stock satu kategori:
+     `{YYYY-MM-DD}_Stock_{NamaKategori}.pdf`.
    - Aturan ini berlaku untuk semua unduhan PDF: laporan harian, laporan selisih
      opname, daftar belanja, dan rekap bulanan.
 3. **Simpan ulang ke Drive** (khusus Pengelola), dipakai setelah ada koreksi data.
@@ -954,6 +996,17 @@ PDF **tidak** dibuat pada setiap submit: lambat, file menumpuk, dan nama file be
    terbatas, jadi template dibuat sederhana (tabel biasa). PDF stock memakai rekap
    harian dan dikelompokkan per kategori. Form kustom memakai satu template umum: judul,
    kotak info, tabel sesuai kolomnya, dan baris "Diperiksa oleh".
+   - **PDF stock semua kategori:** tiap kategori mulai di halaman baru, dengan judul
+     laporan, tanggal, nama kategori, dan baris judul tabel diulang di halaman itu.
+     Kategori yang tidak punya rekap pada tanggal itu dilewati.
+   - Pemisah halaman dibuat dengan aturan CSS `page-break-before`. Dukungannya pada
+     konversi ini belum dipastikan, jadi harus diuji saat dibangun. Jika tidak dipatuhi,
+     PDF semua kategori tetap satu tabel bersambung dengan baris judul kategori, dan
+     unduhan satu kategori menjadi cara untuk mendapat laporan terpisah.
+   - **PDF stock satu kategori:** tata letaknya sama, hanya berisi kategori itu, dan nama
+     kategorinya tertulis di kotak info.
+   - PDF harian otomatis (ke Drive dan lampiran email) tetap satu file Stock berisi semua
+     kategori, supaya lampiran email tidak bertambah banyak.
 5. **Lokasi di Drive:**
    `Laporan Kitchen/{Nama Outlet}/{Tahun}/{Bulan}/{YYYY-MM-DD}_{NamaForm}_{HHmm}.pdf`
    Format tanggal `YYYY-MM-DD` membuat file terurut. Jam di nama file mencegah tabrakan
@@ -1077,7 +1130,12 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 **Akses**
 
 - [ ] **Staff boleh mengisi untuk hari ini dan kemarin.** Tanggal lebih lama hanya Pengelola.
-- [ ] **PIN 6 angka dan sesi 12 jam.**
+- [ ] **PIN 6 angka dan sesi paling lama 12 jam.**
+- [ ] **Keluar otomatis setelah 5 menit tidak dipakai**, untuk semua role. Staff perlu
+      mengetik PIN lagi setiap kali HP sempat ditinggal. Jika terasa terlalu sering,
+      Pengelola bisa menaikkannya menjadi 10, 15, atau 30 menit dari Pengaturan.
+- [ ] **Menghapus staff** hanya menyembunyikan namanya dari aplikasi. Barisnya tetap ada
+      di spreadsheet, dan pemulihannya hanya bisa dilakukan pemilik Sheet.
 - [ ] **Hanya Pengelola** yang melihat nilai rupiah stock, daftar belanja, rekap bulanan,
       dan yang melakukan stock opname.
 - [ ] **Nominal waste (Rp) terlihat oleh staff** di form waste. Jika harga sebaiknya hanya
@@ -1109,8 +1167,9 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
    - Siapkan repo dan GitHub Pages untuk frontend
    - **Uji panggilan API dari halaman di hosting, lewat HP sungguhan** (memastikan batasan CORS teratasi)
 1. **Tahap 1 — Kerangka PWA dan akses:** manifest, service worker, layar pemasangan
-   pertama (Kode Pemasangan, nama outlet), login PIN 6 angka, sesi 12 jam, Ganti pengguna,
-   Lupa PIN, role, deteksi zona waktu otomatis, halaman Pengaturan → Staff (buat/reset PIN)
+   pertama (Kode Pemasangan, nama outlet), login PIN 6 angka, sesi 12 jam, tombol Keluar,
+   keluar otomatis, Lupa PIN, role, deteksi zona waktu otomatis, halaman Pengaturan →
+   Staff (buat/reset PIN, nonaktifkan, hapus)
    dan Pengaturan → Penerima Email. Tata letak untuk HP, tablet, dan desktop serta aturan
    gerak dibangun di tahap ini sebagai pola bersama untuk semua layar berikutnya.
 2. **Tahap 2 — Form Stock Inventory Harian:** form responsif per kategori, catatan gerakan
@@ -1121,8 +1180,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
 3. **Tahap 3 — Riwayat, pemeriksaan, dan koreksi:** menu Riwayat untuk Stock Inventory
    (catatan gerakan, rekap harian, riwayat per item), Laporkan Kekeliruan, status
    Terkirim/Diperiksa, kunci data, koreksi berantai, `Log_Perubahan`
-4. **Tahap 4 — Laporan dan email:** menu Laporan (Unduh PDF, termasuk cara simpan di
-   iPhone), simpan ke Drive, trigger harian sekitar 22:15, email laporan harian, cadangan
+4. **Tahap 4 — Laporan dan email:** menu Laporan (Unduh PDF, termasuk pilihan kategori
+   untuk stock dan cara simpan di iPhone), simpan ke Drive, trigger harian sekitar 22:15, email laporan harian, cadangan
    otomatis mingguan
 5. **Tahap 5 — Form Waste dan Suhu:** Waste dulu (langsung mengurangi stock), lalu Suhu
    dengan cek ulang. Tiap form langsung masuk ke menu Riwayat, Laporan, dan email harian.
@@ -1196,8 +1255,12 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
 - Nilai stock dan nilai bahan terpakai di dashboard (Bagian 8.5)
 - Daftar belanja otomatis dengan saran order (Bagian 9.2)
 - Rekap bulanan PDF (Bagian 9.3) dan cadangan otomatis mingguan (Bagian 9.4)
-- Aturan tanggal isian, PIN 6 angka, sesi 12 jam, dan Ganti pengguna (Bagian 5.0, 7.2)
+- Aturan tanggal isian, PIN 6 angka, sesi 12 jam, dan tombol Keluar (Bagian 5.0, 7.2)
 - Tampilan untuk tablet, kemajuan hari ini di Beranda, dan dua grafik kecil di Dashboard
   aplikasi (Bagian 5.8, 8.5, 11; rinciannya di spesifikasi tampilan)
 - Unduh PDF di iPhone dan iPad lewat lembar bagikan (Bagian 9.1)
+- Keluar otomatis setelah 5 menit tidak dipakai, dan tombol "Ganti pengguna" berganti nama
+  menjadi "Keluar" (Bagian 7.2)
+- Hapus staff yang sudah nonaktif, tanpa menghapus barisnya di spreadsheet (Bagian 5.1)
+- PDF stock per kategori: unduh satu kategori, dan satu halaman per kategori (Bagian 9.1)
 - Opsional: foto bukti waste, arsip tahunan
