@@ -109,6 +109,15 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   menjawab juga `peringatanSistem: [teks]`. `riwayat.daftarForm[]` dan `detailKiriman` ditambah
   `adaPdf`. Fungsi yang dijalankan dari editor atau trigger: `kirimLaporanHarian`, `buatCadangan`,
   `pasangTrigger`, `kirimLaporanSekarang`, dan (5 Oktober 2026) `ujiPemisahHalamanPdf`.
+- Aksi Tahap 5 (bertoken): `formWaste {tanggal}` → `{ tanggal, kategoriWaste, shift, item: [{ nama, kategori, satuan,
+  harga }], kiriman: { jumlah, terakhir, totalRp, baris: [{ item, kategori, qty, satuan, estimasi, oleh, waktu }] }, nihil }`;
+  `kirimWaste {submissionId, tanggal, shift, waktuPerangkat, baris: [{ item, kategori, qty, alasan }]}` → `{ sudahTerkirim,
+  jumlah, form }`; `formSuhu {tanggal}` → `{ tanggal, waktuCek, batas: { chillerMin, chillerMaks, freezerMaks }, unit: [{ nama,
+  tipe }], isian: [{ unit, tipe, waktuCek, suhu, status, tindakan, oleh, waktu }] }`; `kirimSuhu {submissionId, tanggal,
+  waktuCek, waktuPerangkat, baris: [{ unit, suhu, tindakan }]}` → `{ sudahTerkirim, jumlah, luarStandar, form }`.
+  `riwayat` dan `detailKiriman` ditambah `gerakStock`; `riwayat.pilihan` ditambah `labelItem` (Item | Unit); `kolom[]` boleh
+  berjenis `rupiah` dan `status` dan membawa `minus`, `akhiran`, `pilihan`, `ringkas`; `peristiwa[]` ditambah jenis
+  `terlewat { tanggal, kurang: [teks], total }` (Suhu).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -123,7 +132,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai dan digabung (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp) |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
 | 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
-| 5 | Form Waste dan Suhu | Belum |
+| 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 6 | Prep List dan resep | Belum |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
 | 8 | Stock opname dan daftar belanja | Belum |
@@ -525,7 +534,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dari isi PDF, lalu mengisi property itu ("ya" untuk 3 halaman, "tidak" untuk 1); jika jumlahnya
     tidak terbaca, pemilik memeriksa filenya dan mengisi property sendiri. Unduh dari Riwayat, Simpan
     ulang ke Drive, PDF harian, dan lampiran email selalu satu file Stock berisi semua kategori.
-78. **Versi:** Code.gs v0.5.3, aplikasi 0.5.1 (perbaikan di atas Tahap 4, belum Tahap 5).
+78. **Versi:** Code.gs v0.5.3, aplikasi 0.5.1 (perbaikan di atas Tahap 4). Sejak Tahap 5 lihat butir 80.
 79. **Baris baru tepat di bawah baris terakhir yang kolom kuncinya terisi** (v0.5.2, diperketat
     v0.5.3). Kotak centang yang tidak dicentang menyimpan FALSE dan dropdown bisa berisi pilihan
     tanpa data; `getLastRow()` menghitung keduanya, sehingga staff dari Pengaturan sempat tertulis di
@@ -540,3 +549,77 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     baris tanpa kunci berisi pilihan dropdown) dan setiap kali staff ditambah. Tab master yang belum
     ditulis aplikasi (`M_Item`, `M_Kategori`, `M_Unit`, `M_Resep`, `M_ResepBahan`, `M_FormKolom`)
     memakai cara yang sama saat ditulis dari Pengaturan di Tahap 7 dan 9.
+
+### Tahap 5
+
+80. **Versi:** Code.gs v0.6, aplikasi 0.6.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js).
+81. **Foto bukti waste** (opsional di spesifikasi) belum dibangun: butuh unggahan ke Drive dan ruang di HP, jadi digabung
+    dengan Tahap 11 (opsional: foto bukti waste). Kolom `Foto Bukti` di `Data_Waste` sudah ada dan dibiarkan kosong.
+82. **Layar Waste** (`#/waste`): Tanggal (Hari ini, Kemarin, Pengelola "Tanggal lain"), Shift (Pagi, Siang, Malam; wajib),
+    "Tambah item" membuka lembar pencarian item aktif. Per item: Kategori waste (lima tombol), Qty (satuan dari `M_Item`),
+    Alasan / keterangan (wajib hanya untuk Lainnya, paling panjang 200 huruf), dan Estimasi kerugian yang langsung dihitung
+    (Qty × Harga Satuan; "Harga satuan belum diisi Pengelola" jika harga kosong). HP dan tablet: hanya item yang sedang diisi
+    yang terbuka; item lain satu baris ringkas ("Rusak · 2 kg · Rp 90.000", tanda "Belum lengkap" jika kurang), ketuk untuk
+    membuka. Laptop/desktop: tabel (No, Item / Produk, Kategori waste, Qty, Alasan / keterangan, Estimasi kerugian, hapus).
+    Satu kiriman berisi semua item dengan satu shift; boleh berkali-kali sehari. Draft per pengguna `draft:waste`
+    (tanggal, shift, baris, item terbuka, submissionId); jawaban terakhir di `cache:waste`.
+83. **Data_Waste:** satu baris per item. Satuan dan Harga Satuan disalin dari `M_Item` saat dicatat; Estimasi Kerugian =
+    pembulatan Qty × Harga Satuan (kosong jika harga kosong), dihitung server. Qty harus lebih dari 0 (paling banyak 3 angka
+    di belakang koma, butir 35). Urutan tab: tanggal terbaru, nama item, waktu kirim. Setelah ditulis, `hitungUlangStock_`
+    untuk item itu mulai tanggal waste, jadi rekap hari itu dibuat jika belum ada dan Stock Akhir sesudahnya ikut turun.
+84. **Koreksi Waste** (Riwayat): Kategori waste (tombol pilihan), Qty, dan Alasan. Item dan tanggal tidak bisa dikoreksi.
+    Estimasi dihitung ulang dari Harga Satuan yang tercatat di baris itu (bukan harga sekarang) dan ikut tercatat di
+    `Log_Perubahan`; Lainnya tanpa alasan ditolak; lalu `hitungUlangStock_`. `RIWAYAT_FORM` mendapat `turunan` (kolom yang
+    dihitung dari kolom lain setelah koreksi) dan `periksaKoreksi` (aturan isian yang sama dengan kiriman), dipakai juga Suhu
+    dan form berikutnya. Kolom berjenis `rupiah` tampil "Rp 90.000"; tabel detail hanya punya kolom Satuan jika ada kolom
+    angka bersatuan.
+85. **Layar Suhu** (`#/suhu`): Tanggal, lalu Waktu cek (Opening, Middle, Closing, Cek ulang; yang sudah diisi untuk semua unit
+    aktif diberi centang). Pilihan awal: waktu cek pertama yang belum lengkap. Satu kartu per unit aktif (urutan `M_Unit`):
+    nama, tipe, batas normal, pengecekan yang sudah tercatat hari itu ("Opening 07.10: 4 °C, normal · Rina", cek ulang
+    menjorok di bawahnya, tindakan korektif di bawah suhu yang di luar standar), lalu kolom suhu dengan tombol ± (Freezer mulai
+    dengan "-"). Status tampil langsung di HP (perhitungan sama dengan server; yang disimpan tetap hitungan server); di luar
+    standar: kartu bertanda Masalah dan kolom Tindakan korektif muncul (wajib). Unit yang waktu ceknya sudah diisi atau masih
+    menunggu kirim di antrean tampil sebagai teks. Setelah kiriman berisi suhu di luar standar: pesan "Suhu Chiller 2 di luar
+    standar. Catat cek ulang setelah tindakan korektif." dan tombol "Catat cek ulang" di kartu unit yang pengecekan terakhirnya
+    di luar standar (memilih Cek ulang dan memfokuskan kolom unit itu). Unit yang dikosongkan tidak dikirim (Freezer yang
+    hanya berisi "-" dianggap kosong), jadi satu waktu cek boleh diisi bertahap. Laptop/desktop: tabel (No, Unit, Tipe, Batas
+    normal, Tercatat hari ini, Suhu, Tindakan korektif). Tidak ada tanda nihil. Draft `draft:suhu` (per waktu cek, per unit),
+    `cache:suhu`.
+86. **Data_Suhu:** satu baris per unit per kiriman. Opening, Middle, dan Closing sekali per unit per tanggal: jika salah satu
+    unit dalam kiriman sudah punya isian waktu cek itu, seluruh kiriman ditolak ("Suhu Opening Chiller 1 sudah diisi Rina pukul
+    07.10."), supaya tidak ada kiriman setengah masuk. Cek ulang boleh berkali-kali. Status (Normal / Di Luar Standar) dihitung
+    server dari `M_Konfigurasi` (`suhu_chiller_min`, `suhu_chiller_maks`, `suhu_freezer_maks`; nilai kosong atau salah memakai 1,
+    5, −18): Chiller normal jika di antara batas (termasuk), Freezer normal jika sama dengan atau lebih rendah. Suhu menerima
+    koma, titik, "-" dan "−"; di luar −60 sampai 60 ditolak. Unit dibaca dari `M_Unit` (Tipe selain Freezer dianggap
+    Chiller). Urutan tab: tanggal terbaru, nama unit, waktu kirim. Tidak ada email seketika.
+87. **Koreksi Suhu:** Suhu (dengan tombol ±) dan Tindakan korektif. Status dihitung ulang dengan batas yang berlaku saat
+    koreksi dan ikut tercatat di `Log_Perubahan`; suhu di luar standar tanpa tindakan ditolak. Riwayat Suhu memakai filter
+    "Unit" (dari `M_Unit`) menggantikan Item, tanpa kategori. **Pengecekan terlewat** (Bagian 6.1): untuk tiap tanggal sejak
+    isian Suhu pertama sampai kemarin, Riwayat menampilkan baris "Terlewat: 5 dari 9 pengecekan tidak diisi" dengan daftar unit
+    dan waktu ceknya (unit aktif sekarang × Opening/Middle/Closing). Tidak tampil saat filter pengisi atau status dipakai.
+88. **PDF:** Waste: No, Nama Staff, Shift, Item / Produk, Kategori Waste, Qty, Satuan, Alasan, Estimasi Kerugian (Rp), urut waktu
+    kirim, baris total di bawah, kotak info "Jumlah item". Suhu: satu baris per unit (unit aktif ditambah unit yang punya isian),
+    Opening/Middle/Closing berisi suhu dan jam diterima ("belum diisi" jika kosong), di luar standar merah tebal dengan `*`;
+    tiap cek ulang satu baris di bawah unitnya; kotak info "Batas normal". Unduh menolak tanggal tanpa isian.
+89. **Email harian:** lampiran PDF juga untuk form berstatus Sebagian (Suhu yang belum lengkap tetap dilampirkan). Bagian
+    "Suhu": daftar pengecekan di luar standar (unit, waktu cek, jam, suhu, tindakan, hasil cek ulang sesudahnya),
+    "Semua 9 pengecekan normal.", atau "Belum ada pengecekan suhu.". Bagian "Waste": jumlah item, total estimasi
+    kerugian, dan rincian per item.
+90. **Harian_Waste** (rumus A9): satu baris per item waste pada tanggal B5, urut waktu kirim, baris "Total estimasi kerugian"
+    (latar Baja, tebal), lalu Diisi oleh dan Diperiksa oleh. **Harian_Suhu** (rumus A9): satu baris per unit (unit aktif menurut
+    urutan `M_Unit`, ditambah unit yang punya isian hari itu) dengan suhu Opening, Middle, Closing, Nama Staff, dan Tindakan
+    Korektif ("Opening: …"); tiap cek ulang menjadi baris sendiri di bawah unitnya ("Cek ulang 15.40" di kolom Tipe, suhunya di
+    kolom Cek ulang). Kolom I–L (disembunyikan) berisi TRUE/FALSE "di luar standar" untuk kolom C–F, dipakai sorotan merah
+    tebal, sehingga sorotan mengikuti status yang tersimpan. Rumus memakai LET/LAMBDA/MAP/REDUCE/MAKEARRAY seperti Harian_Stock.
+91. **Dashboard:** blok Waste diberi ruang 17 baris (`TINGGI_BLOK_WASTE`) dan blok Suhu 26 baris (`TINGGI_BLOK_SUHU`) dengan
+    menyisipkan baris sebelum blok berikutnya (hanya sekali; `ruangBlokDashboard_` mencari judul blok di kolom A). Waste
+    (periode B3): ringkasan total estimasi; tabel per kategori waste (catatan, estimasi); 5 item paling sering (catatan, qty,
+    estimasi); estimasi per bulan 6 bulan terakhir (tidak mengikuti B3); qty 5 item itu per minggu (7 hari terakhir, 8–14, dan
+    15–21 hari lalu) sebagai "tren per item". Suhu (periode B3): ringkasan jumlah di luar standar; per unit aktif (paling banyak
+    10): jumlah cek, di luar standar (merah jika > 0), rata-rata, terendah, tertinggi, suhu terakhir; lalu rata-rata suhu per
+    unit per hari selama 7 hari terakhir.
+92. **Layar bersama Tahap 5** (app.js): `pilihanTanggalIsian`, `tanggalDraft`, `formatRupiah`, `bacaAngkaSuhu`; kelas CSS
+    `tombol-ikon` (hapus baris, 48 px), `tombol-tanda` (±), `deret-tambah`. Tiket Waste dan Suhu di Beranda membuka layarnya
+    (`LAYAR_FORM`). Laporan PDF Waste dan Suhu otomatis aktif di menu Laporan dan detail Riwayat karena terdaftar di
+    `LAPORAN_PDF`.
+

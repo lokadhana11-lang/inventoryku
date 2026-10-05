@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.5.3 (Tahap 4 + perubahan 5 Oktober 2026)
+// InventoryKu Code.gs v0.6 (Tahap 5)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -39,7 +39,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.5.3';
+var VERSI_KODE = 'v0.6';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -82,6 +82,10 @@ var AKSI_ = {
   kirimStock: { jalankan: aksiKirimStock_ },
   tandaiNihil: { jalankan: aksiTandaiNihil_ },
   sesuaikanStock: { jalankan: aksiSesuaikanStock_, pengelola: true },
+  formWaste: { jalankan: aksiFormWaste_ },
+  kirimWaste: { jalankan: aksiKirimWaste_ },
+  formSuhu: { jalankan: aksiFormSuhu_ },
+  kirimSuhu: { jalankan: aksiKirimSuhu_ },
   riwayat: { jalankan: aksiRiwayat_ },
   detailKiriman: { jalankan: aksiDetailKiriman_ },
   riwayatItem: { jalankan: aksiRiwayatItem_ },
@@ -1895,6 +1899,284 @@ function aksiSesuaikanStock_(body, pengguna) {
 }
 
 /* =========================================================================
+ * Tahap 5: form Waste (spesifikasi sistem Bagian 5.4) dan Suhu (Bagian 5.2)
+ * ========================================================================= */
+
+var KATEGORI_WASTE = ['Expired', 'Rusak', 'Sisa Produksi', 'Kesalahan Order', 'Lainnya'];
+var SHIFT = ['Pagi', 'Siang', 'Malam'];
+var URUTAN_WASTE = [['Tanggal', false], ['Item / Produk', true], ['timestamp_server', true]];
+
+/** Estimasi kerugian = Qty × Harga Satuan (yang disalin saat dicatat), dibulatkan ke rupiah; kosong jika harga kosong. */
+function estimasiWaste_(qty, harga) {
+  if (harga === '' || harga == null || !isFinite(Number(harga))) return '';
+  return Math.round(Number(qty) * Number(harga));
+}
+
+/** Kategori waste harus salah satu pilihan; alasan wajib jika kategori Lainnya. */
+function periksaBarisWaste_(kategori, alasan, label) {
+  if (KATEGORI_WASTE.indexOf(kategori) < 0) throw galatPengguna_('Pilih kategori waste untuk ' + label + '.');
+  if (kategori === 'Lainnya' && !rapikanTeks_(alasan)) {
+    throw galatPengguna_('Tulis alasan untuk ' + label + ', karena kategorinya Lainnya.');
+  }
+}
+
+/**
+ * Data layar isi Waste: item aktif (satuan dan harga dari M_Item), pilihan
+ * kategori waste dan shift, waste yang sudah tercatat pada tanggal itu, dan
+ * tanda nihil.
+ */
+function dataFormWaste_(tanggal) {
+  var zona = ss_().getSpreadsheetTimeZone();
+  var master = bacaItem_();
+  var item = Object.keys(master).filter(function (k) { return master[k].aktif; }).map(function (k) {
+    var m = master[k];
+    return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga };
+  }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+  var kiriman = bacaBarisTanggal_('Data_Waste', tanggal, zona,
+    ['submission_id', 'Item / Produk', 'Kategori Waste', 'Qty', 'Satuan', 'Estimasi Kerugian (Rp)']);
+  var sid = {};
+  var total = 0;
+  var baris = kiriman.map(function (b) {
+    sid[b.submission_id] = true;
+    var rp = angkaAtauNull_(b['Estimasi Kerugian (Rp)']);
+    total += rp || 0;
+    return {
+      item: rapikanTeks_(b['Item / Produk']),
+      kategori: rapikanTeks_(b['Kategori Waste']),
+      qty: Number(b.Qty) || 0,
+      satuan: rapikanTeks_(b.Satuan),
+      estimasi: rp,
+      oleh: b.oleh,
+      waktu: b.waktu ? b.waktu.toISOString() : null
+    };
+  }).sort(function (a, b) { return String(a.waktu).localeCompare(String(b.waktu)); });
+  var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(function (n) {
+    return rapikanTeks_(n['ID Form']).toUpperCase() === 'WASTE';
+  });
+  return {
+    tanggal: tanggal,
+    kategoriWaste: KATEGORI_WASTE,
+    shift: SHIFT,
+    item: item,
+    kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman), totalRp: Math.round(total), baris: baris },
+    nihil: kiriman.length ? null : barisTerakhir_(nihil)
+  };
+}
+
+function aksiFormWaste_(body) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  return dataFormWaste_(body.tanggal);
+}
+
+/**
+ * Kiriman form Waste: satu baris Data_Waste per item. Satuan dan Harga Satuan
+ * disalin dari M_Item saat dicatat; Estimasi Kerugian dihitung server. Waste
+ * langsung mengurangi stock: rekap Stock_Harian item itu pada tanggal itu
+ * (dibuat jika belum ada) dan semua rekap sesudahnya dihitung ulang.
+ */
+function aksiKirimWaste_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var shift = String(body.shift || '');
+  if (SHIFT.indexOf(shift) < 0) throw galatPengguna_('Pilih shift: Pagi, Siang, atau Malam.');
+  var masukan = Array.isArray(body.baris) ? body.baris : [];
+  if (masukan.length > 200) throw galatPengguna_('Isian terlalu banyak untuk satu kiriman.');
+
+  return denganKunci_(function () {
+    var tabel = wajibTabel_('Data_Waste');
+    if (adaSubmission_(tabel, konteks.sid)) {
+      return { sudahTerkirim: true, jumlah: 0, form: dataFormWaste_(tanggal) };
+    }
+    var master = bacaItem_();
+    var baru = masukan.map(function (b) {
+      var m = master[rapikanTeks_(b && b.item).toLowerCase()];
+      if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
+      var qty = angkaIsian_(b.qty, 'Qty ' + m.nama);
+      if (!qty) throw galatPengguna_('Isi Qty ' + m.nama + ' lebih dari 0.');
+      var kategori = String(b.kategori || '');
+      var alasan = rapikanTeks_(b.alasan).slice(0, 200);
+      periksaBarisWaste_(kategori, alasan, m.nama);
+      return gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'Shift': shift,
+        'Nama Staff': pengguna.nama,
+        'Item / Produk': m.nama,
+        'Kategori Waste': kategori,
+        'Qty': qty,
+        'Satuan': m.satuan,
+        'Alasan / Keterangan': teksAman_(alasan),
+        'Harga Satuan (Rp)': m.harga == null ? '' : m.harga,
+        'Estimasi Kerugian (Rp)': estimasiWaste_(qty, m.harga),
+        'Foto Bukti': ''
+      }, isiSistem_(konteks));
+    });
+    if (!baru.length) throw galatPengguna_('Tambah minimal satu item waste.');
+
+    tambahBarisTabel_(tabel, baru);
+    urutkanTabel_(tabel, URUTAN_WASTE);
+    hitungUlangStock_(baru.map(function (b) { return { item: b['Item / Produk'], dari: tanggal }; }));
+    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormWaste_(tanggal) };
+  });
+}
+
+var WAKTU_CEK = ['Opening', 'Middle', 'Closing', 'Cek ulang'];
+var STATUS_SUHU_NORMAL = 'Normal';
+var STATUS_SUHU_LUAR = 'Di Luar Standar';
+
+/** Batas suhu dari M_Konfigurasi; nilai kosong atau tidak sah memakai nilai awal (1, 5, -18). */
+function batasSuhu_() {
+  var n = bacaKonfigurasi_().nilai;
+  function angka(v, awal) {
+    var t = String(v == null ? '' : v).trim().replace(',', '.').replace('−', '-');
+    var x = Number(t);
+    return t !== '' && isFinite(x) ? x : awal;
+  }
+  return {
+    chillerMin: angka(n.suhu_chiller_min, 1),
+    chillerMaks: angka(n.suhu_chiller_maks, 5),
+    freezerMaks: angka(n.suhu_freezer_maks, -18)
+  };
+}
+
+/** Chiller normal jika di antara batas bawah dan atas (termasuk); Freezer normal jika sama dengan atau lebih rendah dari batasnya. */
+function statusSuhuNilai_(tipe, suhu, batas) {
+  var normal = String(tipe).toLowerCase() === 'freezer'
+    ? suhu <= batas.freezerMaks
+    : suhu >= batas.chillerMin && suhu <= batas.chillerMaks;
+  return normal ? STATUS_SUHU_NORMAL : STATUS_SUHU_LUAR;
+}
+
+/** Angka suhu: boleh minus dan desimal ("-18", "−18", "3,5"); wajib diisi. */
+function angkaSuhu_(nilai, label) {
+  var t = String(nilai == null ? '' : nilai).trim().replace(',', '.').replace('−', '-');
+  var x = Number(t);
+  if (t === '' || !isFinite(x)) throw galatPengguna_(label + ' harus angka, misalnya 3,5 atau -18.');
+  if (x < -60 || x > 60) throw galatPengguna_(label + ' di luar jangkauan termometer. Periksa angkanya.');
+  return bulat_(x);
+}
+
+/** M_Unit: [{ nama, tipe, aktif }] menurut urutan di Sheet (nama ganda dilewati). */
+function bacaUnit_() {
+  var t = wajibTabel_('M_Unit');
+  var sudah = {};
+  var hasil = [];
+  t.baris.forEach(function (b) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Unit'));
+    if (!nama || sudah[nama.toLowerCase()]) return;
+    sudah[nama.toLowerCase()] = true;
+    var tipe = rapikanTeks_(nilai_(t, b, 'Tipe'));
+    hasil.push({ nama: nama, tipe: tipe.toLowerCase() === 'freezer' ? 'Freezer' : 'Chiller', aktif: benar_(nilai_(t, b, 'Aktif')) });
+  });
+  return hasil;
+}
+
+/**
+ * Data layar isi Suhu: unit aktif, batas suhu, dan semua pengecekan pada
+ * tanggal itu (termasuk cek ulang), urut waktu kirim.
+ */
+function dataFormSuhu_(tanggal) {
+  var zona = ss_().getSpreadsheetTimeZone();
+  var isian = bacaBarisTanggal_('Data_Suhu', tanggal, zona,
+    ['Waktu Cek', 'Nama Unit', 'Tipe Unit', 'Suhu (°C)', 'Status Suhu', 'Tindakan Korektif']).map(function (b) {
+    return {
+      unit: rapikanTeks_(b['Nama Unit']),
+      tipe: rapikanTeks_(b['Tipe Unit']),
+      waktuCek: rapikanTeks_(b['Waktu Cek']),
+      suhu: angkaAtauNull_(b['Suhu (°C)']),
+      status: rapikanTeks_(b['Status Suhu']),
+      tindakan: rapikanTeks_(b['Tindakan Korektif']),
+      oleh: b.oleh,
+      waktu: b.waktu ? b.waktu.toISOString() : null
+    };
+  }).sort(function (a, b) { return String(a.waktu).localeCompare(String(b.waktu)); });
+  return {
+    tanggal: tanggal,
+    waktuCek: WAKTU_CEK,
+    batas: batasSuhu_(),
+    unit: bacaUnit_().filter(function (u) { return u.aktif; }).map(function (u) { return { nama: u.nama, tipe: u.tipe }; }),
+    isian: isian
+  };
+}
+
+function aksiFormSuhu_(body) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  return dataFormSuhu_(body.tanggal);
+}
+
+/**
+ * Kiriman form Suhu: satu baris Data_Suhu per unit untuk satu waktu cek.
+ * Status dihitung server dari batas di M_Konfigurasi; tindakan korektif
+ * wajib jika di luar standar. Opening, Middle, dan Closing hanya sekali per
+ * unit per tanggal (kiriman kedua ditolak seluruhnya, dengan nama unit dan
+ * pengisinya); Cek ulang boleh berkali-kali. Tidak ada email instan.
+ */
+function aksiKirimSuhu_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var waktu = '';
+  WAKTU_CEK.forEach(function (w) { if (w.toLowerCase() === rapikanTeks_(body.waktuCek).toLowerCase()) waktu = w; });
+  if (!waktu) throw galatPengguna_('Pilih waktu cek: Opening, Middle, Closing, atau Cek ulang.');
+  var masukan = Array.isArray(body.baris) ? body.baris : [];
+  if (masukan.length > 100) throw galatPengguna_('Isian terlalu banyak untuk satu kiriman.');
+
+  return denganKunci_(function () {
+    var tabel = wajibTabel_('Data_Suhu');
+    if (adaSubmission_(tabel, konteks.sid)) {
+      return { sudahTerkirim: true, jumlah: 0, luarStandar: 0, form: dataFormSuhu_(tanggal) };
+    }
+    var unit = {};
+    bacaUnit_().forEach(function (u) { unit[u.nama.toLowerCase()] = u; });
+    var batas = batasSuhu_();
+    var sudah = {};
+    if (waktu !== 'Cek ulang') {
+      bacaBarisTanggal_('Data_Suhu', tanggal, ss_().getSpreadsheetTimeZone(), ['Nama Unit', 'Waktu Cek']).forEach(function (b) {
+        if (rapikanTeks_(b['Waktu Cek']).toLowerCase() === waktu.toLowerCase()) sudah[rapikanTeks_(b['Nama Unit']).toLowerCase()] = b;
+      });
+    }
+    var dalamKiriman = {};
+    var luar = 0;
+    var baru = masukan.map(function (b) {
+      var u = unit[rapikanTeks_(b && b.unit).toLowerCase()];
+      if (!u) throw galatPengguna_('Unit ' + rapikanTeks_(b && b.unit) + ' tidak ada di daftar unit. Muat ulang form.');
+      var kunci = u.nama.toLowerCase();
+      if (waktu !== 'Cek ulang') {
+        var ada = sudah[kunci];
+        if (ada) {
+          throw galatPengguna_('Suhu ' + waktu + ' ' + u.nama + ' sudah diisi ' + ada.oleh +
+            (ada.waktu ? ' pukul ' + jamId_(ada.waktu) : '') + '.');
+        }
+        if (dalamKiriman[kunci]) throw galatPengguna_('Suhu ' + waktu + ' ' + u.nama + ' terisi dua kali. Periksa isiannya.');
+        dalamKiriman[kunci] = true;
+      }
+      var suhu = angkaSuhu_(b.suhu, 'Suhu ' + u.nama);
+      var status = statusSuhuNilai_(u.tipe, suhu, batas);
+      var tindakan = rapikanTeks_(b.tindakan).slice(0, 200);
+      if (status === STATUS_SUHU_LUAR) {
+        luar++;
+        if (!tindakan) {
+          throw galatPengguna_('Suhu ' + u.nama + ' di luar standar. Tulis tindakan korektif sebelum mengirim.');
+        }
+      }
+      return gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'Waktu Cek': waktu,
+        'Nama Unit': u.nama,
+        'Tipe Unit': u.tipe,
+        'Suhu (°C)': suhu,
+        'Status Suhu': status,
+        'Tindakan Korektif': teksAman_(tindakan),
+        'Nama Staff': pengguna.nama
+      }, isiSistem_(konteks));
+    });
+    if (!baru.length) throw galatPengguna_('Isi suhu minimal untuk satu unit.');
+
+    tambahBarisTabel_(tabel, baru);
+    urutkanTabel_(tabel, [['Tanggal', false], ['Nama Unit', true], ['timestamp_server', true]]);
+    return { sudahTerkirim: false, jumlah: baru.length, luarStandar: luar, form: dataFormSuhu_(tanggal) };
+  });
+}
+
+/* =========================================================================
  * Tahap 3: Riwayat, pemeriksaan, dan koreksi (spesifikasi sistem Bagian 6)
  * ========================================================================= */
 
@@ -1921,6 +2203,20 @@ var STATUS_DIPERIKSA = 'Diperiksa';
  *            tampilan Rekap harian
  * setelahKoreksi(baris) : dijalankan di dalam kunci setelah satu baris
  *            dikoreksi; baris: { tanggal, nilai: { judul: nilai } }.
+ * Tahap 5:
+ * kolom.jenis juga rupiah (angka rupiah) dan status (Normal / Di Luar
+ *            Standar, tampil sebagai tanda). kolom.minus: angka boleh minus
+ *            (suhu). kolom.akhiran: satuan tetap di belakang angka ("°C").
+ *            kolom.pilihan: koreksi memilih dari daftar ini. kolom.ringkas:
+ *            false = tidak ikut ringkasan di daftar Riwayat.
+ * kategoriDariItem : filter Kategori memakai kategori item di M_Item (tab
+ *            data tidak punya kolom Kategori, misalnya Data_Waste)
+ * itemDariUnit : filter Item berisi unit dari M_Unit, berlabel "Unit"
+ * terlewat : pengecekan Opening/Middle/Closing yang tidak diisi ikut tampil
+ * gerakStock : koreksi menghitung ulang stock (pesan di layar koreksi)
+ * turunan(nilai) : kolom yang dihitung ulang saat koreksi { judul: nilai }
+ * periksaKoreksi(nilai) : melempar galatPengguna_ jika hasil koreksi tidak sah
+ *            (nilai: semua kolom baris sesudah koreksi dan turunannya)
  */
 var RIWAYAT_FORM = {
   STOCK: {
@@ -1938,6 +2234,55 @@ var RIWAYAT_FORM = {
     // Koreksi berantai (Bagian 6.3): rekap hari itu dan semua rekap sesudahnya dihitung ulang.
     setelahKoreksi: function (baris) {
       hitungUlangStock_([{ item: baris.nilai['Nama Item'], dari: baris.tanggal }]);
+    },
+    gerakStock: true
+  },
+  WASTE: {
+    tab: 'Data_Waste',
+    kepala: [{ judul: 'Shift', kunci: 'shift', label: 'Shift' }],
+    kolom: [
+      { judul: 'Item / Produk', kunci: 'item', label: 'Item / Produk', jenis: 'item' },
+      { judul: 'Kategori Waste', kunci: 'kategoriWaste', label: 'Kategori waste', singkat: 'kategori', jenis: 'teks', koreksi: true, pilihan: KATEGORI_WASTE },
+      { judul: 'Qty', kunci: 'qty', label: 'Qty', singkat: 'qty', jenis: 'angka', koreksi: true, satuan: true },
+      { judul: 'Alasan / Keterangan', kunci: 'alasan', label: 'Alasan', singkat: 'alasan', jenis: 'teks', koreksi: true },
+      { judul: 'Estimasi Kerugian (Rp)', kunci: 'estimasi', label: 'Estimasi kerugian', singkat: 'rugi', jenis: 'rupiah' }
+    ],
+    satuan: 'Satuan',
+    item: 'Item / Produk',
+    kategoriDariItem: true,
+    gerakStock: true,
+    // Estimasi memakai harga yang disalin saat waste dicatat (Bagian 5.4).
+    turunan: function (n) {
+      return { 'Estimasi Kerugian (Rp)': estimasiWaste_(n['Qty'], n['Harga Satuan (Rp)']) };
+    },
+    periksaKoreksi: function (n) {
+      periksaBarisWaste_(rapikanTeks_(n['Kategori Waste']), n['Alasan / Keterangan'], rapikanTeks_(n['Item / Produk']));
+    },
+    // Waste mengurangi stock: rekap hari itu dan sesudahnya dihitung ulang (Bagian 5.5).
+    setelahKoreksi: function (baris) {
+      hitungUlangStock_([{ item: baris.nilai['Item / Produk'], dari: baris.tanggal }]);
+    }
+  },
+  SUHU: {
+    tab: 'Data_Suhu',
+    kepala: [{ judul: 'Waktu Cek', kunci: 'waktuCek', label: 'Waktu cek' }],
+    kolom: [
+      { judul: 'Nama Unit', kunci: 'unit', label: 'Nama Unit', jenis: 'teks' },
+      { judul: 'Tipe Unit', kunci: 'tipe', label: 'Tipe', jenis: 'teks', ringkas: false },
+      { judul: 'Suhu (°C)', kunci: 'suhu', label: 'Suhu', singkat: 'suhu', jenis: 'angka', koreksi: true, minus: true, akhiran: '°C' },
+      { judul: 'Status Suhu', kunci: 'status', label: 'Status', singkat: 'status', jenis: 'status' },
+      { judul: 'Tindakan Korektif', kunci: 'tindakan', label: 'Tindakan korektif', singkat: 'tindakan', jenis: 'teks', koreksi: true }
+    ],
+    item: 'Nama Unit',
+    itemDariUnit: true,
+    terlewat: true,
+    turunan: function (n) {
+      return { 'Status Suhu': statusSuhuNilai_(n['Tipe Unit'], Number(n['Suhu (°C)']), batasSuhu_()) };
+    },
+    periksaKoreksi: function (n) {
+      if (n['Status Suhu'] === STATUS_SUHU_LUAR && !rapikanTeks_(n['Tindakan Korektif'])) {
+        throw galatPengguna_('Suhu ' + rapikanTeks_(n['Nama Unit']) + ' di luar standar. Tulis tindakan korektif.');
+      }
     }
   }
 };
@@ -2032,7 +2377,8 @@ function barisRiwayat_(def, t, b, log) {
   var koreksi = {};
   def.kolom.forEach(function (k) {
     var v = nilai_(t, b, k.judul);
-    nilai[k.kunci] = k.jenis === 'angka' ? angkaAtauNull_(v) : rapikanTeks_(v);
+    var angka = k.jenis === 'angka' || k.jenis === 'rupiah';
+    nilai[k.kunci] = angka ? angkaAtauNull_(v) : rapikanTeks_(v);
     if (k.asli) {
       var a = rapikanTeks_(nilai_(t, b, k.asli));
       if (a) asli[k.kunci] = a;
@@ -2040,7 +2386,7 @@ function barisRiwayat_(def, t, b, log) {
     var lg = logBaris[k.judul];
     if (lg) {
       koreksi[k.kunci] = {
-        lama: k.jenis === 'angka' ? angkaAtauNull_(lg.lama) : rapikanTeks_(lg.lama),
+        lama: angka ? angkaAtauNull_(lg.lama) : rapikanTeks_(lg.lama),
         oleh: lg.oleh,
         waktu: lg.waktu
       };
@@ -2126,11 +2472,16 @@ function kirimanRiwayat_(def, r, f) {
   var t = bacaTabel_(def.tab);
   if (!t) return [];
   var zona = ss_().getSpreadsheetTimeZone();
+  var master = f.kategori && def.kategoriDariItem ? bacaItem_() : null;
   var pilih = t.baris.filter(function (b) {
     var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
     if (!tg || tg < r.dari || tg > r.sampai) return false;
     if (!String(nilai_(t, b, 'submission_id') || '')) return false;
     if (f.kategori && def.kategori && rapikanTeks_(nilai_(t, b, def.kategori)).toLowerCase() !== f.kategori) return false;
+    if (master) {
+      var m = master[rapikanTeks_(nilai_(t, b, def.item)).toLowerCase()];
+      if (!m || m.kategori.toLowerCase() !== f.kategori) return false;
+    }
     if (f.item && def.item && rapikanTeks_(nilai_(t, b, def.item)).toLowerCase() !== f.item) return false;
     if (f.pengisi && rapikanTeks_(nilai_(t, b, 'submitted_by')).toLowerCase() !== f.pengisi) return false;
     return true;
@@ -2182,6 +2533,7 @@ function peristiwaRiwayat_(form, def, r, f) {
       });
     });
   }
+  if (def.terlewat && !f.pengisi) hasil = hasil.concat(suhuTerlewat_(r, f));
   if (!def.stock) return hasil.sort(urutTerbaru_);
 
   var sesuai = bacaTabel_('Data_Penyesuaian');
@@ -2230,6 +2582,44 @@ function peristiwaRiwayat_(form, def, r, f) {
     });
   }
   return hasil.sort(urutTerbaru_);
+}
+
+/**
+ * Pengecekan suhu yang tidak diisi (Bagian 6.1: waktu cek yang tidak diisi
+ * diberi tanda), per tanggal sebelum hari ini: unit aktif × Opening, Middle,
+ * Closing yang tidak punya isian. Dimulai dari tanggal isian Suhu pertama,
+ * supaya hari sebelum form Suhu dipakai tidak dianggap terlewat.
+ * f.item: hanya unit itu.
+ */
+function suhuTerlewat_(r, f) {
+  var t = bacaTabel_('Data_Suhu');
+  if (!t) return [];
+  var zona = ss_().getSpreadsheetTimeZone();
+  var pertama = '';
+  var ada = {};
+  t.baris.forEach(function (b) {
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    if (!tg) return;
+    if (!pertama || tg < pertama) pertama = tg;
+    ada[tg + '|' + rapikanTeks_(nilai_(t, b, 'Nama Unit')).toLowerCase() + '|' +
+      rapikanTeks_(nilai_(t, b, 'Waktu Cek')).toLowerCase()] = true;
+  });
+  if (!pertama) return [];
+  var unit = bacaUnit_().filter(function (u) { return u.aktif && (!f.item || u.nama.toLowerCase() === f.item); });
+  var hari = hariIni_();
+  var hasil = [];
+  for (var tg = r.dari < pertama ? pertama : r.dari; tg <= r.sampai && tg < hari; tg = geserTanggal_(tg, 1)) {
+    var kurang = [];
+    unit.forEach(function (u) {
+      ['Opening', 'Middle', 'Closing'].forEach(function (w) {
+        if (!ada[tg + '|' + u.nama.toLowerCase() + '|' + w.toLowerCase()]) kurang.push(u.nama + ' ' + w);
+      });
+    });
+    if (kurang.length) {
+      hasil.push({ jenis: 'terlewat', tanggal: tg, oleh: '', waktu: null, kurang: kurang, total: unit.length * 3 });
+    }
+  }
+  return hasil;
 }
 
 /**
@@ -2302,9 +2692,12 @@ function rekapRiwayat_(r, f) {
 
 /** Pilihan untuk lembar Filter: kategori, item, dan nama pengisi. */
 function pilihanFilter_(def) {
-  var hasil = { kategori: [], item: [], pengisi: [] };
-  if (def && def.kategori) hasil.kategori = bacaKategori_().map(function (k) { return k.nama; });
-  if (def && def.item) {
+  var hasil = { kategori: [], item: [], pengisi: [], labelItem: 'Item' };
+  if (def && (def.kategori || def.kategoriDariItem)) hasil.kategori = bacaKategori_().map(function (k) { return k.nama; });
+  if (def && def.itemDariUnit) {
+    hasil.labelItem = 'Unit';
+    hasil.item = bacaUnit_().map(function (u) { return { nama: u.nama, kategori: '' }; });
+  } else if (def && def.item) {
     var master = bacaItem_();
     hasil.item = Object.keys(master).map(function (k) {
       return { nama: master[k].nama, kategori: master[k].kategori };
@@ -2357,6 +2750,7 @@ function aksiRiwayat_(body) {
   if (!def) return hasil;
   hasil.kepala = infoKepala_(def);
   hasil.kolom = infoKolom_(def);
+  hasil.gerakStock = !!def.gerakStock;
   if (body.tampilan === 'rekap' && def.stock) {
     hasil.tampilan = 'rekap';
     hasil.rekap = rekapRiwayat_(r, f);
@@ -2370,8 +2764,13 @@ function aksiRiwayat_(body) {
 /** Kolom untuk frontend: yang tampil, jenisnya, dan yang boleh dikoreksi. */
 function infoKolom_(def) {
   return def.kolom.map(function (k) {
-    return { kunci: k.kunci, label: k.label, singkat: k.singkat || k.label.toLowerCase(), jenis: k.jenis,
+    var info = { kunci: k.kunci, label: k.label, singkat: k.singkat || k.label.toLowerCase(), jenis: k.jenis,
       koreksi: !!k.koreksi, satuan: !!k.satuan };
+    if (k.minus) info.minus = true;
+    if (k.akhiran) info.akhiran = k.akhiran;
+    if (k.pilihan) info.pilihan = k.pilihan;
+    if (k.ringkas === false) info.ringkas = false;
+    return info;
   });
 }
 
@@ -2387,7 +2786,8 @@ function aksiDetailKiriman_(body) {
   if (!k) throw galatPengguna_('Isian tidak ditemukan. Kembali ke Riwayat, lalu muat ulang.');
   var nama = idForm;
   bacaDaftarForm_().forEach(function (f) { if (f.id === idForm) nama = f.nama; });
-  return { formId: idForm, namaForm: nama, adaPdf: !!LAPORAN_PDF[idForm], kepala: infoKepala_(def), kolom: infoKolom_(def), kiriman: k };
+  return { formId: idForm, namaForm: nama, adaPdf: !!LAPORAN_PDF[idForm], kepala: infoKepala_(def), kolom: infoKolom_(def),
+    gerakStock: !!def.gerakStock, kiriman: k };
 }
 
 /**
@@ -2543,12 +2943,14 @@ function aksiKoreksi_(body, pengguna) {
       if (!k.koreksi || !Object.prototype.hasOwnProperty.call(baru, k.kunci)) return;
       var lama = nilai_(c.t, c.b, k.judul);
       var nilaiBaru;
+      var label = k.label + (namaBaris ? ' ' + namaBaris : '');
       if (k.jenis === 'angka') {
-        nilaiBaru = angkaIsian_(baru[k.kunci], k.label + (namaBaris ? ' ' + namaBaris : ''));
+        nilaiBaru = k.minus ? angkaSuhu_(baru[k.kunci], label) : angkaIsian_(baru[k.kunci], label);
         lama = Number(lama) || 0;
       } else {
         nilaiBaru = rapikanTeks_(baru[k.kunci]).slice(0, 200);
         lama = rapikanTeks_(lama);
+        if (k.pilihan && k.pilihan.indexOf(nilaiBaru) < 0) throw galatPengguna_('Pilih ' + k.label.toLowerCase() + '.');
       }
       if (nilaiBaru === lama) return;
       ubah[k.judul] = nilaiBaru;
@@ -2561,7 +2963,22 @@ function aksiKoreksi_(body, pengguna) {
         }
       }
     });
-    if (!perubahan.length) throw galatPengguna_('Tidak ada angka yang berubah.');
+    if (!perubahan.length) throw galatPengguna_('Tidak ada yang berubah.');
+    // Kolom turunan (estimasi kerugian, status suhu) dan pemeriksaan hasil koreksi (Tahap 5).
+    var gabungan = {};
+    c.t.judul.forEach(function (j, i) { if (j) gabungan[j] = c.b[i]; });
+    Object.keys(ubah).forEach(function (j) { gabungan[j] = ubah[j]; });
+    if (def.turunan) {
+      var turun = def.turunan(gabungan);
+      Object.keys(turun).forEach(function (j) {
+        var lamaT = nilai_(c.t, c.b, j);
+        gabungan[j] = turun[j];
+        if (String(lamaT) === String(turun[j])) return;
+        ubah[j] = turun[j];
+        perubahan.push([j, lamaT, turun[j]]);
+      });
+    }
+    if (def.periksaKoreksi) def.periksaKoreksi(gabungan);
     var kini = new Date();
     ubah.updated_by = pengguna.nama;
     ubah.updated_at = kini;
@@ -2670,7 +3087,9 @@ var HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
  * perKategori: true berarti form ini bisa diunduh untuk satu kategori.
  */
 var LAPORAN_PDF = {
-  STOCK: { judul: 'Form Stock Inventory Harian', isi: isiPdfStock_, perKategori: true }
+  STOCK: { judul: 'Form Stock Inventory Harian', isi: isiPdfStock_, perKategori: true },
+  SUHU: { judul: 'Form Pengecekan Suhu Chiller & Freezer', isi: isiPdfSuhu_ },
+  WASTE: { judul: 'Form Pencatatan Waste', isi: isiPdfWaste_ }
 };
 
 /**
@@ -2873,6 +3292,144 @@ function isiPdfStock_(tanggal, opsi) {
   };
 }
 
+/** Rupiah untuk PDF dan email: 45000 → "Rp 45.000"; kosong → "–". */
+function rupiahId_(n) {
+  if (n === '' || n == null || !isFinite(Number(n))) return '–';
+  return 'Rp ' + angkaId_(Math.round(Number(n)));
+}
+
+/** Baris tab Data pada satu tanggal sebagai objek { judul: nilai }, urut waktu kirim. */
+function barisDataTanggal_(namaTab, tanggal) {
+  var t = bacaTabel_(namaTab);
+  if (!t) return [];
+  var zona = ss_().getSpreadsheetTimeZone();
+  return t.baris.filter(function (b) {
+    return teksTanggal_(nilai_(t, b, 'Tanggal'), zona) === tanggal && String(nilai_(t, b, 'submission_id') || '');
+  }).map(function (b) {
+    var o = {};
+    t.judul.forEach(function (j, i) { if (j) o[j] = b[i]; });
+    return o;
+  }).sort(function (a, b) {
+    var x = a.timestamp_server instanceof Date ? a.timestamp_server.getTime() : 0;
+    var y = b.timestamp_server instanceof Date ? b.timestamp_server.getTime() : 0;
+    return x - y;
+  });
+}
+
+/**
+ * Isi PDF Waste (tata letak Harian_Waste, Bagian 8.3): satu baris per item
+ * waste, urut waktu kirim, dengan baris total estimasi kerugian.
+ */
+function isiPdfWaste_(tanggal) {
+  var baris = barisDataTanggal_('Data_Waste', tanggal);
+  var total = 0;
+  var adaTanpaHarga = false;
+  var isi = baris.map(function (b, i) {
+    var rp = b['Estimasi Kerugian (Rp)'];
+    if (rp === '' || rp == null) adaTanpaHarga = true;
+    else total += Number(rp) || 0;
+    return '<tr>' +
+      '<td class="angka">' + (i + 1) + '</td>' +
+      '<td>' + escHtml_(b['Nama Staff']) + '</td>' +
+      '<td>' + escHtml_(b['Shift']) + '</td>' +
+      '<td>' + escHtml_(b['Item / Produk']) + '</td>' +
+      '<td>' + escHtml_(b['Kategori Waste']) + '</td>' +
+      '<td class="angka">' + angkaId_(Number(b['Qty']) || 0) + '</td>' +
+      '<td>' + escHtml_(b['Satuan']) + '</td>' +
+      '<td>' + escHtml_(b['Alasan / Keterangan']) + '</td>' +
+      '<td class="angka">' + rupiahId_(rp) + '</td>' +
+      '</tr>';
+  });
+  var judul = ['No', 'Nama Staff', 'Shift', 'Item / Produk', 'Kategori Waste', 'Qty', 'Satuan', 'Alasan',
+    'Estimasi Kerugian (Rp)'];
+  var tabel = '<table class="data"><colgroup><col style="width:4%"><col style="width:11%"><col style="width:7%">' +
+    '<col style="width:17%"><col style="width:12%"><col style="width:8%"><col style="width:7%"><col style="width:20%">' +
+    '<col style="width:14%"></colgroup><thead><tr>' +
+    judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (isi.length ? isi.join('') : '<tr><td colspan="9">Belum ada isian.</td></tr>') +
+    '<tr class="total"><td colspan="8">Total estimasi kerugian</td><td class="angka">' + rupiahId_(total) + '</td></tr>' +
+    '</tbody></table>';
+  var catatan = ['Estimasi kerugian = Qty × Harga Satuan yang tercatat saat waste dicatat.'];
+  if (adaTanpaHarga) catatan.push('Item tanpa harga satuan ditulis "–" dan tidak ikut dijumlahkan.');
+  return { ada: baris.length > 0, info: [['Jumlah item', String(baris.length)]], tabel: tabel, catatan: catatan };
+}
+
+/** "3,5 °C"; minus memakai tanda −. */
+function suhuId_(n) {
+  return angkaId_(n) + ' °C';
+}
+
+/**
+ * Isi PDF Suhu (Bagian 5.2 dan 8.3): satu baris per unit dengan Opening,
+ * Middle, dan Closing (suhu dan jam); cek ulang ditulis di bawah baris
+ * unitnya dengan jamnya. Suhu di luar standar merah tebal dan bertanda *.
+ * Unit aktif selalu tampil; unit nonaktif hanya jika punya isian hari itu.
+ */
+function isiPdfSuhu_(tanggal) {
+  var data = barisDataTanggal_('Data_Suhu', tanggal);
+  var batas = batasSuhu_();
+  var unit = bacaUnit_().filter(function (u) {
+    return u.aktif || data.some(function (b) { return samaNama_(b['Nama Unit'], u.nama); });
+  });
+  data.forEach(function (b) {
+    var nama = rapikanTeks_(b['Nama Unit']);
+    if (!unit.some(function (u) { return samaNama_(u.nama, nama); })) {
+      unit.push({ nama: nama, tipe: rapikanTeks_(b['Tipe Unit']) || 'Chiller', aktif: false });
+    }
+  });
+  var adaLuar = false;
+  function sel(b) {
+    if (!b) return '<td class="tengah kecil">belum diisi</td>';
+    var luar = rapikanTeks_(b['Status Suhu']) === STATUS_SUHU_LUAR;
+    if (luar) adaLuar = true;
+    return '<td class="angka' + (luar ? ' masalah' : '') + '">' + suhuId_(Number(b['Suhu (°C)'])) + (luar ? ' *' : '') +
+      (b.timestamp_server instanceof Date ? '<br><span class="kecil">' + jamId_(b.timestamp_server) + '</span>' : '') + '</td>';
+  }
+  var baris = [];
+  unit.forEach(function (u) {
+    var milik = data.filter(function (b) { return samaNama_(b['Nama Unit'], u.nama); });
+    var per = {};
+    milik.forEach(function (b) { var w = rapikanTeks_(b['Waktu Cek']); if (!per[w]) per[w] = b; });
+    var utama = milik.filter(function (b) { return rapikanTeks_(b['Waktu Cek']) !== 'Cek ulang'; });
+    var staf = [];
+    var tindakan = [];
+    utama.forEach(function (b) {
+      var n = rapikanTeks_(b['Nama Staff']) || rapikanTeks_(b.submitted_by);
+      if (n && staf.indexOf(n) < 0) staf.push(n);
+      var tk = rapikanTeks_(b['Tindakan Korektif']);
+      if (tk) tindakan.push(rapikanTeks_(b['Waktu Cek']) + ': ' + tk);
+    });
+    baris.push('<tr><td>' + escHtml_(u.nama) + '</td><td>' + escHtml_(u.tipe) + '</td>' +
+      sel(per.Opening) + sel(per.Middle) + sel(per.Closing) +
+      '<td>' + escHtml_(staf.join(', ')) + '</td><td>' + escHtml_(tindakan.join(' / ')) + '</td></tr>');
+    milik.filter(function (b) { return rapikanTeks_(b['Waktu Cek']) === 'Cek ulang'; }).forEach(function (b) {
+      var luar = rapikanTeks_(b['Status Suhu']) === STATUS_SUHU_LUAR;
+      if (luar) adaLuar = true;
+      baris.push('<tr class="cek-ulang"><td colspan="2">Cek ulang ' +
+        (b.timestamp_server instanceof Date ? jamId_(b.timestamp_server) : '') + '</td>' +
+        '<td colspan="3" class="' + (luar ? 'masalah' : '') + '">' + suhuId_(Number(b['Suhu (°C)'])) + (luar ? ' *' : '') +
+        ', ' + escHtml_(rapikanTeks_(b['Status Suhu']).toLowerCase()) + '</td>' +
+        '<td>' + escHtml_(rapikanTeks_(b['Nama Staff']) || rapikanTeks_(b.submitted_by)) + '</td>' +
+        '<td>' + escHtml_(rapikanTeks_(b['Tindakan Korektif'])) + '</td></tr>');
+    });
+  });
+  var judul = ['Nama Unit', 'Tipe', 'Opening', 'Middle', 'Closing', 'Nama Staff', 'Tindakan Korektif'];
+  var tabel = '<table class="data"><colgroup><col style="width:16%"><col style="width:9%">' +
+    '<col span="3" style="width:11%"><col style="width:15%"><col style="width:27%"></colgroup><thead><tr>' +
+    judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (baris.length ? baris.join('') : '<tr><td colspan="7">Belum ada unit aktif.</td></tr>') + '</tbody></table>';
+  var catatan = [];
+  if (adaLuar) catatan.push('* Di luar standar (ditulis merah tebal).');
+  catatan.push('Jam di bawah suhu: waktu isian diterima. Cek ulang ditulis di bawah baris unitnya.');
+  return {
+    ada: data.length > 0,
+    info: [['Batas normal', 'Chiller ' + angkaId_(batas.chillerMin) + ' sampai ' + suhuId_(batas.chillerMaks) +
+      ' · Freezer ' + suhuId_(batas.freezerMaks) + ' atau lebih rendah']],
+    tabel: tabel,
+    catatan: catatan
+  };
+}
+
 /**
  * Dokumen HTML lengkap satu laporan: kepala, kotak info, tabel, Diisi/Diperiksa
  * oleh, kaki. Laporan dengan isi.bagian: tiap bagian setelah yang pertama
@@ -2909,6 +3466,8 @@ function htmlLaporan_(idForm, tanggal, isi) {
     'table.data td{padding:3px;border:1px solid ' + w.garis + ';vertical-align:top;word-wrap:break-word}' +
     'td.angka{text-align:right}td.akhir{font-weight:bold}' +
     'tr.kategori td{background:' + w.baja + ';color:' + w.tinta + ';font-weight:bold;text-align:left}' +
+    'tr.total td{background:' + w.baja + ';font-weight:bold}tr.cek-ulang td{color:' + w.tintaRedup + ';font-size:8pt}' +
+    'td.tengah{text-align:center}' +
     '.masalah{color:' + w.masalah + ';font-weight:bold}.kecil{font-size:7pt;color:' + w.tintaRedup + '}' +
     'table.bawah{margin-top:12px}table.bawah td{padding:2px 14px 2px 0}table.bawah td.label{color:' + w.tintaRedup + '}' +
     '.catatan{color:' + w.tintaRedup + ';font-size:8pt;margin:6px 0 0 0}' +
@@ -3103,6 +3662,57 @@ function saranOrder_(m, akhir) {
   return angkaId_(butuh) + ' ' + m.satuan;
 }
 
+/** Waste satu tanggal untuk email: qty per item dan kategori (dijumlah), estimasi kerugian total. */
+function ringkasWasteHari_(tanggal) {
+  var kumpul = {};
+  var urut = [];
+  var total = 0;
+  barisDataTanggal_('Data_Waste', tanggal).forEach(function (b) {
+    var item = rapikanTeks_(b['Item / Produk']);
+    var kat = rapikanTeks_(b['Kategori Waste']);
+    var k = item.toLowerCase() + '|' + kat;
+    var x = kumpul[k];
+    if (!x) {
+      x = kumpul[k] = { item: item, kategori: kat, qty: 0, satuan: rapikanTeks_(b['Satuan']), estimasi: 0 };
+      urut.push(x);
+    }
+    x.qty = bulat_(x.qty + (Number(b['Qty']) || 0));
+    var rp = b['Estimasi Kerugian (Rp)'];
+    if (rp === '' || rp == null) x.estimasi = x.estimasi === 0 ? '' : x.estimasi;
+    else {
+      x.estimasi = (Number(x.estimasi) || 0) + Number(rp);
+      total += Number(rp);
+    }
+  });
+  return { baris: urut, totalRp: Math.round(total) };
+}
+
+/** Suhu satu tanggal untuk email: jumlah pengecekan dan isian di luar standar beserta cek ulang unit itu. */
+function ringkasSuhuHari_(tanggal) {
+  var data = barisDataTanggal_('Data_Suhu', tanggal);
+  var jam = function (b) { return b.timestamp_server instanceof Date ? jamId_(b.timestamp_server) : ''; };
+  var luar = data.filter(function (b) {
+    return rapikanTeks_(b['Waktu Cek']) !== 'Cek ulang' && rapikanTeks_(b['Status Suhu']) === STATUS_SUHU_LUAR;
+  }).map(function (b) {
+    var unit = rapikanTeks_(b['Nama Unit']);
+    var mulai = b.timestamp_server instanceof Date ? b.timestamp_server.getTime() : 0;
+    return {
+      unit: unit,
+      waktuCek: rapikanTeks_(b['Waktu Cek']),
+      jam: jam(b),
+      suhu: Number(b['Suhu (°C)']),
+      tindakan: rapikanTeks_(b['Tindakan Korektif']),
+      cekUlang: data.filter(function (c) {
+        return rapikanTeks_(c['Waktu Cek']) === 'Cek ulang' && samaNama_(c['Nama Unit'], unit) &&
+          (c.timestamp_server instanceof Date ? c.timestamp_server.getTime() : 0) >= mulai;
+      }).map(function (c) {
+        return { jam: jam(c), suhu: Number(c['Suhu (°C)']), status: rapikanTeks_(c['Status Suhu']) };
+      })
+    };
+  });
+  return { jumlah: data.length, luar: luar };
+}
+
 /** Stock pada akhir tanggal itu: item minus dan item di bawah stok minimum (item aktif). */
 function ringkasStockHari_(tanggal) {
   var master = bacaItem_();
@@ -3172,6 +3782,28 @@ function htmlEmailHarian_(d) {
   }
   html += bagian('Stock', stock.length ? stock.join('') : '<p style="margin:0">Tidak ada Stock Akhir minus dan semua stock di atas batas minimum.</p>');
 
+  // Suhu di luar standar beserta tindakan korektif dan cek ulangnya (Bagian 10).
+  var merah = 'color:' + w.masalah + ';font-weight:bold';
+  html += bagian('Suhu', d.suhu.luar.length
+    ? '<p style="margin:0 0 2px"><b style="color:' + w.masalah + '">Di luar standar (' + d.suhu.luar.length + ')</b></p>' +
+      daftar(d.suhu.luar.map(function (x) {
+        return escHtml_(x.unit) + ', ' + escHtml_(x.waktuCek) + (x.jam ? ' ' + x.jam : '') + ': <span style="' + merah + '">' +
+          suhuId_(x.suhu) + '</span>. Tindakan: ' + escHtml_(x.tindakan || '–') +
+          (x.cekUlang.length ? '. Cek ulang: ' + x.cekUlang.map(function (c) {
+            return c.jam + ' ' + suhuId_(c.suhu) + ' (' + c.status.toLowerCase() + ')';
+          }).join(', ') : '');
+      }))
+    : '<p style="margin:0">' + (d.suhu.jumlah ? 'Semua ' + d.suhu.jumlah + ' pengecekan normal.' : 'Belum ada pengecekan suhu.') + '</p>');
+
+  // Total waste hari itu: qty per item dan estimasi kerugian (Bagian 10).
+  html += bagian('Waste', d.waste.baris.length
+    ? '<p style="margin:0 0 2px"><b>Total ' + d.waste.baris.length + ' item, estimasi kerugian ' + rupiahId_(d.waste.totalRp) + '</b></p>' +
+      daftar(d.waste.baris.map(function (x) {
+        return escHtml_(x.item) + ' (' + escHtml_(x.kategori) + '): ' + angkaId_(x.qty) + ' ' + escHtml_(x.satuan) +
+          ', ' + rupiahId_(x.estimasi);
+      }))
+    : '<p style="margin:0">Tidak ada waste tercatat.</p>');
+
   var periksa = [];
   if (d.pemeriksaan.belumDiperiksa) periksa.push(d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa (31 hari terakhir)');
   if (d.pemeriksaan.dilaporkan) periksa.push(d.pemeriksaan.dilaporkan + ' baris dilaporkan keliru');
@@ -3199,8 +3831,9 @@ function htmlEmailHarian_(d) {
 /**
  * Laporan harian (Bagian 9.1 butir 1 dan Bagian 10): PDF tiap form yang
  * terisi hari itu disimpan ke Drive, lalu satu email ke penerima di M_Outlet.
- * Butir yang sumbernya belum dibangun (suhu di luar standar, waste, masa
- * simpan, pengingat opname) dilewati sampai tahapnya. Hasil dan kegagalan
+ * Suhu di luar standar dan total waste ikut sejak Tahap 5. Butir yang
+ * sumbernya belum dibangun (masa simpan, pengingat opname) dilewati sampai
+ * tahapnya. PDF Suhu ikut juga saat pengecekannya baru sebagian. Hasil dan kegagalan
  * dicatat di M_Konfigurasi (laporan_terakhir).
  * opsi: { tanggal, uji: bool }.
  */
@@ -3213,7 +3846,7 @@ function jalankanLaporanHarian_(opsi) {
   try {
     var form = kelengkapanForm_(tanggal);
     form.forEach(function (f) {
-      if (f.status !== 'terkirim' || !LAPORAN_PDF[f.id]) return;
+      if ((f.status !== 'terkirim' && f.status !== 'sebagian') || !LAPORAN_PDF[f.id]) return;
       try {
         var pdf = buatPdf_(f.id, tanggal);
         var x = { namaFile: pdf.namaFile, blob: pdf.blob, drive: false };
@@ -3238,6 +3871,8 @@ function jalankanLaporanHarian_(opsi) {
       tanggal: tanggal,
       form: form,
       stock: ringkasStockHari_(tanggal),
+      waste: ringkasWasteHari_(tanggal),
+      suhu: ringkasSuhuHari_(tanggal),
       pemeriksaan: ringkasPemeriksaan_(),
       reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).map(function (s) { return s.nama; }),
       pdf: hasil.pdf,
@@ -3797,6 +4432,11 @@ function setupSpreadsheet() {
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
     pasangRumusHarianStock_(ss, catatan);
     pasangBlokStockDashboard_(ss, catatan);
+    // Rumus Waste dan Suhu (Tahap 5): tab Harian dan bloknya di Dashboard.
+    pasangRumusHarianWaste_(ss, catatan);
+    pasangRumusHarianSuhu_(ss, catatan);
+    pasangBlokWasteDashboard_(ss, catatan);
+    pasangBlokSuhuDashboard_(ss, catatan);
 
     // 5. Urutkan tab dan buang lembar kosong bawaan Google Sheets.
     aturUrutanTab_(ss);
@@ -4303,6 +4943,283 @@ function pasangBlokStockDashboard_(ss, catatan) {
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([tabel]).build()
   ]);
   catatan.push('Rumus stock dipasang: Dashboard (blok Stock Inventory)');
+}
+
+/* ---------- Tahap 5: rumus Harian_Waste, Harian_Suhu, blok Waste dan Suhu ---------- */
+
+/** Baris Diisi oleh dan Diperiksa oleh di bawah tabel Harian, untuk tab Data dengan kolom tanggal dT. */
+function bawahHarian_(ss, tab, lebar) {
+  var K = function (judul) { return kolomRumus_(ss, tab, judul); };
+  var cocok = K('Tanggal') + '=tgl';
+  return 'olehIsi,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(' + K('submitted_by') + ',' + cocok + '))),""),' +
+    'jamIsi,IFERROR(TEXT(MAX(FILTER(' + K('timestamp_server') + ',' + cocok + ')),"hh:mm"),""),' +
+    'olehCek,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(' + K('checked_by') + ',' + cocok + ',' + K('checked_by') + '<>""))),""),' +
+    'jamCek,IFERROR(TEXT(MAX(FILTER(' + K('checked_at') + ',' + cocok + ',' + K('checked_by') + '<>"")),"hh:mm"),""),' +
+    'bawah,VSTACK(HSTACK(' + kosong_(lebar) + '),' +
+      'HSTACK("","Diisi oleh",IF(olehIsi="","Belum ada isian",olehIsi&", terakhir "&jamIsi),' + kosong_(lebar - 3) + '),' +
+      'HSTACK("","Diperiksa oleh",IF(olehCek="","Belum diperiksa",olehCek&", "&jamCek),' + kosong_(lebar - 3) + ')),';
+}
+
+/** Sel A9 tab Harian: dipasang hanya jika masih kosong, "Belum ada data.", atau rumus. */
+function selRumusHarian_(sheet, catatan) {
+  var mulai = HARIAN.barisJudulTabel + 1;
+  var sel = sheet.getRange(mulai, 1);
+  var isiLama = String(sel.getFormula() || sel.getValue() || '');
+  if (isiLama && isiLama !== 'Belum ada data.' && isiLama.charAt(0) !== '=') {
+    catatan.push('Peringatan: A' + mulai + ' di ' + sheet.getName() + ' berisi teks lain; rumus tidak dipasang.');
+    return null;
+  }
+  return sel;
+}
+
+/**
+ * Rumus tab Harian_Waste (spesifikasi sistem Bagian 8.3), satu rumus di A9:
+ * satu baris per item waste pada tanggal itu, urut waktu kirim, lalu baris
+ * total estimasi kerugian, Diisi oleh, dan Diperiksa oleh.
+ */
+function rumusHarianWaste_(ss) {
+  var K = function (judul) { return kolomRumus_(ss, 'Data_Waste', judul); };
+  var dT = K('Tanggal');
+  var dI = K('Item / Produk');
+  return '=LET(tgl,$B$5,' +
+    'n,COUNTIFS(' + dT + ',tgl,' + dI + ',"<>"),' +
+    'f,IF(n=0,"",SORT(FILTER(HSTACK(' + [K('Nama Staff'), K('Shift'), dI, K('Kategori Waste'), K('Qty'), K('Satuan'),
+      K('Alasan / Keterangan'), K('Estimasi Kerugian (Rp)'), K('timestamp_server')].join(',') + '),' + dT + '=tgl,' + dI + '<>""),9,TRUE)),' +
+    'tabel,IF(n=0,HSTACK("Belum ada data.",' + kosong_(8) + '),HSTACK(SEQUENCE(n),CHOOSECOLS(f,1,2,3,4,5,6,7,8))),' +
+    'total,HSTACK(' + kosong_(7) + ',"Total estimasi kerugian",SUMIFS(' + K('Estimasi Kerugian (Rp)') + ',' + dT + ',tgl)),' +
+    bawahHarian_(ss, 'Data_Waste', 9) +
+    'VSTACK(tabel,total,bawah))';
+}
+
+function pasangRumusHarianWaste_(ss, catatan) {
+  var sheet = ss.getSheetByName('Harian_Waste');
+  var sel = selRumusHarian_(sheet, catatan);
+  if (!sel) return;
+  var mulai = sel.getRow();
+  sel.setFormula(rumusHarianWaste_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
+  sheet.getRange(mulai, 1, tinggi, 1).setNumberFormat(FORMAT.bulat).setHorizontalAlignment('right');
+  sheet.getRange(mulai, 6, tinggi, 1).setNumberFormat(FORMAT.angka);
+  sheet.getRange(mulai, 9, tinggi, 1).setNumberFormat(FORMAT.rupiah);
+  pasangAturanWarna_(sheet, [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$H' + mulai + '="Total estimasi kerugian"')
+      .setBackground(WARNA.baja).setBold(true).setRanges([sheet.getRange(mulai, 1, tinggi, 9)]).build()
+  ]);
+  catatan.push('Rumus waste dipasang: Harian_Waste');
+}
+
+/**
+ * Rumus tab Harian_Suhu (spesifikasi sistem Bagian 8.3), satu rumus di A9:
+ * satu baris per unit (unit aktif menurut urutan M_Unit, ditambah unit yang
+ * punya isian pada tanggal itu) dengan suhu Opening, Middle, dan Closing;
+ * tiap cek ulang menjadi baris sendiri di bawah unitnya ("Cek ulang 15.40",
+ * suhu di kolom Cek ulang). Kolom I sampai L (disembunyikan) berisi TRUE jika
+ * suhu di kolom C, D, E, atau F di luar standar, untuk sorotan.
+ */
+function rumusHarianSuhu_(ss) {
+  var K = function (judul) { return kolomRumus_(ss, 'Data_Suhu', judul); };
+  var dT = K('Tanggal');
+  var dU = K('Nama Unit');
+  var dW = K('Waktu Cek');
+  var dS = K('Suhu (°C)');
+  var dSt = K('Status Suhu');
+  var dN = K('Nama Staff');
+  var dTk = K('Tindakan Korektif');
+  var uN = kolomRumus_(ss, 'M_Unit', 'Nama Unit');
+  var uT = kolomRumus_(ss, 'M_Unit', 'Tipe');
+  var uA = kolomRumus_(ss, 'M_Unit', 'Aktif');
+  var milik = dU + '=x,' + dT + '=tgl';
+  var baris =
+    'LAMBDA(acc,x,LET(' +
+      'tp,IFERROR(INDEX(FILTER(' + uT + ',' + uN + '=x),1),IFERROR(INDEX(FILTER(' + K('Tipe Unit') + ',' + milik + '),1),"")),' +
+      'v,LAMBDA(w,IFERROR(INDEX(FILTER(' + dS + ',' + milik + ',' + dW + '=w),1),"")),' +
+      'st,LAMBDA(w,COUNTIFS(' + dU + ',x,' + dT + ',tgl,' + dW + ',w,' + dSt + ',"Di Luar Standar")>0),' +
+      'staf,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(' + dN + ',' + milik + ',' + dW + '<>"Cek ulang"))),""),' +
+      'tind,IFERROR(TEXTJOIN(" / ",TRUE,FILTER(' + dW + '&": "&' + dTk + ',' + milik + ',' + dW + '<>"Cek ulang",' + dTk + '<>"")),""),' +
+      'utama,HSTACK(x,tp,v("Opening"),v("Middle"),v("Closing"),"",staf,tind,st("Opening"),st("Middle"),st("Closing"),FALSE),' +
+      'nc,COUNTIFS(' + dU + ',x,' + dT + ',tgl,' + dW + ',"Cek ulang"),' +
+      'm,IF(nc=0,"",FILTER(HSTACK(' + K('timestamp_server') + ',' + dS + ',' + dN + ',' + dTk + ',' + dSt + '),' + milik + ',' + dW + '="Cek ulang")),' +
+      'kosong,LAMBDA(k,MAKEARRAY(nc,k,LAMBDA(r,c,""))),' +
+      'cek,IF(nc=0,"",HSTACK(kosong(1),MAP(CHOOSECOLS(m,1),LAMBDA(t,"Cek ulang "&TEXT(t,"hh.mm"))),kosong(3),' +
+        'CHOOSECOLS(m,2),CHOOSECOLS(m,3),CHOOSECOLS(m,4),MAKEARRAY(nc,3,LAMBDA(r,c,FALSE)),' +
+        'MAP(CHOOSECOLS(m,5),LAMBDA(s,s="Di Luar Standar")))),' +
+      'IF(nc=0,VSTACK(acc,utama),VSTACK(acc,utama,cek))))';
+  return '=LET(tgl,$B$5,' +
+    'a,VSTACK(IFERROR(FILTER(' + uN + ',' + uN + '<>"",' + uA + '=TRUE),""),IFERROR(FILTER(' + dU + ',' + dT + '=tgl),"")),' +
+    'unit,IFERROR(UNIQUE(FILTER(a,a<>"")),""),' +
+    'isi,IF(INDEX(unit,1,1)="",HSTACK(' + kosong_(12) + '),REDUCE(HSTACK(' + kosong_(12) + '),unit,' + baris + ')),' +
+    'n,ROWS(isi),' +
+    bawahHarian_(ss, 'Data_Suhu', 12) +
+    'IF(n<2,VSTACK(HSTACK("Belum ada data.",' + kosong_(11) + '),bawah),VSTACK(CHOOSEROWS(isi,SEQUENCE(n-1,1,2)),bawah)))';
+}
+
+function pasangRumusHarianSuhu_(ss, catatan) {
+  var sheet = ss.getSheetByName('Harian_Suhu');
+  var sel = selRumusHarian_(sheet, catatan);
+  if (!sel) return;
+  var mulai = sel.getRow();
+  sel.setFormula(rumusHarianSuhu_(ss)).setFontStyle('normal').setFontColor(WARNA.tinta);
+  var tinggi = Math.max(1, sheet.getMaxRows() - mulai + 1);
+  sheet.getRange(mulai, 3, tinggi, 4).setNumberFormat(FORMAT.suhu).setHorizontalAlignment('right');
+  if (sheet.getMaxColumns() < 12) sheet.insertColumnsAfter(sheet.getMaxColumns(), 12 - sheet.getMaxColumns());
+  sheet.hideColumns(9, 4);
+  var aturan = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($A' + mulai + '="",LEFT($B' + mulai + ',9)="Cek ulang")')
+      .setFontColor(WARNA.tintaRedup).setRanges([sheet.getRange(mulai, 1, tinggi, 2)]).build()
+  ];
+  ['I', 'J', 'K', 'L'].forEach(function (bantu, i) {
+    aturan.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$' + bantu + mulai + '=TRUE')
+      .setFontColor(WARNA.masalah).setBold(true).setRanges([sheet.getRange(mulai, 3 + i, tinggi, 1)]).build());
+  });
+  pasangAturanWarna_(sheet, aturan);
+  catatan.push('Rumus suhu dipasang: Harian_Suhu');
+}
+
+/** Tinggi blok Waste dan Suhu di Dashboard: dari baris judul blok sampai sebelum judul blok berikutnya. */
+var TINGGI_BLOK_WASTE = 17;
+var TINGGI_BLOK_SUHU = 26;
+
+/** Awal periode pilihan Dashboard (B3): 7 hari, 30 hari, atau bulan berjalan. */
+var AWAL_PERIODE_ = 'awalP,IF($B$3="30 hari",TODAY()-29,IF($B$3="Bulan berjalan",DATE(YEAR(TODAY()),MONTH(TODAY()),1),TODAY()-6)),';
+
+/**
+ * Mencari baris judul blok di kolom A Dashboard dan memberi blok itu ruang
+ * `tinggi` baris (menyisipkan baris sebelum blok berikutnya jika kurang).
+ * Mengembalikan nomor baris judulnya, atau 0 jika tidak ditemukan.
+ */
+function ruangBlokDashboard_(sheet, judul, tinggi, catatan) {
+  var akhir = sheet.getLastRow();
+  if (akhir < 1) return 0;
+  var kolA = sheet.getRange(1, 1, akhir, 1).getValues().map(function (r) { return String(r[0]); });
+  var baris = 0;
+  for (var i = 0; i < kolA.length; i++) if (kolA[i] === judul) { baris = i + 1; break; }
+  if (!baris) {
+    catatan.push('Peringatan: blok ' + judul + ' di Dashboard tidak ditemukan; rumus tidak dipasang.');
+    return 0;
+  }
+  var urutan = BLOK_DASHBOARD.indexOf(judul);
+  var berikut = BLOK_DASHBOARD[urutan + 1];
+  var barisBerikut = 0;
+  for (var j = baris; j < kolA.length && berikut; j++) if (kolA[j] === berikut) { barisBerikut = j + 1; break; }
+  if (barisBerikut && barisBerikut - baris < tinggi) {
+    sheet.insertRowsBefore(barisBerikut, tinggi - (barisBerikut - baris));
+    catatan.push('Dashboard: ruang blok ' + judul + ' disisipkan');
+  }
+  return baris;
+}
+
+function judulTabelDashboard_(rentang, judul) {
+  rentang.setValues([judul]).setFontWeight('bold').setFontColor(WARNA.tintaRedup).setBackground(WARNA.baja);
+}
+
+/**
+ * Blok Waste di Dashboard (spesifikasi sistem Bagian 8.5) untuk periode B3:
+ * ringkasan, total per kategori waste, 5 item paling sering waste, estimasi
+ * kerugian per bulan (6 bulan terakhir), dan tren qty 5 item itu per minggu.
+ */
+function pasangBlokWasteDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  var h = ruangBlokDashboard_(sheet, 'Waste', TINGGI_BLOK_WASTE, catatan);
+  if (!h) return;
+  var K = function (judul) { return kolomRumus_(ss, 'Data_Waste', judul); };
+  var wT = K('Tanggal'), wI = K('Item / Produk'), wK = K('Kategori Waste'), wQ = K('Qty'), wE = K('Estimasi Kerugian (Rp)');
+  var wU = K('Satuan');
+  var periode = wT + ',">="&awalP,' + wT + ',"<="&TODAY()';
+  // 5 item paling sering waste dalam periode (jumlah catatan, lalu estimasi).
+  var top = 'u,IFERROR(UNIQUE(FILTER(' + wI + ',' + wI + '<>"",' + wT + '>=awalP,' + wT + '<=TODAY())),""),' +
+    'top,IF(INDEX(u,1,1)="","",ARRAY_CONSTRAIN(SORT(HSTACK(u,' +
+      'MAP(u,LAMBDA(x,COUNTIFS(' + wI + ',x,' + periode + '))),' +
+      'MAP(u,LAMBDA(x,SUMIFS(' + wQ + ',' + wI + ',x,' + periode + '))),' +
+      'MAP(u,LAMBDA(x,SUMIFS(' + wE + ',' + wI + ',x,' + periode + ')))),2,FALSE,4,FALSE),5,4)),';
+
+  sheet.getRange(h + 1, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+    '"Total estimasi kerugian: "&TEXT(SUMIFS(' + wE + ',' + periode + '),"""Rp ""#,##0")&" · "&' +
+    'COUNTIFS(' + periode + ',' + wI + ',"<>")&" catatan · Periode: "&$B$3)')
+    .setFontStyle('normal').setFontColor(WARNA.tinta);
+
+  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
+    ['Kategori Waste', 'Catatan', 'Estimasi (Rp)', '', '5 item paling sering', 'Catatan', 'Qty', 'Estimasi (Rp)']);
+  sheet.getRange(h + 3, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+    'k,VSTACK(' + KATEGORI_WASTE.map(function (x) { return '"' + x + '"'; }).join(',') + '),' +
+    'HSTACK(k,MAP(k,LAMBDA(x,COUNTIFS(' + wK + ',x,' + periode + '))),MAP(k,LAMBDA(x,SUMIFS(' + wE + ',' + wK + ',x,' + periode + ')))))');
+  sheet.getRange(h + 3, 5).setFormula('=LET(' + AWAL_PERIODE_ + top +
+    'IF(INDEX(u,1,1)="","Belum ada waste.",top))');
+  sheet.getRange(h + 3, 2, 5, 1).setNumberFormat(FORMAT.bulat);
+  sheet.getRange(h + 3, 3, 5, 1).setNumberFormat(FORMAT.rupiah);
+  sheet.getRange(h + 3, 6, 5, 1).setNumberFormat(FORMAT.bulat);
+  sheet.getRange(h + 3, 7, 5, 1).setNumberFormat(FORMAT.angka);
+  sheet.getRange(h + 3, 8, 5, 1).setNumberFormat(FORMAT.rupiah);
+
+  judulTabelDashboard_(sheet.getRange(h + 9, 1, 1, 8),
+    ['Bulan', 'Estimasi (Rp)', '', '', 'Qty per minggu', '7 hari terakhir', '8–14 hari lalu', '15–21 hari lalu']);
+  sheet.getRange(h + 10, 1).setFormula('=LET(m,MAP(SEQUENCE(6),LAMBDA(i,EDATE(DATE(YEAR(TODAY()),MONTH(TODAY()),1),i-6))),' +
+    'HSTACK(m,MAP(m,LAMBDA(x,SUMIFS(' + wE + ',' + wT + ',">="&x,' + wT + ',"<"&EDATE(x,1))))))');
+  sheet.getRange(h + 10, 1, 6, 1).setNumberFormat('mmm yyyy');
+  sheet.getRange(h + 10, 2, 6, 1).setNumberFormat(FORMAT.rupiah);
+  var minggu = function (a, b) {
+    return 'MAP(CHOOSECOLS(top,1),LAMBDA(x,SUMIFS(' + wQ + ',' + wI + ',x,' + wT + ',">="&(TODAY()-' + b + '),' + wT + ',"<="&(TODAY()-' + a + '))))';
+  };
+  sheet.getRange(h + 10, 5).setFormula('=LET(' + AWAL_PERIODE_ + top +
+    'IF(INDEX(u,1,1)="","Belum ada waste.",HSTACK(MAP(CHOOSECOLS(top,1),LAMBDA(x,x&" ("&XLOOKUP(x,' + wI + ',' + wU + ',"")&")")),' +
+    minggu(0, 6) + ',' + minggu(7, 13) + ',' + minggu(14, 20) + ')))');
+  sheet.getRange(h + 10, 6, 5, 3).setNumberFormat(FORMAT.angka);
+  catatan.push('Rumus waste dipasang: Dashboard (blok Waste)');
+}
+
+/**
+ * Blok Suhu Chiller & Freezer di Dashboard (Bagian 8.5): ringkasan kejadian
+ * di luar standar dalam periode B3; per unit aktif: jumlah cek, di luar
+ * standar, rata-rata, terendah, tertinggi, dan suhu terakhir; lalu tren
+ * rata-rata suhu per unit per hari selama 7 hari terakhir.
+ */
+function pasangBlokSuhuDashboard_(ss, catatan) {
+  var sheet = ss.getSheetByName('Dashboard');
+  var h = ruangBlokDashboard_(sheet, 'Suhu Chiller & Freezer', TINGGI_BLOK_SUHU, catatan);
+  if (!h) return;
+  var K = function (judul) { return kolomRumus_(ss, 'Data_Suhu', judul); };
+  var sT = K('Tanggal'), sU = K('Nama Unit'), sS = K('Suhu (°C)'), sSt = K('Status Suhu'), sTs = K('timestamp_server');
+  var uN = kolomRumus_(ss, 'M_Unit', 'Nama Unit'), uT = kolomRumus_(ss, 'M_Unit', 'Tipe'), uA = kolomRumus_(ss, 'M_Unit', 'Aktif');
+  var periode = sT + ',">="&awalP,' + sT + ',"<="&TODAY()';
+  var unit = 'u,IFERROR(ARRAY_CONSTRAIN(FILTER(' + uN + ',' + uN + '<>"",' + uA + '=TRUE),10,1),""),';
+
+  sheet.getRange(h + 1, 1).setFormula('=LET(' + AWAL_PERIODE_ +
+    'n,COUNTIFS(' + periode + ',' + sSt + ',"Di Luar Standar"),' +
+    'IF(n=0,"Semua pengecekan normal","Pengecekan di luar standar: "&n)&" · "&COUNTIFS(' + periode + ',' + sU + ',"<>")&" pengecekan · Periode: "&$B$3)')
+    .setFontStyle('normal').setFontColor(WARNA.tinta);
+
+  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
+    ['Unit', 'Tipe', 'Pengecekan', 'Di luar standar', 'Rata-rata (°C)', 'Terendah (°C)', 'Tertinggi (°C)', 'Terakhir (°C)']);
+  var per = function (rumus) { return 'MAP(u,LAMBDA(x,' + rumus + '))'; };
+  var ada = 'COUNTIFS(' + sU + ',x,' + periode + ')';
+  sheet.getRange(h + 3, 1).setFormula('=LET(' + AWAL_PERIODE_ + unit +
+    'IF(INDEX(u,1,1)="","Belum ada unit aktif.",HSTACK(u,' +
+      per('XLOOKUP(x,' + uN + ',' + uT + ',"")') + ',' +
+      per(ada) + ',' +
+      per('COUNTIFS(' + sU + ',x,' + periode + ',' + sSt + ',"Di Luar Standar")') + ',' +
+      per('IF(' + ada + '=0,"",ROUND(AVERAGEIFS(' + sS + ',' + sU + ',x,' + periode + '),1))') + ',' +
+      per('IF(' + ada + '=0,"",MINIFS(' + sS + ',' + sU + ',x,' + periode + '))') + ',' +
+      per('IF(' + ada + '=0,"",MAXIFS(' + sS + ',' + sU + ',x,' + periode + '))') + ',' +
+      per('IFERROR(INDEX(FILTER(' + sS + ',' + sU + '=x,' + sTs + '=MAXIFS(' + sTs + ',' + sU + ',x)),1),"")') + ')))');
+  sheet.getRange(h + 3, 3, 10, 2).setNumberFormat(FORMAT.bulat);
+  sheet.getRange(h + 3, 5, 10, 4).setNumberFormat(FORMAT.suhu);
+
+  sheet.getRange(h + 14, 1).setValue('Rata-rata per hari (°C)');
+  sheet.getRange(h + 14, 2).setFormula('=MAP(SEQUENCE(1,7,-6),LAMBDA(i,TODAY()+i))');
+  sheet.getRange(h + 14, 1, 1, 8).setFontWeight('bold').setFontColor(WARNA.tintaRedup).setBackground(WARNA.baja);
+  sheet.getRange(h + 14, 2, 1, 7).setNumberFormat('d mmm');
+  sheet.getRange(h + 15, 1).setFormula('=LET(' + unit +
+    'IF(INDEX(u,1,1)="","Belum ada unit aktif.",HSTACK(u,MAKEARRAY(ROWS(u),7,LAMBDA(r,c,' +
+      'IFERROR(ROUND(AVERAGEIFS(' + sS + ',' + sU + ',INDEX(u,r,1),' + sT + ',TODAY()-7+c),1),""))))))');
+  sheet.getRange(h + 15, 2, 10, 7).setNumberFormat(FORMAT.suhu);
+  pasangAturanWarna_(sheet, [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(ISNUMBER($D' + (h + 3) + '),$D' + (h + 3) + '>0)')
+      .setFontColor(WARNA.masalah).setBold(true).setRanges([sheet.getRange(h + 3, 4, 10, 1)]).build()
+  ]);
+  catatan.push('Rumus suhu dipasang: Dashboard (blok Suhu Chiller & Freezer)');
 }
 
 /** Menambahkan baris yang kunci kolom A-nya belum ada. Baris lama tidak disentuh. */

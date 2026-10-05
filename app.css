@@ -2477,6 +2477,282 @@ body.papan-ketik .bilah-kirim {
 }
 
 /* =========================================================================
+ * Waste dan Suhu (spesifikasi tampilan Bagian 5.3)
+ * ========================================================================= */
+
+/* Tombol ikon persegi 48 px (hapus baris) */
+.tombol-ikon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tinta-redup);
+  cursor: pointer;
+  transition: transform 100ms ease-out;
+}
+
+.tombol-ikon:active {
+  transform: scale(0.96);
+}
+
+.tombol-ikon:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+.deret-tambah {
+  display: flex;
+  margin-top: 16px;
+}
+
+.deret-tambah .tombol {
+  flex: 1 1 auto;
+}
+
+@media (min-width: 600px) {
+  .deret-tambah .tombol {
+    flex: 0 1 auto;
+  }
+}
+
+/* Kategori waste: lima tombol; di HP dua per baris supaya teksnya tidak terpotong */
+.pilihan-kategori-waste .pilihan {
+  flex: 1 1 calc(50% - 8px);
+}
+
+@media (min-width: 600px) {
+  .pilihan-kategori-waste .pilihan {
+    flex: 1 1 auto;
+  }
+}
+
+.estimasi-angka {
+  font-weight: 600;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+
+.kartu-item-kepala .tombol-ikon {
+  align-self: center;
+  margin: -8px -8px -8px 0;
+}
+
+/* Item yang sudah diisi diringkas jadi satu baris (HP dan tablet) */
+.waste-ringkas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 0;
+}
+
+.waste-ringkas-tombol {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 12px 8px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 100ms ease-out;
+}
+
+.waste-ringkas-tombol:active {
+  transform: scale(0.99);
+}
+
+.waste-ringkas-tombol:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.waste-ringkas-tombol .kartu-item-nama {
+  font-size: 16px;
+}
+
+.waste-ringkas-ket {
+  font-size: 14px;
+  color: var(--tinta-redup);
+  overflow-wrap: anywhere;
+}
+
+/* Tabel waste dan suhu di laptop dan desktop: kolom isian boleh membungkus */
+.tabel-waste td.sel-kategori-waste,
+.tabel-waste td.sel-alasan,
+.tabel-suhu td,
+.tabel-waste td {
+  white-space: normal;
+}
+
+.tabel-waste td.sel-kategori-waste {
+  min-width: 300px;
+}
+
+.tabel-waste .pilihan span {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.tabel-waste td.sel-alasan,
+.tabel-suhu td.sel-alasan {
+  min-width: 200px;
+}
+
+.tabel-waste .kolom,
+.tabel-suhu .kolom {
+  gap: 4px;
+}
+
+/* Detail Riwayat: teks panjang (alasan, tindakan korektif) membungkus; angka tetap satu baris */
+.tabel-detail td:not(.angka):not(:first-child) {
+  white-space: normal;
+  min-width: 120px;
+  max-width: 320px;
+}
+
+.daftar-pilih-item {
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 12px;
+}
+
+/* Suhu */
+.pilihan-waktu-cek {
+  margin-top: 16px;
+}
+
+.pilihan-waktu-cek .pilihan {
+  flex: 1 1 calc(50% - 8px);
+}
+
+@media (min-width: 600px) {
+  .pilihan-waktu-cek .pilihan {
+    flex: 1 1 0;
+  }
+}
+
+.pilihan-waktu-cek .pilihan span {
+  gap: 6px;
+  min-height: 56px;
+  font-size: 18px;
+}
+
+.pilihan-waktu-cek .pilihan span .ikon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.25;
+}
+
+.batas-suhu {
+  font-size: 14px;
+}
+
+.tombol-tanda {
+  flex: none;
+  width: 56px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--garis-isian);
+  border-radius: 10px;
+  background: var(--baja);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 100ms ease-out;
+}
+
+.tombol-tanda:active {
+  transform: scale(0.96);
+}
+
+.tombol-tanda:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+.baris-suhu .satuan-tetap {
+  min-width: 32px;
+}
+
+.status-suhu:empty {
+  display: none;
+}
+
+.daftar-catatan-suhu {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.catatan-suhu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--tinta);
+  overflow-wrap: anywhere;
+}
+
+.catatan-suhu.cek-ulang {
+  padding-left: 12px;
+  border-left: 2px solid var(--garis);
+}
+
+.catatan-suhu-tindakan {
+  flex: 1 1 100%;
+  color: var(--tinta-redup);
+}
+
+.nilai-masalah {
+  color: var(--masalah-teks);
+  font-weight: 600;
+}
+
+.kartu-suhu > .tombol {
+  justify-self: start;
+}
+
+.tabel-suhu td.tercatat {
+  min-width: 220px;
+}
+
+.tabel-suhu .isian-angka {
+  width: 96px;
+}
+
+.tabel-suhu .baris-angka,
+.tabel-waste .baris-angka {
+  flex-wrap: nowrap;
+}
+
+.tabel-suhu .status-suhu {
+  margin-top: 6px;
+}
+
+.tabel-suhu tr.masalah td {
+  background: var(--masalah-latar);
+}
+
+/* =========================================================================
  * Riwayat (spesifikasi tampilan Bagian 5.4)
  * ========================================================================= */
 
@@ -3025,7 +3301,10 @@ body.papan-ketik .bilah-kirim {
   .beranda-pengguna:active,
   .bar-pengguna:active,
   .menu-pengguna-item:active,
-  .tombol-kembali:active {
+  .tombol-kembali:active,
+  .tombol-ikon:active,
+  .tombol-tanda:active,
+  .waste-ringkas-tombol:active {
     transform: none !important;
   }
   .kerangka {
