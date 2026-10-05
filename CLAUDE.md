@@ -122,7 +122,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 2 | Form Stock Inventory Harian (termasuk rumus `Harian_Stock` dan blok Stock di tab Dashboard) | Kode selesai (Code.gs v0.3, aplikasi 0.3.0), diuji dengan API tiruan. Rumus Sheet belum bisa diuji di sini |
 | 3 | Riwayat, pemeriksaan, dan koreksi | Kode selesai dan digabung (Code.gs v0.4, aplikasi 0.4.0), diuji dengan API tiruan (Code.gs dijalankan di Node dengan tiruan SpreadsheetApp) |
 | 4 | Laporan PDF dan email harian, cadangan mingguan | Kode selesai (Code.gs v0.5, aplikasi 0.5.0), diuji dengan API tiruan (Drive, Gmail, dan trigger tiruan; template PDF dirender di Chromium). Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `kirimLaporanSekarang` (izin baru), `pasangTrigger`, deploy versi baru, uji dari HP |
-| 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.1, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
+| 4+ | Perubahan 5 Oktober 2026 (spesifikasi tampilan 1.6): tombol Keluar, keluar otomatis, Pengaturan → Outlet dan jadwal, hapus staff, PDF stock per kategori | Kode selesai (Code.gs v0.5.3, aplikasi 0.5.1), diuji dengan API tiruan dan Chromium. Pemisah halaman pada konversi PDF Google belum bisa diuji di sini (butir 77). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` dan `ujiPemisahHalamanPdf`, deploy versi baru, uji dari HP |
 | 5 | Form Waste dan Suhu | Belum |
 | 6 | Prep List dan resep | Belum |
 | 7 | Dashboard di aplikasi dan pengelolaan master | Belum |
@@ -525,4 +525,18 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dari isi PDF, lalu mengisi property itu ("ya" untuk 3 halaman, "tidak" untuk 1); jika jumlahnya
     tidak terbaca, pemilik memeriksa filenya dan mengisi property sendiri. Unduh dari Riwayat, Simpan
     ulang ke Drive, PDF harian, dan lampiran email selalu satu file Stock berisi semua kategori.
-78. **Versi:** Code.gs v0.5.1, aplikasi 0.5.1 (perbaikan di atas Tahap 4, belum Tahap 5).
+78. **Versi:** Code.gs v0.5.3, aplikasi 0.5.1 (perbaikan di atas Tahap 4, belum Tahap 5).
+79. **Baris baru tepat di bawah baris terakhir yang kolom kuncinya terisi** (v0.5.2, diperketat
+    v0.5.3). Kotak centang yang tidak dicentang menyimpan FALSE dan dropdown bisa berisi pilihan
+    tanpa data; `getLastRow()` menghitung keduanya, sehingga staff dari Pengaturan sempat tertulis di
+    baris 1001 (atau gagal jika kotak centang sampai baris terakhir tab). Sekarang setiap tab yang
+    ditulis aplikasi memakai kolom kunci yang selalu terisi pada baris data: `KUNCI_MASTER` (Nama di
+    `M_Staff`, Satuan di `M_Satuan`, ID Form di `M_Form`, Kunci di `M_Konfigurasi`) lewat
+    `barisBaruMaster_`, dan kolom A (Tanggal; Waktu di `Log_Perubahan`) untuk `Stock_Harian`, semua
+    tab `Data_*`, dan `Log_Perubahan` lewat `barisTulis_`. Baris yang kolom kuncinya kosong bukan
+    data. `rapikanTabMaster_` memindahkan baris berkunci ke atas mulai baris 2 tanpa mengubah urutan
+    dan isinya, lalu mengosongkan isi baris tanpa kunci (validasi dan format tetap); dijalankan
+    setupSpreadsheet untuk keempat tab master itu (dengan catatan di log, termasuk peringatan jika
+    baris tanpa kunci berisi pilihan dropdown) dan setiap kali staff ditambah. Tab master yang belum
+    ditulis aplikasi (`M_Item`, `M_Kategori`, `M_Unit`, `M_Resep`, `M_ResepBahan`, `M_FormKolom`)
+    memakai cara yang sama saat ditulis dari Pengaturan di Tahap 7 dan 9.
