@@ -2,14 +2,15 @@
    Tahap 3: Riwayat, pemeriksaan, dan koreksi; Tahap 4: laporan PDF;
    5 Oktober 2026: tombol Keluar, keluar otomatis, hapus staff, PDF stock per kategori;
    Tahap 5: form Waste dan Suhu; Tahap 6: Prep List, resep, masa simpan;
-   Tahap 7: Dashboard dan Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal).
+   Tahap 7: Dashboard dan Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal;
+   Tahap 8: stock opname dan daftar belanja; Tahap 9: form kustom dan Pengaturan → Form).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.9.0';
+  var VERSI_APLIKASI = '0.10.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -344,7 +345,8 @@
     jam: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     resep: '<path d="M3.5 11.5h17"/><path d="M5 11.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M9 4.5c-1 1.2 1 2.3 0 3.5M13 4.5c-1 1.2 1 2.3 0 3.5"/>',
     kotak: '<path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>',
-    label: '<path d="M3.5 12.5v-8h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.5"/>'
+    label: '<path d="M3.5 12.5v-8h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.5"/>',
+    titikTiga: '<path d="M12 5.5v.01M12 12v.01M12 18.5v.01" stroke-width="3"/>'
   };
 
   /** Ikon kecil 16 px untuk tanda status. */
@@ -1084,6 +1086,7 @@
     { pola: /^\/waste$/, menu: 'beranda', layar: layarWaste },
     { pola: /^\/suhu$/, menu: 'beranda', layar: layarSuhu },
     { pola: /^\/prep$/, menu: 'beranda', layar: layarPrep },
+    { pola: /^\/form\/([A-Za-z0-9_%]+)$/, menu: 'beranda', layar: layarFormKustom },
     { pola: /^\/riwayat(?:\?(.*))?$/, menu: 'riwayat', layar: layarRiwayat },
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
@@ -1093,6 +1096,9 @@
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
     { pola: /^\/pengaturan\/staff\/([^/]+)(\/pin)?$/, menu: 'pengaturan', pengelola: true, layar: layarStaffDetail },
     { pola: /^\/pengaturan\/penerima$/, menu: 'pengaturan', pengelola: true, layar: layarPenerima },
+    { pola: /^\/pengaturan\/form$/, menu: 'pengaturan', pengelola: true, layar: layarFormDaftar },
+    { pola: /^\/pengaturan\/form-baru$/, menu: 'pengaturan', pengelola: true, layar: layarFormUbah },
+    { pola: /^\/pengaturan\/form\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarFormUbah },
     { pola: /^\/pengaturan\/outlet$/, menu: 'pengaturan', pengelola: true, layar: layarOutletJadwal },
     { pola: /^\/pengaturan\/item$/, menu: 'pengaturan', pengelola: true, layar: layarItem },
     { pola: /^\/pengaturan\/item-baru$/, menu: 'pengaturan', pengelola: true, layar: layarItemUbah },
@@ -1987,7 +1993,10 @@
       var gerak = pembuka && !tiketSudahTampil;
       form.forEach(function (f, i) {
         var st = STATUS_TIKET[f.status] || STATUS_TIKET.belum;
-        var tanda = tandaStatus(st.jenis, st.kata || f.detail || 'Belum diisi');
+        var kataTiket = st.kata || f.detail || 'Belum diisi';
+        // Form kustom di luar jadwalnya tidak ditagih (Bagian 5.8): tiketnya tidak menulis "Belum diisi".
+        if (f.status === 'belum' && !f.wajib) kataTiket = f.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu' : 'Tidak dijadwalkan hari ini';
+        var tanda = tandaStatus(st.jenis, kataTiket);
         var lama = statusSebelum[f.id];
         if (lama && lama !== f.status && (f.status === 'terkirim' || f.status === 'nihil')) {
           tanda.classList.add('cap');
@@ -2005,6 +2014,7 @@
           style: gerak && i < 8 ? '--urut:' + i : null,
           onclick: function () {
             if (LAYAR_FORM[f.id]) location.hash = LAYAR_FORM[f.id];
+            else if (f.jenis === 'kustom') location.hash = hrefFormKustom(f.id);
             else toast(PESAN.formBelumDibangun, 'info');
           }
         }, [
@@ -4510,6 +4520,540 @@
   }
 
   /* =======================================================================
+   * Form kustom (spesifikasi sistem Bagian 5.6, tampilan Bagian 5.3): layar
+   * isi umum yang dibentuk dari definisi form. Kolom kepala di kotak info,
+   * kolom baris sebagai kartu (HP dan tablet) atau tabel (laptop dan
+   * desktop). Dipakai juga pratinjau di Pengaturan → Form.
+   * ===================================================================== */
+
+  var JENIS_KOLOM = ['Teks', 'Angka', 'Pilihan', 'Ya/Tidak', 'Item', 'Jam'];
+  var URUTAN_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  var NAMA_JADWAL = { harian: 'Setiap hari', 'hari tertentu': 'Hari tertentu', 'sewaktu-waktu': 'Sewaktu-waktu' };
+
+  /** "Setiap hari", "Senin, Kamis", atau "Sewaktu-waktu". */
+  function teksJadwal(f) {
+    if (f.jadwal === 'hari tertentu') return (f.hari || []).length ? f.hari.join(', ') : 'Hari tertentu';
+    return NAMA_JADWAL[f.jadwal] || 'Setiap hari';
+  }
+
+  /** "Diisi tiap closing. Jadwal: Setiap hari." */
+  function kalimatKeterangan(ket, jadwal) {
+    var k = String(ket || '').trim();
+    if (!k) return jadwal;
+    return k + (/[.!?]$/.test(k) ? ' ' : '. ') + jadwal;
+  }
+
+  function hrefFormKustom(id) {
+    return '#/form/' + encodeURIComponent(id);
+  }
+
+  /** "Isi" untuk kolom yang diketik, "Pilih" untuk pilihan dan item (pesan sama dengan server). */
+  function kataIsi(c) {
+    return c.jenis === 'Pilihan' || c.jenis === 'Ya/Tidak' || c.jenis === 'Item' ? 'Pilih ' : 'Isi ';
+  }
+
+  /** Nilai satu kolom: { kosong, salah (pesan) }. */
+  function periksaNilaiKustom(c, v, letak) {
+    var t = String(v == null ? '' : v).trim();
+    if (!t) return { kosong: true, salah: '' };
+    if (c.jenis === 'Angka') {
+      var n = bacaAngka(t);
+      if (n === null || isNaN(n)) return { kosong: false, salah: c.label + letak + ' diisi angka 0 atau lebih, misalnya 2,5.' };
+    }
+    if (c.jenis === 'Jam' && !/^\d{1,2}[:.]\d{2}$/.test(t)) return { kosong: false, salah: c.label + letak + ' diisi jam, misalnya 07:30.' };
+    return { kosong: false, salah: '' };
+  }
+
+  /** Nilai untuk dikirim: angka sebagai bilangan, lainnya teks. */
+  function nilaiKirimKustom(c, v) {
+    var t = String(v == null ? '' : v).trim();
+    if (!t) return '';
+    return c.jenis === 'Angka' ? bacaAngka(t) : t;
+  }
+
+  /**
+   * Isian satu kolom menurut jenisnya (tampilan Bagian 5.3): Teks dan Angka
+   * kolom isian; Pilihan tombol berjajar jika empat atau kurang, selebihnya
+   * dropdown; Ya/Tidak dua tombol; Item pencarian item; Jam pemilih waktu.
+   * opsi: { nilai, ubah(v), item: [{ nama, kategori, satuan }], tabel: label
+   *         hanya untuk pembaca layar, kunci: data-kunci untuk fokus }.
+   * Mengembalikan { wadah, fokus(), galat(pesan) }.
+   */
+  function isianKolomKustom(c, opsi) {
+    var label = c.label + (c.wajib ? ' (wajib)' : '');
+    var nilai = opsi.nilai == null ? '' : String(opsi.nilai);
+    var hasil;
+    if (c.jenis === 'Ya/Tidak' || (c.jenis === 'Pilihan' && (c.pilihan || []).length <= 4)) {
+      var g = grupPilihan(label, c.jenis === 'Ya/Tidak' ? ['Ya', 'Tidak'] : c.pilihan, nilai);
+      if (opsi.tabel) g.wadah.querySelector('legend').classList.add('sr');
+      g.wadah.querySelector('fieldset').classList.add('pilihan-kustom');
+      g.input.forEach(function (i) {
+        if (opsi.kunci) i.setAttribute('data-kunci', opsi.kunci);
+        i.addEventListener('change', function () { g.galat(''); opsi.ubah(g.nilai()); });
+      });
+      hasil = { wadah: g.wadah, fokus: function () { g.input[0].focus(); }, galat: g.galat };
+    } else if (c.jenis === 'Pilihan') {
+      var kp = kolomPilih({ label: label, nilai: nilai, pilihan: [{ value: '', text: 'Pilih…' }].concat(c.pilihan.map(function (p) {
+        return { value: p, text: p };
+      })) });
+      if (opsi.tabel) kp.wadah.querySelector('label').classList.add('sr');
+      if (opsi.kunci) kp.input.setAttribute('data-kunci', opsi.kunci);
+      kp.input.addEventListener('change', function () { kp.galat(''); opsi.ubah(kp.input.value); });
+      hasil = { wadah: kp.wadah, fokus: function () { kp.input.focus(); }, galat: kp.galat };
+    } else if (c.jenis === 'Item') {
+      var daftar = opsi.item || [];
+      var wadah = el('div', { class: 'kolom kolom-item' });
+      var galatItem = el('p', { class: 'kolom-galat' });
+      var gambarItem = function () {
+        kosongkan(wadah);
+        var it = daftar.filter(function (x) { return x.nama.toLowerCase() === nilai.toLowerCase(); })[0];
+        var pilih = tombol(nilai ? 'Ganti item' : 'Pilih item', 'kedua', { 'aria-haspopup': 'dialog',
+          'aria-label': (nilai ? 'Ganti ' : 'Pilih ') + c.label.toLowerCase() + (nilai ? ', sekarang ' + nilai : ''), 'data-kunci': opsi.kunci });
+        pilih.addEventListener('click', function () {
+          bukaPilihItem({
+            judul: 'Pilih ' + c.label.toLowerCase(),
+            daftar: daftar,
+            kosong: 'Daftar item belum termuat. Periksa sinyal, lalu buka lagi.',
+            ket: function (x) { return [x.kategori, x.satuan].filter(Boolean).join(' · '); },
+            pilih: function (x) {
+              nilai = x.nama;
+              opsi.ubah(nilai);
+              gambarItem();
+              var t = wadah.querySelector('button');
+              if (t) t.focus();
+            }
+          });
+        });
+        wadah.appendChild(el('span', { class: 'kolom-label' + (opsi.tabel ? ' sr' : ''), text: label }));
+        if (nilai) {
+          wadah.appendChild(el('p', { class: 'nilai-terpilih' }, [el('strong', { text: nilai }),
+            it && it.satuan ? el('span', { class: 'otomatis', text: ' · ' + it.satuan }) : null]));
+        }
+        wadah.appendChild(el('div', { class: 'deret-tombol' }, [pilih, nilai && !c.wajib ? tombol('Kosongkan', 'tautan', {
+          'aria-label': 'Kosongkan ' + c.label.toLowerCase(),
+          onclick: function () { nilai = ''; opsi.ubah(''); gambarItem(); }
+        }) : null]));
+        wadah.appendChild(galatItem);
+      };
+      gambarItem();
+      hasil = {
+        wadah: wadah,
+        fokus: function () { var t = wadah.querySelector('button'); if (t) t.focus(); },
+        galat: function (pesan) {
+          kosongkan(galatItem);
+          if (pesan) {
+            galatItem.appendChild(ikonStatus('masalah'));
+            galatItem.appendChild(el('span', { text: pesan }));
+          }
+          return !pesan;
+        }
+      };
+    } else {
+      var ki = kolomIsian({
+        label: label,
+        type: c.jenis === 'Jam' ? 'time' : 'text',
+        inputmode: c.jenis === 'Angka' ? 'decimal' : null,
+        kelas: c.jenis === 'Angka' ? 'isian-angka' : (c.jenis === 'Jam' ? 'isian-jam' : null),
+        maxlength: c.jenis === 'Teks' ? 200 : null,
+        nilai: nilai,
+        atribut: opsi.kunci ? { 'data-kunci': opsi.kunci } : null
+      });
+      if (opsi.tabel) ki.wadah.querySelector('label').classList.add('sr');
+      ki.input.addEventListener('input', function () {
+        if (ki.input.getAttribute('aria-invalid') === 'true') ki.galat('');
+        opsi.ubah(ki.input.value);
+      });
+      hasil = { wadah: ki.wadah, fokus: function () { ki.input.focus(); }, galat: ki.galat };
+    }
+    return hasil;
+  }
+
+  /**
+   * Isian form kustom: kolom kepala, baris (kartu atau tabel), penghitung,
+   * pemeriksaan kolom wajib, dan isi kiriman. o: { def: { nama, kolom },
+   * item, keadaan: { kepala: { id: nilai }, baris: [{ id, nilai: {} }] },
+   * ubah() (dipanggil setiap isian berubah), wadahBaris, penghitung,
+   * desktop() → bool }.
+   */
+  function isianFormKustom(o) {
+    var kolomKepala = o.def.kolom.filter(function (c) { return c.bagian === 'kepala'; });
+    var kolomBaris = o.def.kolom.filter(function (c) { return c.bagian === 'baris'; });
+    var k = o.keadaan;
+    if (!k.kepala) k.kepala = {};
+    if (!Array.isArray(k.baris) || !k.baris.length) k.baris = [{ id: buatId(), nilai: {} }];
+    var isianKepala = {};
+    var isianBaris = {};
+
+    function barisTerisi(b) {
+      return kolomBaris.some(function (c) { return !periksaNilaiKustom(c, b.nilai[c.id], '').kosong; });
+    }
+
+    function barisLengkap(b) {
+      return kolomBaris.every(function (c) {
+        var h = periksaNilaiKustom(c, b.nilai[c.id], '');
+        return !h.salah && !(c.wajib && h.kosong);
+      });
+    }
+
+    function perbaruiPenghitung() {
+      if (!o.penghitung) return;
+      var terisi = k.baris.filter(barisTerisi);
+      var lengkap = terisi.filter(barisLengkap).length;
+      o.penghitung.textContent = terisi.length ? lengkap + ' dari ' + terisi.length + ' baris lengkap' : 'Belum ada baris terisi';
+    }
+
+    var kepala = kolomKepala.map(function (c) {
+      var x = isianKolomKustom(c, {
+        nilai: k.kepala[c.id], item: o.item, kunci: 'kepala|' + c.id,
+        ubah: function (v) { k.kepala[c.id] = v; o.ubah(); }
+      });
+      isianKepala[c.id] = x;
+      return x.wadah;
+    });
+
+    function hapusBaris(b) {
+      k.baris = k.baris.filter(function (x) { return x !== b; });
+      if (!k.baris.length) k.baris.push({ id: buatId(), nilai: {} });
+      o.ubah();
+      gambarBaris();
+    }
+
+    function isianSatuBaris(b, nomor, tabel) {
+      var hasil = {};
+      isianBaris[b.id] = hasil;
+      return kolomBaris.map(function (c) {
+        var x = isianKolomKustom(c, {
+          nilai: b.nilai[c.id], item: o.item, tabel: tabel, kunci: b.id + '|' + c.id,
+          ubah: function (v) { b.nilai[c.id] = v; o.ubah(); perbaruiPenghitung(); }
+        });
+        hasil[c.id] = x;
+        return x;
+      });
+    }
+
+    function tombolHapus(b, nomor) {
+      return el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus baris ' + nomor,
+        onclick: function () { hapusBaris(b); } }, ikon('sampah'));
+    }
+
+    function gambarBaris() {
+      kosongkan(o.wadahBaris);
+      isianBaris = {};
+      if (o.desktop()) {
+        var badan = el('tbody');
+        k.baris.forEach(function (b, i) {
+          var x = isianSatuBaris(b, i + 1, true);
+          badan.appendChild(el('tr', {}, [el('td', { class: 'angka', text: String(i + 1) })]
+            .concat(x.map(function (y, j) { return el('td', { class: 'sel-kustom sel-' + kolomBaris[j].jenis.replace('/', '').toLowerCase() }, y.wadah); }))
+            .concat([el('td', {}, tombolHapus(b, i + 1))])));
+        });
+        o.wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-kustom' }, [
+          el('thead', {}, el('tr', {}, [el('th', { scope: 'col', class: 'angka', text: 'No' })]
+            .concat(kolomBaris.map(function (c) { return el('th', { scope: 'col', text: c.label + (c.wajib ? ' (wajib)' : '') }); }))
+            .concat([el('th', { scope: 'col' }, el('span', { class: 'sr', text: 'Hapus' }))]))),
+          badan
+        ])));
+      } else {
+        var grid = el('div', { class: 'grid-item' });
+        k.baris.forEach(function (b, i) {
+          var x = isianSatuBaris(b, i + 1, false);
+          grid.appendChild(el('article', { class: 'kartu-item', 'aria-label': 'Baris ' + (i + 1) }, [
+            el('div', { class: 'kartu-item-kepala' }, [el('h2', { class: 'kartu-item-nama', text: 'Baris ' + (i + 1) }), tombolHapus(b, i + 1)])
+          ].concat(x.map(function (y) { return y.wadah; }))));
+        });
+        o.wadahBaris.appendChild(grid);
+      }
+      perbaruiPenghitung();
+    }
+
+    function tambahBaris() {
+      var b = { id: buatId(), nilai: {} };
+      k.baris.push(b);
+      o.ubah();
+      gambarBaris();
+      var pertama = o.wadahBaris.querySelector('[data-kunci^="' + b.id + '|"]');
+      if (pertama) {
+        if (!apakahSentuh()) pertama.focus();
+        else pertama.scrollIntoView({ block: 'center' });
+      }
+    }
+
+    /** Pemeriksaan sebelum kirim: null jika sah, atau { pesan, fokus() }. */
+    function periksa() {
+      var salah = null;
+      kolomKepala.forEach(function (c) {
+        if (salah) return;
+        var h = periksaNilaiKustom(c, k.kepala[c.id], '');
+        var pesan = h.salah || (c.wajib && h.kosong ? kataIsi(c) + c.label + '.' : '');
+        if (pesan) {
+          isianKepala[c.id].galat(pesan);
+          salah = { pesan: pesan, fokus: isianKepala[c.id].fokus };
+        }
+      });
+      if (salah) return salah;
+      var terisi = 0;
+      k.baris.forEach(function (b, i) {
+        if (salah || !barisTerisi(b)) return;
+        terisi++;
+        kolomBaris.forEach(function (c) {
+          if (salah) return;
+          var letak = ' di baris ' + (i + 1);
+          var h = periksaNilaiKustom(c, b.nilai[c.id], letak);
+          var pesan = h.salah || (c.wajib && h.kosong ? kataIsi(c) + c.label + letak + '.' : '');
+          if (pesan) {
+            var x = isianBaris[b.id] && isianBaris[b.id][c.id];
+            if (x) x.galat(pesan);
+            salah = { pesan: pesan, fokus: x ? x.fokus : function () {} };
+          }
+        });
+      });
+      if (salah) return salah;
+      if (!terisi) return { pesan: 'Isi minimal satu baris.', fokus: function () {} };
+      return null;
+    }
+
+    function kumpul() {
+      var kp = {};
+      kolomKepala.forEach(function (c) { kp[c.id] = nilaiKirimKustom(c, k.kepala[c.id]); });
+      return {
+        kepala: kp,
+        baris: k.baris.filter(barisTerisi).map(function (b) {
+          var isi = {};
+          kolomBaris.forEach(function (c) { isi[c.id] = nilaiKirimKustom(c, b.nilai[c.id]); });
+          return isi;
+        })
+      };
+    }
+
+    return { kepala: kepala, gambarBaris: gambarBaris, tambahBaris: tambahBaris, periksa: periksa, kumpul: kumpul,
+      jumlahBaris: function () { return k.baris.filter(barisTerisi).length; } };
+  }
+
+  /** Draft per pengguna per form: { tanggal, kepala, baris: [{ id, nilai }], sid }. */
+  function bacaDraftKustom(id) {
+    var d = Draft.baca('kustom:' + id);
+    var data = d && d.data ? d.data : {};
+    return {
+      tanggal: data.tanggal || '',
+      kepala: data.kepala && typeof data.kepala === 'object' ? data.kepala : {},
+      baris: Array.isArray(data.baris) ? data.baris : [],
+      sid: data.sid || '',
+      waktu: d ? d.waktu : null
+    };
+  }
+
+  /** Definisi form di HP (Bagian 11: form bisa dibuka tanpa sinyal). Untuk tanggal lain: tanpa catatan. */
+  function dataKustomDariHp(id, tanggal) {
+    var c = Cache.baca('kustom:' + id);
+    if (!c || !c.data || !c.data.form) return null;
+    if (c.data.tanggal === tanggal) return c.data;
+    return Object.assign({}, c.data, { tanggal: tanggal, kiriman: { jumlah: 0, baris: 0, terakhir: null }, nihil: null, turunan: true });
+  }
+
+  function layarFormKustom(k) {
+    var idForm = '';
+    try {
+      idForm = decodeURIComponent(k.cocok[1]).toUpperCase();
+    } catch (err) {
+      idForm = String(k.cocok[1]).toUpperCase();
+    }
+    var pengelola = !!k.sesi.pengguna.pengelola;
+    var simpanan = Cache.baca('kustom:' + idForm);
+    var namaAwal = simpanan && simpanan.data && simpanan.data.form ? simpanan.data.form.nama : 'Form';
+    aturJudul(namaAwal);
+    var draft = bacaDraftKustom(idForm);
+    var tanggal = tanggalDraft(draft.tanggal, pengelola);
+    var data = null;
+    var isian = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var judul = el('h1', { class: 'judul-layar', text: namaAwal });
+    var keterangan = el('p', { class: 'kolom-bantuan keterangan-form' });
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var statusForm = el('div', { class: 'status-form' });
+    var wadahKepala = el('div', { class: 'kepala-kustom' });
+    var wadahBaris = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolKirim = tombol('Kirim ' + namaAwal.toLowerCase(), 'utama');
+    var tombolTambah = tombol('Tambah baris', 'kedua');
+    tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
+    var gTanggal = pilihanTanggalIsian({ pengelola: pengelola, tanggal: tanggal, ganti: gantiTanggal });
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form layar-kustom' }, [
+      tautanKembali('Beranda', '#/'),
+      judul,
+      keterangan,
+      catatanDraft,
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+        gTanggal.wadah,
+        wadahKepala,
+        el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
+      ]),
+      wadahBaris,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, el('div', { class: 'deret-tombol bilah-kirim-tombol' }, [tombolTambah, tombolKirim])])
+    ]));
+
+    function simpanDraft() {
+      var waktu = Draft.simpan('kustom:' + idForm, { tanggal: tanggal, kepala: draft.kepala, baris: draft.baris, sid: draft.sid });
+      catatanDraft.textContent = waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktu && draft.baris.length) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    function gambarStatus() {
+      kosongkan(statusForm);
+      if (!data) return;
+      var menunggu = antreanForm(idForm, tanggal);
+      var kirimMenunggu = menunggu.filter(function (e) { return e.aksi === 'kirimKustom'; });
+      var nihilMenunggu = menunggu.filter(function (e) { return e.aksi === 'tandaiNihil'; })[0] || null;
+      var kr = data.kiriman || { jumlah: 0 };
+      if (kr.jumlah) {
+        var t = kr.terakhir;
+        statusForm.appendChild(el('p', {}, [tandaStatus('baik', 'Terkirim'),
+          el('span', { class: 'kolom-bantuan', text: ' ' + kr.jumlah + ' kiriman, ' + kr.baris + ' baris' +
+            (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') + '.' })]));
+      }
+      if (kirimMenunggu.length) statusForm.appendChild(tandaStatus('menunggu', kirimMenunggu.length + ' isian menunggu kirim'));
+      var nihil = bagianNihil({
+        formId: idForm,
+        namaForm: data.form.nama,
+        tanggal: tanggal,
+        nihil: data.nihil,
+        adaIsian: kr.jumlah > 0 || kirimMenunggu.length > 0,
+        menunggu: nihilMenunggu,
+        selesai: function (n) {
+          data.nihil = n;
+          gambarStatus();
+        }
+      });
+      if (nihil) statusForm.appendChild(nihil);
+    }
+
+    function gambar(d) {
+      var defBerubah = !data || JSON.stringify(data.form) !== JSON.stringify(d.form) || JSON.stringify(data.item) !== JSON.stringify(d.item);
+      data = d;
+      var f = d.form;
+      aturJudul(f.nama);
+      judul.textContent = f.nama;
+      gantiTeksTombol(tombolKirim, 'Kirim ' + f.nama.toLowerCase());
+      keterangan.textContent = kalimatKeterangan(f.keterangan, 'Jadwal: ' + teksJadwal(f) + (d.wajib ? '.' : ', tidak ditagih pada tanggal ini.'));
+      gambarStatus();
+      if (!defBerubah && isian) return;
+      isian = isianFormKustom({
+        def: f, item: d.item || [], keadaan: draft, wadahBaris: wadahBaris, penghitung: penghitung,
+        desktop: function () { return mediaDesktop.matches; },
+        ubah: function () { tulisPesan(pesan, ''); simpanDraft(); }
+      });
+      kosongkan(wadahKepala);
+      tambahAnak(wadahKepala, isian.kepala);
+      wadahKepala.hidden = !isian.kepala.length;
+      isian.gambarBaris();
+    }
+
+    function gantiTanggal(baru) {
+      if (baru === tanggal) return;
+      tanggal = baru;
+      simpanDraft();
+      muat();
+    }
+
+    tombolTambah.addEventListener('click', function () {
+      if (isian) isian.tambahBaris();
+    });
+
+    tombolKirim.addEventListener('click', function () {
+      if (tombolKirim.disabled || !isian || !data) return;
+      tulisPesan(pesan, '');
+      var salah = isian.periksa();
+      if (salah) {
+        tulisPesan(pesan, salah.pesan, 'masalah');
+        salah.fokus();
+        return;
+      }
+      if (!draft.sid) draft.sid = buatId();
+      var kumpul = isian.kumpul();
+      var namaForm = data.form.nama;
+      var isi = { formId: idForm, submissionId: draft.sid, tanggal: tanggal, waktuPerangkat: new Date().toISOString(),
+        kepala: kumpul.kepala, baris: kumpul.baris };
+      var entri = { id: isi.submissionId, aksi: 'kirimKustom', isi: isi, formId: idForm,
+        judul: namaForm + ' · ' + kumpul.baris.length + ' baris', tanggal: tanggal };
+      function kosongkanIsian() {
+        // Kolom kepala tetap (seperti shift di Waste); baris dikosongkan.
+        draft.baris = [{ id: buatId(), nilai: {} }];
+        draft.sid = buatId();
+        simpanDraft();
+        isian = null;
+      }
+      function keAntrean() {
+        simpanKeAntrean(entri);
+        kosongkanIsian();
+        gambar(data);
+        toast('Tersimpan di HP. Dikirim saat ada sinyal.');
+      }
+      if (navigator.onLine === false) {
+        keAntrean();
+        return;
+      }
+      aturTombolProses(tombolKirim, true, 'Mengirim…');
+      jagaProses(panggilApi('kirimKustom', isi)).then(function (hasil) {
+        aturTombolProses(tombolKirim, false);
+        kosongkanIsian();
+        Cache.tulis('kustom:' + idForm, hasil.form);
+        gambar(hasil.form.tanggal === tanggal ? hasil.form : data);
+        toast(namaForm + ' terkirim.');
+      }).catch(function (err) {
+        aturTombolProses(tombolKirim, false);
+        if (err && err.jaringan) {
+          keAntrean();
+          return;
+        }
+        if (err && err.sesiBerakhir) {
+          simpanKeAntrean(entri);
+          kosongkanIsian();
+          tanganiSesiBerakhir(err);
+          return;
+        }
+        tulisPesan(pesan, pesanGalat(err), 'masalah');
+      });
+    });
+
+    function muat() {
+      return muatData({
+        dariHp: function () { return dataKustomDariHp(idForm, tanggal); },
+        simpanHp: function (d) { Cache.tulis('kustom:' + idForm, d); },
+        ambil: function () { return panggilApi('formKustom', { formId: idForm, tanggal: tanggal }); },
+        gambar: function (d) {
+          if (d.tanggal === tanggal) gambar(d);
+        },
+        kerangka: function () {
+          kosongkan(wadahBaris).appendChild(kerangkaBaris(3));
+        },
+        galat: function (teks, cobaLagi) {
+          kosongkan(wadahBaris).appendChild(kotakGalat(navigator.onLine === false
+            ? 'Form ini belum pernah dibuka di HP ini. Buka sekali saat ada sinyal supaya bisa diisi tanpa sinyal.' : teks, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      if (isian) isian.gambarBaris();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    muat();
+    segarkanLayar = muat;
+    segarkanAntrean = gambarStatus;
+  }
+
+  /* =======================================================================
    * Riwayat, pemeriksaan, dan koreksi (spesifikasi sistem Bagian 6,
    * tampilan Bagian 5.4). Dibangun umum dari daftar form di M_Form: form
    * yang Riwayat-nya sudah didaftarkan di server (RIWAYAT_FORM di Code.gs)
@@ -4631,11 +5175,11 @@
       isi.push(el('del', { class: 'nilai-lama' }, [
         el('span', { class: 'sr', text: 'Nilai lama ' }),
         kol.jenis === 'angka' ? formatAngka(lama || 0) + (satuan ? ' ' + satuan : '')
-          : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama || '–'))
+          : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama === '' || kor.lama == null ? '(kosong)' : kor.lama))
       ]));
       isi.push(' ');
     }
-    if (kol.jikaAda && v == null && !kor) isi.push(el('span', { class: 'otomatis', text: '–' }));
+    if ((kol.jikaAda || kol.opsional) && v == null && !kor) isi.push(el('span', { class: 'otomatis', text: '–' }));
     else if (kol.jenis === 'tanggal') isi.push(el('span', { class: 'angka-satuan', text: v ? tanggalPendek(v) : '–' }));
     else if (kol.jenis === 'angka') isi.push(angkaSatuan(v || 0, satuan));
     else if (kol.jenis === 'rupiah') isi.push(el('span', { class: 'angka-satuan', text: formatRupiah(v) }));
@@ -4660,7 +5204,7 @@
       if (k === nama || k.ringkas === false) return;
       var v = b.nilai[k.kunci];
       var kor = b.koreksi && b.koreksi[k.kunci];
-      if (k.jenis === 'angka' && !v && !kor && (!k.akhiran || k.jikaAda)) return;
+      if (k.jenis === 'angka' && !v && !kor && (!k.akhiran || k.jikaAda || k.opsional)) return;
       if (k.jenis !== 'angka' && (v === '' || v == null)) return;
       // Status hanya ditulis jika bermasalah: "di luar standar".
       if (k.jenis === 'status') {
@@ -5487,7 +6031,13 @@
 
     var namaItem = function (b) {
       var v = nama ? b.nilai[nama.kunci] : '';
-      if (nama && nama.jenis === 'item' && v) return tombolNamaItem(v);
+      // Kolom nama form kustom boleh dikoreksi: nilai lamanya ditulis dicoret.
+      var kor = nama && b.koreksi && b.koreksi[nama.kunci];
+      if (nama && nama.jenis === 'item' && v) {
+        return kor ? el('span', {}, [el('del', { class: 'nilai-lama' }, [el('span', { class: 'sr', text: 'Nilai lama ' }), kor.lama || '(kosong)']), ' ',
+          tombolNamaItem(v)]) : tombolNamaItem(v);
+      }
+      if (kor) return el('span', { class: 'daftar-baris-judul' }, nilaiKolom(b, nama));
       return el('span', { class: 'daftar-baris-judul', text: v || '–' });
     };
 
@@ -5644,16 +6194,19 @@
     var namaBaris = nama ? b.nilai[nama.kunci] : '';
     var kolomIsi = kolom.map(function (k) {
       if (k.pilihan) {
-        // Pilihan tetap (kategori waste): tombol berjajar, bukan ketikan bebas.
+        // Pilihan tetap (kategori waste, pilihan form kustom): tombol berjajar, bukan ketikan bebas.
         var g = grupPilihan(k.label, k.pilihan, b.nilai[k.kunci] || '');
         return { k: k, pilihan: g, kolom: { wadah: g.wadah } };
       }
+      var kosongBoleh = k.opsional && b.nilai[k.kunci] == null;
       var kI = kolomIsian({
         label: k.label + (k.satuan && b.satuan ? ' (' + b.satuan + ')' : (k.akhiran ? ' (' + k.akhiran + ')' : '')),
+        type: k.waktu ? 'time' : 'text',
         inputmode: k.jenis === 'angka' ? 'decimal' : null,
-        kelas: k.jenis === 'angka' ? 'isian-angka' : null,
-        nilai: k.jenis === 'angka' ? String(b.nilai[k.kunci] || 0).replace('.', ',') : (b.nilai[k.kunci] || ''),
-        bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.' : (k.bantuan || null)
+        kelas: k.jenis === 'angka' ? 'isian-angka' : (k.waktu ? 'isian-jam' : null),
+        nilai: k.jenis === 'angka' ? (kosongBoleh ? '' : String(b.nilai[k.kunci] || 0).replace('.', ',')) : (b.nilai[k.kunci] || ''),
+        bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.'
+          : (k.bantuan || (k.jenis === 'item' ? 'Tulis nama item persis seperti di daftar item.' : (k.opsional ? 'Tidak wajib; boleh dikosongkan.' : null)))
       });
       if (k.minus) {
         // Papan angka iPhone tidak punya tanda minus: tombol ± di samping kolom.
@@ -5689,7 +6242,7 @@
       kolomIsi.forEach(function (x) {
         if (x.pilihan) {
           var p = x.pilihan.nilai();
-          ok = x.pilihan.galat(p ? '' : 'Pilih ' + x.k.label.toLowerCase() + '.') && ok;
+          ok = x.pilihan.galat(p || x.k.opsional ? '' : 'Pilih ' + x.k.label.toLowerCase() + '.') && ok;
           nilai[x.k.kunci] = p;
           return;
         }
@@ -5709,7 +6262,7 @@
             return;
           }
           x.kolom.galat('');
-          nilai[x.k.kunci] = n === null ? 0 : n;
+          nilai[x.k.kunci] = n === null ? (x.k.opsional ? '' : 0) : n;
         } else {
           nilai[x.k.kunci] = v;
         }
@@ -7199,6 +7752,14 @@
           el('span', { class: 'daftar-baris-isi' }, [
             el('span', { class: 'daftar-baris-judul', text: 'Penerima email' }),
             el('span', { class: 'daftar-baris-ket', text: 'Alamat yang menerima laporan harian.' })
+          ]),
+          ikon('kanan')
+        ]),
+        el('a', { class: 'daftar-baris', href: '#/pengaturan/form' }, [
+          ikon('tiket'),
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: 'Form' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Urutan dan tampil di Beranda, ganti nama, buat dan susun form kustom.' })
           ]),
           ikon('kanan')
         ]),
@@ -8698,6 +9259,694 @@
       galat: function (pesan, cobaLagi) {
         kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
       },
+      penanda: penanda
+    });
+  }
+
+  /* ---------- Pengaturan → Form (spesifikasi tampilan Bagian 5.7, sistem Bagian 5.6) ---------- */
+
+  function hrefFormUbah(id) {
+    return '#/pengaturan/form/' + encodeURIComponent(id);
+  }
+
+  /** Sakelar Tampil / Disembunyikan (selalu dengan kata keadaannya). */
+  function sakelarTampil(opsi) {
+    var id = 'sakelar-' + (++nomorKolom);
+    var input = el('input', { type: 'checkbox', role: 'switch', class: 'sakelar-input', id: id,
+      'aria-label': opsi.labelSr || null });
+    input.checked = !!opsi.nilai;
+    var kata = el('span', { class: 'sakelar-kata', text: opsi.nilai ? (opsi.kataYa || 'Tampil') : (opsi.kataTidak || 'Disembunyikan') });
+    input.addEventListener('change', function () {
+      kata.textContent = input.checked ? (opsi.kataYa || 'Tampil') : (opsi.kataTidak || 'Disembunyikan');
+      if (opsi.ubah) opsi.ubah(input.checked);
+    });
+    return {
+      wadah: el('label', { class: 'sakelar' + (opsi.kelas ? ' ' + opsi.kelas : ''), for: id }, [
+        input,
+        el('span', { class: 'sakelar-jalur', 'aria-hidden': 'true' }),
+        opsi.teks ? el('span', { class: 'sakelar-teks', text: opsi.teks }) : null,
+        kata
+      ]),
+      input: input,
+      atur: function (b) {
+        input.checked = b;
+        kata.textContent = b ? (opsi.kataYa || 'Tampil') : (opsi.kataTidak || 'Disembunyikan');
+      }
+    };
+  }
+
+  function ketFormDaftar(f) {
+    if (f.jenis !== 'kustom') return 'Bawaan';
+    return 'Kustom · ' + teksJadwal(f) + ' · ' + f.jumlahKolom + ' kolom';
+  }
+
+  /**
+   * Daftar semua form dalam urutan Beranda: nama, tanda Bawaan/Kustom, sakelar
+   * tampil/sembunyi, tombol naik/turun (lalu "Simpan urutan"). Form kustom yang
+   * dihapus tampil di bawah dengan "Pulihkan".
+   */
+  function layarFormDaftar(k) {
+    aturJudul('Form');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var wadahArsip = el('div');
+    var ketBatas = el('p', { class: 'kolom-bantuan' });
+    var tambah = el('a', { class: 'tombol tombol-utama', href: '#/pengaturan/form-baru' }, el('span', { class: 'tombol-teks', text: 'Buat form' }));
+    var pesanSiap = el('p', { class: 'pesan-formulir', role: 'status' });
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Pengaturan', '#/pengaturan'),
+      el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Form' }), tambah]),
+      el('p', { class: 'kartu-teks', text: 'Urutan ini dipakai tiket di Beranda. Form yang disembunyikan tidak tampil di Beranda, tetapi isian lamanya tetap ada di Riwayat.' }),
+      pesanSiap,
+      penanda,
+      wadah,
+      ketBatas,
+      wadahArsip
+    ]));
+    var data = null;
+    var urutan = null;
+
+    function cari(id) {
+      return (data.form || []).filter(function (f) { return f.id === id; })[0];
+    }
+
+    function terima(d) {
+      Cache.tulis('form-daftar', d);
+      var lama = urutan;
+      data = d;
+      // Urutan yang belum disimpan tetap, selama daftarnya sama.
+      var ids = (d.form || []).map(function (f) { return f.id; }).sort().join('\n');
+      urutan = lama && lama.slice().sort().join('\n') === ids ? lama : null;
+      gambarSemua();
+    }
+
+    function gambarSemua() {
+      var penuh = data.jumlahKustom >= data.batasForm;
+      tambah.hidden = penuh || data.siap === false;
+      ketBatas.textContent = data.jumlahKustom + ' dari ' + data.batasForm + ' form kustom dipakai.' +
+        (penuh ? ' Hapus form kustom yang tidak dipakai lagi untuk membuat form baru.' : '');
+      tulisPesan(pesanSiap, data.siap === false ? 'Form kustom belum bisa dibuat: pemilik Sheet perlu menjalankan ulang setupSpreadsheet di editor Apps Script.' : '', 'tinjau');
+      gambarDaftar();
+      gambarArsip();
+    }
+
+    function gambarDaftar() {
+      kosongkan(wadah);
+      var semua = data.form || [];
+      var ids = urutan || semua.map(function (f) { return f.id; });
+      var berubah = !!urutan && urutan.join('\n') !== semua.map(function (f) { return f.id; }).join('\n');
+      var daftar = el('ol', { class: 'daftar daftar-urut', 'aria-label': 'Urutan form di Beranda' });
+      ids.forEach(function (id, i) {
+        var f = cari(id);
+        if (!f) return;
+        function geser(arah) {
+          var baru = ids.slice();
+          baru[i] = baru[i + arah];
+          baru[i + arah] = id;
+          urutan = baru;
+          gambarDaftar();
+          var t = wadah.querySelector('[data-urut="' + (arah < 0 ? 'naik' : 'turun') + '-' + (i + arah) + '"]');
+          if (!t || t.disabled) t = wadah.querySelector('[data-urut="' + (arah < 0 ? 'turun' : 'naik') + '-' + (i + arah) + '"]');
+          if (t) t.focus();
+        }
+        var s = sakelarTampil({
+          nilai: f.aktif,
+          labelSr: 'Tampilkan ' + f.nama + ' di Beranda',
+          ubah: function (b) {
+            s.input.disabled = true;
+            panggilApi('aturFormTampil', { formId: f.id, tampil: b }).then(function (d) {
+              terima(d);
+              toast(f.nama + (b ? ' tampil di Beranda.' : ' disembunyikan dari Beranda.'));
+            }).catch(function (err) {
+              s.input.disabled = false;
+              s.atur(!b);
+              if (tanganiSesiBerakhir(err)) return;
+              toast(pesanGalat(err), 'masalah');
+            });
+          }
+        });
+        daftar.appendChild(el('li', { class: 'baris-urut baris-form' + (f.aktif ? '' : ' nonaktif') }, [
+          el('div', { class: 'baris-form-isi' }, [
+            el('a', { class: 'baris-urut-nama', href: hrefFormUbah(f.id) }, el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: f.nama }),
+              el('span', { class: 'tanda-deret bungkus' }, [el('span', { class: 'tanda-jenis', text: f.jenis === 'kustom' ? 'Kustom' : 'Bawaan' })]),
+              el('span', { class: 'daftar-baris-ket', text: f.jenis === 'kustom' ? teksJadwal(f) + ' · ' + f.jumlahKolom + ' kolom' : 'Kolom terkunci' })
+            ])),
+            s.wadah
+          ]),
+          el('button', { type: 'button', class: 'tombol-ikon', 'data-urut': 'naik-' + i, 'aria-label': 'Naikkan ' + f.nama, disabled: i === 0,
+            onclick: function () { geser(-1); } }, ikon('atas')),
+          el('button', { type: 'button', class: 'tombol-ikon', 'data-urut': 'turun-' + i, 'aria-label': 'Turunkan ' + f.nama, disabled: i === ids.length - 1,
+            onclick: function () { geser(1); } }, ikon('bawah'))
+        ]));
+      });
+      wadah.appendChild(semua.length ? daftar : kotakKosong('Belum ada form. Ketuk Buat form untuk membuat form pertama.', 'tiket'));
+      if (berubah) {
+        var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+        var simpan = tombol('Simpan urutan', 'utama');
+        var batal = tombol('Batal', 'kedua', { onclick: function () { urutan = null; gambarDaftar(); } });
+        simpan.addEventListener('click', function () {
+          aturTombolProses(simpan, true, 'Menyimpan…');
+          panggilApi('urutForm', { urutan: urutan }).then(function (d) {
+            urutan = null;
+            terima(d);
+            toast('Urutan form tersimpan.');
+          }).catch(function (err) {
+            aturTombolProses(simpan, false);
+            if (tanganiSesiBerakhir(err)) return;
+            tulisPesan(pesan, pesanGalat(err), 'masalah');
+          });
+        });
+        wadah.appendChild(el('div', { class: 'deret-tombol urut-aksi' }, [batal, simpan]));
+        wadah.appendChild(pesan);
+      }
+    }
+
+    function gambarArsip() {
+      kosongkan(wadahArsip);
+      var arsip = data.arsip || [];
+      if (!arsip.length) return;
+      wadahArsip.appendChild(el('section', { class: 'bagian', 'aria-labelledby': 'judul-arsip-form' }, [
+        el('h2', { class: 'judul-bagian', id: 'judul-arsip-form', text: 'Form yang dihapus' }),
+        el('p', { class: 'kartu-teks', text: 'Isian lamanya tetap tersimpan di spreadsheet. Pulihkan untuk memakainya lagi.' }),
+        el('ul', { class: 'daftar' }, arsip.map(function (f) {
+          var t = tombol('Pulihkan', 'kedua', { 'aria-label': 'Pulihkan ' + f.nama });
+          t.addEventListener('click', function () {
+            aturTombolProses(t, true, 'Memulihkan…');
+            panggilApi('pulihkanForm', { formId: f.id }).then(function (d) {
+              terima(d);
+              toast('Form ' + f.nama + ' dipulihkan.');
+            }).catch(function (err) {
+              aturTombolProses(t, false);
+              if (tanganiSesiBerakhir(err)) return;
+              toast(pesanGalat(err), 'masalah');
+            });
+          });
+          return el('li', { class: 'baris-tetap' }, [
+            el('span', { class: 'baris-tetap-teks daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: f.nama }),
+              el('span', { class: 'daftar-baris-ket', text: 'Dihapus ' + (f.diarsipkan ? waktuPendek(f.diarsipkan) : '') + ' · ' + f.jumlahKolom + ' kolom' })
+            ]),
+            t
+          ]);
+        }))
+      ]));
+    }
+
+    muatData({
+      kunciCache: 'form-daftar',
+      ambil: function () { return panggilApi('daftarForm'); },
+      gambar: function (d) {
+        data = d;
+        gambarSemua();
+      },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(4)); },
+      galat: function (pesan, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi)); },
+      penanda: penanda
+    });
+  }
+
+  /**
+   * Lembar tambah/ubah kolom (tampilan Bagian 5.7): label, jenis, pilihan (jika
+   * Pilihan), dan sakelar wajib. opsi: { kolom (null = baru), bagian,
+   * jenisTerkunci, labelLain: [label kecil yang sudah dipakai], simpan(kolom) }.
+   */
+  function bukaLembarKolom(opsi) {
+    var c = opsi.kolom || { bagian: opsi.bagian, label: '', jenis: 'Teks', pilihan: [], wajib: false };
+    var kLabel = kolomIsian({ label: 'Label', maxlength: 40, nilai: c.label,
+      bantuan: opsi.bagian === 'kepala' ? 'Misalnya Shift atau Area.' : 'Misalnya Butir, Jumlah, atau Kondisi.' });
+    var gJenis = null;
+    var teksJenis = null;
+    if (opsi.jenisTerkunci) {
+      teksJenis = el('div', { class: 'kolom' }, [
+        el('span', { class: 'kolom-label', text: 'Jenis kolom' }),
+        el('p', { class: 'nilai-terpilih' }, [ikon('kunci'), ' ', el('strong', { text: c.jenis })]),
+        el('p', { class: 'kolom-bantuan', text: 'Tidak bisa diganti karena form ini sudah punya isian. Hapus kolomnya, lalu buat kolom baru.' })
+      ]);
+    } else {
+      gJenis = grupPilihan('Jenis kolom', JENIS_KOLOM, c.jenis);
+      gJenis.wadah.querySelector('fieldset').classList.add('pilihan-jenis-kolom');
+    }
+    var idPilihan = 'kolom-' + (++nomorKolom);
+    var inPilihan = el('textarea', { class: 'isian isian-catatan', id: idPilihan, rows: 4, 'aria-describedby': idPilihan + '-bantuan' });
+    inPilihan.value = (c.pilihan || []).join('\n');
+    var galatPilihan = el('p', { class: 'kolom-galat' });
+    var bagianPilihan = el('div', { class: 'kolom' }, [
+      el('label', { class: 'kolom-label', for: idPilihan, text: 'Pilihan' }),
+      el('p', { class: 'kolom-bantuan', id: idPilihan + '-bantuan', text: 'Satu pilihan per baris, minimal dua. Empat atau kurang tampil sebagai tombol, selebihnya dropdown.' }),
+      inPilihan,
+      galatPilihan
+    ]);
+    var wajib = c.wajib;
+    var sWajib = sakelarTampil({ nilai: c.wajib, teks: 'Wajib diisi', kataYa: 'Wajib', kataTidak: 'Tidak wajib', ubah: function (b) { wajib = b; } });
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    function jenisKini() { return gJenis ? gJenis.nilai() : c.jenis; }
+    function aturPilihan() { bagianPilihan.hidden = jenisKini() !== 'Pilihan'; }
+    if (gJenis) gJenis.input.forEach(function (i) { i.addEventListener('change', function () { gJenis.galat(''); aturPilihan(); }); });
+    aturPilihan();
+    var CADANGAN = ['tanggal', 'nama staff', 'no'];
+
+    function simpan(t, l) {
+      tulisPesan(pesan, '');
+      var label = kLabel.input.value.replace(/\s+/g, ' ').trim();
+      var kecil = label.toLowerCase();
+      var ok = true;
+      var salahLabel = !label ? 'Isi label kolom.'
+        : (/^[=+\-@]/.test(label) ? 'Label tidak boleh diawali tanda =, +, -, atau @.'
+          : (CADANGAN.indexOf(kecil) >= 0 || /^(submission_id|row_id|outlet|timestamp_server|timestamp_device|submitted_by|status|checked_by|checked_at|updated_by|updated_at|flagged_by|flag_note)$/.test(kecil)
+            ? 'Label ' + label + ' sudah dipakai sistem. Pakai label lain.'
+            : (opsi.labelLain.indexOf(kecil) >= 0 ? 'Label ' + label + ' sudah dipakai kolom lain di form ini.' : '')));
+      if (!kLabel.galat(salahLabel)) ok = false;
+      var jenis = jenisKini();
+      if (gJenis && !gJenis.galat(jenis ? '' : 'Pilih jenis kolom.')) ok = false;
+      var pilihan = [];
+      kosongkan(galatPilihan);
+      if (jenis === 'Pilihan') {
+        var sudah = {};
+        inPilihan.value.split('\n').forEach(function (p) {
+          var x = p.replace(/\s+/g, ' ').trim();
+          if (x && !sudah[x.toLowerCase()]) { sudah[x.toLowerCase()] = true; pilihan.push(x); }
+        });
+        var salahPilihan = pilihan.length < 2 ? 'Tulis minimal dua pilihan, satu per baris.'
+          : (pilihan.length > 20 ? 'Paling banyak 20 pilihan.'
+            : (pilihan.some(function (x) { return x.length > 40; }) ? 'Tiap pilihan paling panjang 40 huruf.'
+              : (pilihan.some(function (x) { return /^[=+\-@]/.test(x) || x.indexOf('|') >= 0; }) ? 'Pilihan tidak boleh diawali =, +, -, atau @, dan tidak boleh memuat tanda |.' : '')));
+        if (salahPilihan) {
+          ok = false;
+          galatPilihan.appendChild(ikonStatus('masalah'));
+          galatPilihan.appendChild(el('span', { text: salahPilihan }));
+          inPilihan.setAttribute('aria-invalid', 'true');
+        } else {
+          inPilihan.setAttribute('aria-invalid', 'false');
+        }
+      }
+      if (!ok) {
+        var pertama = l.elemen.querySelector('[aria-invalid="true"]');
+        if (pertama) pertama.focus();
+        return;
+      }
+      l.tutup();
+      opsi.simpan(Object.assign({}, c, { label: label, jenis: jenis, pilihan: jenis === 'Pilihan' ? pilihan : [], wajib: wajib }));
+    }
+    var form = el('form', { class: 'formulir', novalidate: true }, [kLabel.wadah, gJenis ? gJenis.wadah : teksJenis, bagianPilihan,
+      el('div', { class: 'kolom' }, sWajib.wadah), pesan]);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      simpan(lembar.tombol[1], lembar);
+    });
+    var lembar = bukaLembar({
+      judul: opsi.kolom ? 'Ubah kolom ' + c.label : (opsi.bagian === 'kepala' ? 'Tambah kolom kepala' : 'Tambah kolom baris'),
+      isi: form,
+      aksi: [{ teks: 'Batal', jenis: 'kedua' }, { teks: opsi.kolom ? 'Simpan kolom' : 'Tambah kolom', jenis: 'utama', klik: simpan }]
+    });
+  }
+
+  /** Pratinjau: layar isi form persis seperti yang dilihat staff, tanpa mengirim apa pun. */
+  function bukaPratinjauForm(def, item) {
+    var keadaan = { kepala: {}, baris: [] };
+    var wadahBaris = el('div');
+    var penghitung = el('span', { class: 'penghitung' });
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var hariIni = tanggalIso(new Date());
+    var gTanggal = pilihanTanggalIsian({ pengelola: false, tanggal: hariIni, ganti: function () {} });
+    var isian = isianFormKustom({
+      def: def, item: item || [], keadaan: keadaan, wadahBaris: wadahBaris, penghitung: penghitung,
+      desktop: function () { return window.matchMedia(DESKTOP).matches; },
+      ubah: function () { tulisPesan(pesan, ''); }
+    });
+    var tambahB = tombol('Tambah baris', 'kedua', { onclick: function () { isian.tambahBaris(); } });
+    tambahB.insertBefore(ikon('tambah'), tambahB.lastChild);
+    var kirimB = tombol('Kirim ' + (def.nama || 'form').toLowerCase(), 'utama', {
+      onclick: function () {
+        var salah = isian.periksa();
+        if (salah) {
+          tulisPesan(pesan, salah.pesan, 'masalah');
+          salah.fokus();
+          return;
+        }
+        tulisPesan(pesan, 'Isian lengkap. Ini pratinjau, jadi tidak ada yang dikirim.', 'info');
+      }
+    });
+    isian.gambarBaris();
+    var tanpaSisi = el('div', { class: 'layar-form layar-kustom pratinjau-form' }, [
+      el('p', { class: 'pesan-formulir info' }, [ikon('info'), el('span', { text: 'Pratinjau. Isian di sini tidak disimpan dan tidak dikirim.' })]),
+      el('h3', { class: 'kartu-judul', text: def.nama || 'Form tanpa nama' }),
+      el('p', { class: 'kolom-bantuan keterangan-form', text: kalimatKeterangan(def.keterangan, 'Jadwal: ' + teksJadwal(def) + '.') }),
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [gTanggal.wadah,
+        isian.kepala.length ? el('div', { class: 'kepala-kustom' }, isian.kepala) : null,
+        el('div', { class: 'lebar-penuh' }, el('div', { class: 'baris-nihil' }, tombol('Tidak ada hari ini', 'kedua', {
+          onclick: function () { tulisPesan(pesan, 'Ini pratinjau. Tanda nihil tidak disimpan.', 'info'); }
+        })))]),
+      wadahBaris,
+      pesan,
+      el('div', { class: 'bilah-kirim bilah-pratinjau' }, [penghitung, el('div', { class: 'deret-tombol bilah-kirim-tombol' }, [tambahB, kirimB])])
+    ]);
+    bukaLembar({ judul: 'Pratinjau ' + (def.nama || 'form'), isi: tanpaSisi, lebar: true, aksi: [{ teks: 'Tutup pratinjau', jenis: 'kedua' }] });
+  }
+
+  /**
+   * Layar susun form (tampilan Bagian 5.7): nama, keterangan, jadwal, tampil,
+   * kolom kepala, kolom baris (menu titik tiga: ubah, geser, hapus), Lihat
+   * pratinjau, Simpan form, dan Hapus form. Form bawaan: hanya nama dan
+   * tampil/sembunyi; daftar kolomnya terkunci. Isian tersimpan sebagai draft.
+   */
+  function layarFormUbah(k) {
+    var baru = !k.cocok[1];
+    var idForm = '';
+    if (!baru) {
+      try {
+        idForm = decodeURIComponent(k.cocok[1]).toUpperCase();
+      } catch (err) {
+        idForm = String(k.cocok[1]).toUpperCase();
+      }
+    }
+    var daftarSimpan = Cache.baca('form-daftar');
+    var dariDaftar = !baru && daftarSimpan && daftarSimpan.data ? (daftarSimpan.data.form || []).filter(function (f) { return f.id === idForm; })[0] : null;
+    var judulAwal = baru ? 'Buat form' : (dariDaftar ? dariDaftar.nama : 'Ubah form');
+    aturJudul(judulAwal);
+    var kunciDraft = 'form:' + (baru ? '+baru' : idForm);
+    var judul = el('h1', { class: 'judul-layar', text: judulAwal });
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit layar-form' }, [
+      tautanKembali('Form', '#/pengaturan/form'),
+      judul,
+      catatanDraft,
+      penanda,
+      wadah
+    ]));
+
+    var data = null;
+    var isi = null; // { nama, keterangan, jadwal, hari, tampil, kolom: [{ kunci, id, bagian, label, jenis, pilihan, wajib }] }
+    var d = Draft.baca(kunciDraft);
+    if (d && d.data) {
+      isi = d.data;
+      catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(d.waktu).toISOString());
+    }
+
+    function simpanDraft() {
+      var waktu = Draft.simpan(kunciDraft, isi);
+      if (waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(waktu).toISOString());
+    }
+
+    function dariServer(f) {
+      return {
+        nama: f.nama, keterangan: f.keterangan || '', jadwal: f.jadwal || 'harian', hari: (f.hari || []).slice(), tampil: f.aktif !== false,
+        kolom: (f.kolom || []).filter(function (c) { return c.aktif; }).map(function (c) {
+          return { kunci: c.id, id: c.id, bagian: c.bagian, label: c.label, jenis: c.jenis, pilihan: (c.pilihan || []).slice(), wajib: !!c.wajib };
+        })
+      };
+    }
+
+    function gambar(hasil) {
+      data = hasil;
+      if (!baru && !hasil.form) {
+        kosongkan(wadah).appendChild(kotakKosong('Form tidak ditemukan. Kembali ke daftar form.', 'tiket'));
+        return;
+      }
+      if (!isi) isi = baru ? { nama: '', keterangan: '', jadwal: 'harian', hari: [], tampil: true, kolom: [] } : dariServer(hasil.form);
+      if (!baru) {
+        aturJudul(hasil.form.nama);
+        judul.textContent = hasil.form.nama;
+      }
+      gambarIsian();
+    }
+
+    function kolomServer(id) {
+      return (data.form && data.form.kolom || []).filter(function (c) { return c.id === id; })[0] || null;
+    }
+
+    function gambarIsian() {
+      kosongkan(wadah);
+      var bawaan = !baru && data.form.jenis === 'bawaan';
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+      var kNama = kolomIsian({ label: 'Nama form', maxlength: 40, nilai: isi.nama,
+        bantuan: bawaan ? 'Nama yang tampil di tiket Beranda, Riwayat, dan laporan.' : 'Misalnya Checklist kebersihan.' });
+      kNama.input.addEventListener('input', function () { isi.nama = kNama.input.value; kNama.galat(''); simpanDraft(); });
+      var sTampil = sakelarTampil({ nilai: isi.tampil, teks: 'Tampil di Beranda', ubah: function (b) { isi.tampil = b; simpanDraft(); } });
+      var bagianUtama = [kNama.wadah];
+      var gJadwal = null;
+      var galatHari = el('p', { class: 'kolom-galat' });
+      if (!bawaan) {
+        var kKet = kolomIsian({ label: 'Keterangan', maxlength: 120, nilai: isi.keterangan, bantuan: 'Tidak wajib. Misalnya Diisi tiap closing.' });
+        kKet.input.addEventListener('input', function () { isi.keterangan = kKet.input.value; simpanDraft(); });
+        var nilaiJadwal = { harian: 'Setiap hari', 'hari tertentu': 'Hari tertentu', 'sewaktu-waktu': 'Sewaktu-waktu' };
+        gJadwal = grupPilihan('Jadwal', ['Setiap hari', 'Hari tertentu', 'Sewaktu-waktu'], nilaiJadwal[isi.jadwal] || 'Setiap hari');
+        var hari = el('fieldset', { class: 'pilihan-grup pilihan-hari' }, [el('legend', { class: 'sr', text: 'Hari' })].concat(URUTAN_HARI.map(function (h) {
+          var cb = el('input', { type: 'checkbox', value: h });
+          cb.checked = isi.hari.indexOf(h) >= 0;
+          cb.addEventListener('change', function () {
+            isi.hari = URUTAN_HARI.filter(function (x) {
+              var i = hari.querySelector('input[value="' + x + '"]');
+              return i && i.checked;
+            });
+            kosongkan(galatHari);
+            simpanDraft();
+          });
+          return el('label', { class: 'pilihan' }, [cb, el('span', { text: h.slice(0, 3), title: h, 'aria-label': h })]);
+        })));
+        var bantuJadwal = el('p', { class: 'kolom-bantuan' });
+        function aturJadwal() {
+          var v = gJadwal.nilai();
+          hari.hidden = v !== 'Hari tertentu';
+          bantuJadwal.textContent = v === 'Sewaktu-waktu' ? 'Diisi hanya saat perlu. Tidak pernah ditagih di Beranda dan email harian.'
+            : (v === 'Hari tertentu' ? 'Hanya ditagih di Beranda dan email harian pada hari yang dipilih.' : 'Ditagih setiap hari di Beranda dan email harian.');
+        }
+        gJadwal.input.forEach(function (i) {
+          i.addEventListener('change', function () {
+            var v = gJadwal.nilai();
+            isi.jadwal = v === 'Hari tertentu' ? 'hari tertentu' : (v === 'Sewaktu-waktu' ? 'sewaktu-waktu' : 'harian');
+            aturJadwal();
+            simpanDraft();
+          });
+        });
+        aturJadwal();
+        gJadwal.wadah.appendChild(hari);
+        gJadwal.wadah.appendChild(bantuJadwal);
+        gJadwal.wadah.appendChild(galatHari);
+        bagianUtama.push(kKet.wadah, gJadwal.wadah);
+      }
+      bagianUtama.push(el('div', { class: 'kolom' }, sTampil.wadah));
+      wadah.appendChild(el('section', { class: 'kartu formulir', 'aria-label': 'Nama dan jadwal' }, bagianUtama));
+
+      if (bawaan) {
+        wadah.appendChild(el('section', { class: 'kartu formulir', 'aria-labelledby': 'judul-kolom-bawaan' }, [
+          el('h2', { class: 'kartu-judul', id: 'judul-kolom-bawaan', text: 'Kolom' }),
+          el('p', { class: 'pesan-formulir info' }, [ikon('kunci'), el('span', { text: 'Kolom form bawaan terikat pada hitungan otomatis dan tidak bisa diubah. Form ini juga tidak bisa dihapus, hanya disembunyikan.' })]),
+          el('ul', { class: 'daftar daftar-kolom-form' }, (data.kolomBawaan || []).map(function (l) {
+            return el('li', { class: 'baris-kolom-form terkunci' }, el('span', { class: 'daftar-baris-judul', text: l }));
+          }))
+        ]));
+      } else {
+        wadah.appendChild(bagianKolom('kepala', 'Kolom kepala', 'Diisi sekali per isian, misalnya shift atau area. Tidak wajib ada.'));
+        wadah.appendChild(bagianKolom('baris', 'Kolom baris', 'Diisi berulang, satu baris per butir, seperti tabel di form kertas. Minimal satu kolom.'));
+        var jumlah = isi.kolom.length;
+        wadah.appendChild(el('p', { class: 'kolom-bantuan catatan-kolom-form' }, 'Tanggal dan nama pengisi tercatat otomatis. ' + jumlah + ' dari ' + (data.batasKolom || 15) + ' kolom.'));
+        if (data.adaIsian) {
+          wadah.appendChild(el('p', { class: 'pesan-formulir info' }, [ikon('info'), el('span', {
+            text: 'Form ini sudah punya isian. Jenis kolom yang sudah ada tidak bisa diganti. Kolom baru kosong di isian lama. Kolom yang dihapus tetap tersimpan di spreadsheet dan Riwayat.' })]));
+        }
+      }
+
+      var simpan = tombol('Simpan form', 'utama');
+      var lihat = bawaan ? null : tombol('Lihat pratinjau', 'kedua', { 'aria-haspopup': 'dialog' });
+      if (lihat) {
+        lihat.addEventListener('click', function () {
+          bukaPratinjauForm({ nama: isi.nama.trim(), keterangan: isi.keterangan.trim(), jadwal: isi.jadwal, hari: isi.hari,
+            kolom: isi.kolom.map(function (c) { return { id: c.kunci, bagian: c.bagian, label: c.label, jenis: c.jenis, pilihan: c.pilihan, wajib: c.wajib }; }) },
+          data.item || []);
+        });
+      }
+      simpan.addEventListener('click', function () {
+        if (simpan.disabled) return;
+        tulisPesan(pesan, '');
+        var nama = isi.nama.replace(/\s+/g, ' ').trim();
+        if (!kNama.galat(nama ? '' : 'Isi nama form.')) {
+          kNama.input.focus();
+          return;
+        }
+        if (!bawaan && isi.jadwal === 'hari tertentu' && !isi.hari.length) {
+          galatHari.appendChild(ikonStatus('masalah'));
+          galatHari.appendChild(el('span', { text: 'Pilih minimal satu hari.' }));
+          tulisPesan(pesan, 'Pilih minimal satu hari untuk jadwal Hari tertentu.', 'masalah');
+          return;
+        }
+        if (!bawaan && !isi.kolom.some(function (c) { return c.bagian === 'baris'; })) {
+          tulisPesan(pesan, 'Tambah minimal satu kolom baris.', 'masalah');
+          return;
+        }
+        if (navigator.onLine === false) {
+          tulisPesan(pesan, PESAN.tidakAdaSinyal, 'masalah');
+          return;
+        }
+        aturTombolProses(simpan, true, 'Menyimpan…');
+        panggilApi('simpanForm', {
+          baru: baru, formId: idForm, nama: nama, tampil: isi.tampil, keterangan: isi.keterangan, jadwal: isi.jadwal, hari: isi.hari,
+          kolom: isi.kolom.map(function (c) {
+            return { id: c.id || '', bagian: c.bagian, label: c.label, jenis: c.jenis, pilihan: c.pilihan, wajib: c.wajib };
+          })
+        }).then(function (hasil) {
+          Draft.hapus(kunciDraft);
+          Cache.tulis('form-daftar', hasil);
+          var s = hasil.disimpan || {};
+          toast(s.tampil ? 'Form tersimpan dan sudah tampil di Beranda.' : 'Form tersimpan. Form ini disembunyikan dari Beranda.');
+          location.hash = '#/pengaturan/form';
+        }).catch(function (err) {
+          aturTombolProses(simpan, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesan, pesanGalat(err), 'masalah');
+        });
+      });
+      wadah.appendChild(pesan);
+      wadah.appendChild(el('div', { class: 'bilah-kirim bilah-susun' }, [
+        el('span', { class: 'penghitung', text: bawaan ? 'Form bawaan' : isi.kolom.length + ' kolom' }),
+        el('div', { class: 'deret-tombol bilah-kirim-tombol' }, [lihat, simpan])
+      ]));
+
+      if (!baru && !bawaan) {
+        wadah.appendChild(el('section', { class: 'kartu bagian-hapus-form' }, [
+          el('h2', { class: 'kartu-judul', text: 'Hapus form' }),
+          el('p', { class: 'kartu-teks', text: 'Form hilang dari aplikasi. Isian lamanya tetap tersimpan di spreadsheet dan bisa dipulihkan dari daftar form.' }),
+          tombol('Hapus form', 'bahaya', { onclick: hapusForm })
+        ]));
+      }
+    }
+
+    function labelLain(kecuali) {
+      var semua = isi.kolom.filter(function (c) { return c !== kecuali; }).map(function (c) { return c.label.toLowerCase(); });
+      // Label kolom yang sudah dihapus tetap dipakai di tab datanya.
+      (data.form && data.form.kolom || []).forEach(function (c) {
+        if (!c.aktif) semua.push(c.label.toLowerCase());
+      });
+      return semua;
+    }
+
+    function bagianKolom(bagian, judulBagian, bantuan) {
+      var kolom = isi.kolom.filter(function (c) { return c.bagian === bagian; });
+      var penuh = isi.kolom.length >= (data.batasKolom || 15);
+      var tambahK = tombol(bagian === 'kepala' ? 'Tambah kolom kepala' : 'Tambah kolom baris', 'kedua', { 'aria-haspopup': 'dialog', disabled: penuh });
+      tambahK.insertBefore(ikon('tambah'), tambahK.lastChild);
+      tambahK.addEventListener('click', function () {
+        bukaLembarKolom({
+          bagian: bagian, labelLain: labelLain(null),
+          simpan: function (c) {
+            c.kunci = 'baru-' + buatId();
+            c.id = '';
+            isi.kolom.push(c);
+            simpanDraft();
+            gambarIsian();
+          }
+        });
+      });
+      var daftar = el('ul', { class: 'daftar daftar-kolom-form', 'aria-label': judulBagian });
+      kolom.forEach(function (c, i) {
+        var ket = c.jenis + (c.jenis === 'Pilihan' ? ': ' + c.pilihan.join(', ') : '') + ' · ' + (c.wajib ? 'wajib' : 'tidak wajib');
+        daftar.appendChild(el('li', { class: 'baris-kolom-form' }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: c.label }),
+            el('span', { class: 'daftar-baris-ket', text: ket })
+          ]),
+          el('button', { type: 'button', class: 'tombol-ikon', 'aria-haspopup': 'dialog', 'aria-label': 'Menu kolom ' + c.label,
+            onclick: function () { menuKolom(c, kolom, i); } }, ikon('titikTiga'))
+        ]));
+      });
+      return el('section', { class: 'kartu formulir', 'aria-label': judulBagian }, [
+        el('h2', { class: 'kartu-judul', text: judulBagian }),
+        el('p', { class: 'kolom-bantuan', text: bantuan }),
+        kolom.length ? daftar : el('p', { class: 'otomatis', text: bagian === 'kepala' ? 'Belum ada kolom kepala.' : 'Belum ada kolom baris. Ketuk Tambah kolom baris.' }),
+        el('div', {}, tambahK)
+      ]);
+    }
+
+    /** Menu titik tiga satu kolom: ubah, geser naik/turun, hapus. */
+    function menuKolom(c, sebagian, i) {
+      function geser(arah) {
+        var lain = sebagian[i + arah];
+        var a = isi.kolom.indexOf(c);
+        var b = isi.kolom.indexOf(lain);
+        isi.kolom[a] = lain;
+        isi.kolom[b] = c;
+        simpanDraft();
+        lembar.tutup(true);
+        gambarIsian();
+        var t = wadah.querySelector('[aria-label="Menu kolom ' + c.label.replace(/"/g, '\\"') + '"]');
+        if (t) t.focus();
+      }
+      var server = c.id ? kolomServer(c.id) : null;
+      var tombolMenu = [
+        tombol('Ubah', 'kedua', { onclick: function () {
+          lembar.tutup(true);
+          bukaLembarKolom({
+            kolom: c, bagian: c.bagian, labelLain: labelLain(c), jenisTerkunci: !!(server && data.adaIsian),
+            simpan: function (baruK) {
+              var j = isi.kolom.indexOf(c);
+              if (j >= 0) isi.kolom[j] = baruK;
+              simpanDraft();
+              gambarIsian();
+            }
+          });
+        } }),
+        tombol('Geser ke atas', 'kedua', { disabled: i === 0, onclick: function () { geser(-1); } }),
+        tombol('Geser ke bawah', 'kedua', { disabled: i === sebagian.length - 1, onclick: function () { geser(1); } }),
+        tombol('Hapus kolom', 'bahaya', { onclick: function () {
+          lembar.tutup(true);
+          konfirmasi({
+            judul: 'Hapus kolom ' + c.label + '?',
+            teks: server
+              ? 'Kolom hilang dari layar isi. Isian lamanya tetap tersimpan di spreadsheet dan Riwayat. Perubahan berlaku setelah Simpan form.'
+              : 'Kolom ini belum pernah disimpan, jadi langsung hilang.',
+            teksYa: 'Hapus',
+            bahaya: true
+          }).then(function (ya) {
+            if (!ya) return;
+            isi.kolom = isi.kolom.filter(function (x) { return x !== c; });
+            simpanDraft();
+            gambarIsian();
+            toast('Kolom ' + c.label + ' dihapus. Ketuk Simpan form untuk menyimpan.');
+          });
+        } })
+      ];
+      var lembar = bukaLembar({
+        judul: 'Kolom ' + c.label,
+        isi: el('div', { class: 'menu-kolom' }, tombolMenu),
+        aksi: [{ teks: 'Tutup', jenis: 'kedua' }]
+      });
+    }
+
+    function hapusForm() {
+      var nama = data.form.nama;
+      konfirmasi({
+        judul: 'Hapus form ' + nama + '?',
+        teks: 'Form hilang dari aplikasi. Isian lamanya tetap tersimpan di spreadsheet.',
+        teksYa: 'Hapus',
+        teksProses: 'Menghapus…',
+        bahaya: true,
+        jalankan: function () { return panggilApi('arsipkanForm', { formId: idForm }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Draft.hapus(kunciDraft);
+        Cache.tulis('form-daftar', hasil);
+        toast('Form ' + nama + ' dihapus.');
+        location.hash = '#/pengaturan/form';
+      });
+    }
+
+    muatData({
+      kunciCache: 'form:' + (baru ? '+baru' : idForm),
+      ambil: function () { return panggilApi('detailForm', { formId: idForm }); },
+      gambar: function (hasil) {
+        // Isian yang sedang diketik tidak digambar ulang; hanya data pendukungnya diperbarui.
+        if (isi && data) {
+          var ulang = JSON.stringify(data.form && data.form.kolom) !== JSON.stringify(hasil.form && hasil.form.kolom) || data.adaIsian !== hasil.adaIsian;
+          data = hasil;
+          if (ulang) gambarIsian();
+          return;
+        }
+        gambar(hasil);
+      },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(4)); },
+      galat: function (pesan, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi)); },
       penanda: penanda
     });
   }

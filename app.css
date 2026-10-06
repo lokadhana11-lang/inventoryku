@@ -4239,6 +4239,242 @@ body.papan-ketik .bilah-kirim {
 
 /* Kurangi gerak: semua geser, skala, goyang, pudar, dan denyut dimatikan.
    Perubahan langsung jadi; pesan teks tetap tampil. Indikator putar tetap ada. */
+/* =========================================================================
+ * Tahap 9: form kustom dan Pengaturan → Form (spesifikasi tampilan Bagian
+ * 5.3 dan 5.7)
+ * ========================================================================= */
+
+/* Layar isi: kolom kepala ikut kisi kotak info */
+.kepala-kustom {
+  display: contents;
+}
+
+.kepala-kustom[hidden] {
+  display: none;
+}
+
+.keterangan-form {
+  margin: 0 0 8px;
+}
+
+.catatan-kolom-form {
+  margin: 12px 0 0;
+}
+
+.keterangan-form:empty {
+  display: none;
+}
+
+.pilihan-kustom .pilihan {
+  flex: 1 1 calc(50% - 8px);
+}
+
+@media (min-width: 600px) {
+  .pilihan-kustom .pilihan {
+    flex: 1 1 auto;
+  }
+}
+
+.isian-jam {
+  max-width: 180px;
+}
+
+.kolom-item .deret-tombol {
+  margin-top: 4px;
+}
+
+.kolom-item .kolom-galat:empty {
+  display: none;
+}
+
+/* Bilah kirim dengan dua tombol: Tambah baris dan Kirim */
+.bilah-kirim-tombol {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+@media (max-width: 599px) {
+  .bilah-kirim-tombol {
+    flex: 1 1 100%;
+  }
+  .bilah-kirim-tombol .tombol {
+    flex: 1 1 auto;
+  }
+}
+
+/* Tabel isian form kustom (laptop dan desktop) */
+.tabel-kustom td.sel-kustom {
+  min-width: 160px;
+}
+
+.tabel-kustom td.sel-teks {
+  min-width: 220px;
+}
+
+.tabel-kustom td.sel-angka,
+.tabel-kustom td.sel-jam {
+  min-width: 140px;
+}
+
+.tabel-kustom td.sel-yatidak,
+.tabel-kustom td.sel-pilihan {
+  min-width: 200px;
+}
+
+.tabel-kustom .kolom {
+  margin: 0;
+}
+
+.tabel-kustom .pilihan-grup legend.sr + .pilihan {
+  margin-top: 0;
+}
+
+/* Pratinjau di dalam lembar: bilah tidak menempel di bawah */
+.pratinjau-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.pratinjau-form > * {
+  min-width: 0;
+}
+
+.pratinjau-form .grid-item,
+.pratinjau-form .tabel-isian-bingkai {
+  margin-top: 0;
+}
+
+.bilah-kirim.bilah-pratinjau {
+  position: static;
+  margin: 0;
+  border-radius: 10px;
+}
+
+/* Daftar form: nama dan sakelar, lalu tombol naik dan turun */
+.baris-form-isi {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  min-width: 0;
+}
+
+.baris-form-isi .baris-urut-nama {
+  flex: 1 1 14em;
+  text-decoration: none;
+}
+
+.baris-form-isi .sakelar {
+  flex: none;
+  padding-left: 16px;
+}
+
+.baris-urut.baris-form.nonaktif .daftar-baris-judul {
+  color: var(--tinta-redup);
+}
+
+.tanda-jenis {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--garis-isian);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-redup);
+  background: var(--kertas);
+}
+
+/* Susun form: daftar kolom dengan menu titik tiga */
+.daftar-kolom-form {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--garis);
+  border-radius: 8px;
+}
+
+.baris-kolom-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 4px 4px 4px 16px;
+  border-bottom: 1px solid var(--garis);
+}
+
+.baris-kolom-form:last-child {
+  border-bottom: 0;
+}
+
+.baris-kolom-form .daftar-baris-isi {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.baris-kolom-form.terkunci {
+  padding-right: 16px;
+}
+
+.menu-kolom {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-kolom .tombol {
+  justify-content: flex-start;
+}
+
+.pilihan-jenis-kolom .pilihan {
+  flex: 1 1 calc(50% - 8px);
+}
+
+@media (min-width: 600px) {
+  .pilihan-jenis-kolom .pilihan {
+    flex: 1 1 calc(33% - 8px);
+  }
+}
+
+.pilihan-hari {
+  margin-top: 8px;
+}
+
+.pilihan-hari[hidden] {
+  display: none;
+}
+
+.pilihan-hari .pilihan {
+  flex: 1 0 calc(25% - 8px);
+}
+
+.pilihan-hari .pilihan span {
+  padding: 8px;
+}
+
+@media (min-width: 600px) {
+  .pilihan-hari .pilihan {
+    flex: 1 0 calc(14% - 8px);
+  }
+}
+
+textarea.isian-catatan {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.bilah-kirim.bilah-susun {
+  margin-top: 16px;
+}
+
+.bagian-hapus-form {
+  margin-top: 24px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

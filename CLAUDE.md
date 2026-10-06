@@ -152,6 +152,18 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   satuanBesar, isiSatuanBesar, stock, stokMin, stokMaks, saran: { jumlah, satuan, dasar, teks } | null }] }] }`. `status` opname = `{
   terakhir: { id, tanggal, oleh, waktu } | null, jadwal, batasHari, hariLalu, lewat }`, juga di `beranda.opname` (Pengelola) dan
   `dashboard.opname`; `dashboard.perhatian[]` boleh berjenis `opname`; `riwayat.peristiwa[]` opname ditambah `id` dan `nilai`.
+- Aksi Tahap 9 (bertoken, semua role): `formKustom {formId, tanggal}` → `{ formId, tanggal, form: { id, nama, jenis, keterangan,
+  jadwal: harian|hari tertentu|sewaktu-waktu, hari: [nama hari], aktif, kolom: [{ id, bagian: kepala|baris, label, jenis:
+  Teks|Angka|Pilihan|Ya/Tidak|Item|Jam, pilihan, wajib, aktif }] }, item: [{ nama, kategori, satuan }], kiriman: { jumlah, baris,
+  terakhir }, nihil, wajib }`; `kirimKustom {formId, submissionId, tanggal, waktuPerangkat, kepala: { idKolom: nilai }, baris: [{
+  idKolom: nilai }]}` → `{ sudahTerkirim, jumlah, form }`. Khusus Pengelola: `daftarForm` → `{ form: [{ id, nama, jenis, keterangan,
+  jadwal, hari, aktif, urutan, jumlahKolom, diarsipkan }], arsip: [...], jumlahKustom, batasForm, batasKolom, siap }`; `detailForm
+  {formId?}` → `{ form (kolom termasuk yang dihapus, aktif: false) | null, adaIsian, kolomBawaan: [label], item, jumlahKustom,
+  batasForm, batasKolom, siap }`; `simpanForm {baru, formId, nama, tampil, keterangan, jadwal, hari, kolom: [{ id, bagian, label,
+  jenis, pilihan, wajib }]}`, `aturFormTampil {formId, tampil}`, `urutForm {urutan: [id]}`, `arsipkanForm {formId}`, `pulihkanForm
+  {formId}` → jawaban `daftarForm` (simpan: + `disimpan: { id, nama, tampil }`). `beranda.form[]` ditambah `jadwal` dan `hari`;
+  `riwayat.daftarForm[]` dan `infoLaporan.form[]` ditambah `tampil` (form yang disembunyikan tetap ada di Riwayat dan Laporan);
+  `riwayat.kolom[]` boleh membawa `opsional` dan `waktu`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -170,7 +182,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 6 | Prep List dan resep (Pengaturan → Resep, pengaman resep, form Prep List, Data_Prep/Data_PrepBahan, gerakan stock, koreksi jumlah resep, masa simpan di Beranda dan email, harga barang jadi dari resep, Riwayat, PDF, tab Harian_Prep, blok Prep List di Dashboard) | Kode selesai (Code.gs v0.7, aplikasi 0.7.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Perbaikan warna dan rumus tab Dashboard di Code.gs v0.8.1 (butir 118–121). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 8 | Stock opname dan daftar belanja (layar Stock opname dari Dashboard, Data_Opname dan penyesuaian "Stock opname", laporan selisih PDF, opname di Riwayat, pengingat jadwal di Beranda/Dashboard/email, blok Stock opname di tab Dashboard, Daftar belanja di Laporan dengan PDF dan ringkasan di email) | Kode selesai (Code.gs v0.9, aplikasi 0.9.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 9 | Form kustom | Belum |
+| 9 | Form kustom (Pengaturan → Form, susun form dan pratinjau, jadwal form, M_Form/M_FormKolom, tab Data_K_<ID>, layar isi umum, Beranda, Riwayat dan koreksi, PDF umum, email, kolom Form kustom di blok Kepatuhan) | Kode selesai (Code.gs v0.10, aplikasi 0.10.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 10 | Rekap bulanan | Belum |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Belum |
 
@@ -290,7 +302,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     (nama dipakai sebagai `submitted_by`). Role dan keadaan akun sendiri tidak bisa diubah sendiri,
     supaya Pengelola tidak mengunci diri. Daftar staff memakai pola tabel lebar (kolom nama diam).
     Pengaturan hanya menampilkan bagian yang sudah dibangun (sejak Tahap 7: Staff dan PIN, Penerima email,
-    Item, Resep, Unit, Kategori dan satuan, Outlet dan jadwal); Form menyusul di Tahap 9.
+    Item, Resep, Unit, Kategori dan satuan, Outlet dan jadwal; sejak Tahap 9 juga Form, sesudah Penerima email).
 28. **Penerima email** disimpan di `M_Outlet` kolom Email Penerima Laporan, dipisah koma; alamat
     ganda (huruf besar/kecil) dibuang.
 29. **Penyimpanan di HP** (localStorage): `inventoryku:sesi`, `inventoryku:infoLogin`, dan per
@@ -887,3 +899,85 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     membuka dan menyimpan, kiriman ulang, validasi, jadwal mingguan/bulanan, Riwayat, PDF, saran 20/12 → 2 dus, tanpa stok maksimum,
     email, penolakan Staff, rumus seimbang), 16 uji alur Chromium (termasuk iPhone dengan lembar bagikan tiruan), dan delapan ukuran
     Bagian 4.6; uji Tahap 7 tetap lulus.
+
+### Tahap 9
+
+128. **Versi:** Code.gs v0.10, aplikasi 0.10.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js). `VERSI_KODE` di Code.gs masih tertulis
+    `v0.8.1` sejak Tahap 8 (baris pertama sudah v0.9); kini keduanya v0.10.
+129. **Kolom baru di master** (ditambahkan `setupSpreadsheet` di kanan): `M_Form` `Hari` (nama hari dipisah koma, untuk jadwal
+    "hari tertentu") dan `Diarsipkan` (waktu); `M_FormKolom` `ID Kolom`. `M_FormKolom` masuk `KUNCI_MASTER` (kunci ID Form) dan ikut
+    dirapikan. Selama kolom itu belum ada, Pengaturan → Form menulis "pemilik Sheet perlu menjalankan ulang setupSpreadsheet" dan
+    server menolak membuat form kustom; menyembunyikan, mengurutkan, dan mengganti nama form bawaan tetap bisa.
+130. **Tampil, sembunyi, dan hapus.** `Aktif` di `M_Form` = tampil di Beranda. Form yang disembunyikan (bawaan atau kustom) tidak
+    punya tiket, tidak ditagih, tidak bisa ditandai nihil, dan layar isinya menolak dibuka ("sedang disembunyikan"), tetapi tetap ada
+    di pilihan Riwayat dan Laporan, dan kiriman dari antrean tetap diterima. Hapus form kustom = arsip: `Diarsipkan` diisi waktu,
+    form hilang dari Beranda, Riwayat, Laporan, dan email; tab datanya tetap dengan tanda arsip (warna tab Garis dan catatan "ARSIP:
+    …" di sel A1). "Pulihkan" (bagian "Form yang dihapus" di daftar form) mengosongkan `Diarsipkan`, menaruh form di urutan terakhir
+    dengan keadaan tampil seperti sebelum dihapus, dan ditolak jika sudah ada 10 form kustom atau nama yang sama. Form bawaan tidak
+    bisa dihapus. Kolom yang dihapus tidak bisa dipulihkan dari aplikasi (buat kolom baru dengan label lain).
+131. **ID form kustom** dibuat dari nama saat form dibuat ("Checklist kebersihan" → `CHECKLIST_KEBERSIHAN`, huruf A–Z, angka, dan
+    `_`, paling panjang 20, diberi `_2` dan seterusnya jika sudah dipakai) dan tidak berubah lagi, jadi tab `Data_K_<ID>` tetap
+    bernama sama walau form diganti nama. Nama form unik (huruf besar/kecil tidak dibedakan) di antara semua form, termasuk yang
+    diarsipkan, paling panjang 40 huruf; keterangan paling panjang 120.
+132. **Susunan kolom.** Batas diperiksa server: 10 form kustom yang belum dihapus dan 15 kolom aktif (kepala + baris) per form.
+    Minimal satu kolom baris (form tanpa baris tidak didukung; checklist cukup satu baris). Label unik per form termasuk kolom yang
+    sudah dihapus (kolomnya masih ada di tab), paling panjang 40, tidak boleh `Tanggal`, `Nama Staff`, `No`, atau nama kolom sistem.
+    Pilihan: 2–20, masing-masing paling panjang 40, disimpan dipisah ` | ` di `M_FormKolom`. Kolom tidak bisa dipindah antara kepala
+    dan baris. Jenis kolom yang sudah ada tidak bisa diganti setelah form punya isian (kiriman di tab datanya); sebelum itu boleh.
+    Kolom baru diberi ID `K<n>`. Kolom yang tidak dikirim lagi oleh layar susun menjadi `Aktif` kosong (dihapus = disembunyikan).
+133. **Tab `Data_K_<ID>`** dibuat saat form disimpan pertama kali, tepat sesudah tab Data terakhir: `Tanggal`, `Nama Staff`, kolom
+    kepala, `No` (nomor baris dalam satu kiriman), kolom baris, lalu 13 kolom sistem (dilipat), dengan format, filter, proteksi, dan
+    warna berselang yang sama dengan tab Data lain. Judul kolom = label. Kolom baru disisipkan tepat sebelum kolom sistem (isian lama
+    kosong di situ). Mengganti label menulis ulang judul kolom di tab itu dan nama kolom di `Log_Perubahan` untuk tab itu, supaya
+    jejak koreksinya tetap terbaca. Kolom Angka berformat angka, lainnya teks. Urutan tab: tanggal terbaru, waktu kirim, No.
+    `setupSpreadsheet` membuat atau melengkapi tab semua form kustom (juga yang diarsipkan) dan menaruhnya di kelompok tab Data. Gaya
+    rumus (butir 93) dicatat di Script Property `GAYA_RUMUS`, supaya aplikasi bisa memasang warna berselang tanpa tab uji.
+134. **Nilai isian** (sama di HP, kiriman, dan koreksi): Teks paling panjang 200 (diawali `=`, `+`, `-`, `@` diberi kutip); Angka 0
+    atau lebih (butir 35, tanpa minus); Pilihan dan Ya/Tidak salah satu pilihannya (disimpan "Ya"/"Tidak"); Item nama di `M_Item`
+    (di HP dipilih lewat lembar pencarian, satuannya tampil di samping; di Sheet hanya nama item); Jam `hh:mm` (boleh diketik "7.05").
+    Kosong selalu boleh untuk kolom tidak wajib. Baris yang semua kolomnya kosong tidak dikirim; minimal satu baris berisi. Pesan:
+    "Pilih Area.", "Isi Butir di baris 2.", "Isi minimal satu baris.". Nilai kolom yang sudah dihapus tetap ditulis jika datang dari
+    antrean; kolom wajib diperiksa dengan definisi saat server menerima kiriman.
+135. **Jadwal dan penagihan** (Bagian 5.8, `wajibPada_`): form bawaan yang tampil selalu ditagih; form kustom "Setiap hari" setiap
+    hari, "Hari tertentu" hanya pada hari yang dipilih (menurut tanggal isian), "Sewaktu-waktu" tidak pernah. Form yang tidak ditagih
+    tetap punya tiket (bisa diisi kapan saja) tanpa ruas rel; tiketnya menulis "Sewaktu-waktu" atau "Tidak dijadwalkan hari ini"
+    (bukan "Belum diisi") selama belum ada isian. Email harian: "Tidak ada isian (sewaktu-waktu, tidak ditagih)" / "(tidak dijadwalkan
+    hari ini)", tanpa warna merah. Lampiran email juga untuk form kustom yang terkirim.
+136. **Layar isi form kustom** (`#/form/<ID>`): Tanggal (aturan Bagian 5.0), kolom kepala di kotak info, status kiriman dan "Tidak ada
+    hari ini", lalu baris: kartu "Baris 1, 2, …" (HP satu kolom, tablet dua) atau tabel (No, kolom baris, hapus) di laptop/desktop.
+    Label kolom wajib diberi "(wajib)". Pilihan ≤ 4 tombol berjajar, > 4 dropdown. Bilah bawah: penghitung "2 dari 3 baris lengkap",
+    "Tambah baris", dan "Kirim <nama form huruf kecil>". Sesudah terkirim, baris dikosongkan dan kolom kepala tetap (seperti shift di
+    Waste). Draft `draft:kustom:<ID>` (tanggal, kepala, baris per ID kolom, submissionId); jawaban `formKustom` di `cache:kustom:<ID>`
+    sehingga form yang pernah dibuka bisa diisi tanpa sinyal; tanpa sinyal dan belum pernah dibuka: "Form ini belum pernah dibuka di
+    HP ini…". Antrean dan kiriman ganda memakai pola yang sama dengan form lain (aksi `kirimKustom`).
+137. **Pengaturan → Form** (`#/pengaturan/form`, `-baru`, `/<ID>`): daftar semua form dalam urutan Beranda (nama, tanda
+    Bawaan/Kustom, jadwal dan jumlah kolom, sakelar Tampil/Disembunyikan yang langsung tersimpan, tombol naik/turun lalu "Simpan
+    urutan" seperti kategori), "Buat form" (hilang jika sudah 10), "n dari 10 form kustom dipakai", dan "Form yang dihapus". Layar
+    susun: nama, keterangan, jadwal (Setiap hari / Hari tertentu dengan tujuh tombol hari / Sewaktu-waktu), sakelar tampil, kolom
+    kepala, kolom baris (menu titik tiga: Ubah, Geser ke atas/bawah, Hapus kolom dengan konfirmasi), lembar kolom (label, jenis enam
+    tombol, pilihan satu per baris, sakelar Wajib), "Lihat pratinjau" (lembar/dialog lebar berisi layar isi yang sama persis; Kirim
+    hanya memeriksa isian dan menulis bahwa ini pratinjau), "Simpan form" ("Form tersimpan dan sudah tampil di Beranda."), dan "Hapus
+    form" (konfirmasi Bagian 5.7). Perubahan kolom baru tersimpan saat "Simpan form". Form bawaan: nama dan sakelar tampil saja,
+    daftar kolomnya ditampilkan terkunci. Draft `draft:form:<ID>` / `draft:form:+baru`; `cache:form-daftar`, `cache:form:<ID>`.
+138. **Riwayat, koreksi, dan PDF form kustom.** `defRiwayat_` membentuk definisi dari `M_FormKolom` (`defRiwayatKustom_`): kolom kepala
+    tampil di kepala kiriman (tidak dikoreksi; kepala yang salah dilaporkan lewat baris), kolom baris bisa dikoreksi Pengelola dengan
+    aturan nilai butir 134 (kolom tidak wajib boleh dikosongkan; Pilihan dan Ya/Tidak lewat tombol; Jam pemilih waktu; Item diketik
+    sesuai nama di daftar item), tercatat di `Log_Perubahan`. Kolom yang sudah dihapus tampil "Label (dihapus)" hanya di baris yang
+    berisi dan tidak bisa dikoreksi. Kolom pertama (Item, atau Teks) menjadi nama baris; nilai lamanya kini juga ditulis dicoret
+    (perbaikan bersama `gambarDetailKiriman`). Filter Kategori dan Item tersedia jika form punya kolom Item. PDF umum
+    (`laporanPdf_`, `isiPdfKustom_`): judul = nama form, kotak info (Keterangan, Jumlah isian, Jumlah baris), tabel No, Nama Staff,
+    Jam, kolom kepala, kolom baris (kolom yang dihapus hanya jika berisi pada tanggal itu), Diisi oleh dan Diperiksa oleh; nama file
+    `{tanggal}_{Nama_form}.pdf`.
+139. **Blok Kepatuhan di tab Dashboard**: kolom I "Form kustom" ("Terkirim", "1 dari 2", atau "–" jika tidak ada form kustom yang
+    ditagih hari itu) dan form kustom ikut dihitung di Form belum lengkap, Isian belum diperiksa, dan Baris dilaporkan keliru. Tab
+    `Data_K_<ID>` dibaca lewat `INDIRECT` dari daftar form kustom yang tampil dan belum dihapus di `M_Form` (kolom dicari menurut
+    judulnya), jadi form yang dibuat dari aplikasi langsung ikut tanpa menjalankan `setupSpreadsheet`. Nama LET diawali `kf`/`ku`
+    (butir 120).
+140. **Uji Tahap 9** (di luar repo): Code.gs dijalankan di Node dengan tiruan SpreadsheetApp/Utilities/Properties/Drive/Mail (12 uji
+    server: buat form tiga kolom dan tabnya, kirim dan kiriman ganda, Riwayat, PDF, laporkan, koreksi dengan log, diperiksa dan buka
+    kunci, tambah/ganti label/hapus kolom setelah ada isian, jenis terkunci, batas 10 form dan 15 kolom, jadwal hari tertentu dan
+    sewaktu-waktu di Beranda dan email, Item dan Jam, arsip dan pulihkan, sembunyikan Waste, urutan, penolakan Staff, setupSpreadsheet
+    ulang dan rumus seimbang), lalu frontend di Chromium dengan API tiruan yang memanggil `doPost` asli (8 uji alur termasuk pratinjau,
+    antrean tanpa sinyal, unduh PDF dari Riwayat dan Laporan, Staff tanpa menu Pengaturan; delapan ukuran Bagian 4.6 untuk daftar
+    form, susun form, pratinjau, lembar kolom, form bawaan, dua layar isi, dan Beranda; uji regresi layar lama).
+
