@@ -3,14 +3,15 @@
    5 Oktober 2026: tombol Keluar, keluar otomatis, hapus staff, PDF stock per kategori;
    Tahap 5: form Waste dan Suhu; Tahap 6: Prep List, resep, masa simpan;
    Tahap 7: Dashboard dan Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal;
-   Tahap 8: stock opname dan daftar belanja; Tahap 9: form kustom dan Pengaturan → Form).
+   Tahap 8: stock opname dan daftar belanja; Tahap 9: form kustom dan Pengaturan → Form;
+   Tahap 10: rekap bulanan di menu Laporan).
    Tanpa framework, tanpa langkah build. Semua teks antarmuka mengikuti
    spesifikasi tampilan Bagian 7. */
 (function () {
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.10.0';
+  var VERSI_APLIKASI = '0.11.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -6617,8 +6618,9 @@
         unduh.pesan,
         pengelola ? pesanDrive : null
       ]),
-      // Daftar belanja (Tahap 8, khusus Pengelola). Rekap bulanan menyusul di Tahap 10.
-      pengelola ? kartuDaftarBelanja() : null
+      // Daftar belanja (Tahap 8) dan Rekap bulanan (Tahap 10), khusus Pengelola.
+      pengelola ? kartuDaftarBelanja() : null,
+      pengelola ? kartuRekapBulanan() : null
     ]));
 
     function simpanPilihan() {
@@ -7721,6 +7723,50 @@
       galat: function (teks, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(teks, cobaLagi)); }
     });
     return kartu;
+  }
+
+  /** Jumlah bulan yang bisa dipilih untuk rekap bulanan (bulan berjalan dan 23 bulan sebelumnya). */
+  var BULAN_REKAP = 24;
+
+  /**
+   * Kartu Rekap bulanan di menu Laporan (Pengelola; tampilan Bagian 5.5,
+   * sistem Bagian 9.3): pilih bulan, lalu "Unduh PDF" lewat unduhPdf bersama
+   * (aturan iPhone sama). Nilai awal bulan lalu, karena itulah rekap yang
+   * dikirim tiap tanggal 1. Pilihan tersimpan per pengguna (cache:rekap-pilihan).
+   */
+  function kartuRekapBulanan() {
+    var kini = tanggalIso(new Date()).slice(0, 7);
+    var bulan = [];
+    var th = Number(kini.slice(0, 4));
+    var bl = Number(kini.slice(5, 7));
+    for (var i = 0; i < BULAN_REKAP; i++) {
+      bulan.push(th + '-' + duaAngka(bl));
+      bl--;
+      if (!bl) { bl = 12; th--; }
+    }
+    var simpanan = Cache.baca('rekap-pilihan');
+    var pilih = simpanan && simpanan.data && bulan.indexOf(simpanan.data.bulan) >= 0 ? simpanan.data.bulan : bulan[1];
+    var pilihBulan = el('select', { class: 'isian', id: 'rekap-bulan' }, bulan.map(function (b, n) {
+      var nama = NAMA_BULAN[Number(b.slice(5, 7)) - 1] + ' ' + b.slice(0, 4);
+      return el('option', { value: b, text: n === 0 ? nama + ' (bulan berjalan)' : nama });
+    }));
+    pilihBulan.value = pilih;
+    var unduh = unduhPdf({ aksi: 'unduhPdfRekap', minta: function () { return { bulan: pilihBulan.value }; } });
+    pilihBulan.addEventListener('change', function () {
+      Cache.tulis('rekap-pilihan', { bulan: pilihBulan.value });
+      unduh.reset();
+    });
+    return el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-rekap' }, [
+      el('h2', { class: 'kartu-judul', id: 'judul-rekap', text: 'Rekap bulanan' }),
+      el('p', { class: 'kartu-teks', text: 'Stock, stock opname, waste, prep, suhu, dan kepatuhan selama satu bulan. ' +
+        'Rekap bulan lalu juga dikirim ke penerima email tiap tanggal 1.' }),
+      el('div', { class: 'kolom' }, [
+        el('label', { class: 'kolom-label', for: 'rekap-bulan', text: 'Bulan' }),
+        pilihBulan
+      ]),
+      el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol]),
+      unduh.pesan
+    ]);
   }
 
   /* =======================================================================

@@ -1179,9 +1179,12 @@ body.papan-ketik .layar {
   background: var(--kertas-tekan);
 }
 
+/* Nama yang bisa diketuk di tabel: sasaran sentuh 44 px (Bagian 9) tanpa menambah tinggi baris */
 .tabel-tombol {
-  display: inline;
-  padding: 0;
+  display: inline-block;
+  min-width: 44px;
+  padding: 11px 0;
+  margin: -11px 0;
   border: 0;
   background: none;
   color: var(--biru-malam);
