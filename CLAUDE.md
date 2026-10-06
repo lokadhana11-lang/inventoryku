@@ -164,6 +164,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   {formId}` → jawaban `daftarForm` (simpan: + `disimpan: { id, nama, tampil }`). `beranda.form[]` ditambah `jadwal` dan `hari`;
   `riwayat.daftarForm[]` dan `infoLaporan.form[]` ditambah `tampil` (form yang disembunyikan tetap ada di Riwayat dan Laporan);
   `riwayat.kolom[]` boleh membawa `opsional` dan `waktu`.
+- Aksi Tahap 10 (khusus Pengelola): `unduhPdfRekap {bulan: 'yyyy-mm'}` → `{ namaFile, mime, data }` (rekap bulanan, Bagian 9.3;
+  tidak menambah file di Drive). Fungsi dari editor atau trigger: `kirimRekapBulanan` (trigger tanggal 1) dan `kirimRekapSekarang`
+  (uji dari editor). `M_Konfigurasi` mendapat baris `rekap_terakhir` (dibuat otomatis); nilai yang diawali "Gagal" ikut
+  `beranda.peringatanSistem` dan butir `sistem` di `dashboard.perhatian`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -183,7 +187,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Perbaikan warna dan rumus tab Dashboard di Code.gs v0.8.1 (butir 118–121). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 8 | Stock opname dan daftar belanja (layar Stock opname dari Dashboard, Data_Opname dan penyesuaian "Stock opname", laporan selisih PDF, opname di Riwayat, pengingat jadwal di Beranda/Dashboard/email, blok Stock opname di tab Dashboard, Daftar belanja di Laporan dengan PDF dan ringkasan di email) | Kode selesai (Code.gs v0.9, aplikasi 0.9.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 9 | Form kustom (Pengaturan → Form, susun form dan pratinjau, jadwal form, M_Form/M_FormKolom, tab Data_K_<ID>, layar isi umum, Beranda, Riwayat dan koreksi, PDF umum, email, kolom Form kustom di blok Kepatuhan) | Kode selesai (Code.gs v0.10, aplikasi 0.10.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 10 | Rekap bulanan | Belum |
+| 10 | Rekap bulanan (PDF enam bagian Bagian 9.3, unduh dari menu Laporan untuk Pengelola, simpan ke Drive, email dan trigger tanggal 1, `kirimRekapSekarang`) dan pemeriksaan akhir terhadap kedua spesifikasi | Kode selesai (Code.gs v0.11, aplikasi 0.11.0), diuji dengan API tiruan (Code.gs di Node, 61 uji server), Chromium (28 uji alur termasuk iPhone, delapan ukuran) dan sapuan semua layar pada delapan ukuran (274 pemeriksaan) serta "kurangi gerak". Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `pasangTrigger` dan `kirimRekapSekarang`, deploy versi baru, uji dari HP. setupSpreadsheet tidak perlu dijalankan ulang |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Belum |
 
 ## Keputusan tambahan
@@ -482,7 +486,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Pengelola "Simpan ulang ke Drive" (hasilnya ditulis di bawah tombol beserta lokasi file). Form
     yang laporannya belum dibangun menonaktifkan tombol dengan tulisan "Laporan PDF … dibangun di
     tahap berikutnya, bersama formnya." Pilihan tersimpan per pengguna (`cache:laporan-pilihan`).
-    Daftar belanja dibangun di Tahap 8 (butir 124); Rekap bulanan menyusul di Tahap 10.
+    Daftar belanja dibangun di Tahap 8 (butir 124); Rekap bulanan di Tahap 10 (butir 143).
 68. **Email harian** (`jalankanLaporanHarian_`, dipanggil `kirimLaporanHarian` dan
     `kirimLaporanSekarang`) lewat `MailApp` (izin kirim saja), nama pengirim "InventoryKu", subjek
     "Laporan harian {Outlet}, {Hari, tanggal}". Isi: status tiap form aktif menurut Bagian 5.8
@@ -981,3 +985,94 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     antrean tanpa sinyal, unduh PDF dari Riwayat dan Laporan, Staff tanpa menu Pengaturan; delapan ukuran Bagian 4.6 untuk daftar
     form, susun form, pratinjau, lembar kolom, form bawaan, dua layar isi, dan Beranda; uji regresi layar lama).
 
+### Tahap 10
+
+141. **Versi:** Code.gs v0.11 (`VERSI_KODE` juga), aplikasi 0.11.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js). Tidak ada tab, kolom,
+    atau rumus Sheet baru, jadi `setupSpreadsheet` tidak perlu dijalankan ulang. Baris `rekap_terakhir` di `M_Konfigurasi` dibuat
+    otomatis saat rekap pertama berjalan (seperti `laporan_terakhir`).
+142. **Isi rekap bulanan** (`dataRekapBulan_`, satu kali baca per tab; `isiPdfRekap_`; judul "Rekap Bulanan September 2026", kotak
+    info Nama Outlet, Bulan, Periode). Bulan berjalan: data sampai hari ini, Periode "1–6 Oktober 2026 (bulan berjalan)";
+    kelengkapan form dan pengecekan terlewat dinilai sampai kemarin. Bulan masa depan ditolak; bulan tanpa isian sama sekali tetap
+    menghasilkan PDF dengan "Keterangan: Belum ada isian pada bulan ini." dan kalimat kosong di tiap bagian.
+    - **Stock:** satu baris per kategori (urutan `M_Kategori`): item bergerak, Masuk, Bahan terpakai, Penyesuaian, dan Nilai stock
+      akhir bulan, semuanya dalam rupiah, ditambah baris total. Satuan item berbeda-beda, jadi jumlah per kategori hanya bermakna
+      sebagai nilai. Nilai = jumlah (dari rekap `Stock_Harian` bulan itu) × Harga Satuan **sekarang**, sama dengan nilai stock di
+      Dashboard. Bahan terpakai = (Stock Keluar + Dipakai Prep) × harga untuk item tanpa resep aktif (Bagian 8.5, butir 111).
+      Penyesuaian termasuk hasil stock opname. Nilai stock akhir bulan = `nilaiStock_` pada tanggal terakhir. Kategori yang semua
+      itemnya belum punya harga ditulis "–"; nama item tanpa harga (yang bergerak atau stock-nya bukan nol) disebut di catatan.
+    - **Stock opname:** satu baris per opname (tanggal, dihitung oleh, item dihitung, item berselisih, nilai selisih yang tercatat
+      di `Data_Opname`), urut lama ke baru, dengan total; lalu paling banyak 10 item yang paling sering berselisih (berapa kali,
+      total selisih dan satuannya, total nilai).
+    - **Waste:** lima kategori waste (urutan form) dengan jumlah catatan dan estimasi kerugian yang tercatat; "jumlah" = jumlah
+      catatan, karena qty item berbeda satuan. Catatan tanpa harga ditandai `*`. Lalu 10 item dengan nilai waste terbesar (qty,
+      satuan, catatan, nilai); item tanpa harga diurutkan sesudahnya.
+    - **Prep:** per item (urut nama): jumlah catatan, total jumlah resep (– untuk item tanpa resep), total Hasil atau Qty, satuan.
+    - **Suhu:** per unit (unit aktif menurut urutan `M_Unit`, ditambah unit nonaktif yang punya isian bulan itu): jumlah
+      pengecekan (termasuk cek ulang), di luar standar (merah tebal jika lebih dari 0), terlewat; lalu tabel tanggal yang punya
+      pengecekan terlewat. Terlewat memakai aturan Riwayat (butir 87): unit aktif sekarang × Opening/Middle/Closing, sejak isian
+      Suhu pertama.
+    - **Kepatuhan:** per form yang belum dihapus (urutan Beranda): hari ditagih (`wajibPada_`), hari tidak lengkap dan tanggalnya
+      ("5 dan 20", "10, 11, dan 15"), jumlah isian (kiriman), isian belum diperiksa, dan baris yang masih dilaporkan keliru saat
+      rekap dibuat (laporan yang sudah dikoreksi atau ditutup tidak lagi tercatat di tab Data). Kelengkapan memakai aturan Bagian
+      5.8 dengan jadwal dan keadaan tampil form **sekarang**; hari sebelum isian pertama di aplikasi tidak dihitung. Form yang
+      disembunyikan atau sewaktu-waktu ditulis "tidak ditagih".
+143. **Menu Laporan** (Pengelola): kartu ketiga "Rekap bulanan" di bawah Daftar belanja, berisi satu kalimat isi rekap, `<select>`
+    "Bulan" (bulan berjalan dan 23 bulan sebelumnya, terbaru di atas, bulan berjalan bertanda "(bulan berjalan)"; nilai awal bulan
+    lalu; pilihan tersimpan di `cache:rekap-pilihan`), dan "Unduh PDF" lewat `unduhPdf` bersama (aturan iPhone sama; mengganti
+    bulan mengembalikan tombol ke "Unduh PDF"). Tiap kartu Laporan punya tombol utamanya sendiri (lihat butir 150). Staff tidak
+    melihat kartu ini dan server menolak `unduhPdfRekap` dari Staff ("Rekap bulanan hanya untuk Head Kitchen dan Manager.").
+144. **Otomatis tiap tanggal 1** (`kirimRekapBulanan` → `jalankanRekapBulanan_`): rekap bulan sebelumnya disimpan ke
+    `Laporan Kitchen/{Nama Outlet}/{YYYY}/Rekap_{YYYY-MM}.pdf` (file rekap bulan yang sama yang sudah ada di folder itu dipindah ke
+    tempat sampah Drive, supaya satu file per bulan), lalu satu email ke penerima `M_Outlet`: subjek "Rekap bulanan {Outlet},
+    {September 2026}", ringkasan tiap bagian, lampiran PDF, tautan aplikasi. PDF tetap disimpan ke Drive walau email gagal; hasil
+    dan kegagalan di `rekap_terakhir`. Nama file unduhan sama: `Rekap_{YYYY-MM}.pdf`. Baris "Dibuat oleh": nama pengunduh dan
+    waktunya, "Otomatis, …" (trigger), atau "Uji dari editor Apps Script, …".
+145. **`pasangTrigger`** kini memasang tiga trigger: laporan harian, cadangan mingguan, dan `kirimRekapBulanan` tiap tanggal 1
+    pukul 07.00 (`JAM_REKAP`, `onMonthDay(1).atHour(7)`) dalam zona waktu tersimpan. Pukul 07.00 dipilih supaya isian closing
+    hari terakhir bulan lalu yang dicatat larut malam sudah masuk. Jalankan `pasangTrigger` sekali setelah menempel Code.gs v0.11.
+146. **`kirimRekapSekarang`** (dari editor): sama dengan trigger (rekap bulan lalu, simpan ke Drive, email), subjek diawali
+    "[Uji]". Jika bulan lalu sama sekali belum punya isian (aplikasi baru dipakai), yang dibuat rekap bulan berjalan, dan log
+    menyebutkannya. Rekap bulan itu yang dibuat sesudahnya menggantikan file uji di Drive.
+147. **Uji Tahap 10** (di luar repo): Code.gs dijalankan di Node dengan tiruan SpreadsheetApp/Utilities/Properties/Drive/Mail/
+    ScriptApp dan data contoh satu bulan (September 2026: Stock, Suhu dengan cek ulang dan pengecekan terlewat, Waste dengan dan
+    tanpa harga, Prep beresep dan tanpa resep, tanda nihil, dua opname, form kustom berjadwal Senin, pemeriksaan, laporan
+    kekeliruan): 61 uji server (angka tiap bagian, bulan tanpa data, bulan berjalan, masa depan, Staff dan tanpa token ditolak,
+    trigger tanggal 1, file Drive tunggal, email, gagal tanpa penerima tampil di Beranda dan Dashboard, `kirimRekapSekarang`,
+    `pasangTrigger` tidak menggandakan trigger). PDF dirender di Chromium dan diperiksa per bagian. Frontend: 28 uji alur di
+    Chromium dengan API tiruan yang memanggil `doPost` asli (unduh Android, iPhone dengan lembar bagikan tiruan dan tanpa dukungan
+    berbagi file, tanpa sinyal, Staff, delapan ukuran).
+
+### Pemeriksaan akhir terhadap kedua spesifikasi (Tahap 10, 6 Oktober 2026)
+
+148. **Cara periksa.** Kedua file spesifikasi dibaca ulang bagian demi bagian dan dibandingkan dengan kode. Semua layar (27 rute
+    Pengelola, 3 rute Staff, Login pilih nama dan PIN, lembar nilai stock) diperiksa otomatis di Chromium pada delapan ukuran
+    Bagian 4.6 (274 pemeriksaan): halaman tidak bergulir ke samping, tidak ada elemen keluar layar di luar bingkai gulir tabel,
+    tidak ada teks terpotong, sasaran sentuh minimal 44 px, tanpa galat konsol. Gerak diperiksa terhadap Bagian 8: semua di CSS,
+    hanya `transform` dan `opacity` (warna latar hanya pada keadaan tekan), lama sesuai tabel 8.1 (tekan 100 ms, penanda menu dan
+    rel 200 ms, ganti layar 120 ms, lembar 200/150 ms, cap 150 ms, goyang PIN 300 ms, pembuka 400 ms dan tiket 150 ms berjeda
+    50 ms, paling banyak 8 tiket, kerangka 1,2 detik), masuk `ease-out` dan keluar `ease-in`, grafik tanpa animasi. Dengan
+    "kurangi gerak" (`prefers-reduced-motion`) tidak ada animasi atau transisi yang tersisa selain indikator putar.
+149. **Diperbaiki di pemeriksaan ini:** nama yang bisa diketuk di tabel (`tabel-tombol`: nama item di detail Riwayat, nama staff
+    di Pengaturan → Staff dan PIN) hanya setinggi 24 px; kini sasaran sentuhnya 44 px (padding dengan margin negatif, tinggi
+    baris tabel tidak berubah), sesuai Bagian 9.
+150. **Belum terpenuhi atau menyimpang** (sengaja tidak diubah di Tahap 10):
+    - Foto bukti waste (sistem 5.4, tampilan 5.3): belum dibangun, digabung dengan Tahap 11 (butir 81).
+    - Arsip data tahunan (sistem 8.4) dan outlet tambahan (sistem 3): Tahap 11 (opsional).
+    - Waste: "geser kartu ke kiri" untuk menghapus baris (tampilan 5.3) tidak dibangun; yang ada ikon tempat sampah. Kartu yang
+      mengikuti jari butuh gerak yang dihitung JavaScript tiap bingkai, yang dilarang Bagian 8.2 butir 1.
+    - Pengaturan → Form: urutan diubah dengan tombol naik/turun lalu "Simpan urutan" (butir 137), bukan pegangan geser (tampilan
+      5.7), dengan alasan yang sama dan supaya bisa dipakai dengan papan ketik.
+    - Pengaturan → Staff: "sakelar Aktif/Nonaktif" (tampilan 5.7) berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan
+      lagi" (butir 76).
+    - PDF stock semua kategori satu halaman per kategori (sistem 9.1) baru berlaku setelah pemilik menjalankan
+      `ujiPemisahHalamanPdf` dan hasilnya "ya"; bawaannya satu tabel bersambung (butir 77).
+    - Urutan `Data_Suhu`: tanggal, unit, lalu waktu kirim (butir 86), bukan unit lalu waktu cek (sistem 8.4); Opening, Middle,
+      Closing biasanya dikirim berurutan, jadi hasilnya hampir selalu sama.
+    - Menu Laporan Pengelola punya tiga tombol utama (satu per kartu: Laporan harian, Daftar belanja yang memang disebut "tombol
+      utama" di tampilan 5.9, dan Rekap bulanan), padahal tampilan Bagian 6 menyebut tombol utama satu per layar.
+    - Rekap bulanan, kelengkapan Suhu, dan pengecekan terlewat memakai unit aktif dan jadwal form **sekarang**, bukan keadaan
+      pada bulan itu (spesifikasi tidak mengatur; tidak ada riwayat perubahan master).
+    - Belum bisa diuji di sini: hasil rumus dan grafik di Google Sheets, konversi HTML ke PDF milik Google (termasuk h2/h3 rekap),
+      pengiriman email asli, trigger asli, huruf perangkat diperbesar 200% (tampilan Bagian 9), dan pemasangan PWA di HP.
+    - Catatan rapi: nomor butir 118–121 di CLAUDE.md dipakai dua kali (perbaikan Dashboard v0.8.1 dan Tahap 8); rujukan lama
+      tetap, jadi tidak dinomori ulang.

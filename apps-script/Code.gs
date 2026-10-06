@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.10 (Tahap 9: form kustom)
+// InventoryKu Code.gs v0.11 (Tahap 10: rekap bulanan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -41,10 +41,14 @@
  * - Tahap 9            : form kustom (Pengaturan → Form, M_Form dan
  *                        M_FormKolom, tab Data_K_<ID Form>, layar isi umum,
  *                        jadwal form, Riwayat, PDF umum, email, Kepatuhan).
+ * - Tahap 10           : rekap bulanan PDF (unduh dari menu Laporan, simpan ke
+ *                        Drive, email tiap tanggal 1).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
- * - pasangTrigger      : dijalankan dari editor; memasang kedua trigger.
+ * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
+ * - pasangTrigger      : dijalankan dari editor; memasang ketiga trigger.
  * - kirimLaporanSekarang : dijalankan dari editor untuk menguji email dan PDF.
+ * - kirimRekapSekarang : dijalankan dari editor untuk menguji rekap bulanan.
  * - setupSpreadsheet   : dijalankan dari editor; menyimpan ID spreadsheet dan
  *                        membuat semua tab. Aman dijalankan ulang.
  * - buatKodePemasangan : dijalankan dari editor saat tidak ada Pengelola yang
@@ -53,7 +57,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.10';
+var VERSI_KODE = 'v0.11';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -163,6 +167,8 @@ var AKSI_ = {
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
   unduhPdfBelanja: { jalankan: aksiUnduhPdfBelanja_, pengelola: true,
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
+  unduhPdfRekap: { jalankan: aksiUnduhPdfRekap_, pengelola: true,
+    pesan: 'Rekap bulanan hanya untuk Head Kitchen dan Manager.' },
   formKustom: { jalankan: aksiFormKustom_ },
   kirimKustom: { jalankan: aksiKirimKustom_ },
   daftarForm: { jalankan: aksiDaftarForm_, pengelola: true,
@@ -6409,6 +6415,8 @@ function isiPdfSuhu_(tanggal) {
  * sendiri. Diisi/Diperiksa oleh dan kaki hanya di akhir. Laporan yang bukan
  * form harian (Tahap 8: selisih opname, daftar belanja) memberi isi.judul dan
  * isi.bawah ([[label, nilai]]) sebagai pengganti Diisi/Diperiksa oleh.
+ * Rekap bulanan (Tahap 10) memberi isi.infoDasar (pengganti baris Tanggal di
+ * kotak info) dan memakai h2 sebagai judul tiap bagiannya.
  */
 function htmlLaporan_(idForm, tanggal, isi) {
   var judul = isi.judul || laporanPdf_(idForm).judul;
@@ -6422,7 +6430,7 @@ function htmlLaporan_(idForm, tanggal, isi) {
   var dibuat = Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH.mm');
   var bagian = isi.bagian || [{ info: isi.info, tabel: isi.tabel }];
   var kepala = function (b) {
-    var info = [['Nama Outlet', outlet], ['Tanggal', tanggalPanjangId_(tanggal)]].concat(b.info || []);
+    var info = [['Nama Outlet', outlet]].concat(isi.infoDasar || [['Tanggal', tanggalPanjangId_(tanggal)]], b.info || []);
     return '<div class="kepala">InventoryKu · ' + escHtml_(outlet) + '</div>' +
       '<h1>' + escHtml_(judul) + '</h1>' +
       '<table class="info">' + info.map(function (r) {
@@ -6437,6 +6445,8 @@ function htmlLaporan_(idForm, tanggal, isi) {
     'table{border-collapse:collapse}' +
     'table.info{margin-bottom:10px}table.info td{padding:2px 14px 2px 0;vertical-align:top}' +
     'table.info td.label{color:' + w.tintaRedup + '}table.info td.nilai{font-weight:bold}' +
+    'h2{font-size:11pt;color:' + w.navy + ';margin:16px 0 4px 0}h3{font-size:9pt;color:' + w.tinta + ';margin:10px 0 4px 0}' +
+    'p.isi{margin:0 0 4px 0}' +
     'table.data{width:100%;table-layout:fixed}' +
     'table.data th{background:' + w.navy + ';color:#FFFFFF;font-weight:bold;padding:4px 3px;border:1px solid ' + w.garis +
       ';text-align:center;font-size:8pt}' +
@@ -6616,14 +6626,16 @@ function catatStatusSistem_(kunci, teks, keterangan) {
   }
 }
 
-/** Untuk Beranda Pengelola: email laporan atau cadangan terakhir yang gagal. */
+/** Untuk Beranda Pengelola: email laporan, cadangan, atau rekap bulanan terakhir yang gagal. */
 function peringatanSistem_() {
   var nilai = bacaKonfigurasi_().nilai;
   var hasil = [];
   var lap = String(nilai.laporan_terakhir || '');
   var cad = String(nilai.cadangan_terakhir || '');
+  var rek = String(nilai.rekap_terakhir || '');
   if (/^Gagal/.test(lap)) hasil.push('Laporan harian: ' + lap);
   if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
+  if (/^Gagal/.test(rek)) hasil.push('Rekap bulanan: ' + rek);
   // Jadwal diubah dari Pengaturan → Outlet dan jadwal, trigger belum dipasang ulang (Tahap 7).
   if (/^Perlu/.test(String(nilai.pasang_trigger || ''))) {
     hasil.push('Jadwal: jam closing, jeda laporan, hari cadangan, atau zona waktu sudah diubah. ' +
@@ -7008,6 +7020,753 @@ function buatCadangan() {
   }
 }
 
+/* =========================================================================
+ * Tahap 10: rekap bulanan PDF (spesifikasi sistem Bagian 9.3 dan 10,
+ * tampilan Bagian 5.5). Dibuat otomatis tiap tanggal 1 untuk bulan
+ * sebelumnya (kirimRekapBulanan, dipasang pasangTrigger), disimpan ke Drive,
+ * dan dikirim ke penerima email. Pengelola juga bisa mengunduhnya dari menu
+ * Laporan untuk bulan mana pun (aksi unduhPdfRekap).
+ * ========================================================================= */
+
+var JAM_REKAP = 7; // tanggal 1, pagi: isian closing hari terakhir bulan lalu sudah sempat masuk
+var ITEM_TERATAS_REKAP = 10;
+
+function bulanSah_(bulan) {
+  return typeof bulan === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(bulan);
+}
+
+/** "2026-09" → "September 2026". */
+function namaBulanId_(bulan) {
+  var p = String(bulan).split('-');
+  return BULAN_ID[Number(p[1]) - 1] + ' ' + p[0];
+}
+
+/** Bulan sebelum bulan tanggal itu: "2026-10-01" → "2026-09". */
+function bulanLalu_(tanggal) {
+  return geserTanggal_(String(tanggal).slice(0, 8) + '01', -1).slice(0, 7);
+}
+
+/** Tanggal terakhir satu bulan: "2026-02" → "2026-02-28". */
+function akhirBulan_(bulan) {
+  var p = String(bulan).split('-');
+  return new Date(Date.UTC(Number(p[0]), Number(p[1]), 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * Data rekap satu bulan (Bagian 9.3), dihitung dari tab Data, Stock_Harian,
+ * dan master. Tiap tab dibaca sekali. Bulan berjalan: data sampai hari ini;
+ * kelengkapan form dan pengecekan suhu terlewat dinilai sampai kemarin
+ * (hari ini belum selesai). Kelengkapan dinilai mulai isian pertama di
+ * aplikasi, supaya hari sebelum aplikasi dipakai tidak dihitung tidak lengkap.
+ * Nilai rupiah stock memakai Harga Satuan sekarang (seperti nilai stock di
+ * Dashboard); nilai selisih opname dan estimasi waste memakai nilai yang
+ * tercatat saat itu.
+ */
+function dataRekapBulan_(bulan) {
+  if (!bulanSah_(bulan)) throw galatPengguna_('Bulan tidak terbaca. Pilih bulan lagi.');
+  var hari = hariIni_();
+  var dari = bulan + '-01';
+  var akhirBulan = akhirBulan_(bulan);
+  if (dari > hari) throw galatPengguna_('Bulan ' + namaBulanId_(bulan) + ' belum dimulai. Pilih bulan lain.');
+  var berjalan = akhirBulan >= hari;
+  var sampai = berjalan ? hari : akhirBulan;
+  var akhirNilai = berjalan ? geserTanggal_(hari, -1) : akhirBulan;
+  var zona = ss_().getSpreadsheetTimeZone();
+  var memo = {};
+  function tabel(nama) {
+    if (!Object.prototype.hasOwnProperty.call(memo, nama)) memo[nama] = bacaTabel_(nama);
+    return memo[nama];
+  }
+  /** Tanggal baris jika jatuh di bulan itu (sampai hari ini), selain itu ''. */
+  function dalam(t, b) {
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    return tg && tg >= dari && tg <= sampai ? tg : '';
+  }
+  var adaIsian = false;
+  var hasil = {
+    bulan: bulan, nama: namaBulanId_(bulan), dari: dari, sampai: sampai, akhirBulan: akhirBulan,
+    berjalan: berjalan, akhirNilai: akhirNilai
+  };
+
+  /* ---------- Stock: masuk, bahan terpakai, penyesuaian per kategori; nilai stock akhir bulan ---------- */
+  var master = bacaItem_();
+  var rekap = bacaRekap_();
+  var resep = bacaResep_();
+  var urutKat = {};
+  var namaKat = {};
+  bacaSemuaKategori_().forEach(function (k, i) {
+    urutKat[k.nama.toLowerCase()] = i;
+    namaKat[k.nama.toLowerCase()] = k.nama;
+  });
+  var grupKat = {};
+  function grup(kategori) {
+    var nama = namaKat[String(kategori).toLowerCase()] || kategori || 'Tanpa kategori';
+    var k = nama.toLowerCase();
+    return grupKat[k] = grupKat[k] || { kategori: nama, item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, nilaiAkhir: 0, adaHarga: false,
+      adaAkhir: false };
+  }
+  var tanpaHarga = [];
+  var bergerak = 0;
+  Object.keys(rekap.item).forEach(function (k) {
+    var m = master[k];
+    if (!m) return;
+    var g = gerakanKosong_();
+    var ada = false;
+    rekap.item[k].forEach(function (x) {
+      if (x.tanggal < dari || x.tanggal > sampai) return;
+      ada = true;
+      Object.keys(g).forEach(function (j) { g[j] = bulat_(g[j] + x[j]); });
+    });
+    if (!ada) return;
+    adaIsian = true;
+    bergerak++;
+    var x = grup(m.kategori);
+    x.item++;
+    if (m.harga == null) {
+      tanpaHarga.push(m.nama);
+      return;
+    }
+    x.adaHarga = true;
+    x.masuk += g.masuk * m.harga;
+    // Nilai bahan terpakai hanya untuk item yang bukan hasil resep (Bagian 8.5).
+    if (!(resep[k] && resep[k].aktif)) x.terpakai += (g.keluar + g.dipakaiPrep) * m.harga;
+    x.penyesuaian += g.penyesuaian * m.harga;
+  });
+  var nilai = nilaiStock_(master, rekap, sampai);
+  nilai.perKategori.forEach(function (n) {
+    var x = grup(n.kategori);
+    x.nilaiAkhir = n.nilai;
+    x.adaAkhir = true;
+  });
+  nilai.tanpaHarga.forEach(function (n) {
+    if (n.stock && tanpaHarga.indexOf(n.nama) < 0) tanpaHarga.push(n.nama);
+  });
+  var posisiKat = function (nama) {
+    var u = urutKat[nama.toLowerCase()];
+    return u == null ? 1e6 : u;
+  };
+  var total = { item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, nilaiAkhir: nilai.total };
+  var daftarKat = Object.keys(grupKat).map(function (k) { return grupKat[k]; }).filter(function (x) {
+    return x.item || x.nilaiAkhir;
+  }).sort(function (a, b) {
+    return posisiKat(a.kategori) - posisiKat(b.kategori) || a.kategori.localeCompare(b.kategori, 'id');
+  });
+  daftarKat.forEach(function (x) {
+    ['masuk', 'terpakai', 'penyesuaian'].forEach(function (j) {
+      x[j] = Math.round(x[j]);
+      total[j] += x[j];
+    });
+    total.item += x.item;
+    // Kategori yang semua itemnya belum punya harga: nilainya kosong (–), bukan Rp 0.
+    if (!x.adaHarga) x.masuk = x.terpakai = x.penyesuaian = null;
+    if (!x.adaAkhir) x.nilaiAkhir = null;
+    delete x.adaHarga;
+    delete x.adaAkhir;
+  });
+  tanpaHarga.sort(function (a, b) { return a.localeCompare(b, 'id'); });
+  hasil.stock = { kategori: daftarKat, total: total, bergerak: bergerak, tanpaHarga: tanpaHarga };
+
+  /* ---------- Stock opname: tiap opname dan nilai selisihnya; item paling sering berselisih ---------- */
+  var opname = {};
+  var daftarOpname = [];
+  var itemOpname = {};
+  var tOp = tabel('Data_Opname');
+  if (tOp) {
+    tOp.baris.forEach(function (b) {
+      var tg = dalam(tOp, b);
+      var sid = String(nilai_(tOp, b, 'submission_id') || '');
+      var nama = rapikanTeks_(nilai_(tOp, b, 'Nama Item'));
+      if (!tg || !sid || !nama) return;
+      adaIsian = true;
+      var o = opname[sid];
+      if (!o) {
+        var w = nilai_(tOp, b, 'timestamp_server');
+        o = opname[sid] = { tanggal: tg, oleh: rapikanTeks_(nilai_(tOp, b, 'submitted_by')), ms: w instanceof Date ? w.getTime() : 0,
+          jumlah: 0, berselisih: 0, nilai: 0, tanpaHarga: 0 };
+        daftarOpname.push(o);
+      }
+      var selisih = Number(nilai_(tOp, b, 'Selisih')) || 0;
+      var rp = angkaAtauNull_(nilai_(tOp, b, 'Nilai Selisih (Rp)'));
+      o.jumlah++;
+      if (!selisih) return;
+      o.berselisih++;
+      if (rp == null) o.tanpaHarga++;
+      o.nilai += rp || 0;
+      var k = nama.toLowerCase();
+      var it = itemOpname[k] = itemOpname[k] || { item: nama, satuan: rapikanTeks_(nilai_(tOp, b, 'Satuan')), kali: 0, selisih: 0,
+        nilai: 0, adaNilai: false };
+      it.kali++;
+      it.selisih = bulat_(it.selisih + selisih);
+      if (rp != null) {
+        it.nilai += rp;
+        it.adaNilai = true;
+      }
+    });
+  }
+  daftarOpname.sort(function (a, b) { return a.tanggal < b.tanggal ? -1 : (a.tanggal > b.tanggal ? 1 : a.ms - b.ms); });
+  var totalOpname = 0;
+  daftarOpname.forEach(function (o) {
+    o.nilai = Math.round(o.nilai);
+    totalOpname += o.nilai;
+    delete o.ms;
+  });
+  var itemSelisih = Object.keys(itemOpname).map(function (k) { return itemOpname[k]; }).sort(function (a, b) {
+    return b.kali - a.kali || Math.abs(b.nilai) - Math.abs(a.nilai) || a.item.localeCompare(b.item, 'id');
+  }).slice(0, ITEM_TERATAS_REKAP);
+  itemSelisih.forEach(function (x) {
+    x.nilai = x.adaNilai ? Math.round(x.nilai) : null;
+    delete x.adaNilai;
+  });
+  hasil.opname = { daftar: daftarOpname, totalNilai: totalOpname, item: itemSelisih };
+
+  /* ---------- Waste: jumlah catatan dan nilai per kategori waste; 10 item dengan nilai terbesar ---------- */
+  var perKatWaste = {};
+  KATEGORI_WASTE.forEach(function (k) { perKatWaste[k.toLowerCase()] = { kategori: k, catatan: 0, nilai: 0, tanpaHarga: 0 }; });
+  var itemWaste = {};
+  var totalWaste = { catatan: 0, nilai: 0, tanpaHarga: 0 };
+  var tW = tabel('Data_Waste');
+  if (tW) {
+    tW.baris.forEach(function (b) {
+      var tg = dalam(tW, b);
+      var nama = rapikanTeks_(nilai_(tW, b, 'Item / Produk'));
+      if (!tg || !nama) return;
+      adaIsian = true;
+      var kat = rapikanTeks_(nilai_(tW, b, 'Kategori Waste')) || 'Lainnya';
+      var x = perKatWaste[kat.toLowerCase()] = perKatWaste[kat.toLowerCase()] || { kategori: kat, catatan: 0, nilai: 0, tanpaHarga: 0 };
+      var rp = angkaAtauNull_(nilai_(tW, b, 'Estimasi Kerugian (Rp)'));
+      var k = nama.toLowerCase();
+      var it = itemWaste[k] = itemWaste[k] || { item: nama, satuan: rapikanTeks_(nilai_(tW, b, 'Satuan')), qty: 0, catatan: 0, nilai: 0,
+        adaNilai: false };
+      it.qty = bulat_(it.qty + (Number(nilai_(tW, b, 'Qty')) || 0));
+      it.catatan++;
+      x.catatan++;
+      totalWaste.catatan++;
+      if (rp == null) {
+        x.tanpaHarga++;
+        totalWaste.tanpaHarga++;
+        return;
+      }
+      it.nilai += rp;
+      it.adaNilai = true;
+      x.nilai += rp;
+      totalWaste.nilai += rp;
+    });
+  }
+  var katWaste = Object.keys(perKatWaste).map(function (k) { return perKatWaste[k]; });
+  katWaste.forEach(function (x) { x.nilai = Math.round(x.nilai); });
+  totalWaste.nilai = Math.round(totalWaste.nilai);
+  // Item tanpa harga tidak punya nilai: diurutkan sesudah item yang punya nilai.
+  var itemWasteTeratas = Object.keys(itemWaste).map(function (k) { return itemWaste[k]; }).sort(function (a, b) {
+    if (a.adaNilai !== b.adaNilai) return a.adaNilai ? -1 : 1;
+    return b.nilai - a.nilai || b.catatan - a.catatan || a.item.localeCompare(b.item, 'id');
+  }).slice(0, ITEM_TERATAS_REKAP);
+  itemWasteTeratas.forEach(function (x) {
+    x.nilai = x.adaNilai ? Math.round(x.nilai) : null;
+    delete x.adaNilai;
+  });
+  hasil.waste = { kategori: katWaste, total: totalWaste, item: itemWasteTeratas, jumlahItem: Object.keys(itemWaste).length };
+
+  /* ---------- Prep: total resep dan hasil per item ---------- */
+  var itemPrep = {};
+  var catatanPrep = 0;
+  var tP = tabel('Data_Prep');
+  if (tP) {
+    tP.baris.forEach(function (b) {
+      var tg = dalam(tP, b);
+      var nama = rapikanTeks_(nilai_(tP, b, 'Item / Menu Prep'));
+      if (!tg || !nama) return;
+      adaIsian = true;
+      catatanPrep++;
+      var beresep = nilai_(tP, b, 'Hasil per 1 Resep') !== '' && nilai_(tP, b, 'Hasil per 1 Resep') != null;
+      var k = nama.toLowerCase();
+      var it = itemPrep[k] = itemPrep[k] || { item: nama, satuan: rapikanTeks_(nilai_(tP, b, 'Satuan')), catatan: 0, resep: null, hasil: 0 };
+      it.catatan++;
+      if (beresep) it.resep = bulat_((it.resep || 0) + (Number(nilai_(tP, b, 'Jumlah Resep')) || 0));
+      it.hasil = bulat_(it.hasil + (Number(nilai_(tP, b, beresep ? 'Hasil' : 'Qty')) || 0));
+    });
+  }
+  hasil.prep = {
+    catatan: catatanPrep,
+    item: Object.keys(itemPrep).map(function (k) { return itemPrep[k]; }).sort(function (a, b) { return a.item.localeCompare(b.item, 'id'); })
+  };
+
+  /* ---------- Suhu: kejadian di luar standar per unit; pengecekan terlewat ---------- */
+  var unitAktif = bacaUnit_().filter(function (u) { return u.aktif; });
+  var perUnit = {};
+  var daftarUnit = [];
+  unitAktif.forEach(function (u) {
+    perUnit[u.nama.toLowerCase()] = { unit: u.nama, tipe: u.tipe, aktif: true, cek: 0, luar: 0, terlewat: 0 };
+    daftarUnit.push(perUnit[u.nama.toLowerCase()]);
+  });
+  var adaSuhu = {};
+  var suhuPertama = '';
+  var tS = tabel('Data_Suhu');
+  if (tS) {
+    tS.baris.forEach(function (b) {
+      var tgSemua = teksTanggal_(nilai_(tS, b, 'Tanggal'), zona);
+      var nama = rapikanTeks_(nilai_(tS, b, 'Nama Unit'));
+      if (!tgSemua || !nama) return;
+      if (!suhuPertama || tgSemua < suhuPertama) suhuPertama = tgSemua;
+      adaSuhu[tgSemua + '|' + nama.toLowerCase() + '|' + rapikanTeks_(nilai_(tS, b, 'Waktu Cek')).toLowerCase()] = true;
+      if (!dalam(tS, b)) return;
+      adaIsian = true;
+      var u = perUnit[nama.toLowerCase()];
+      if (!u) {
+        u = perUnit[nama.toLowerCase()] = { unit: nama, tipe: rapikanTeks_(nilai_(tS, b, 'Tipe Unit')).toLowerCase() === 'freezer' ? 'Freezer' : 'Chiller',
+          aktif: false, cek: 0, luar: 0, terlewat: null };
+        daftarUnit.push(u);
+      }
+      u.cek++;
+      if (rapikanTeks_(nilai_(tS, b, 'Status Suhu')) === STATUS_SUHU_LUAR) u.luar++;
+    });
+  }
+  // Pengecekan terlewat (seperti Riwayat Suhu): unit aktif sekarang × Opening/Middle/Closing,
+  // sejak isian Suhu pertama, sampai kemarin untuk bulan berjalan.
+  var terlewat = [];
+  var jumlahTerlewat = 0;
+  if (suhuPertama) {
+    for (var tg = dari < suhuPertama ? suhuPertama : dari; tg <= akhirNilai; tg = geserTanggal_(tg, 1)) {
+      var kurang = [];
+      unitAktif.forEach(function (u) {
+        ['Opening', 'Middle', 'Closing'].forEach(function (w) {
+          if (adaSuhu[tg + '|' + u.nama.toLowerCase() + '|' + w.toLowerCase()]) return;
+          kurang.push(u.nama + ' ' + w);
+          perUnit[u.nama.toLowerCase()].terlewat++;
+        });
+      });
+      if (kurang.length) {
+        terlewat.push({ tanggal: tg, kurang: kurang, total: unitAktif.length * 3 });
+        jumlahTerlewat += kurang.length;
+      }
+    }
+  }
+  hasil.suhu = {
+    unit: daftarUnit,
+    cek: daftarUnit.reduce(function (n, u) { return n + u.cek; }, 0),
+    luar: daftarUnit.reduce(function (n, u) { return n + u.luar; }, 0),
+    terlewat: terlewat,
+    jumlahTerlewat: jumlahTerlewat,
+    mulai: suhuPertama
+  };
+
+  /* ---------- Kepatuhan: hari tiap form tidak lengkap (Bagian 5.8); isian belum diperiksa; laporan kekeliruan ---------- */
+  var pertama = suhuPertama;
+  var nihil = {};
+  var tN = tabel('Data_Nihil');
+  if (tN) {
+    tN.baris.forEach(function (b) {
+      var tg = teksTanggal_(nilai_(tN, b, 'Tanggal'), zona);
+      if (!tg) return;
+      if (!pertama || tg < pertama) pertama = tg;
+      nihil[tg + '|' + rapikanTeks_(nilai_(tN, b, 'ID Form')).toUpperCase()] = true;
+      if (tg >= dari && tg <= sampai) adaIsian = true;
+    });
+  }
+  var formKepatuhan = bacaDaftarForm_().map(function (f) {
+    var x = { id: f.id, nama: f.nama, tampil: f.aktif, jadwal: f.jadwal, ditagih: 0, tidakLengkap: [], kiriman: 0, belumDiperiksa: 0,
+      dilaporkan: 0, _f: f, _tanggal: {} };
+    var t = f.id === 'SUHU' ? tS : tabel(tabDataForm_(f.id));
+    if (!t) return x;
+    var sid = {};
+    t.baris.forEach(function (b) {
+      var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+      var id = String(nilai_(t, b, 'submission_id') || '');
+      if (!tg || !id) return;
+      if (!pertama || tg < pertama) pertama = tg;
+      x._tanggal[tg] = true;
+      if (tg < dari || tg > sampai) return;
+      adaIsian = true;
+      if (!sid[id]) {
+        sid[id] = { belum: false };
+        x.kiriman++;
+      }
+      if (rapikanTeks_(nilai_(t, b, 'status')) !== STATUS_DIPERIKSA && !sid[id].belum) {
+        sid[id].belum = true;
+        x.belumDiperiksa++;
+      }
+      if (rapikanTeks_(nilai_(t, b, 'flagged_by'))) x.dilaporkan++;
+    });
+    return x;
+  });
+  function suhuLengkap(tg) {
+    return unitAktif.length > 0 && unitAktif.every(function (u) {
+      return WAKTU_CEK_WAJIB.every(function (w) { return adaSuhu[tg + '|' + u.nama.toLowerCase() + '|' + w]; });
+    });
+  }
+  var mulaiNilai = pertama && pertama > dari ? pertama : dari;
+  var hariDinilai = 0;
+  if (pertama) {
+    for (var d = mulaiNilai; d <= akhirNilai; d = geserTanggal_(d, 1)) {
+      hariDinilai++;
+      formKepatuhan.forEach(function (x) {
+        if (!wajibPada_(x._f, d)) return;
+        x.ditagih++;
+        var lengkap = x.id === 'SUHU' ? suhuLengkap(d) : (x._tanggal[d] || nihil[d + '|' + x.id]);
+        if (!lengkap) x.tidakLengkap.push(d);
+      });
+    }
+  }
+  var totalKepatuhan = { kiriman: 0, belumDiperiksa: 0, dilaporkan: 0, hariTidakLengkap: 0 };
+  formKepatuhan.forEach(function (x) {
+    delete x._f;
+    delete x._tanggal;
+    totalKepatuhan.kiriman += x.kiriman;
+    totalKepatuhan.belumDiperiksa += x.belumDiperiksa;
+    totalKepatuhan.dilaporkan += x.dilaporkan;
+    totalKepatuhan.hariTidakLengkap += x.tidakLengkap.length;
+  });
+  hasil.kepatuhan = {
+    form: formKepatuhan,
+    total: totalKepatuhan,
+    hariDinilai: hariDinilai,
+    mulai: pertama && hariDinilai ? mulaiNilai : '',
+    akhir: akhirNilai
+  };
+  // Penyesuaian stock ikut menandai bulan yang punya isian.
+  var tSesuai = tabel('Data_Penyesuaian');
+  if (!adaIsian && tSesuai) adaIsian = tSesuai.baris.some(function (b) { return !!dalam(tSesuai, b); });
+  hasil.adaIsian = adaIsian;
+  return hasil;
+}
+
+/** "1–30 September 2026" atau "1–6 Oktober 2026 (bulan berjalan)". */
+function teksPeriodeRekap_(d) {
+  var p = d.sampai.split('-');
+  return '1–' + Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1] + ' ' + p[0] + (d.berjalan ? ' (bulan berjalan)' : '');
+}
+
+/** "3, 7, dan 12" (atau "5 dan 20") dari tanggal-tanggal satu bulan. */
+function teksHariBulan_(tanggal) {
+  var n = tanggal.map(function (t) { return String(Number(t.slice(8, 10))); });
+  if (n.length < 2) return n.join('');
+  if (n.length === 2) return n[0] + ' dan ' + n[1];
+  return n.slice(0, -1).join(', ') + ', dan ' + n[n.length - 1];
+}
+
+/**
+ * Tabel sederhana untuk rekap: kolom [{ judul, lebar (%), angka }], baris
+ * [[html sel]] (sel boleh { html, kelas }), total (baris tebal di bawah,
+ * opsional), kosong (teks jika tidak ada baris).
+ */
+function tabelRekap_(kolom, baris, total, kosong) {
+  var sel = function (isi, i, tag) {
+    var o = isi && typeof isi === 'object' ? isi : { html: isi };
+    var kelas = [kolom[i] && kolom[i].angka ? 'angka' : '', o.kelas || ''].join(' ').trim();
+    return '<' + tag + (kelas ? ' class="' + kelas + '"' : '') + '>' + (o.html == null ? '' : o.html) + '</' + tag + '>';
+  };
+  var html = '<table class="data"><colgroup>' + kolom.map(function (k) {
+    return '<col style="width:' + k.lebar + '%">';
+  }).join('') + '</colgroup><thead><tr>' + kolom.map(function (k) { return '<th>' + escHtml_(k.judul) + '</th>'; }).join('') +
+    '</tr></thead><tbody>';
+  if (!baris.length) {
+    html += '<tr><td colspan="' + kolom.length + '">' + escHtml_(kosong || '') + '</td></tr>';
+  } else {
+    html += baris.map(function (b) { return '<tr>' + b.map(function (c, i) { return sel(c, i, 'td'); }).join('') + '</tr>'; }).join('');
+    if (total) html += '<tr class="total">' + total.map(function (c, i) { return sel(c, i, 'td'); }).join('') + '</tr>';
+  }
+  return html + '</tbody></table>';
+}
+
+/** Isi HTML rekap bulanan (semua bagian Bagian 9.3), untuk htmlLaporan_. */
+function isiPdfRekap_(d) {
+  var e = escHtml_;
+  var rp = function (n) { return n == null ? '–' : rupiahId_(n); };
+  var html = '';
+  var catatan = function (teks) { return '<p class="catatan">' + e(teks) + '</p>'; };
+
+  // Stock
+  var s = d.stock;
+  html += '<h2>Stock</h2>' + tabelRekap_([
+    { judul: 'Kategori', lebar: 22 }, { judul: 'Item bergerak', lebar: 11, angka: true },
+    { judul: 'Masuk (Rp)', lebar: 16, angka: true }, { judul: 'Bahan terpakai (Rp)', lebar: 17, angka: true },
+    { judul: 'Penyesuaian (Rp)', lebar: 16, angka: true }, { judul: 'Nilai stock akhir bulan (Rp)', lebar: 18, angka: true }
+  ], s.kategori.map(function (x) {
+    return [e(x.kategori), x.item ? String(x.item) : '–', rp(x.masuk), rp(x.terpakai), rp(x.penyesuaian), rp(x.nilaiAkhir)];
+  }), ['Total', String(s.total.item), rp(s.total.masuk), rp(s.total.terpakai), rp(s.total.penyesuaian), rp(s.total.nilaiAkhir)],
+  'Tidak ada gerakan stock dan belum ada stock bernilai pada bulan ini.');
+  html += catatan('Nilai = jumlah × harga satuan sekarang di daftar item. Bahan terpakai = stock keluar + dipakai prep, ' +
+    'tanpa barang jadi hasil resep (biayanya sudah terhitung saat bahannya dipakai). Penyesuaian termasuk hasil stock opname. ' +
+    'Nilai stock akhir bulan = stock akhir pada ' + tanggalSedangId_(d.sampai) + '.');
+  if (s.tanpaHarga.length) {
+    html += catatan(s.tanpaHarga.length + ' item belum punya harga dan tidak ikut dihitung: ' + daftarNamaSingkat_(s.tanpaHarga) + '.');
+  }
+
+  // Stock opname
+  var o = d.opname;
+  html += '<h2>Stock opname</h2>' + tabelRekap_([
+    { judul: 'No', lebar: 6, angka: true }, { judul: 'Tanggal', lebar: 16 }, { judul: 'Dihitung oleh', lebar: 22 },
+    { judul: 'Item dihitung', lebar: 16, angka: true }, { judul: 'Item berselisih', lebar: 16, angka: true },
+    { judul: 'Nilai selisih (Rp)', lebar: 24, angka: true }
+  ], o.daftar.map(function (x, i) {
+    return [String(i + 1), e(tanggalSedangId_(x.tanggal)), e(x.oleh), String(x.jumlah), String(x.berselisih),
+      rp(x.nilai) + (x.tanpaHarga ? ' *' : '')];
+  }), [{ html: 'Total', kelas: '' }, '', '', '', '', rp(o.totalNilai)], 'Tidak ada stock opname pada bulan ini.');
+  if (o.daftar.some(function (x) { return x.tanpaHarga; })) {
+    html += catatan('* Ada item berselisih yang belum punya harga; nilainya tidak ikut dihitung.');
+  }
+  if (o.item.length) {
+    html += '<h3>Item yang paling sering berselisih</h3>' + tabelRekap_([
+      { judul: 'No', lebar: 6, angka: true }, { judul: 'Nama Item', lebar: 34 }, { judul: 'Kali berselisih', lebar: 14, angka: true },
+      { judul: 'Total selisih', lebar: 14, angka: true }, { judul: 'Satuan', lebar: 10 }, { judul: 'Nilai selisih (Rp)', lebar: 22, angka: true }
+    ], o.item.map(function (x, i) {
+      return [String(i + 1), e(x.item), String(x.kali), (x.selisih > 0 ? '+' : '') + angkaId_(x.selisih), e(x.satuan), rp(x.nilai)];
+    }));
+  }
+
+  // Waste
+  var w = d.waste;
+  html += '<h2>Waste</h2>' + tabelRekap_([
+    { judul: 'Kategori waste', lebar: 40 }, { judul: 'Jumlah catatan', lebar: 25, angka: true },
+    { judul: 'Estimasi kerugian (Rp)', lebar: 35, angka: true }
+  ], w.total.catatan ? w.kategori.map(function (x) {
+    var nilaiKat = !x.catatan ? '–' : (x.tanpaHarga === x.catatan ? '– *' : rp(x.nilai) + (x.tanpaHarga ? ' *' : ''));
+    return [e(x.kategori), x.catatan ? String(x.catatan) : '–', nilaiKat];
+  }) : [], ['Total', String(w.total.catatan), rp(w.total.nilai)], 'Tidak ada waste tercatat pada bulan ini.');
+  if (w.total.tanpaHarga) {
+    html += catatan('* ' + w.total.tanpaHarga + ' catatan waste tanpa harga satuan; estimasinya tidak ikut dihitung.');
+  }
+  if (w.item.length) {
+    html += '<h3>' + (w.jumlahItem > ITEM_TERATAS_REKAP ? 'Sepuluh item dengan nilai waste terbesar' : 'Item dengan nilai waste terbesar') +
+      '</h3>' + tabelRekap_([
+      { judul: 'No', lebar: 6, angka: true }, { judul: 'Item / Produk', lebar: 36 }, { judul: 'Qty', lebar: 12, angka: true },
+      { judul: 'Satuan', lebar: 10 }, { judul: 'Catatan', lebar: 12, angka: true }, { judul: 'Estimasi kerugian (Rp)', lebar: 24, angka: true }
+    ], w.item.map(function (x, i) {
+      return [String(i + 1), e(x.item), angkaId_(x.qty), e(x.satuan), String(x.catatan), rp(x.nilai)];
+    }));
+  }
+
+  // Prep
+  var p = d.prep;
+  html += '<h2>Prep</h2>' + tabelRekap_([
+    { judul: 'No', lebar: 6, angka: true }, { judul: 'Item / Menu Prep', lebar: 38 }, { judul: 'Catatan', lebar: 12, angka: true },
+    { judul: 'Jumlah resep', lebar: 14, angka: true }, { judul: 'Hasil atau Qty', lebar: 16, angka: true }, { judul: 'Satuan', lebar: 14 }
+  ], p.item.map(function (x, i) {
+    return [String(i + 1), e(x.item), String(x.catatan), x.resep == null ? '–' : angkaId_(x.resep), angkaId_(x.hasil), e(x.satuan)];
+  }), null, 'Tidak ada prep tercatat pada bulan ini.');
+  if (p.item.length) html += catatan('Item tanpa resep ditulis dengan Qty-nya; jumlah resep "–".');
+
+  // Suhu
+  var su = d.suhu;
+  html += '<h2>Suhu</h2>' + tabelRekap_([
+    { judul: 'Nama Unit', lebar: 32 }, { judul: 'Tipe', lebar: 14 }, { judul: 'Pengecekan', lebar: 16, angka: true },
+    { judul: 'Di luar standar', lebar: 19, angka: true }, { judul: 'Terlewat', lebar: 19, angka: true }
+  ], su.unit.map(function (u) {
+    return [e(u.unit) + (u.aktif ? '' : ' <span class="kecil">(nonaktif)</span>'), e(u.tipe), String(u.cek),
+      { html: String(u.luar), kelas: u.luar ? 'masalah' : '' }, u.terlewat == null ? '–' : String(u.terlewat)];
+  }), su.unit.length ? ['Total', '', String(su.cek), String(su.luar), String(su.jumlahTerlewat)] : null,
+  'Belum ada unit Chiller atau Freezer aktif dan belum ada pengecekan suhu.');
+  html += catatan('Pengecekan termasuk cek ulang. Terlewat = Opening, Middle, atau Closing unit aktif yang tidak diisi' +
+    (su.mulai ? ', dihitung sejak isian Suhu pertama (' + tanggalSedangId_(su.mulai) + ')' : '') +
+    (d.berjalan ? ' sampai kemarin' : '') + '.');
+  if (su.terlewat.length) {
+    html += '<h3>Pengecekan yang terlewat</h3>' + tabelRekap_([
+      { judul: 'Tanggal', lebar: 16 }, { judul: 'Terlewat', lebar: 14, angka: true }, { judul: 'Pengecekan yang tidak diisi', lebar: 70 }
+    ], su.terlewat.map(function (x) {
+      return [e(tanggalSedangId_(x.tanggal)), x.kurang.length + ' dari ' + x.total, e(x.kurang.join(', '))];
+    }));
+  } else if (su.mulai && d.akhirNilai >= d.dari) {
+    html += catatan('Tidak ada pengecekan Opening, Middle, atau Closing yang terlewat.');
+  }
+
+  // Kepatuhan
+  var k = d.kepatuhan;
+  html += '<h2>Kepatuhan</h2>';
+  html += '<p class="isi">' + e(k.hariDinilai
+    ? 'Hari yang dinilai: ' + tanggalSedangId_(k.mulai) + ' sampai ' + tanggalSedangId_(k.akhir) + ' (' + k.hariDinilai + ' hari).'
+    : (d.berjalan && d.akhirNilai < d.dari
+      ? 'Belum ada hari yang dinilai: hari pertama bulan ini belum selesai.'
+      : 'Belum ada hari yang dinilai: aplikasi belum dipakai pada bulan ini.')) + '</p>';
+  html += tabelRekap_([
+    { judul: 'Form', lebar: 20 }, { judul: 'Hari ditagih', lebar: 10, angka: true }, { judul: 'Hari tidak lengkap', lebar: 11, angka: true },
+    { judul: 'Tanggal tidak lengkap', lebar: 26 }, { judul: 'Isian', lebar: 9, angka: true },
+    { judul: 'Belum diperiksa', lebar: 12, angka: true }, { judul: 'Dilaporkan keliru', lebar: 12, angka: true }
+  ], k.form.map(function (x) {
+    var tanggal = x.tidakLengkap.length ? teksHariBulan_(x.tidakLengkap)
+      : (!k.hariDinilai ? '–' : x.ditagih ? 'Semua lengkap' : (!x.tampil ? 'Disembunyikan, tidak ditagih' : (x.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu, tidak ditagih' : 'Tidak ditagih')));
+    return [e(x.nama), String(x.ditagih), { html: String(x.tidakLengkap.length), kelas: x.tidakLengkap.length ? 'akhir' : '' }, e(tanggal),
+      String(x.kiriman), String(x.belumDiperiksa), { html: String(x.dilaporkan), kelas: x.dilaporkan ? 'akhir' : '' }];
+  }), ['Total', '', String(k.total.hariTidakLengkap), '', String(k.total.kiriman), String(k.total.belumDiperiksa), String(k.total.dilaporkan)],
+  'Belum ada form.');
+  html += catatan('Lengkap menurut aturan kelengkapan: ada kiriman atau ditandai nihil; Suhu lengkap jika semua unit aktif punya ' +
+    'Opening, Middle, dan Closing. Isian = kiriman pada bulan ini; belum diperiksa dan dilaporkan keliru dihitung saat rekap dibuat.');
+  return html;
+}
+
+/**
+ * PDF rekap bulanan: { blob, namaFile }. Nama file Rekap_{YYYY-MM}.pdf
+ * (Bagian 9.3). dibuatOleh: teks baris "Dibuat oleh".
+ */
+function buatPdfRekap_(d, dibuatOleh) {
+  var info = [['Periode', teksPeriodeRekap_(d)]];
+  if (!d.adaIsian) info.push(['Keterangan', 'Belum ada isian pada bulan ini.']);
+  var html = htmlLaporan_('', d.sampai, {
+    judul: 'Rekap Bulanan ' + d.nama,
+    infoDasar: [['Bulan', d.nama]],
+    info: info,
+    tabel: isiPdfRekap_(d),
+    bawah: [['Dibuat oleh', dibuatOleh]]
+  });
+  var namaFile = 'Rekap_' + d.bulan + '.pdf';
+  var blob = Utilities.newBlob(html, 'text/html', namaFile + '.html').getAs('application/pdf').setName(namaFile);
+  return { blob: blob, namaFile: namaFile, html: html };
+}
+
+/**
+ * Menyimpan rekap ke Laporan Kitchen/{Nama Outlet}/{Tahun}/Rekap_{YYYY-MM}.pdf
+ * (Bagian 9.3). Rekap bulan yang sama yang sudah ada di folder itu dipindah ke
+ * tempat sampah Drive, supaya hanya ada satu file per bulan.
+ */
+function simpanRekapKeDrive_(pdf, bulan) {
+  var tahun = bulan.slice(0, 4);
+  var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
+  var outlet = cariAtauBuatFolder_(akar, (namaOutlet_() || 'Outlet').replace(/[\\/]+/g, '-'));
+  var folder = cariAtauBuatFolder_(outlet, tahun);
+  var lama = folder.getFilesByName(pdf.namaFile);
+  while (lama.hasNext()) lama.next().setTrashed(true);
+  folder.createFile(pdf.blob.copyBlob().setName(pdf.namaFile));
+  return { namaFile: pdf.namaFile, lokasi: [FOLDER_LAPORAN, namaOutlet_() || 'Outlet', tahun].join('/') };
+}
+
+/** Unduh rekap bulanan (khusus Pengelola): bulan "yyyy-mm". Tidak menambah file di Drive. */
+function aksiUnduhPdfRekap_(body, pengguna) {
+  var bulan = String(body.bulan || '');
+  if (!bulanSah_(bulan)) throw galatPengguna_('Bulan tidak terbaca. Pilih bulan lagi.');
+  var pdf = buatPdfRekap_(dataRekapBulan_(bulan), pengguna.nama + ', ' + waktuPendekId_(new Date()));
+  return { namaFile: pdf.namaFile, mime: 'application/pdf', data: Utilities.base64Encode(pdf.blob.getBytes()) };
+}
+
+/** Isi email rekap bulanan: ringkasan tiap bagian; rinciannya di PDF terlampir. */
+function htmlEmailRekap_(d, x) {
+  var w = WARNA_PDF;
+  var e = escHtml_;
+  var bagian = function (judul, baris) {
+    return '<h2 style="font-size:15px;color:' + w.navy + ';margin:20px 0 6px;padding-bottom:4px;border-bottom:1px solid ' +
+      w.garis + '">' + e(judul) + '</h2><ul style="margin:0;padding-left:18px">' + baris.map(function (b) {
+      return '<li style="margin:2px 0">' + b + '</li>';
+    }).join('') + '</ul>';
+  };
+  var s = d.stock;
+  var k = d.kepatuhan;
+  var html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:' + w.tinta + ';max-width:640px">' +
+    '<div style="background:' + w.navy + ';color:#FFFFFF;padding:14px 16px">' +
+      '<div style="font-size:18px;font-weight:bold">Rekap bulanan ' + e(x.outlet) + '</div>' +
+      '<div style="color:#A9B8CF">' + e(d.nama) + ' · ' + e(teksPeriodeRekap_(d)) + '</div></div>';
+  if (!d.adaIsian) html += '<p style="margin:16px 0 0">Belum ada isian pada bulan ini.</p>';
+  html += bagian('Stock', [
+    'Nilai stock akhir bulan: <b>' + rupiahId_(s.total.nilaiAkhir) + '</b>',
+    'Masuk ' + rupiahId_(s.total.masuk) + ', bahan terpakai ' + rupiahId_(s.total.terpakai) + ', penyesuaian ' + rupiahId_(s.total.penyesuaian) +
+      ' (' + s.bergerak + ' item bergerak)'
+  ].concat(s.tanpaHarga.length ? [s.tanpaHarga.length + ' item belum punya harga, tidak ikut dihitung'] : []));
+  html += bagian('Stock opname', [d.opname.daftar.length
+    ? d.opname.daftar.length + ' kali, total nilai selisih ' + rupiahId_(d.opname.totalNilai)
+    : 'Tidak ada stock opname pada bulan ini.']);
+  html += bagian('Waste', [d.waste.total.catatan
+    ? d.waste.total.catatan + ' catatan, estimasi kerugian <b>' + rupiahId_(d.waste.total.nilai) + '</b>' +
+      (d.waste.item[0] ? '. Terbesar: ' + e(d.waste.item[0].item) + (d.waste.item[0].nilai != null ? ' ' + rupiahId_(d.waste.item[0].nilai) : '') : '')
+    : 'Tidak ada waste tercatat pada bulan ini.']);
+  html += bagian('Prep', [d.prep.catatan
+    ? d.prep.catatan + ' catatan prep untuk ' + d.prep.item.length + ' item'
+    : 'Tidak ada prep tercatat pada bulan ini.']);
+  html += bagian('Suhu', [
+    (d.suhu.luar ? '<b style="color:' + w.masalah + '">' + d.suhu.luar + ' pengecekan di luar standar</b>' : 'Tidak ada pengecekan di luar standar') +
+      ' dari ' + d.suhu.cek + ' pengecekan',
+    d.suhu.jumlahTerlewat ? d.suhu.jumlahTerlewat + ' pengecekan terlewat pada ' + d.suhu.terlewat.length + ' hari' : 'Tidak ada pengecekan yang terlewat'
+  ]);
+  var tidak = k.form.filter(function (f) { return f.tidakLengkap.length; }).map(function (f) {
+    return e(f.nama) + ' ' + f.tidakLengkap.length + ' hari';
+  });
+  html += bagian('Kepatuhan', [
+    k.hariDinilai ? (tidak.length ? 'Form tidak lengkap: ' + tidak.join(', ') : 'Semua form wajib lengkap selama ' + k.hariDinilai + ' hari yang dinilai')
+      : 'Belum ada hari yang dinilai',
+    k.total.belumDiperiksa + ' isian belum diperiksa, ' + k.total.dilaporkan + ' baris dilaporkan keliru'
+  ]);
+  html += bagian('Lampiran', [e(x.namaFile) + (x.drive ? ' (tersimpan di Drive: ' + e(x.lokasi) + ')' : ' (gagal disimpan ke Drive)')]);
+  html += '<p style="margin:20px 0 0">' + (x.alamat
+    ? '<a href="' + e(x.alamat) + '" style="color:' + w.navy + ';font-weight:bold">Buka InventoryKu</a>'
+    : 'Buka InventoryKu dari HP untuk melihat rinciannya.') + '</p>' +
+    '<p style="color:' + w.tintaRedup + ';font-size:12px;margin:12px 0 0">Email otomatis dari InventoryKu, dikirim tiap tanggal 1.</p></div>';
+  return html;
+}
+
+/**
+ * Rekap bulanan (Bagian 9.3 dan 10): PDF disimpan ke Drive, lalu satu email
+ * berlampiran PDF ke penerima di M_Outlet. Hasil dan kegagalan dicatat di
+ * M_Konfigurasi (rekap_terakhir); yang diawali "Gagal" tampil di Beranda dan
+ * Dashboard Pengelola. opsi: { bulan, data (opsional, sudah dihitung), uji }.
+ */
+function jalankanRekapBulanan_(opsi) {
+  var ket = 'Diisi otomatis oleh rekap bulanan. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola.';
+  var hasil = { bulan: opsi.bulan, penerima: [], terkirim: false, drive: false };
+  try {
+    var d = opsi.data || dataRekapBulan_(opsi.bulan);
+    var pdf = buatPdfRekap_(d, opsi.uji ? 'Uji dari editor Apps Script, ' + waktuPendekId_(new Date()) : 'Otomatis, ' + waktuPendekId_(new Date()));
+    hasil.namaFile = pdf.namaFile;
+    var masalah = [];
+    var x = { outlet: namaOutlet_() || 'Outlet', namaFile: pdf.namaFile, drive: false, lokasi: '' };
+    try {
+      x.lokasi = simpanRekapKeDrive_(pdf, d.bulan).lokasi;
+      x.drive = hasil.drive = true;
+    } catch (err) {
+      console.error('Rekap gagal disimpan ke Drive: ' + (err && err.stack ? err.stack : err));
+      masalah.push('PDF gagal disimpan ke Drive: ' + (err && err.message ? err.message : err));
+    }
+    var konf = bacaKonfigurasi_().nilai;
+    x.alamat = /^https:\/\//.test(String(konf.alamat_aplikasi || '')) ? String(konf.alamat_aplikasi) : '';
+    var penerima = bacaDaftarEmail_();
+    hasil.penerima = penerima;
+    if (!penerima.length) throw new Error('belum ada penerima email. Tambahkan di Pengaturan → Penerima email.');
+    var sisa = MailApp.getRemainingDailyQuota();
+    if (sisa < penerima.length) throw new Error('kuota email harian Gmail habis (sisa ' + sisa + ').');
+    hasil.html = htmlEmailRekap_(d, x);
+    MailApp.sendEmail({
+      to: penerima.join(','),
+      subject: (opsi.uji ? '[Uji] ' : '') + 'Rekap bulanan ' + x.outlet + ', ' + d.nama,
+      htmlBody: hasil.html,
+      name: 'InventoryKu',
+      attachments: [pdf.blob]
+    });
+    hasil.terkirim = true;
+    catatStatusSistem_('rekap_terakhir', 'Terkirim ' + waktuSekarangId_() + ' untuk ' + d.nama + ' ke ' + penerima.length + ' penerima' +
+      (masalah.length ? '. Masalah: ' + masalah.join('; ') : '') + '.', ket);
+  } catch (err) {
+    console.error('Rekap bulanan gagal: ' + (err && err.stack ? err.stack : err));
+    hasil.galat = err && err.message ? err.message : String(err);
+    catatStatusSistem_('rekap_terakhir', 'Gagal ' + waktuSekarangId_() + ' untuk ' + namaBulanId_(opsi.bulan) + ': ' + hasil.galat, ket);
+  }
+  return hasil;
+}
+
+/** Dijalankan trigger bulanan tanggal 1 (dipasang pasangTrigger): rekap bulan sebelumnya. */
+function kirimRekapBulanan() {
+  SS_ = null;
+  resetMemoForm_();
+  return jalankanRekapBulanan_({ bulan: bulanLalu_(hariIni_()) });
+}
+
+/**
+ * Jalankan dari editor Apps Script untuk menguji rekap tanpa menunggu
+ * tanggal 1: rekap bulan lalu, sama seperti trigger. Jika bulan lalu sama
+ * sekali belum punya isian (aplikasi baru dipakai), rekap bulan berjalan
+ * yang dibuat, supaya isinya bisa diperiksa. Subjek email diawali "[Uji]";
+ * PDF juga disimpan ke Drive (rekap bulan itu yang dibuat sesudahnya
+ * menggantikannya). Hasilnya tertulis di log eksekusi.
+ */
+function kirimRekapSekarang() {
+  SS_ = null;
+  resetMemoForm_();
+  var hari = hariIni_();
+  var d = dataRekapBulan_(bulanLalu_(hari));
+  if (!d.adaIsian) {
+    console.log('Bulan lalu (' + d.nama + ') belum punya isian, jadi yang dibuat rekap bulan berjalan.');
+    d = dataRekapBulan_(hari.slice(0, 7));
+  }
+  var h = jalankanRekapBulanan_({ bulan: d.bulan, data: d, uji: true });
+  console.log(h.terkirim
+    ? 'Rekap ' + d.nama + ' terkirim ke ' + h.penerima.join(', ') + ' dengan lampiran ' + h.namaFile +
+      (h.drive ? '; tersimpan di Drive.' : '; GAGAL disimpan ke Drive (lihat rekap_terakhir di M_Konfigurasi).')
+    : 'Rekap gagal: ' + h.galat + '. Lihat baris rekap_terakhir di M_Konfigurasi.');
+}
+
 /* ---------- Trigger ---------- */
 
 var HARI_TRIGGER = {
@@ -7020,8 +7779,9 @@ var JAM_CADANGAN = 3; // dini hari
  * Jalankan dari editor Apps Script (sekali, dan setiap kali jam closing,
  * jeda laporan, hari cadangan, atau zona waktu diubah). Menghapus semua
  * trigger lama milik script ini, lalu memasang trigger harian (jam closing +
- * jeda dari M_Konfigurasi) dan trigger cadangan mingguan (hari_cadangan,
- * pukul 03.00), dalam zona waktu yang tersimpan.
+ * jeda dari M_Konfigurasi), trigger cadangan mingguan (hari_cadangan, pukul
+ * 03.00), dan trigger rekap bulanan (tanggal 1, pukul 07.00; Tahap 10), dalam
+ * zona waktu yang tersimpan.
  */
 function pasangTrigger() {
   SS_ = null;
@@ -7040,11 +7800,14 @@ function pasangTrigger() {
     .atHour(Math.floor(menit / 60)).nearMinute(menit % 60).everyDays(1).inTimezone(zona).create();
   ScriptApp.newTrigger('buatCadangan').timeBased()
     .onWeekDay(ScriptApp.WeekDay[hari]).atHour(JAM_CADANGAN).inTimezone(zona).create();
+  ScriptApp.newTrigger('kirimRekapBulanan').timeBased()
+    .onMonthDay(1).atHour(JAM_REKAP).inTimezone(zona).create();
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
+  var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00';
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
-    ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00.');
+    ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');
   catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +
-    jamTeks + ', cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00.', KETERANGAN_PASANG_TRIGGER);
+    jamTeks + ', cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.', KETERANGAN_PASANG_TRIGGER);
 }
 
 /* =========================================================================
