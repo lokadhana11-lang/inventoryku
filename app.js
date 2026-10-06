@@ -9,7 +9,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.8.0';
+  var VERSI_APLIKASI = '0.9.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1088,6 +1088,7 @@
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
     { pola: /^\/dashboard$/, menu: 'dashboard', pengelola: true, layar: layarDashboard },
+    { pola: /^\/opname$/, menu: 'dashboard', pengelola: true, layar: layarOpname },
     { pola: /^\/pengaturan$/, menu: 'pengaturan', pengelola: true, layar: layarPengaturan },
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
     { pola: /^\/pengaturan\/staff\/([^/]+)(\/pin)?$/, menu: 'pengaturan', pengelola: true, layar: layarStaffDetail },
@@ -1971,7 +1972,8 @@
       var form = data.form || [];
       gambarTiket(form);
       gambarKemajuan(form);
-      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null);
+      gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null,
+        data.opname || null);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
@@ -2059,7 +2061,7 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname) {
       kosongkan(bawah);
       // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
       var simpan = barisMasaSimpan(masaSimpan);
@@ -2067,6 +2069,9 @@
       var baris = barisAntrean();
       if (baris) bawah.appendChild(baris);
       if (!sesiKini().pengguna.pengelola) return;
+      // Pengingat stock opname yang lewat jadwal (Tahap 8), di bawah pemeriksaan.
+      var pengingat = barisPengingatOpname(opname);
+      if (pengingat) bawah.insertBefore(pengingat, bawah.firstChild);
       var periksa = barisPemeriksaan(pemeriksaan);
       if (periksa) bawah.insertBefore(periksa, bawah.firstChild);
       // Email laporan harian atau cadangan mingguan yang gagal (Tahap 4).
@@ -5041,7 +5046,10 @@
       } else {
         namaIkon = 'opname';
         judul = [el('span', { class: 'daftar-baris-judul', text: 'Stock opname' })];
-        ket = p.jumlahItem + ' item dihitung, ' + p.berselisih + ' berselisih. ' + ket;
+        ket = p.jumlahItem + ' item dihitung, ' + p.berselisih + ' berselisih' +
+          (p.berselisih ? ', nilai selisih ' + formatRupiah(p.nilai || 0) : '') + '. ' + ket;
+        // Rincian dan laporan selisih (khusus Pengelola, Tahap 8).
+        if (pengelola && p.id) klik = function () { bukaDetailOpname(p.id); };
       }
       var isiBaris = [
         el('span', { class: 'ikon-peristiwa' }, ikon(namaIkon)),
@@ -5049,7 +5057,8 @@
       ];
       if (klik) {
         isiBaris.push(ikon('kanan'));
-        return el('button', { type: 'button', class: 'daftar-baris peristiwa', onclick: klik, 'aria-label': 'Riwayat ' + p.item }, isiBaris);
+        return el('button', { type: 'button', class: 'daftar-baris peristiwa', onclick: klik,
+          'aria-label': p.jenis === 'opname' ? 'Rincian stock opname ' + jam(p.waktu) : 'Riwayat ' + p.item }, isiBaris);
       }
       return el('div', { class: 'daftar-baris peristiwa tetap' }, isiBaris);
     }
@@ -5929,7 +5938,8 @@
 
   /**
    * Tombol "Unduh PDF". opsi: { aksi (bawaan 'unduhPdf'), minta() → isi
-   * permintaan, jenis, label }. Server menjawab { namaFile, mime, data (base64) }.
+   * permintaan, jenis, label, teks (bawaan "Unduh PDF", misalnya "Unduh
+   * laporan selisih") }. Server menjawab { namaFile, mime, data (base64) }.
    * Android, laptop, desktop: file langsung tersimpan, lalu "PDF diunduh.".
    * iPhone dan iPad: dua langkah. PDF diambil dulu, tombol berganti menjadi
    * "Simpan PDF"; ketukan berikutnya langsung membuka lembar bagikan tanpa
@@ -5938,14 +5948,15 @@
    */
   function unduhPdf(opsi) {
     var ios = apakahIos();
-    var t = tombol('Unduh PDF', opsi.jenis || 'utama', opsi.label ? { 'aria-label': opsi.label } : null);
+    var teksAwal = opsi.teks || 'Unduh PDF';
+    var t = tombol(teksAwal, opsi.jenis || 'utama', opsi.label ? { 'aria-label': opsi.label } : null);
     var pesan = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite' });
     var file = null;
 
     function reset() {
       file = null;
       aturTombolProses(t, false);
-      gantiTeksTombol(t, 'Unduh PDF');
+      gantiTeksTombol(t, teksAwal);
       t.classList.remove('siap-simpan');
       tulisPesan(pesan, '');
     }
@@ -6052,7 +6063,9 @@
         el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol, tombolDrive]),
         unduh.pesan,
         pengelola ? pesanDrive : null
-      ])
+      ]),
+      // Daftar belanja (Tahap 8, khusus Pengelola). Rekap bulanan menyusul di Tahap 10.
+      pengelola ? kartuDaftarBelanja() : null
     ]));
 
     function simpanPilihan() {
@@ -6453,6 +6466,7 @@
       case 'resetPin': return { href: hrefStaff(data.nama, true) };
       case 'formBelum': return { href: '#/' };
       case 'jadwal': return { href: '#/pengaturan/outlet' };
+      case 'opname': return { href: '#/opname' };
       case 'tanpaHarga': return { klik: function () { bukaNilaiStock(d.nilaiStock); } };
       default: return null;
     }
@@ -6513,6 +6527,13 @@
         wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'Data ' + tanggalJudul(d.tanggal) + '.' }));
       }
       wadah.appendChild(angkaRingkas(d));
+      // Tombol Stock opname dengan tanggal opname terakhir di sampingnya (Tahap 8).
+      wadah.appendChild(el('div', { class: 'dashboard-opname' }, [
+        el('a', { class: 'tombol tombol-kedua', href: '#/opname' }, el('span', { class: 'tombol-teks', text: 'Stock opname' })),
+        d.opname && d.opname.lewat
+          ? tandaStatus('tinjau', teksOpnameTerakhir(d.opname))
+          : el('span', { class: 'kolom-bantuan', text: teksOpnameTerakhir(d.opname) })
+      ]));
       wadah.appendChild(el('div', { class: 'dashboard-isi' }, [
         el('section', { class: 'dashboard-perhatian', 'aria-labelledby': 'judul-perhatian' }, [
           el('h2', { class: 'judul-bagian', id: 'judul-perhatian', text: 'Perlu perhatian' }),
@@ -6551,6 +6572,602 @@
     }
     muat();
     segarkanLayar = muat;
+  }
+
+  /* =======================================================================
+   * Tahap 8: Stock opname (khusus Pengelola; spesifikasi tampilan Bagian 5.8,
+   * sistem Bagian 5.7) dan Daftar belanja (tampilan Bagian 5.9, sistem 9.2)
+   * ===================================================================== */
+
+  /** "Stock opname terakhir 9 hari lalu." atau "Belum ada stock opname." (tampilan Bagian 5.2). */
+  function teksPengingatOpname(s) {
+    if (!s || !s.terakhir) return 'Belum ada stock opname.';
+    return 'Stock opname terakhir ' + (s.hariLalu === 0 ? 'hari ini' : s.hariLalu + ' hari lalu') + '.';
+  }
+
+  /** "Terakhir 3 Okt (3 hari lalu)", di samping tombol Stock opname di Dashboard. */
+  function teksOpnameTerakhir(s) {
+    if (!s || !s.terakhir) return 'Belum ada stock opname';
+    var lalu = s.hariLalu === 0 ? 'hari ini' : (s.hariLalu === 1 ? 'kemarin' : s.hariLalu + ' hari lalu');
+    return 'Terakhir ' + tanggalPendek(s.terakhir.tanggal) + ' (' + lalu + ')';
+  }
+
+  /** Beranda Pengelola: pengingat jika opname terakhir sudah lewat jadwal. */
+  function barisPengingatOpname(s) {
+    if (!s || !s.lewat) return null;
+    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pengingat stock opname' },
+      el('a', { class: 'daftar-baris pemberitahuan', href: '#/opname' }, [
+        el('span', { class: 'daftar-baris-isi' }, [
+          tandaStatus('tinjau', teksPengingatOpname(s)),
+          el('span', { class: 'daftar-baris-ket', text: 'Jadwal ' + s.jadwal + '. Ketuk untuk membuka Stock opname.' })
+        ]),
+        ikon('kanan')
+      ]));
+  }
+
+  /** Pesan siap pakai (ikon dan warna seperti tulisPesan). */
+  function pesanJadi(teks, jenis) {
+    var p = el('p', { class: 'pesan-formulir', role: jenis === 'masalah' ? 'alert' : 'status' });
+    tulisPesan(p, teks, jenis);
+    return p;
+  }
+
+  /** "+1,5 kg" / "−0,5 kg" */
+  function teksSelisih(n, satuan) {
+    return (n > 0 ? '+' : '') + formatAngka(n) + (satuan ? ' ' + satuan : '');
+  }
+
+  /**
+   * Daftar hasil opname: [{ item, satuan, tercatat, hitung, selisih, nilai }].
+   * Laptop/desktop: tabel; HP/tablet: satu baris per item. Selisih bukan nol
+   * memakai tanda Perlu ditinjau.
+   */
+  function daftarHasilOpname(baris, judul) {
+    if (window.matchMedia(DESKTOP).matches) {
+      return el('div', { class: 'tabel-bingkai' }, el('table', { class: 'tabel tabel-opname' }, [
+        el('caption', { class: 'sr', text: judul }),
+        el('thead', {}, el('tr', {}, ['Item', 'Tercatat', 'Hitung', 'Selisih', 'Nilai selisih'].map(function (j, i) {
+          return el('th', { scope: 'col', class: i ? 'angka' : null, text: j });
+        }))),
+        el('tbody', {}, baris.map(function (b) {
+          return el('tr', {}, [
+            el('th', { scope: 'row', text: b.item }),
+            el('td', { class: 'angka' }, angkaSatuan(b.tercatat, b.satuan)),
+            el('td', { class: 'angka' }, angkaSatuan(b.hitung, b.satuan)),
+            el('td', { class: 'angka' }, b.selisih ? tandaStatus('tinjau', teksSelisih(b.selisih, b.satuan)) : el('span', { class: 'otomatis', text: 'Sesuai' })),
+            el('td', { class: 'angka' }, el('span', { class: 'angka-satuan', text: b.selisih ? formatRupiah(b.nilai) : '–' }))
+          ]);
+        }))
+      ]));
+    }
+    return el('div', { class: 'daftar', role: 'group', 'aria-label': judul }, baris.map(function (b) {
+      var ket = 'Tercatat ' + formatAngka(b.tercatat) + ' ' + b.satuan + ', hitung ' + formatAngka(b.hitung) + ' ' + b.satuan + '.';
+      if (b.selisih) ket += ' Nilai ' + (b.nilai == null ? 'belum bisa dihitung: harga belum diisi' : formatRupiah(b.nilai)) + '.';
+      return el('div', { class: 'daftar-baris peristiwa tetap' }, el('span', { class: 'daftar-baris-isi' }, [
+        el('span', { class: 'opname-hasil-judul' }, [
+          el('span', { class: 'daftar-baris-judul', text: b.item }),
+          b.selisih ? tandaStatus('tinjau', 'Selisih ' + teksSelisih(b.selisih, b.satuan)) : tandaStatus('baik', 'Sesuai')
+        ]),
+        el('span', { class: 'daftar-baris-ket', text: ket })
+      ]));
+    }));
+  }
+
+  /** Angka ringkas opname: item dihitung, berselisih, total nilai selisih. */
+  function ringkasOpname(jumlah, berselisih, total, dari) {
+    return el('dl', { class: 'opname-ringkas' }, [
+      el('div', {}, [el('dt', { text: 'Item dihitung' }), el('dd', { text: jumlah + (dari ? ' dari ' + dari : '') })]),
+      el('div', {}, [el('dt', { text: 'Item berselisih' }), el('dd', { text: String(berselisih) })]),
+      el('div', {}, [el('dt', { text: 'Total nilai selisih' }), el('dd', { text: formatRupiah(total) })])
+    ]);
+  }
+
+  /** Rincian satu opname (dari Riwayat): semua item yang dihitung dan tombol laporan selisih. */
+  function bukaDetailOpname(sid) {
+    var wadah = el('div', { class: 'opname-detail' }, kerangkaBaris(3));
+    var unduh = unduhPdf({ aksi: 'unduhPdfOpname', minta: function () { return { submissionId: sid }; }, teks: 'Unduh laporan selisih', jenis: 'kedua' });
+    var lembar = bukaLembar({ judul: 'Stock opname', isi: [wadah], lebar: true, aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+    panggilApi('detailOpname', { submissionId: sid }).then(function (o) {
+      if (lembar !== lembarKini) return;
+      kosongkan(wadah);
+      wadah.appendChild(el('p', { class: 'kartu-teks', text: tanggalJudul(o.tanggal) + ' · ' + o.oleh + (o.waktu ? ', ' + jam(o.waktu) : '') }));
+      wadah.appendChild(ringkasOpname(o.jumlah, o.berselisih, o.totalNilai));
+      if (o.tanpaHarga) wadah.appendChild(el('p', { class: 'kolom-bantuan', text: o.tanpaHarga + ' item berselisih belum punya harga, tidak ikut total nilai.' }));
+      wadah.appendChild(daftarHasilOpname(o.baris, 'Hasil hitung'));
+      wadah.appendChild(el('div', { class: 'deret-tombol' }, [unduh.tombol]));
+      wadah.appendChild(unduh.pesan);
+    }).catch(function (err) {
+      if (lembar !== lembarKini) return;
+      if (tanganiSesiBerakhir(err)) return;
+      kosongkan(wadah).appendChild(kotakGalat(pesanGalat(err), function () { bukaDetailOpname(sid); }));
+    });
+  }
+
+  function bacaDraftOpname() {
+    var d = Draft.baca('opname');
+    var data = d && d.data ? d.data : {};
+    return {
+      kategori: typeof data.kategori === 'string' ? data.kategori : '',
+      hitung: data.hitung && typeof data.hitung === 'object' ? data.hitung : {},
+      sid: data.sid || '',
+      waktu: d ? d.waktu : null
+    };
+  }
+
+  /**
+   * Layar Stock opname (#/opname, dari Dashboard). Tiga keadaan: hitung (daftar
+   * item dengan stock tercatat dan kolom Hitung; selisih muncul saat diketik),
+   * ringkasan (item berselisih dan total nilainya, "Simpan opname"), selesai
+   * ("Opname tersimpan. 3 item diluruskan." dan "Unduh laporan selisih").
+   * Hitungan tersimpan sebagai draft per pengguna; menyimpan butuh sinyal.
+   * Selisih yang disimpan dihitung server dari stock saat disimpan.
+   */
+  function layarOpname(k) {
+    aturJudul('Stock opname');
+    var hariIni = tanggalIso(new Date());
+    var draft = bacaDraftOpname();
+    var data = null;
+    var tahap = 'hitung';
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var infoTerakhir = el('p', { class: 'kolom-bantuan' });
+    var pilihKategori = el('select', { class: 'isian', id: 'opname-kategori' });
+    var wadahItem = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolLanjut = tombol('Lanjut', 'utama');
+
+    var isiHitung = el('div', {}, [
+      catatanDraft,
+      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+        el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'opname-kategori', text: 'Kategori' }), pilihKategori]),
+        el('div', { class: 'kolom' }, [el('span', { class: 'kolom-label', text: 'Tanggal' }), el('p', { class: 'opname-tanggal', text: tanggalJudul(hariIni) })]),
+        el('div', { class: 'lebar-penuh' }, [
+          penanda,
+          infoTerakhir,
+          el('p', { class: 'kolom-bantuan', text: 'Hitung sebelum opening atau setelah closing, saat tidak ada barang bergerak. ' +
+            'Item yang dikosongkan tidak dihitung dan stock-nya tidak diubah.' })
+        ])
+      ]),
+      wadahItem,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolLanjut])
+    ]);
+    var isiLain = el('div', { hidden: true });
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
+      tautanKembali('Dashboard', '#/dashboard'),
+      el('h1', { class: 'judul-layar', text: 'Stock opname' }),
+      isiHitung,
+      isiLain
+    ]));
+
+    function adaHitung() {
+      return Object.keys(draft.hitung).some(function (n) { return String(draft.hitung[n] || '').trim() !== ''; });
+    }
+    function simpanDraft() {
+      var waktu = Draft.simpan('opname', { kategori: draft.kategori, hitung: draft.hitung, sid: draft.sid });
+      catatanDraft.textContent = adaHitung() && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
+    }
+    if (draft.waktu && adaHitung()) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    function itemTampil() {
+      return (data && data.item || []).filter(function (it) { return !draft.kategori || it.kategori === draft.kategori; });
+    }
+
+    /** Isian Hitung satu item: { kosong, salah, angka, selisih, nilai }. */
+    function nilaiHitung(it) {
+      var n = bacaAngka(draft.hitung[it.nama.toLowerCase()]);
+      var hasil = { kosong: n === null, salah: n !== null && isNaN(n), angka: n, selisih: null, nilai: null };
+      if (!hasil.kosong && !hasil.salah) {
+        hasil.selisih = bulat3(n - it.tercatat);
+        hasil.nilai = it.harga == null ? null : Math.round(hasil.selisih * it.harga);
+      }
+      return hasil;
+    }
+
+    function dihitung() {
+      return itemTampil().filter(function (it) { return !nilaiHitung(it).kosong; });
+    }
+
+    function perbaruiPenghitung() {
+      penghitung.textContent = dihitung().length + ' dari ' + itemTampil().length + ' dihitung';
+    }
+
+    function tandaSelisih(h, satuan, ringkas) {
+      if (h.kosong) return null;
+      if (h.salah) {
+        return ringkas ? tandaStatus('masalah', 'Angka salah') : pesanJadi('Isi angka 0 atau lebih, misalnya 2,5.', 'masalah');
+      }
+      if (!h.selisih) return tandaStatus('baik', 'Sesuai');
+      return tandaStatus('tinjau', (ringkas ? '' : 'Selisih ') + teksSelisih(h.selisih, satuan));
+    }
+
+    /** Satu item: kartu (HP dan tablet) atau baris tabel (laptop dan desktop). */
+    function buatItem(it, nomor, modeTabel) {
+      var kunci = it.nama.toLowerCase();
+      var input = el('input', {
+        class: 'isian isian-angka',
+        type: 'text',
+        inputmode: 'decimal',
+        autocomplete: 'off',
+        id: 'hitung-' + nomor,
+        'data-kunci': kunci,
+        'aria-label': modeTabel ? 'Hitung ' + it.nama : null
+      });
+      input.value = draft.hitung[kunci] || '';
+      var wadahSelisih = el('span', { class: 'wadah-peringatan' });
+      var kartu = null;
+      function perbarui() {
+        var h = nilaiHitung(it);
+        input.setAttribute('aria-invalid', h.salah ? 'true' : 'false');
+        kosongkan(wadahSelisih);
+        var t = tandaSelisih(h, it.satuan, modeTabel);
+        if (t) wadahSelisih.appendChild(t);
+        if (kartu) kartu.classList.toggle('dihitung', !h.kosong);
+        perbaruiPenghitung();
+      }
+      input.addEventListener('input', function () {
+        draft.hitung[kunci] = input.value;
+        if (!input.value.trim()) delete draft.hitung[kunci];
+        simpanDraft();
+        tulisPesan(pesan, '');
+        perbarui();
+      });
+      var hasil;
+      if (modeTabel) {
+        hasil = el('tr', {}, [
+          el('td', { class: 'angka', text: String(nomor) }),
+          el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: it.nama })),
+          el('td', { class: 'angka otomatis' }, angkaSatuan(it.tercatat)),
+          el('td', {}, input),
+          el('td', { class: 'angka' }, wadahSelisih),
+          el('td', { class: 'otomatis', text: it.satuan })
+        ]);
+      } else {
+        kartu = el('article', { class: 'kartu-item kartu-opname', 'aria-label': it.nama }, [
+          el('div', { class: 'kartu-item-kepala' }, [
+            el('h3', { class: 'kartu-item-nama', text: it.nama }),
+            el('span', { class: 'kartu-item-satuan', text: it.satuan })
+          ]),
+          el('div', { class: 'opname-baris' }, [
+            el('p', { class: 'otomatis opname-tercatat' }, ['Tercatat ', angkaSatuan(it.tercatat)]),
+            el('div', { class: 'opname-hitung' }, [
+              el('label', { class: 'kolom-label', for: input.id, text: 'Hitung' }),
+              input
+            ])
+          ]),
+          wadahSelisih
+        ]);
+        hasil = kartu;
+      }
+      perbarui();
+      return hasil;
+    }
+
+    /** Menggambar ulang daftar item; kolom yang sedang diketik tetap aktif. */
+    function gambarItem() {
+      var aktif = document.activeElement;
+      var kunciAktif = aktif && aktif.getAttribute ? aktif.getAttribute('data-kunci') : null;
+      var posisi = kunciAktif && typeof aktif.selectionStart === 'number' ? aktif.selectionStart : null;
+      kosongkan(wadahItem);
+      var semua = itemTampil();
+      if (!semua.length) {
+        wadahItem.appendChild(kotakKosong(data && data.item && data.item.length
+          ? 'Belum ada item aktif di kategori ini.'
+          : 'Belum ada item aktif. Tambahkan di Pengaturan → Item.'));
+        perbaruiPenghitung();
+        return;
+      }
+      var kelompok = [];
+      semua.forEach(function (it) {
+        var g = kelompok[kelompok.length - 1];
+        if (!g || g.nama !== it.kategori) kelompok.push(g = { nama: it.kategori, item: [] });
+        g.item.push(it);
+      });
+      var nomor = 0;
+      kelompok.forEach(function (g) {
+        var bagian = el('section', { class: 'kelompok opname-kelompok', 'aria-label': g.nama });
+        if (!draft.kategori) bagian.appendChild(el('h2', { class: 'kelompok-judul', text: g.nama }));
+        if (mediaDesktop.matches) {
+          var badan = el('tbody');
+          g.item.forEach(function (it) { badan.appendChild(buatItem(it, ++nomor, true)); });
+          bagian.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-hitung' }, [
+            el('thead', {}, el('tr', {}, ['No', 'Nama Item', 'Tercatat', 'Hitung', 'Selisih', 'Satuan'].map(function (j, i) {
+              return el('th', { scope: 'col', class: [0, 2, 4].indexOf(i) >= 0 ? 'angka' : null, text: j });
+            }))),
+            badan
+          ])));
+        } else {
+          var grid = el('div', { class: 'grid-item' });
+          g.item.forEach(function (it) { grid.appendChild(buatItem(it, ++nomor, false)); });
+          bagian.appendChild(grid);
+        }
+        wadahItem.appendChild(bagian);
+      });
+      perbaruiPenghitung();
+      if (kunciAktif) {
+        var baru = wadahItem.querySelector('[data-kunci="' + kunciAktif.replace(/"/g, '\\"') + '"]');
+        if (baru) {
+          baru.focus({ preventScroll: true });
+          if (posisi != null && baru.setSelectionRange) {
+            try { baru.setSelectionRange(posisi, posisi); } catch (err) { /* kolom tanpa kursor */ }
+          }
+        }
+      }
+    }
+
+    function gambar(d) {
+      data = d;
+      kosongkan(pilihKategori);
+      pilihKategori.appendChild(el('option', { value: '', text: 'Semua kategori' }));
+      (d.kategori || []).forEach(function (n) { pilihKategori.appendChild(el('option', { value: n, text: n })); });
+      if (draft.kategori && (d.kategori || []).indexOf(draft.kategori) < 0) draft.kategori = '';
+      pilihKategori.value = draft.kategori;
+      infoTerakhir.textContent = d.status && d.status.terakhir
+        ? 'Opname terakhir ' + tanggalJudul(d.status.terakhir.tanggal) + ', ' + d.status.terakhir.oleh + '. Jadwal ' + d.status.jadwal + '.'
+        : 'Belum ada stock opname. Jadwal ' + (d.status ? d.status.jadwal : 'mingguan') + '.';
+      if (tahap === 'hitung') gambarItem();
+    }
+
+    pilihKategori.addEventListener('change', function () {
+      draft.kategori = pilihKategori.value;
+      simpanDraft();
+      tulisPesan(pesan, '');
+      gambarItem();
+    });
+
+    function tampilkan(baru) {
+      tahap = baru;
+      isiHitung.hidden = tahap !== 'hitung';
+      isiLain.hidden = tahap === 'hitung';
+      window.scrollTo(0, 0);
+      if (tahap === 'hitung') gambarItem();
+    }
+
+    tombolLanjut.addEventListener('click', function () {
+      if (!data) return;
+      tulisPesan(pesan, '');
+      var salah = itemTampil().filter(function (it) { return nilaiHitung(it).salah; })[0];
+      if (salah) {
+        tulisPesan(pesan, 'Periksa angka Hitung ' + salah.nama + '. Isi angka 0 atau lebih, misalnya 2,5.', 'masalah');
+        var kolom = wadahItem.querySelector('[data-kunci="' + salah.nama.toLowerCase().replace(/"/g, '\\"') + '"]');
+        if (kolom) kolom.focus();
+        return;
+      }
+      if (!dihitung().length) {
+        tulisPesan(pesan, 'Isi hasil hitung minimal untuk satu item.', 'masalah');
+        return;
+      }
+      gambarRingkasan();
+      tampilkan('ringkasan');
+    });
+
+    /** Ringkasan sebelum disimpan (perkiraan dari stock tercatat saat layar dibuka). */
+    function gambarRingkasan() {
+      kosongkan(isiLain);
+      var semua = dihitung();
+      var berselisih = [];
+      var total = 0;
+      var tanpaHarga = 0;
+      semua.forEach(function (it) {
+        var h = nilaiHitung(it);
+        if (!h.selisih) return;
+        berselisih.push({ item: it.nama, satuan: it.satuan, tercatat: it.tercatat, hitung: h.angka, selisih: h.selisih, nilai: h.nilai });
+        if (h.nilai == null) tanpaHarga++;
+        else total += h.nilai;
+      });
+      var pesanSimpan = el('p', { class: 'pesan-formulir', role: 'alert' });
+      var tombolKembali = tombol('Kembali', 'kedua');
+      var tombolSimpan = tombol('Simpan opname', 'utama');
+      tombolKembali.addEventListener('click', function () { tampilkan('hitung'); });
+      tombolSimpan.addEventListener('click', function () { simpan(tombolSimpan, pesanSimpan); });
+      isiLain.appendChild(el('section', { class: 'kartu opname-kartu', 'aria-labelledby': 'judul-ringkasan-opname' }, [
+        el('h2', { class: 'kartu-judul', id: 'judul-ringkasan-opname', text: 'Ringkasan opname' }),
+        el('p', { class: 'kartu-teks', text: tanggalJudul(hariIni) + (draft.kategori ? ' · Kategori ' + draft.kategori : ' · Semua kategori') }),
+        ringkasOpname(semua.length, berselisih.length, total, itemTampil().length),
+        berselisih.length
+          ? daftarHasilOpname(berselisih, 'Item berselisih')
+          : el('p', {}, [tandaStatus('baik', 'Sesuai'), ' ', el('span', { text: 'Semua item yang dihitung sama dengan stock tercatat.' })]),
+        tanpaHarga ? el('p', { class: 'kolom-bantuan', text: tanpaHarga + ' item berselisih belum punya harga, tidak ikut total nilai.' }) : null,
+        el('p', { class: 'kolom-bantuan', text: 'Saat disimpan, selisih dihitung lagi dari stock tercatat saat itu. ' +
+          'Item yang berselisih diluruskan dengan penyesuaian beralasan Stock opname.' }),
+        pesanSimpan,
+        el('div', { class: 'deret-tombol opname-aksi' }, [tombolKembali, tombolSimpan])
+      ]));
+    }
+
+    function simpan(t, wadahPesan) {
+      if (t.disabled) return;
+      tulisPesan(wadahPesan, '');
+      if (navigator.onLine === false) {
+        tulisPesan(wadahPesan, 'Tidak ada sinyal. Hitungan tetap tersimpan di HP. Simpan lagi saat ada sinyal.', 'masalah');
+        return;
+      }
+      if (!draft.sid) {
+        draft.sid = buatId();
+        simpanDraft();
+      }
+      var awal = {};
+      itemTampil().forEach(function (it) { awal[it.nama.toLowerCase()] = it.tercatat; });
+      var baris = dihitung().map(function (it) { return { item: it.nama, hitung: nilaiHitung(it).angka }; });
+      aturTombolProses(t, true, 'Menyimpan…');
+      jagaProses(panggilApi('simpanOpname', { submissionId: draft.sid, tanggal: hariIni, waktuPerangkat: new Date().toISOString(), baris: baris }))
+        .then(function (h) {
+          aturTombolProses(t, false);
+          Draft.hapus('opname');
+          draft = { kategori: draft.kategori, hitung: {}, sid: '', waktu: null };
+          catatanDraft.textContent = '';
+          gambarSelesai(h, awal);
+          tampilkan('selesai');
+          toast('Opname tersimpan.');
+          muat();
+        })
+        .catch(function (err) {
+          aturTombolProses(t, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(wadahPesan, err && err.jaringan
+            ? 'Opname belum tersimpan: ' + pesanGalat(err) + ' Hitungan tetap tersimpan di HP.'
+            : pesanGalat(err), 'masalah');
+        });
+    }
+
+    /** Sesudah disimpan: hasil dari server (selisih terhadap stock saat disimpan). */
+    function gambarSelesai(o, awal) {
+      kosongkan(isiLain);
+      var berselisih = o.baris.filter(function (b) { return b.selisih; });
+      var berubah = o.baris.filter(function (b) {
+        var a = awal[b.item.toLowerCase()];
+        return a != null && bulat3(a) !== bulat3(b.tercatat);
+      });
+      var unduh = unduhPdf({ aksi: 'unduhPdfOpname', minta: function () { return { submissionId: o.id }; }, teks: 'Unduh laporan selisih' });
+      isiLain.appendChild(el('section', { class: 'kartu opname-kartu', 'aria-labelledby': 'judul-selesai-opname' }, [
+        el('h2', { class: 'kartu-judul', id: 'judul-selesai-opname', text: 'Opname tersimpan' }),
+        pesanJadi('Opname tersimpan. ' + (berselisih.length ? berselisih.length + ' item diluruskan.' : 'Semua item sesuai, tidak ada yang diluruskan.'), 'baik'),
+        berubah.length ? pesanJadi('Stock tercatat ' + berubah.map(function (b) {
+          return b.item + ' berubah sejak layar dibuka (' + formatAngka(awal[b.item.toLowerCase()]) + ' → ' + formatAngka(b.tercatat) + ' ' + b.satuan + ')';
+        }).join(', ') + '. Selisih dihitung dari stock saat disimpan.', 'info') : null,
+        ringkasOpname(o.jumlah, o.berselisih, o.totalNilai),
+        berselisih.length ? daftarHasilOpname(berselisih, 'Item yang diluruskan') : null,
+        o.tanpaHarga ? el('p', { class: 'kolom-bantuan', text: o.tanpaHarga + ' item berselisih belum punya harga, tidak ikut total nilai.' }) : null,
+        el('div', { class: 'deret-tombol opname-aksi' }, [
+          unduh.tombol,
+          el('a', { class: 'tombol tombol-kedua', href: '#/dashboard' }, el('span', { class: 'tombol-teks', text: 'Kembali ke Dashboard' }))
+        ]),
+        unduh.pesan
+      ]));
+    }
+
+    function muat() {
+      return muatData({
+        kunciCache: 'opname',
+        ambil: function () { return panggilApi('formOpname', { tanggal: hariIni }); },
+        gambar: gambar,
+        kerangka: function () { kosongkan(wadahItem).appendChild(kerangkaBaris(4)); },
+        galat: function (teks, cobaLagi) { kosongkan(wadahItem).appendChild(kotakGalat(teks, cobaLagi)); },
+        penanda: penanda
+      });
+    }
+
+    function gantiSusunan() {
+      if (data && tahap === 'hitung') gambarItem();
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    muat();
+    segarkanLayar = function () {
+      if (tahap === 'hitung') return muat();
+      return Promise.resolve();
+    };
+  }
+
+  /** Angka untuk kolom isian: "2,5" (tanpa pemisah ribuan, karena titik dibaca sebagai koma desimal). */
+  function teksIsianAngka(n) {
+    return n == null ? '' : String(bulat3(n)).replace('.', ',');
+  }
+
+  /**
+   * Kartu Daftar belanja di menu Laporan (Pengelola; tampilan Bagian 5.9):
+   * item di bawah stok minimum per kategori, kolom Order terisi saran (dalam
+   * satuan besar jika item punya), bisa diubah sebelum diunduh. Perubahan hanya
+   * untuk cetakan: disimpan di memori layar saja dan dikirim bersama permintaan PDF.
+   */
+  function kartuDaftarBelanja() {
+    var order = {};
+    var data = null;
+    var wadah = el('div', { class: 'belanja' });
+    var catatan = el('p', { class: 'kolom-bantuan', text: 'Perubahan di sini hanya untuk cetakan.' });
+    var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: order }; } });
+    var kartu = el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-belanja' }, [
+      el('h2', { class: 'kartu-judul', id: 'judul-belanja', text: 'Daftar belanja' }),
+      wadah,
+      catatan,
+      el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol]),
+      unduh.pesan
+    ]);
+
+    function barisItem(it, nomor) {
+      var satuanOrder = it.satuanBesar && it.isiSatuanBesar > 0 ? it.satuanBesar : it.satuan;
+      var input = el('input', {
+        class: 'isian isian-angka',
+        type: 'text',
+        inputmode: 'decimal',
+        autocomplete: 'off',
+        id: 'order-' + nomor,
+        'aria-describedby': 'order-ket-' + nomor
+      });
+      input.value = Object.prototype.hasOwnProperty.call(order, it.nama) ? order[it.nama] : (it.saran ? teksIsianAngka(it.saran.jumlah) : '');
+      var ket = el('span', { class: 'konversi', id: 'order-ket-' + nomor });
+      function perbarui() {
+        var n = bacaAngka(input.value);
+        input.setAttribute('aria-invalid', n !== null && isNaN(n) ? 'true' : 'false');
+        if (n !== null && isNaN(n)) ket.textContent = 'Isi angka, misalnya 2.';
+        else if (n !== null && satuanOrder !== it.satuan) ket.textContent = '= ' + formatAngka(n * it.isiSatuanBesar) + ' ' + it.satuan;
+        else if (n === null) ket.textContent = it.saran ? 'Kosong: dicetak tanpa jumlah.' : 'Tanpa saran: stok maksimum kosong.';
+        else ket.textContent = '';
+      }
+      input.addEventListener('input', function () {
+        order[it.nama] = input.value;
+        unduh.reset();
+        perbarui();
+      });
+      perbarui();
+      var info = 'Stock ' + formatAngka(it.stock) + ' ' + it.satuan + ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan;
+      return el('div', { class: 'daftar-baris peristiwa tetap belanja-baris' }, [
+        el('span', { class: 'daftar-baris-isi' }, [
+          el('span', { class: 'daftar-baris-judul', text: it.nama }),
+          el('span', { class: 'daftar-baris-ket' + (it.stock < 0 ? ' nilai-masalah' : ''), text: info }),
+          el('span', { class: 'daftar-baris-ket', text: it.saran ? 'Saran ' + it.saran.teks : 'Tanpa saran: stok maksimum kosong' })
+        ]),
+        el('div', { class: 'belanja-order' }, [
+          el('label', { class: 'kolom-label', for: input.id, text: 'Order' }),
+          el('div', { class: 'baris-angka' }, [input, el('span', { class: 'satuan-tetap', text: satuanOrder })]),
+          ket
+        ])
+      ]);
+    }
+
+    function gambar(d) {
+      data = d;
+      kosongkan(wadah);
+      unduh.reset();
+      // Jumlah yang diubah untuk item yang tidak ada lagi di daftar dibuang.
+      var ada = {};
+      (d.kategori || []).forEach(function (g) { g.item.forEach(function (it) { ada[it.nama] = true; }); });
+      Object.keys(order).forEach(function (n) { if (!ada[n]) delete order[n]; });
+      unduh.tombol.disabled = !d.jumlah;
+      catatan.hidden = !d.jumlah;
+      if (!d.jumlah) {
+        wadah.appendChild(kotakKosong('Semua stock di atas batas minimum.', 'centang'));
+        return;
+      }
+      wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum. Saran order = stok maksimum − stock akhir, ' +
+        'dibulatkan ke atas ke satuan besar.' }));
+      var nomor = 0;
+      d.kategori.forEach(function (g) {
+        wadah.appendChild(el('h3', { class: 'judul-sub', text: g.nama }));
+        wadah.appendChild(el('div', { class: 'daftar', role: 'group', 'aria-label': g.nama }, g.item.map(function (it) {
+          return barisItem(it, ++nomor);
+        })));
+      });
+    }
+
+    unduh.tombol.disabled = true;
+    catatan.hidden = true;
+    muatData({
+      kunciCache: 'belanja',
+      ambil: function () { return panggilApi('daftarBelanja'); },
+      gambar: gambar,
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(2)); },
+      galat: function (teks, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(teks, cobaLagi)); }
+    });
+    return kartu;
   }
 
   /* =======================================================================
