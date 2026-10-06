@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.9 (Tahap 8: stock opname dan daftar belanja)
+// InventoryKu Code.gs v0.10 (Tahap 9: form kustom)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -37,6 +37,10 @@
  *                        Pengaturan → Item, Unit, Kategori dan satuan, Outlet
  *                        dan jadwal; blok Nilai stock dan Kepatuhan serta
  *                        grafik tiap blok di tab Dashboard.
+ * - Tahap 8            : stock opname, laporan selisih, daftar belanja.
+ * - Tahap 9            : form kustom (Pengaturan → Form, M_Form dan
+ *                        M_FormKolom, tab Data_K_<ID Form>, layar isi umum,
+ *                        jadwal form, Riwayat, PDF umum, email, Kepatuhan).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - pasangTrigger      : dijalankan dari editor; memasang kedua trigger.
@@ -49,7 +53,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.8.1';
+var VERSI_KODE = 'v0.10';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -158,7 +162,23 @@ var AKSI_ = {
   daftarBelanja: { jalankan: aksiDaftarBelanja_, pengelola: true,
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
   unduhPdfBelanja: { jalankan: aksiUnduhPdfBelanja_, pengelola: true,
-    pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' }
+    pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
+  formKustom: { jalankan: aksiFormKustom_ },
+  kirimKustom: { jalankan: aksiKirimKustom_ },
+  daftarForm: { jalankan: aksiDaftarForm_, pengelola: true,
+    pesan: 'Pengaturan form hanya untuk Head Kitchen dan Manager.' },
+  detailForm: { jalankan: aksiDetailForm_, pengelola: true,
+    pesan: 'Pengaturan form hanya untuk Head Kitchen dan Manager.' },
+  simpanForm: { jalankan: aksiSimpanForm_, pengelola: true,
+    pesan: 'Form hanya bisa dibuat dan diubah Head Kitchen atau Manager.' },
+  aturFormTampil: { jalankan: aksiAturFormTampil_, pengelola: true,
+    pesan: 'Form hanya bisa diubah Head Kitchen atau Manager.' },
+  urutForm: { jalankan: aksiUrutForm_, pengelola: true,
+    pesan: 'Form hanya bisa diubah Head Kitchen atau Manager.' },
+  arsipkanForm: { jalankan: aksiArsipkanForm_, pengelola: true,
+    pesan: 'Form hanya bisa dihapus Head Kitchen atau Manager.' },
+  pulihkanForm: { jalankan: aksiPulihkanForm_, pengelola: true,
+    pesan: 'Form hanya bisa dipulihkan Head Kitchen atau Manager.' }
 };
 
 /**
@@ -173,6 +193,7 @@ var AKSI_ = {
 function doPost(e) {
   var hasil;
   SS_ = null;
+  resetMemoForm_();
   try {
     var body = bacaBody_(e);
     var nama = typeof body.action === 'string' ? body.action : '';
@@ -784,6 +805,7 @@ var KUNCI_MASTER = {
   M_Staff: 'Nama',
   M_Satuan: 'Satuan',
   M_Form: 'ID Form',
+  M_FormKolom: 'ID Form',
   M_Konfigurasi: 'Kunci',
   M_Resep: 'Item Hasil',
   M_ResepBahan: 'Item Hasil',
@@ -1047,36 +1069,98 @@ function simpanAlamatAplikasi_(alamat) {
   }
 }
 
-/** Form di M_Form: [{ id, nama, jenis, jadwal, urutan, aktif }], urut menurut Urutan. */
-function bacaDaftarForm_() {
+/** Tab data satu form: Data_Stock dan seterusnya, atau Data_K_<ID Form> untuk form kustom. */
+function tabDataForm_(idForm) {
+  return TAB_DATA_FORM[idForm] || (AWALAN_TAB_KUSTOM + idForm);
+}
+
+/** Hari dalam seminggu untuk jadwal "hari tertentu", urut Senin sampai Minggu. */
+var URUTAN_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+/** Teks sel Hari ("Senin, Kamis") → ['Senin', 'Kamis'] dalam urutan URUTAN_HARI. */
+function bacaHari_(teks) {
+  var ada = String(teks == null ? '' : teks).toLowerCase().split(/[,;|]/).map(function (x) { return x.trim(); });
+  return URUTAN_HARI.filter(function (h) { return ada.indexOf(h.toLowerCase()) >= 0; });
+}
+
+/** Nama hari tanggal "2026-10-05" → "Senin". */
+function namaHari_(tanggal) {
+  var p = String(tanggal).split('-');
+  return HARI_ID[new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]))).getUTCDay()];
+}
+
+/**
+ * Form di M_Form: [{ id, nama, jenis, keterangan, jadwal, hari, urutan,
+ * aktif (tampil), diarsipkan (Date|null), baris }], urut menurut Urutan.
+ * Form kustom yang diarsipkan (dihapus dari aplikasi, Bagian 5.6) hanya ikut
+ * jika termasukArsip. Form bawaan selalu berjadwal harian.
+ */
+function bacaDaftarForm_(termasukArsip) {
+  var kunciMemo = termasukArsip ? 'formArsip' : 'form';
+  if (MEMO_FORM_[kunciMemo]) return MEMO_FORM_[kunciMemo].slice();
   var sheet = ambilTab_('M_Form');
   var kol = posisiKolom_(sheet, {
     id: 'ID Form', nama: 'Nama', jenis: 'Jenis', jadwal: 'Jadwal', urutan: 'Urutan', aktif: 'Aktif'
   });
+  var kKet = posisiKolomOpsional_(sheet, 'Keterangan');
+  var kHari = posisiKolomOpsional_(sheet, 'Hari');
+  var kArsip = posisiKolomOpsional_(sheet, 'Diarsipkan');
   var daftar = [];
   var lastRow = sheet.getLastRow();
   if (lastRow >= 2) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues().forEach(function (r, i) {
       var id = rapikanTeks_(r[kol.id - 1]).toUpperCase();
       if (!id) return;
-      var aktif = r[kol.aktif - 1];
+      var jenis = rapikanTeks_(r[kol.jenis - 1]).toLowerCase() === 'kustom' ? 'kustom' : 'bawaan';
+      var jadwal = rapikanTeks_(r[kol.jadwal - 1]).toLowerCase();
+      if (jenis === 'bawaan' || JADWAL_FORM.indexOf(jadwal) < 0) jadwal = 'harian';
+      var arsip = kArsip ? r[kArsip - 1] : '';
+      var diarsipkan = arsip instanceof Date ? arsip : (String(arsip == null ? '' : arsip).trim() ? new Date(0) : null);
+      if (diarsipkan && jenis !== 'kustom') diarsipkan = null; // form bawaan tidak bisa dihapus
+      if (diarsipkan && !termasukArsip) return;
       daftar.push({
         id: id,
         nama: rapikanTeks_(r[kol.nama - 1]) || id,
-        jenis: rapikanTeks_(r[kol.jenis - 1]).toLowerCase(),
-        jadwal: rapikanTeks_(r[kol.jadwal - 1]).toLowerCase(),
+        jenis: jenis,
+        keterangan: kKet ? rapikanTeks_(r[kKet - 1]) : '',
+        jadwal: jadwal,
+        hari: kHari ? bacaHari_(r[kHari - 1]) : [],
         urutan: Number(r[kol.urutan - 1]) || 999,
-        aktif: aktif === true || String(aktif).toUpperCase() === 'TRUE'
+        aktif: benar_(r[kol.aktif - 1]),
+        diarsipkan: diarsipkan,
+        baris: i + 2
       });
     });
   }
-  return daftar.sort(function (a, b) { return a.urutan - b.urutan; });
+  daftar.sort(function (a, b) { return a.urutan - b.urutan; });
+  MEMO_FORM_[kunciMemo] = daftar;
+  return daftar.slice();
+}
+
+/** Satu form menurut ID (termasuk yang diarsipkan), atau null. */
+function cariForm_(idForm, termasukArsip) {
+  var id = rapikanTeks_(idForm).toUpperCase();
+  return bacaDaftarForm_(termasukArsip).filter(function (f) { return f.id === id; })[0] || null;
+}
+
+/**
+ * Form ditagih (wajib) pada satu tanggal (Bagian 5.8): form yang tampil,
+ * bawaan, atau kustom yang jadwalnya mengena tanggal itu. Sewaktu-waktu
+ * tidak pernah ditagih.
+ */
+function wajibPada_(f, tanggal) {
+  if (!f.aktif || f.diarsipkan) return false;
+  if (f.jenis !== 'kustom') return true;
+  if (f.jadwal === 'sewaktu-waktu') return false;
+  if (f.jadwal === 'hari tertentu') return f.hari.indexOf(namaHari_(tanggal)) >= 0;
+  return true;
 }
 
 /**
  * Status tiap form yang tampil (Aktif) pada satu tanggal, menurut aturan
  * kelengkapan Bagian 5.8.
- * wajib  : punya ruas di rel kemajuan (form bawaan, atau form kustom harian).
+ * wajib  : punya ruas di rel kemajuan (form bawaan, atau form kustom yang
+ *          dijadwalkan pada tanggal itu; Tahap 9).
  * status : belum | sebagian (Suhu) | terkirim | nihil.
  */
 function kelengkapanForm_(tanggal) {
@@ -1087,11 +1171,13 @@ function kelengkapanForm_(tanggal) {
       id: f.id,
       nama: f.nama,
       jenis: f.jenis,
-      wajib: f.jenis === 'bawaan' || f.jadwal === 'harian'
+      jadwal: f.jadwal,
+      hari: f.hari,
+      wajib: wajibPada_(f, tanggal)
     };
     if (f.id === 'SUHU') return statusSuhu_(dasar, tanggal, zonaSheet);
 
-    var kiriman = bacaBarisTanggal_(TAB_DATA_FORM[f.id] || ('Data_K_' + f.id), tanggal, zonaSheet, []);
+    var kiriman = bacaBarisTanggal_(tabDataForm_(f.id), tanggal, zonaSheet, []);
     var tandaNihil = nihil.filter(function (n) {
       return rapikanTeks_(n['ID Form']).toUpperCase() === f.id;
     });
@@ -1878,7 +1964,7 @@ function aksiTandaiNihil_(body, pengguna) {
     var punyaForm = function (n) { return rapikanTeks_(n['ID Form']).toUpperCase() === idForm; };
     var ada = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(punyaForm);
     if (!adaSubmission_(tabel, konteks.sid) && !ada.length) {
-      if (bacaBarisTanggal_(TAB_DATA_FORM[idForm] || ('Data_K_' + idForm), tanggal, zona, []).length) {
+      if (bacaBarisTanggal_(tabDataForm_(idForm), tanggal, zona, []).length) {
         throw galatPengguna_(form.nama + ' sudah punya isian pada tanggal ini.');
       }
       tambahBarisTabel_(tabel, [gabung_({
@@ -4105,6 +4191,843 @@ function aksiUnduhPdfBelanja_(body, pengguna) {
 }
 
 /* =========================================================================
+ * Tahap 9: form kustom (spesifikasi sistem Bagian 5.6 dan 5.8, tampilan
+ * Bagian 5.3 dan 5.7). Definisi di M_Form dan M_FormKolom; data tiap form di
+ * tab Data_K_<ID Form> (kolom form di kiri, kolom sistem di kanan).
+ * ========================================================================= */
+
+var BATAS_FORM_KUSTOM = 10;
+var BATAS_KOLOM_FORM = 15;
+var JENIS_KOLOM = ['Teks', 'Angka', 'Pilihan', 'Ya/Tidak', 'Item', 'Jam'];
+var JADWAL_FORM = ['harian', 'hari tertentu', 'sewaktu-waktu'];
+var AWALAN_TAB_KUSTOM = 'Data_K_';
+var PANJANG_NAMA_FORM_MAKS = 40;
+var PANJANG_KETERANGAN_FORM_MAKS = 120;
+var PANJANG_LABEL_MAKS = 40;
+var PANJANG_PILIHAN_MAKS = 40;
+var JUMLAH_PILIHAN_MAKS = 20;
+var PANJANG_TEKS_ISIAN_MAKS = 200;
+var BARIS_KUSTOM_MAKS = 100;
+var PEMISAH_PILIHAN = ' | ';
+/** Kolom form yang selalu ada di tab Data_K_: tanggal, pengisi, dan nomor baris dalam satu kiriman. */
+var KOLOM_TETAP_KUSTOM = ['Tanggal', 'Nama Staff', 'No'];
+var URUTAN_KUSTOM = [['Tanggal', false], ['timestamp_server', true], ['No', true]];
+
+/* ---------- Membaca definisi (memo per permintaan) ---------- */
+
+var MEMO_FORM_ = {};
+
+function resetMemoForm_() {
+  MEMO_FORM_ = {};
+}
+
+function normalJenisKolom_(nilai) {
+  var t = rapikanTeks_(nilai).toLowerCase().replace(/\s+/g, '');
+  for (var i = 0; i < JENIS_KOLOM.length; i++) {
+    if (JENIS_KOLOM[i].toLowerCase().replace(/\s+/g, '') === t) return JENIS_KOLOM[i];
+  }
+  return 'Teks';
+}
+
+/** "Baik | Rusak" (atau satu pilihan per baris) → ['Baik', 'Rusak'], tanpa yang kosong atau ganda. */
+function pisahPilihan_(nilai) {
+  var daftar = Array.isArray(nilai) ? nilai : String(nilai == null ? '' : nilai).split(/\s*[|\n]\s*/);
+  var sudah = {};
+  var hasil = [];
+  daftar.forEach(function (p) {
+    var t = rapikanTeks_(p);
+    if (!t || sudah[t.toLowerCase()]) return;
+    sudah[t.toLowerCase()] = true;
+    hasil.push(t);
+  });
+  return hasil;
+}
+
+/**
+ * Semua kolom form di M_FormKolom: { ID_FORM: [{ id, urutan, label, jenis,
+ * pilihan, wajib, bagian, aktif }] }, kolom kepala lebih dulu, lalu menurut
+ * Urutan. Kolom yang Aktif-nya kosong sudah dihapus dari form (Bagian 5.6):
+ * tidak tampil di layar isi, tetapi isian lamanya tetap terbaca.
+ */
+function bacaSemuaKolomForm_() {
+  if (MEMO_FORM_.kolom) return MEMO_FORM_.kolom;
+  var t = bacaTabel_('M_FormKolom');
+  var hasil = {};
+  if (t) {
+    t.baris.forEach(function (b, i) {
+      var idForm = rapikanTeks_(nilai_(t, b, 'ID Form')).toUpperCase();
+      var label = rapikanTeks_(nilai_(t, b, 'Label'));
+      if (!idForm || !label) return;
+      var jenis = normalJenisKolom_(nilai_(t, b, 'Jenis Kolom'));
+      var daftar = hasil[idForm] = hasil[idForm] || [];
+      daftar.push({
+        id: rapikanTeks_(nilai_(t, b, 'ID Kolom')).toUpperCase() || ('L' + (i + 2)),
+        urutan: Number(nilai_(t, b, 'Urutan')) || 999,
+        label: label,
+        jenis: jenis,
+        pilihan: jenis === 'Pilihan' ? pisahPilihan_(nilai_(t, b, 'Pilihan')) : (jenis === 'Ya/Tidak' ? ['Ya', 'Tidak'] : []),
+        wajib: benar_(nilai_(t, b, 'Wajib')),
+        bagian: rapikanTeks_(nilai_(t, b, 'Bagian')).toLowerCase() === 'kepala' ? 'kepala' : 'baris',
+        aktif: benar_(nilai_(t, b, 'Aktif')),
+        nomor: i + 2
+      });
+    });
+  }
+  Object.keys(hasil).forEach(function (k) {
+    hasil[k].sort(function (a, b) {
+      return (a.bagian === 'kepala' ? 0 : 1) - (b.bagian === 'kepala' ? 0 : 1) || a.urutan - b.urutan || a.nomor - b.nomor;
+    });
+  });
+  MEMO_FORM_.kolom = hasil;
+  return hasil;
+}
+
+/** Kolom satu form (aktif dan yang sudah dihapus). */
+function kolomForm_(idForm) {
+  return bacaSemuaKolomForm_()[rapikanTeks_(idForm).toUpperCase()] || [];
+}
+
+/** Kolom untuk layar isi dan Pengaturan: { id, bagian, label, jenis, pilihan, wajib, aktif }. */
+function infoKolomForm_(c) {
+  return { id: c.id, bagian: c.bagian, label: c.label, jenis: c.jenis, pilihan: c.pilihan, wajib: c.wajib, aktif: c.aktif };
+}
+
+/** Definisi form untuk aplikasi. semuaKolom: kolom yang sudah dihapus ikut (Pengaturan). */
+function definisiForm_(f, semuaKolom) {
+  return {
+    id: f.id, nama: f.nama, jenis: f.jenis, keterangan: f.keterangan, jadwal: f.jadwal, hari: f.hari, aktif: f.aktif,
+    kolom: f.jenis === 'kustom' ? kolomForm_(f.id).filter(function (c) { return semuaKolom || c.aktif; }).map(infoKolomForm_) : []
+  };
+}
+
+/** Form kustom sudah punya isian (kiriman) di tab datanya. */
+function adaIsianForm_(idForm) {
+  var t = bacaTabel_(tabDataForm_(idForm));
+  if (!t || t.kol.submission_id === undefined) return false;
+  return t.baris.some(function (b) { return String(b[t.kol.submission_id] || '') !== ''; });
+}
+
+/** Kolom yang dibutuhkan form kustom sudah dipasang setupSpreadsheet (Tahap 9). */
+function kolomFormSiap_() {
+  return !!(posisiKolomOpsional_(ambilTab_('M_Form'), 'Hari') && posisiKolomOpsional_(ambilTab_('M_Form'), 'Diarsipkan') &&
+    posisiKolomOpsional_(ambilTab_('M_FormKolom'), 'ID Kolom'));
+}
+
+function wajibKolomFormSiap_() {
+  if (!kolomFormSiap_()) {
+    throw galatPengguna_('Kolom form kustom belum dipasang di spreadsheet. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet ' +
+      'di editor Apps Script, lalu coba lagi.');
+  }
+}
+
+/** Kolom yang terkunci di form bawaan (hanya untuk ditampilkan di Pengaturan → Form). */
+function labelKolomBawaan_(idForm) {
+  var def = RIWAYAT_FORM[idForm];
+  if (!def) return [];
+  return (def.kepala || []).map(function (k) { return k.label; }).concat(def.kolom.map(function (k) { return k.label; }));
+}
+
+/* ---------- Tab Data_K_<ID Form> ---------- */
+
+function defKolomTabKustom_(c) {
+  return k_(c.label, c.jenis === 'Angka' ? 'angka' : 'teks');
+}
+
+/** Kolom form tab Data_K_: Tanggal, Nama Staff, kolom kepala, No, kolom baris (termasuk yang sudah dihapus). */
+function kolomTabKustom_(kolom) {
+  return [k_('Tanggal', 'tanggal'), k_('Nama Staff')]
+    .concat(kolom.filter(function (c) { return c.bagian === 'kepala'; }).map(defKolomTabKustom_))
+    .concat([k_('No', 'bulat')])
+    .concat(kolom.filter(function (c) { return c.bagian === 'baris'; }).map(defKolomTabKustom_));
+}
+
+/** Indeks (dari 0) untuk tab Data baru: tepat sesudah tab Data terakhir. */
+function indeksTabDataBaru_(ss) {
+  var indeks = 0;
+  ss.getSheets().forEach(function (sheet, i) {
+    var nama = sheet.getName();
+    if (nama === 'Stock_Harian' || nama.indexOf('Data_') === 0) indeks = i + 1;
+  });
+  return indeks;
+}
+
+/** Tanda arsip di tab data form yang dihapus dari aplikasi: warna tab Garis dan catatan di A1. */
+function tandaArsipTab_(sheet, f) {
+  var sel = sheet.getRange(1, 1);
+  if (f.diarsipkan) {
+    sheet.setTabColor(WARNA.garis);
+    sel.setNote('ARSIP: form ' + f.nama + ' dihapus dari aplikasi ' + Utilities.formatDate(f.diarsipkan, zonaWaktu_(), 'yyyy-MM-dd HH:mm') +
+      '. Isian lama tetap di tab ini. Pengelola bisa memulihkannya dari Pengaturan → Form.');
+  } else {
+    sel.setNote('');
+  }
+}
+
+/**
+ * Membuat atau melengkapi tab Data_K_<ID Form> (Bagian 5.6): kolom form di
+ * kiri, kolom sistem di kanan. Label yang diganti ditulis ulang di baris
+ * judul (opsi.ganti: { idKolom: labelLama }); kolom baru disisipkan tepat
+ * sebelum kolom sistem, sehingga isian lama kosong di kolom itu. Kolom yang
+ * dihapus dari form tetap ada di tab. Dipakai aplikasi (simpan form) dan
+ * setupSpreadsheet.
+ */
+function siapkanTabKustom_(ss, f, kolom, opsi) {
+  opsi = opsi || {};
+  var catatan = opsi.catatan || [];
+  var namaTab = tabDataForm_(f.id);
+  var sheet = ss.getSheetByName(namaTab);
+  if (!sheet) {
+    sheet = ss.insertSheet(namaTab, indeksTabDataBaru_(ss));
+    catatan.push('Tab dibuat: ' + namaTab);
+  }
+  var form = kolomTabKustom_(kolom);
+  var lebar = sheet.getLastColumn();
+  if (lebar > 0) {
+    var judul = sheet.getRange(1, 1, 1, lebar).getValues()[0].map(function (j) { return String(j).trim(); });
+    // Label yang diganti: posisi dicari dulu semuanya, baru ditulis (dua label boleh bertukar).
+    var tulis = [];
+    Object.keys(opsi.ganti || {}).forEach(function (id) {
+      var c = kolom.filter(function (x) { return x.id === id; })[0];
+      var i = judul.indexOf(opsi.ganti[id]);
+      if (c && i >= 0) tulis.push([i + 1, c.label]);
+    });
+    tulis.forEach(function (x) { sheet.getRange(1, x[0]).setValue(x[1]); });
+    if (tulis.length) {
+      judul = sheet.getRange(1, 1, 1, lebar).getValues()[0].map(function (j) { return String(j).trim(); });
+    }
+    var awalSistem = judul.indexOf(KOLOM_SISTEM[0].nama) + 1;
+    form.forEach(function (k) {
+      if (judul.indexOf(k.nama) >= 0) return;
+      if (awalSistem > 0) {
+        sheet.insertColumnBefore(awalSistem);
+        sheet.getRange(1, awalSistem).setValue(k.nama);
+        judul.splice(awalSistem - 1, 0, k.nama);
+        awalSistem++;
+      } else {
+        pastikanJumlahKolom_(sheet, judul.length + 1);
+        sheet.getRange(1, judul.length + 1).setValue(k.nama);
+        judul.push(k.nama);
+      }
+      catatan.push('Kolom ditambahkan di ' + namaTab + ': ' + k.nama);
+    });
+  }
+  siapkanTabTabel_(ss, sheet, { kolom: form }, {
+    sistem: KOLOM_SISTEM,
+    warnaTab: f.diarsipkan ? WARNA.garis : WARNA_TAB.data,
+    proteksi: 'keras',
+    pitaTanggal: true,
+    catatan: catatan
+  });
+  tandaArsipTab_(sheet, f);
+  return sheet;
+}
+
+/** Label kolom yang diganti ikut diganti di Log_Perubahan tab itu, supaya jejak koreksinya tetap terbaca di Riwayat. */
+function gantiLabelLog_(namaTab, peta) {
+  var t = bacaTabel_(TAB_LOG.nama);
+  if (!t || t.kol.Kolom === undefined || t.kol.Tab === undefined || !t.baris.length) return;
+  var berubah = false;
+  var kolom = t.baris.map(function (b) {
+    var v = b[t.kol.Kolom];
+    if (rapikanTeks_(b[t.kol.Tab]) === namaTab && Object.prototype.hasOwnProperty.call(peta, rapikanTeks_(v))) {
+      berubah = true;
+      return [peta[rapikanTeks_(v)]];
+    }
+    return [v];
+  });
+  if (berubah) t.sheet.getRange(2, t.kol.Kolom + 1, kolom.length, 1).setValues(kolom);
+}
+
+/* ---------- Pengaturan → Form (khusus Pengelola) ---------- */
+
+function ringkasFormPengaturan_(f) {
+  return {
+    id: f.id, nama: f.nama, jenis: f.jenis, keterangan: f.keterangan, jadwal: f.jadwal, hari: f.hari, aktif: f.aktif,
+    urutan: f.urutan,
+    jumlahKolom: f.jenis === 'kustom' ? kolomForm_(f.id).filter(function (c) { return c.aktif; }).length : null,
+    diarsipkan: f.diarsipkan ? f.diarsipkan.toISOString() : null
+  };
+}
+
+/** Daftar Pengaturan → Form: semua form dalam urutan Beranda, dan form kustom yang dihapus (diarsipkan). */
+function dataPengaturanForm_() {
+  resetMemoForm_();
+  var semua = bacaDaftarForm_(true);
+  var tampil = semua.filter(function (f) { return !f.diarsipkan; });
+  return {
+    form: tampil.map(ringkasFormPengaturan_),
+    arsip: semua.filter(function (f) { return f.diarsipkan; }).map(ringkasFormPengaturan_),
+    jumlahKustom: tampil.filter(function (f) { return f.jenis === 'kustom'; }).length,
+    batasForm: BATAS_FORM_KUSTOM,
+    batasKolom: BATAS_KOLOM_FORM,
+    siap: kolomFormSiap_()
+  };
+}
+
+function aksiDaftarForm_() {
+  return dataPengaturanForm_();
+}
+
+/** Item aktif untuk kolom Item: [{ nama, kategori, satuan }], urut nama. */
+function itemAktifRingkas_() {
+  var master = bacaItem_();
+  return Object.keys(master).map(function (k) { return master[k]; }).filter(function (m) { return m.aktif; })
+    .map(function (m) { return { nama: m.nama, kategori: m.kategori, satuan: m.satuan }; })
+    .sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+}
+
+/**
+ * Layar susun form: definisi lengkap (termasuk kolom yang sudah dihapus),
+ * apakah form sudah punya isian (jenis kolom terkunci), kolom terkunci form
+ * bawaan, dan daftar item untuk pratinjau. formId kosong = form baru.
+ */
+function aksiDetailForm_(body) {
+  var f = null;
+  if (rapikanTeks_(body.formId)) {
+    f = cariForm_(body.formId);
+    if (!f) throw galatPengguna_('Form tidak ditemukan. Kembali ke daftar form.');
+  }
+  var daftar = bacaDaftarForm_();
+  return {
+    form: f ? definisiForm_(f, true) : null,
+    adaIsian: f && f.jenis === 'kustom' ? adaIsianForm_(f.id) : false,
+    kolomBawaan: f && f.jenis === 'bawaan' ? labelKolomBawaan_(f.id) : [],
+    item: itemAktifRingkas_(),
+    jumlahKustom: daftar.filter(function (x) { return x.jenis === 'kustom'; }).length,
+    batasForm: BATAS_FORM_KUSTOM,
+    batasKolom: BATAS_KOLOM_FORM,
+    siap: kolomFormSiap_()
+  };
+}
+
+/** ID form kustom dari namanya saat dibuat ("Checklist kebersihan" → CHECKLIST_KEBERSIHAN); tidak berubah lagi. */
+function buatIdForm_(nama, semua) {
+  var dasar = String(nama).toUpperCase();
+  try {
+    dasar = dasar.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  } catch (err) {
+    /* tanpa normalize: huruf beraksen dibuang di bawah */
+  }
+  dasar = dasar.replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 20).replace(/_+$/, '');
+  if (!dasar || /^\d/.test(dasar)) dasar = ('FORM_' + dasar).slice(0, 20).replace(/_+$/, '');
+  var dipakai = {};
+  semua.forEach(function (f) { dipakai[f.id] = true; });
+  Object.keys(TAB_DATA_FORM).forEach(function (k) { dipakai[k] = true; });
+  var id = dasar;
+  var n = 2;
+  while (dipakai[id] || ss_().getSheetByName(tabDataForm_(id))) {
+    id = dasar.slice(0, 17) + '_' + n;
+    n++;
+  }
+  return id;
+}
+
+function periksaPilihanKolom_(nilai, label) {
+  var daftar = pisahPilihan_(nilai);
+  if (daftar.length < 2) throw galatPengguna_('Kolom ' + label + ' butuh minimal dua pilihan.');
+  if (daftar.length > JUMLAH_PILIHAN_MAKS) throw galatPengguna_('Kolom ' + label + ' paling banyak ' + JUMLAH_PILIHAN_MAKS + ' pilihan.');
+  daftar.forEach(function (p) {
+    if (p.length > PANJANG_PILIHAN_MAKS) throw galatPengguna_('Pilihan "' + p.slice(0, 20) + '…" terlalu panjang. Paling panjang ' + PANJANG_PILIHAN_MAKS + ' huruf.');
+    if (/^[=+\-@]/.test(p)) throw galatPengguna_('Pilihan tidak boleh diawali tanda =, +, -, atau @.');
+  });
+  return daftar;
+}
+
+/**
+ * Memeriksa susunan kolom yang dikirim layar susun form (aturan perubahan
+ * Bagian 5.6). Kolom lama yang tidak dikirim lagi disembunyikan (Aktif
+ * kosong), datanya tetap ada. Jenis kolom tidak bisa diganti setelah form
+ * punya isian. Mengembalikan { semua: [kolom aktif..., kolom dihapus...],
+ * ganti: { idKolom: labelLama } }.
+ */
+function periksaKolomForm_(masukan, lama, adaIsian) {
+  masukan = Array.isArray(masukan) ? masukan : [];
+  if (masukan.length > BATAS_KOLOM_FORM) {
+    throw galatPengguna_('Paling banyak ' + BATAS_KOLOM_FORM + ' kolom per form. Hapus kolom yang tidak dipakai.');
+  }
+  var petaLama = {};
+  var nomorTerbesar = 0;
+  lama.forEach(function (c) {
+    petaLama[c.id] = c;
+    var m = /^K(\d+)$/.exec(c.id);
+    if (m) nomorTerbesar = Math.max(nomorTerbesar, Number(m[1]));
+  });
+  var terlarang = KOLOM_TETAP_KUSTOM.concat(KOLOM_SISTEM.map(function (k) { return k.nama; })).map(function (x) { return x.toLowerCase(); });
+  var dipakai = {};
+  var sudahId = {};
+  var ganti = {};
+  var hasil = masukan.map(function (m) {
+    m = m && typeof m === 'object' ? m : {};
+    var bagian = m.bagian === 'kepala' ? 'kepala' : 'baris';
+    var label = periksaNama_(m.label, 'Label kolom', PANJANG_LABEL_MAKS);
+    var kecil = label.toLowerCase();
+    if (terlarang.indexOf(kecil) >= 0) throw galatPengguna_('Label ' + label + ' sudah dipakai sistem. Pakai label lain.');
+    if (dipakai[kecil]) throw galatPengguna_('Ada dua kolom berlabel ' + label + '. Pakai label yang berbeda.');
+    dipakai[kecil] = true;
+    var jenis = JENIS_KOLOM.indexOf(m.jenis) >= 0 ? m.jenis : '';
+    if (!jenis) throw galatPengguna_('Pilih jenis kolom ' + label + '.');
+    var id = rapikanTeks_(m.id).toUpperCase();
+    var c = id && petaLama[id] && !sudahId[id] ? petaLama[id] : null;
+    if (c) {
+      sudahId[id] = true;
+      if (c.bagian !== bagian) throw galatPengguna_('Kolom ' + c.label + ' tidak bisa dipindah antara kolom kepala dan kolom baris.');
+      if (adaIsian && c.jenis !== jenis) {
+        throw galatPengguna_('Jenis kolom ' + c.label + ' tidak bisa diganti karena form ini sudah punya isian. Hapus kolomnya, lalu buat kolom baru.');
+      }
+      if (c.label !== label) ganti[c.id] = c.label;
+    } else {
+      nomorTerbesar++;
+      id = 'K' + nomorTerbesar;
+    }
+    return {
+      id: id, bagian: bagian, label: label, jenis: jenis,
+      pilihan: jenis === 'Pilihan' ? periksaPilihanKolom_(m.pilihan, label) : (jenis === 'Ya/Tidak' ? ['Ya', 'Tidak'] : []),
+      wajib: m.wajib === true, aktif: true
+    };
+  });
+  if (!hasil.some(function (c) { return c.bagian === 'baris'; })) throw galatPengguna_('Tambah minimal satu kolom baris.');
+  lama.forEach(function (c) {
+    if (sudahId[c.id]) return;
+    if (dipakai[c.label.toLowerCase()]) {
+      throw galatPengguna_('Label ' + c.label + ' masih dipakai kolom yang sudah dihapus dari form ini. Pakai label lain.');
+    }
+    hasil.push({ id: c.id, bagian: c.bagian, label: c.label, jenis: c.jenis, pilihan: c.pilihan, wajib: c.wajib, aktif: false });
+  });
+  return { semua: hasil, ganti: ganti };
+}
+
+/** Menulis ulang baris M_FormKolom satu form (baris form lain tetap, urutannya tidak berubah). */
+function tulisKolomForm_(idForm, kolom) {
+  var t = wajibTabel_('M_FormKolom');
+  var lebar = t.judul.length;
+  var tetap = t.baris.filter(function (b) {
+    return kunciTerisi_(nilai_(t, b, 'ID Form')) && rapikanTeks_(nilai_(t, b, 'ID Form')).toUpperCase() !== idForm;
+  });
+  var urut = kolom.filter(function (c) { return c.aktif && c.bagian === 'kepala'; })
+    .concat(kolom.filter(function (c) { return c.aktif && c.bagian === 'baris'; }))
+    .concat(kolom.filter(function (c) { return !c.aktif; }));
+  urut.forEach(function (c, i) {
+    tetap.push(susunBaris_(t, {
+      'ID Form': idForm,
+      'Urutan': i + 1,
+      'Label': c.label,
+      'Jenis Kolom': c.jenis,
+      'Pilihan': c.jenis === 'Pilihan' ? c.pilihan.join(PEMISAH_PILIHAN) : '',
+      'Wajib': !!c.wajib,
+      'Bagian': c.bagian,
+      'Aktif': !!c.aktif,
+      'ID Kolom': c.id
+    }));
+  });
+  var sheet = t.sheet;
+  var perlu = tetap.length + 1;
+  if (sheet.getMaxRows() < perlu) sheet.insertRowsAfter(sheet.getMaxRows(), perlu - sheet.getMaxRows());
+  if (tetap.length) sheet.getRange(2, 1, tetap.length, lebar).setValues(tetap);
+  if (t.baris.length > tetap.length) sheet.getRange(tetap.length + 2, 1, t.baris.length - tetap.length, lebar).clearContent();
+  resetMemoForm_();
+}
+
+/**
+ * Simpan form (Pengaturan → Form). body: { baru, formId, nama, tampil,
+ * keterangan, jadwal, hari: [nama hari], kolom: [{ id, bagian, label, jenis,
+ * pilihan, wajib }] }. Form bawaan hanya bisa diganti nama dan
+ * ditampilkan/disembunyikan; kolomnya terkunci. Form kustom baru mendapat ID
+ * dari namanya dan tab Data_K_<ID> dibuat saat itu juga.
+ */
+function aksiSimpanForm_(body) {
+  var baru = body.baru === true;
+  var nama = periksaNama_(body.nama, 'Nama form', PANJANG_NAMA_FORM_MAKS);
+  var tampil = body.tampil !== false;
+  return denganKunci_(function () {
+    resetMemoForm_();
+    var semua = bacaDaftarForm_(true);
+    var idMinta = rapikanTeks_(body.formId).toUpperCase();
+    var f = baru ? null : semua.filter(function (x) { return x.id === idMinta && !x.diarsipkan; })[0];
+    if (!baru && !f) throw galatPengguna_('Form tidak ditemukan. Kembali ke daftar form.');
+    semua.forEach(function (x) {
+      if (x === f || !samaNama_(x.nama, nama)) return;
+      throw galatPengguna_(x.diarsipkan
+        ? 'Nama ' + nama + ' dipakai form yang sudah dihapus. Pulihkan form itu dari daftar form, atau pakai nama lain.'
+        : 'Sudah ada form bernama ' + x.nama + '. Pakai nama lain.');
+    });
+    var t = wajibTabel_('M_Form');
+    if (f && f.jenis === 'bawaan') {
+      tulisBarisMaster_(t, f.baris, { 'Nama': nama, 'Aktif': tampil });
+      var dB = dataPengaturanForm_();
+      dB.disimpan = { id: f.id, nama: nama, tampil: tampil };
+      return dB;
+    }
+    wajibKolomFormSiap_();
+    if (baru && semua.filter(function (x) { return x.jenis === 'kustom' && !x.diarsipkan; }).length >= BATAS_FORM_KUSTOM) {
+      throw galatPengguna_('Paling banyak ' + BATAS_FORM_KUSTOM + ' form kustom. Hapus form yang tidak dipakai lagi dulu.');
+    }
+    var keterangan = rapikanTeks_(body.keterangan);
+    if (keterangan.length > PANJANG_KETERANGAN_FORM_MAKS) {
+      throw galatPengguna_('Keterangan paling panjang ' + PANJANG_KETERANGAN_FORM_MAKS + ' huruf.');
+    }
+    var jadwal = String(body.jadwal || '');
+    if (JADWAL_FORM.indexOf(jadwal) < 0) throw galatPengguna_('Pilih jadwal form: Setiap hari, Hari tertentu, atau Sewaktu-waktu.');
+    var hari = jadwal === 'hari tertentu' ? bacaHari_((Array.isArray(body.hari) ? body.hari : []).join(',')) : [];
+    if (jadwal === 'hari tertentu' && !hari.length) throw galatPengguna_('Pilih minimal satu hari untuk jadwal Hari tertentu.');
+    var lama = f ? kolomForm_(f.id) : [];
+    var adaIsian = f ? adaIsianForm_(f.id) : false;
+    var kolom = periksaKolomForm_(body.kolom, lama, adaIsian);
+    var id = f ? f.id : buatIdForm_(nama, semua);
+    if (f) {
+      tulisBarisMaster_(t, f.baris, {
+        'Nama': nama, 'Keterangan': teksAman_(keterangan), 'Jadwal': jadwal, 'Aktif': tampil, 'Hari': hari.join(', ')
+      });
+    } else {
+      var urutan = 0;
+      semua.forEach(function (x) { if (x.urutan < 999) urutan = Math.max(urutan, x.urutan); });
+      tambahBarisMaster_('M_Form', {
+        'ID Form': id, 'Nama': nama, 'Jenis': 'kustom', 'Keterangan': teksAman_(keterangan), 'Jadwal': jadwal,
+        'Urutan': urutan + 1, 'Aktif': tampil, 'Hari': hari.join(', '), 'Diarsipkan': ''
+      });
+    }
+    tulisKolomForm_(id, kolom.semua);
+    resetMemoForm_();
+    siapkanTabKustom_(ss_(), cariForm_(id, true), kolomForm_(id), { ganti: kolom.ganti });
+    var petaLog = {};
+    Object.keys(kolom.ganti).forEach(function (idKolom) {
+      var c = kolom.semua.filter(function (x) { return x.id === idKolom; })[0];
+      if (c) petaLog[kolom.ganti[idKolom]] = c.label;
+    });
+    if (Object.keys(petaLog).length) gantiLabelLog_(tabDataForm_(id), petaLog);
+    var d = dataPengaturanForm_();
+    d.disimpan = { id: id, nama: nama, tampil: tampil };
+    return d;
+  });
+}
+
+/** Sakelar tampil/sembunyi di daftar form (bawaan maupun kustom). */
+function aksiAturFormTampil_(body) {
+  var tampil = body.tampil === true;
+  return denganKunci_(function () {
+    var f = cariForm_(body.formId);
+    if (!f) throw galatPengguna_('Form tidak ditemukan. Muat ulang daftar form.');
+    tulisBarisMaster_(wajibTabel_('M_Form'), f.baris, { 'Aktif': tampil });
+    return dataPengaturanForm_();
+  });
+}
+
+/** Urutan form di Beranda: urutan berisi semua ID form yang belum dihapus. */
+function aksiUrutForm_(body) {
+  var urutan = (Array.isArray(body.urutan) ? body.urutan : []).map(function (x) { return rapikanTeks_(x).toUpperCase(); });
+  return denganKunci_(function () {
+    resetMemoForm_();
+    var daftar = bacaDaftarForm_();
+    var ada = {};
+    daftar.forEach(function (f) { ada[f.id] = f; });
+    var unik = {};
+    urutan.forEach(function (id) { unik[id] = true; });
+    if (urutan.length !== daftar.length || Object.keys(unik).length !== daftar.length || urutan.some(function (id) { return !ada[id]; })) {
+      throw galatPengguna_('Daftar form berubah. Muat ulang layar ini, lalu atur urutannya lagi.');
+    }
+    var t = wajibTabel_('M_Form');
+    urutan.forEach(function (id, i) {
+      if (ada[id].urutan !== i + 1) tulisBarisMaster_(t, ada[id].baris, { 'Urutan': i + 1 });
+    });
+    return dataPengaturanForm_();
+  });
+}
+
+/**
+ * Hapus form kustom = arsipkan (Bagian 5.6): form hilang dari aplikasi; tab
+ * datanya tetap ada dengan tanda arsip dan bisa dipulihkan Pengelola.
+ */
+function aksiArsipkanForm_(body) {
+  return denganKunci_(function () {
+    wajibKolomFormSiap_();
+    var f = cariForm_(body.formId);
+    if (!f) throw galatPengguna_('Form tidak ditemukan. Muat ulang daftar form.');
+    if (f.jenis !== 'kustom') throw galatPengguna_('Form bawaan tidak bisa dihapus, hanya bisa disembunyikan.');
+    var kini = new Date();
+    tulisBarisMaster_(wajibTabel_('M_Form'), f.baris, { 'Diarsipkan': kini });
+    var sheet = ss_().getSheetByName(tabDataForm_(f.id));
+    if (sheet) {
+      f.diarsipkan = kini;
+      sheet.setTabColor(WARNA.garis);
+      tandaArsipTab_(sheet, f);
+    }
+    return dataPengaturanForm_();
+  });
+}
+
+/** Memulihkan form kustom yang diarsipkan: tampil lagi di urutan terakhir, dengan keadaan tampil seperti sebelum dihapus. */
+function aksiPulihkanForm_(body) {
+  return denganKunci_(function () {
+    wajibKolomFormSiap_();
+    resetMemoForm_();
+    var semua = bacaDaftarForm_(true);
+    var id = rapikanTeks_(body.formId).toUpperCase();
+    var f = semua.filter(function (x) { return x.id === id && x.diarsipkan; })[0];
+    if (!f) throw galatPengguna_('Form tidak ditemukan di daftar form yang dihapus. Muat ulang layar ini.');
+    var aktif = semua.filter(function (x) { return !x.diarsipkan; });
+    if (aktif.filter(function (x) { return x.jenis === 'kustom'; }).length >= BATAS_FORM_KUSTOM) {
+      throw galatPengguna_('Sudah ada ' + BATAS_FORM_KUSTOM + ' form kustom. Hapus satu form dulu untuk memulihkan form ini.');
+    }
+    aktif.forEach(function (x) {
+      if (samaNama_(x.nama, f.nama)) throw galatPengguna_('Sudah ada form bernama ' + x.nama + '. Ganti nama form itu dulu.');
+    });
+    var urutan = 0;
+    aktif.forEach(function (x) { if (x.urutan < 999) urutan = Math.max(urutan, x.urutan); });
+    tulisBarisMaster_(wajibTabel_('M_Form'), f.baris, { 'Diarsipkan': '', 'Urutan': urutan + 1 });
+    f.diarsipkan = null;
+    siapkanTabKustom_(ss_(), f, kolomForm_(f.id), {});
+    return dataPengaturanForm_();
+  });
+}
+
+/* ---------- Layar isi form kustom (semua role) ---------- */
+
+/**
+ * Nilai satu kolom form kustom untuk ditulis ke Sheet; '' jika kosong.
+ * Angka: 0 atau lebih (butir 35). Pilihan dan Ya/Tidak: salah satu
+ * pilihannya. Item: nama di M_Item. Jam: "07:30".
+ */
+function nilaiKolomKustom_(c, mentah, label, master) {
+  if (mentah == null) return '';
+  if (c.jenis === 'Angka') {
+    if (String(mentah).trim() === '') return '';
+    return angkaIsian_(mentah, label);
+  }
+  var t = rapikanTeks_(mentah);
+  if (!t) return '';
+  if (c.jenis === 'Pilihan' || c.jenis === 'Ya/Tidak') {
+    var p = c.pilihan.filter(function (x) { return x.toLowerCase() === t.toLowerCase(); })[0];
+    if (!p) throw galatPengguna_('Pilih ' + label + ' dari pilihannya.');
+    return p;
+  }
+  if (c.jenis === 'Item') {
+    var m = (master || bacaItem_())[t.toLowerCase()];
+    if (!m) throw galatPengguna_('Item ' + t + ' di kolom ' + label + ' tidak ada di daftar item. Muat ulang form.');
+    return m.nama;
+  }
+  if (c.jenis === 'Jam') {
+    var j = /^(\d{1,2})[:.](\d{2})$/.exec(t);
+    if (!j || Number(j[1]) > 23 || Number(j[2]) > 59) throw galatPengguna_(label + ' diisi jam, misalnya 07:30.');
+    return ('0' + Number(j[1])).slice(-2) + ':' + j[2];
+  }
+  return t.slice(0, PANJANG_TEKS_ISIAN_MAKS);
+}
+
+/** Nilai yang tersimpan di Sheet, dalam bentuk yang sama dengan nilaiKolomKustom_. */
+function nilaiTersimpanKustom_(c, v) {
+  if (v === '' || v == null) return '';
+  if (c.jenis === 'Angka') return isFinite(Number(v)) ? Number(v) : rapikanTeks_(v);
+  if (c.jenis === 'Jam' && v instanceof Date) return Utilities.formatDate(v, ss_().getSpreadsheetTimeZone(), 'HH:mm');
+  return rapikanTeks_(v);
+}
+
+function kataIsi_(c) {
+  return c.jenis === 'Pilihan' || c.jenis === 'Ya/Tidak' || c.jenis === 'Item' ? 'Pilih ' : 'Isi ';
+}
+
+/**
+ * Data layar isi form kustom: definisi (kolom aktif), item untuk kolom Item,
+ * kiriman dan tanda nihil pada tanggal itu. Disimpan di HP supaya form bisa
+ * dibuka tanpa sinyal.
+ */
+function dataFormKustom_(f, tanggal) {
+  var zona = ss_().getSpreadsheetTimeZone();
+  var def = definisiForm_(f, false);
+  var kiriman = bacaBarisTanggal_(tabDataForm_(f.id), tanggal, zona, ['submission_id']);
+  var sid = {};
+  kiriman.forEach(function (b) { if (b.submission_id) sid[b.submission_id] = true; });
+  var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(function (n) {
+    return rapikanTeks_(n['ID Form']).toUpperCase() === f.id;
+  });
+  return {
+    formId: f.id,
+    tanggal: tanggal,
+    form: def,
+    item: def.kolom.some(function (c) { return c.jenis === 'Item'; }) ? itemAktifRingkas_() : [],
+    kiriman: { jumlah: Object.keys(sid).length, baris: kiriman.length, terakhir: barisTerakhir_(kiriman) },
+    nihil: nihil.length ? barisTerakhir_(nihil) : null,
+    wajib: wajibPada_(f, tanggal)
+  };
+}
+
+function aksiFormKustom_(body) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  var f = cariForm_(body.formId);
+  if (!f || f.jenis !== 'kustom') throw galatPengguna_('Form ini tidak ditemukan. Mungkin sudah dihapus Pengelola.');
+  if (!f.aktif) throw galatPengguna_('Form ini sedang disembunyikan. Pengelola bisa menampilkannya lagi dari Pengaturan → Form.');
+  return dataFormKustom_(f, body.tanggal);
+}
+
+/**
+ * Kiriman form kustom: satu baris Data_K_<ID> per baris isian, kolom kepala
+ * diulang di tiap baris (Bagian 5.0). body: { formId, submissionId, tanggal,
+ * waktuPerangkat, kepala: { idKolom: nilai }, baris: [{ idKolom: nilai }] }.
+ * Baris yang semua kolomnya kosong dilewati. Kolom wajib diperiksa menurut
+ * definisi saat server menerima kiriman; nilai kolom yang sudah dihapus tetap
+ * ditulis (isian dari antrean tidak hilang).
+ */
+function aksiKirimKustom_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  resetMemoForm_();
+  var f = cariForm_(body.formId, true);
+  if (!f || f.jenis !== 'kustom') throw galatPengguna_('Form ini sudah tidak ada. Hapus isian ini dari HP.');
+  var kolom = kolomForm_(f.id);
+  var master = kolom.some(function (c) { return c.jenis === 'Item'; }) ? bacaItem_() : null;
+  var isiKepala = body.kepala && typeof body.kepala === 'object' ? body.kepala : {};
+  var masukan = Array.isArray(body.baris) ? body.baris : [];
+  if (masukan.length > BARIS_KUSTOM_MAKS) throw galatPengguna_('Paling banyak ' + BARIS_KUSTOM_MAKS + ' baris untuk satu kiriman.');
+
+  var kepala = {};
+  kolom.filter(function (c) { return c.bagian === 'kepala'; }).forEach(function (c) {
+    var v = nilaiKolomKustom_(c, isiKepala[c.id], c.label, master);
+    if (v === '' && c.aktif && c.wajib) throw galatPengguna_(kataIsi_(c) + c.label + '.');
+    if (v !== '') kepala[c.label] = typeof v === 'string' ? teksAman_(v) : v;
+  });
+  var kolomBaris = kolom.filter(function (c) { return c.bagian === 'baris'; });
+  var baris = [];
+  masukan.forEach(function (m, i) {
+    m = m && typeof m === 'object' ? m : {};
+    var isi = {};
+    var ada = false;
+    kolomBaris.forEach(function (c) {
+      var v = nilaiKolomKustom_(c, m[c.id], c.label + ' di baris ' + (i + 1), master);
+      if (v !== '') {
+        ada = true;
+        isi[c.label] = typeof v === 'string' ? teksAman_(v) : v;
+      }
+    });
+    if (!ada) return;
+    kolomBaris.forEach(function (c) {
+      if (c.aktif && c.wajib && !Object.prototype.hasOwnProperty.call(isi, c.label)) {
+        throw galatPengguna_(kataIsi_(c) + c.label + ' di baris ' + (i + 1) + '.');
+      }
+    });
+    baris.push(isi);
+  });
+  if (!baris.length) throw galatPengguna_('Isi minimal satu baris.');
+
+  return denganKunci_(function () {
+    var namaTab = tabDataForm_(f.id);
+    var tabel = bacaTabel_(namaTab);
+    var perlu = kolomTabKustom_(kolom).map(function (k) { return k.nama; });
+    if (!tabel || perlu.some(function (j) { return tabel.kol[j] === undefined; })) {
+      siapkanTabKustom_(ss_(), f, kolom, {});
+      tabel = wajibTabel_(namaTab);
+    }
+    if (adaSubmission_(tabel, konteks.sid)) {
+      return { sudahTerkirim: true, jumlah: 0, form: dataFormKustom_(f, tanggal) };
+    }
+    var baru = baris.map(function (isi, i) {
+      return gabung_(gabung_({ 'Tanggal': tanggalSel_(tanggal), 'Nama Staff': pengguna.nama, 'No': i + 1 }, kepala),
+        gabung_(isi, isiSistem_(konteks)));
+    });
+    tambahBarisTabel_(tabel, baru);
+    urutkanTabel_(tabel, URUTAN_KUSTOM);
+    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormKustom_(f, tanggal) };
+  });
+}
+
+/* ---------- Riwayat dan PDF form kustom ---------- */
+
+/** Kolom Riwayat dari satu kolom form kustom (Tahap 3: RIWAYAT_FORM). */
+function kolomRiwayatKustom_(c, ambilMaster) {
+  var jenis = c.jenis === 'Angka' ? 'angka' : (c.jenis === 'Item' ? 'item' : 'teks');
+  var k = {
+    judul: c.label,
+    kunci: 'c' + c.id,
+    label: c.label + (c.aktif ? '' : ' (dihapus)'),
+    singkat: c.label.toLowerCase(),
+    jenis: jenis,
+    koreksi: c.aktif,
+    opsional: !c.wajib,
+    ubah: function (v, label) { return nilaiKolomKustom_(c, v, label, ambilMaster()); },
+    normal: function (v) { return nilaiTersimpanKustom_(c, v); }
+  };
+  if (c.pilihan.length) k.pilihan = c.pilihan;
+  if (c.jenis === 'Jam') k.waktu = true;
+  // Kolom yang sudah dihapus: hanya tampil di baris yang berisi, dan tidak bisa dikoreksi.
+  if (!c.aktif) k.jikaAda = true;
+  return k;
+}
+
+/** Definisi Riwayat form kustom dari M_FormKolom, atau null. */
+function defRiwayatKustom_(idForm) {
+  var f = cariForm_(idForm, true);
+  if (!f || f.jenis !== 'kustom') return null;
+  var kolom = kolomForm_(f.id);
+  var master = null;
+  var ambilMaster = function () { return master || (master = bacaItem_()); };
+  var item = kolom.filter(function (c) { return c.bagian === 'baris' && c.jenis === 'Item'; })[0];
+  var wajib = kolom.filter(function (c) { return c.aktif && c.wajib && c.bagian === 'baris'; });
+  return {
+    tab: tabDataForm_(f.id),
+    kustom: true,
+    kepala: kolom.filter(function (c) { return c.bagian === 'kepala'; }).map(function (c) {
+      return { judul: c.label, kunci: 'c' + c.id, label: c.label };
+    }),
+    kolom: kolom.filter(function (c) { return c.bagian === 'baris'; }).map(function (c) { return kolomRiwayatKustom_(c, ambilMaster); }),
+    item: item ? item.label : '',
+    kategoriDariItem: !!item,
+    periksaKoreksi: function (n) {
+      wajib.forEach(function (c) {
+        if (n[c.label] === '' || n[c.label] == null) throw galatPengguna_(kataIsi_(c) + c.label + '. Kolom ini wajib.');
+      });
+    }
+  };
+}
+
+/** Template PDF satu form: LAPORAN_PDF untuk form bawaan, template umum untuk form kustom (Bagian 9.1 butir 4). */
+function laporanPdf_(idForm) {
+  var id = rapikanTeks_(idForm).toUpperCase();
+  if (LAPORAN_PDF[id]) return LAPORAN_PDF[id];
+  var f = cariForm_(id, true);
+  if (!f || f.jenis !== 'kustom') return null;
+  return { judul: f.nama, isi: function (tanggal) { return isiPdfKustom_(f, tanggal); } };
+}
+
+/**
+ * PDF form kustom (template umum): judul = nama form, kotak info (jumlah isian
+ * dan baris), satu tabel sesuai kolomnya (No, Nama Staff, jam kirim, kolom
+ * kepala, kolom baris), lalu Diisi oleh dan Diperiksa oleh. Kolom yang sudah
+ * dihapus dari form hanya tampil jika ada isinya pada tanggal itu.
+ */
+function isiPdfKustom_(f, tanggal) {
+  var kolom = kolomForm_(f.id);
+  var baris = barisDataTanggal_(tabDataForm_(f.id), tanggal);
+  var berisi = function (c) {
+    return baris.some(function (b) { return nilaiTersimpanKustom_(c, b[c.label]) !== ''; });
+  };
+  var tampil = kolom.filter(function (c) { return c.aktif || berisi(c); });
+  var urut = tampil.filter(function (c) { return c.bagian === 'kepala'; }).concat(tampil.filter(function (c) { return c.bagian === 'baris'; }));
+  var sid = {};
+  baris.forEach(function (b) { sid[String(b.submission_id)] = true; });
+  var lebarSisa = urut.length ? (79 / urut.length).toFixed(1) : 79;
+  var judul = ['No', 'Nama Staff', 'Jam'].concat(urut.map(function (c) { return c.label + (c.aktif ? '' : ' (dihapus)'); }));
+  var isiBaris = baris.map(function (b, i) {
+    return '<tr><td class="angka">' + (i + 1) + '</td><td>' + escHtml_(rapikanTeks_(b['Nama Staff'] || b.submitted_by)) + '</td>' +
+      '<td class="tengah">' + escHtml_(b.timestamp_server instanceof Date ? jamId_(b.timestamp_server) : '') + '</td>' +
+      urut.map(function (c) {
+        var v = nilaiTersimpanKustom_(c, b[c.label]);
+        if (c.jenis === 'Angka') return '<td class="angka">' + (v === '' ? '' : angkaId_(Number(v))) + '</td>';
+        return '<td' + (c.jenis === 'Ya/Tidak' || c.jenis === 'Jam' ? ' class="tengah"' : '') + '>' + escHtml_(v) + '</td>';
+      }).join('') + '</tr>';
+  }).join('');
+  var tabel = '<table class="data"><colgroup><col style="width:4%"><col style="width:11%"><col style="width:6%">' +
+    urut.map(function () { return '<col style="width:' + lebarSisa + '%">'; }).join('') + '</colgroup><thead><tr>' +
+    judul.map(function (j) { return '<th>' + escHtml_(j) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (isiBaris || '<tr><td colspan="' + judul.length + '">Belum ada isian.</td></tr>') + '</tbody></table>';
+  var info = [];
+  if (f.keterangan) info.push(['Keterangan', f.keterangan]);
+  info.push(['Jumlah isian', String(Object.keys(sid).length)]);
+  info.push(['Jumlah baris', String(baris.length)]);
+  var catatan = [];
+  if (urut.some(function (c) { return !c.aktif; })) {
+    catatan.push('Kolom bertanda (dihapus) sudah dihapus dari form; isian lamanya tetap ditampilkan.');
+  }
+  return { ada: baris.length > 0, judul: f.nama, info: info, tabel: tabel, catatan: catatan };
+}
+
+/* =========================================================================
  * Tahap 3: Riwayat, pemeriksaan, dan koreksi (spesifikasi sistem Bagian 6)
  * ========================================================================= */
 
@@ -4255,7 +5178,8 @@ var RIWAYAT_FORM = {
 
 /** Definisi Riwayat satu form, atau null jika Riwayat form itu belum dibangun. */
 function defRiwayat_(idForm) {
-  return RIWAYAT_FORM[rapikanTeks_(idForm).toUpperCase()] || null;
+  var id = rapikanTeks_(idForm).toUpperCase();
+  return RIWAYAT_FORM[id] || (id ? defRiwayatKustom_(id) : null);
 }
 
 function wajibDefRiwayat_(idForm) {
@@ -4343,8 +5267,11 @@ function barisRiwayat_(def, t, b, log) {
   var koreksi = {};
   def.kolom.forEach(function (k) {
     var v = nilai_(t, b, k.judul);
+    if (k.normal) v = k.normal(v);
     var angka = k.jenis === 'angka' || k.jenis === 'rupiah';
     nilai[k.kunci] = angka ? angkaAtauNull_(v) : (k.jenis === 'tanggal' ? teksTanggal_(v, ss_().getSpreadsheetTimeZone()) : rapikanTeks_(v));
+    // Kolom "jikaAda" yang kosong (misalnya kolom form kustom yang sudah dihapus) tidak tampil di kartu.
+    if (k.jikaAda && nilai[k.kunci] === '') nilai[k.kunci] = null;
     if (k.asli) {
       var a = rapikanTeks_(nilai_(t, b, k.asli));
       if (a) asli[k.kunci] = a;
@@ -4692,7 +5619,8 @@ function pilihanFilter_(def) {
  * penyesuaian, opname) atau rekap (Stock_Harian, khusus Stock).
  */
 function aksiRiwayat_(body) {
-  var daftar = bacaDaftarForm_().filter(function (f) { return f.aktif; });
+  // Form yang disembunyikan tetap ada di Riwayat: isian lamanya masih bisa dilihat (Tahap 9).
+  var daftar = bacaDaftarForm_();
   var idForm = rapikanTeks_(body.formId).toUpperCase();
   var form = null;
   daftar.forEach(function (f) { if (f.id === idForm) form = f; });
@@ -4709,8 +5637,8 @@ function aksiRiwayat_(body) {
     sampai: r.sampai,
     tampilan: 'catatan',
     daftarForm: daftar.map(function (x) {
-      return { id: x.id, nama: x.nama, adaRiwayat: !!defRiwayat_(x.id), stock: !!(defRiwayat_(x.id) || {}).stock,
-        adaPdf: !!LAPORAN_PDF[x.id] };
+      var d = defRiwayat_(x.id);
+      return { id: x.id, nama: x.nama, adaRiwayat: !!d, stock: !!(d || {}).stock, adaPdf: !!laporanPdf_(x.id), tampil: x.aktif };
     }),
     kepala: [],
     kolom: [],
@@ -4744,6 +5672,8 @@ function infoKolom_(def) {
     if (k.ringkas === false) info.ringkas = false;
     if (k.jikaAda) info.jikaAda = true;
     if (k.bantuan) info.bantuan = k.bantuan;
+    if (k.opsional) info.opsional = true;
+    if (k.waktu) info.waktu = true;
     return info;
   });
 }
@@ -4760,7 +5690,7 @@ function aksiDetailKiriman_(body) {
   if (!k) throw galatPengguna_('Isian tidak ditemukan. Kembali ke Riwayat, lalu muat ulang.');
   var nama = idForm;
   bacaDaftarForm_().forEach(function (f) { if (f.id === idForm) nama = f.nama; });
-  return { formId: idForm, namaForm: nama, adaPdf: !!LAPORAN_PDF[idForm], kepala: infoKepala_(def), kolom: infoKolom_(def),
+  return { formId: idForm, namaForm: nama, adaPdf: !!laporanPdf_(idForm), kepala: infoKepala_(def), kolom: infoKolom_(def),
     gerakStock: !!def.gerakStock, kiriman: k };
 }
 
@@ -4918,7 +5848,12 @@ function aksiKoreksi_(body, pengguna) {
       var lama = nilai_(c.t, c.b, k.judul);
       var nilaiBaru;
       var label = k.label + (namaBaris ? ' ' + namaBaris : '');
-      if (k.jenis === 'angka') {
+      if (k.ubah) {
+        // Form kustom (Tahap 9): aturan isian sama dengan saat dikirim; kosong boleh untuk kolom tidak wajib.
+        nilaiBaru = k.ubah(baru[k.kunci], label);
+        lama = k.normal ? k.normal(lama) : lama;
+        if (String(nilaiBaru) === String(lama)) return;
+      } else if (k.jenis === 'angka') {
         nilaiBaru = k.minus ? angkaSuhu_(baru[k.kunci], label) : angkaIsian_(baru[k.kunci], label);
         lama = Number(lama) || 0;
       } else {
@@ -5476,7 +6411,7 @@ function isiPdfSuhu_(tanggal) {
  * isi.bawah ([[label, nilai]]) sebagai pengganti Diisi/Diperiksa oleh.
  */
 function htmlLaporan_(idForm, tanggal, isi) {
-  var judul = isi.judul || LAPORAN_PDF[idForm].judul;
+  var judul = isi.judul || laporanPdf_(idForm).judul;
   var outlet = namaOutlet_();
   var bawah = isi.bawah;
   if (!bawah) {
@@ -5535,7 +6470,7 @@ function htmlLaporan_(idForm, tanggal, isi) {
  */
 function buatPdf_(idForm, tanggal, opsi) {
   idForm = rapikanTeks_(idForm).toUpperCase();
-  var t = LAPORAN_PDF[idForm];
+  var t = laporanPdf_(idForm);
   var namaForm = namaFormDari_(idForm);
   if (!t) throw galatPengguna_('Laporan PDF ' + namaForm + ' dibangun di tahap berikutnya, bersama formnya.');
   if (!tanggalSah_(tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
@@ -5596,9 +6531,11 @@ function aksiInfoLaporan_() {
   var kategori = null;
   return {
     hariIni: hariIni_(),
-    form: bacaDaftarForm_().filter(function (f) { return f.aktif; }).map(function (f) {
-      var hasil = { id: f.id, nama: f.nama, adaPdf: !!LAPORAN_PDF[f.id] };
-      if (LAPORAN_PDF[f.id] && LAPORAN_PDF[f.id].perKategori) {
+    // Form yang disembunyikan tetap bisa diunduh laporannya (Tahap 9).
+    form: bacaDaftarForm_().map(function (f) {
+      var t = laporanPdf_(f.id);
+      var hasil = { id: f.id, nama: f.nama, adaPdf: !!t, tampil: f.aktif };
+      if (t && t.perKategori) {
         kategori = kategori || bacaKategori_().map(function (k) { return k.nama; });
         hasil.kategori = kategori;
       }
@@ -5804,7 +6741,9 @@ function teksStatusForm_(f) {
   }
   if (f.status === 'nihil') return 'Nihil (ditandai ' + (f.terakhir ? f.terakhir.oleh : '') + ')';
   if (f.status === 'sebagian') return 'Belum lengkap: ' + f.detail;
-  return f.wajib ? 'Belum diisi' : 'Belum diisi (tidak wajib hari ini)';
+  if (f.wajib) return 'Belum diisi';
+  // Form kustom di luar jadwalnya tidak ditagih (Bagian 5.8).
+  return f.jadwal === 'sewaktu-waktu' ? 'Tidak ada isian (sewaktu-waktu, tidak ditagih)' : 'Tidak ada isian (tidak dijadwalkan hari ini)';
 }
 
 /** Isi email laporan harian sebagai HTML sederhana (tanpa amber, Bagian 2). */
@@ -5938,6 +6877,7 @@ function htmlEmailHarian_(d) {
  */
 function jalankanLaporanHarian_(opsi) {
   SS_ = null;
+  resetMemoForm_();
   opsi = opsi || {};
   var tanggal = opsi.tanggal || hariIni_();
   var masalah = [];
@@ -5945,7 +6885,7 @@ function jalankanLaporanHarian_(opsi) {
   try {
     var form = kelengkapanForm_(tanggal);
     form.forEach(function (f) {
-      if ((f.status !== 'terkirim' && f.status !== 'sebagian') || !LAPORAN_PDF[f.id]) return;
+      if ((f.status !== 'terkirim' && f.status !== 'sebagian') || !laporanPdf_(f.id)) return;
       try {
         var pdf = buatPdf_(f.id, tanggal);
         var x = { namaFile: pdf.namaFile, blob: pdf.blob, drive: false };
@@ -6332,7 +7272,9 @@ var TAB_MASTER = [
       k_('Keterangan'),
       k_('Jadwal', 'teks', { pilihan: ['harian', 'hari tertentu', 'sewaktu-waktu'] }),
       k_('Urutan', 'bulat'),
-      k_('Aktif', null, { centang: true })
+      k_('Aktif', null, { centang: true }),
+      k_('Hari'),
+      k_('Diarsipkan', 'waktu')
     ]
   },
   {
@@ -6345,7 +7287,8 @@ var TAB_MASTER = [
       k_('Pilihan'),
       k_('Wajib', null, { centang: true }),
       k_('Bagian', 'teks', { pilihan: ['kepala', 'baris'] }),
-      k_('Aktif', null, { centang: true })
+      k_('Aktif', null, { centang: true }),
+      k_('ID Kolom')
     ]
   },
   {
@@ -6407,10 +7350,16 @@ var BLOK_DASHBOARD = [
 ];
 
 /** Urutan tab di spreadsheet (spesifikasi sistem Bagian 8.2). */
-function urutanTab_() {
+function urutanTab_(ss) {
   var nama = ['Dashboard'];
   TAB_HARIAN.forEach(function (t) { nama.push(t.nama); });
   TAB_DATA.forEach(function (t) { nama.push(t.nama); });
+  // Tab data form kustom (Tahap 9) ikut kelompok tab Data, urut nama.
+  if (ss) {
+    ss.getSheets().map(function (sh) { return sh.getName(); }).filter(function (n) {
+      return n.indexOf(AWALAN_TAB_KUSTOM) === 0;
+    }).sort().forEach(function (n) { nama.push(n); });
+  }
   TAB_MASTER.forEach(function (t) { nama.push(t.nama); });
   nama.push(TAB_LOG.nama);
   return nama;
@@ -6470,6 +7419,8 @@ function setupSpreadsheet() {
     throw new Error('Jalankan setupSpreadsheet dari editor Apps Script yang menempel pada Google Sheet (Extensions → Apps Script).');
   }
   PropertiesService.getScriptProperties().setProperty(PROP_ID_SPREADSHEET, ss.getId());
+  SS_ = null;
+  resetMemoForm_();
 
   var kunci = LockService.getScriptLock();
   kunci.waitLock(30000);
@@ -6535,6 +7486,12 @@ function setupSpreadsheet() {
     isiBarisAwal_(ss.getSheetByName('M_Form'), FORM_BAWAAN, 'M_Form', catatan);
     isiKonfigurasiAwal_(ss.getSheetByName('M_Konfigurasi'), catatan);
 
+    // Tahap 9: tab data tiap form kustom (juga yang diarsipkan) dibuat atau dilengkapi.
+    resetMemoForm_();
+    bacaDaftarForm_(true).filter(function (f) { return f.jenis === 'kustom'; }).forEach(function (f) {
+      siapkanTabKustom_(ss, f, kolomForm_(f.id), { catatan: catatan });
+    });
+
 
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
     pasangRumusHarianStock_(ss, catatan);
@@ -6585,6 +7542,7 @@ function setupSpreadsheet() {
  * ditulis lewat rumusLokal_. Lokalitas file tidak diubah.
  */
 var GAYA_RUMUS_ = null; // 'koma' (en-US) atau 'titikKoma'
+var PROP_GAYA_RUMUS = 'GAYA_RUMUS';
 
 /** Rumus uji: argumen, angka desimal, dan array sekaligus. Hasilnya 3,5 jika terurai. */
 var RUMUS_UJI_ = '=IF(TRUE,SUM(1.5,COLUMNS({1,2})),0)';
@@ -6606,6 +7564,7 @@ function deteksiGayaRumus_(ss, catatan) {
       sel.setFormula(ubahGayaRumus_(RUMUS_UJI_, gaya[i]));
       SpreadsheetApp.flush();
       if (sel.getValue() === 3.5) {
+        PropertiesService.getScriptProperties().setProperty(PROP_GAYA_RUMUS, gaya[i]);
         catatan.push('Lokalitas spreadsheet ' + lokal + ': rumus ditulis dengan ' + (gaya[i] === 'koma'
           ? 'pemisah koma dan desimal titik'
           : 'pemisah titik koma, desimal koma, dan pemisah kolom array \\'));
@@ -6622,6 +7581,8 @@ function deteksiGayaRumus_(ss, catatan) {
 
 /** Mengubah rumus gaya en-US ke gaya yang diterima file ini (lihat GAYA_RUMUS_). */
 function rumusLokal_(rumus) {
+  // Di luar setupSpreadsheet (misalnya tab form kustom dibuat dari aplikasi) dipakai gaya yang tercatat setupSpreadsheet.
+  if (!GAYA_RUMUS_) GAYA_RUMUS_ = PropertiesService.getScriptProperties().getProperty(PROP_GAYA_RUMUS) || '';
   if (!GAYA_RUMUS_) GAYA_RUMUS_ = deteksiGayaRumus_(ss_(), []);
   return ubahGayaRumus_(rumus, GAYA_RUMUS_);
 }
@@ -7709,7 +8670,11 @@ function pasangBlokNilaiDashboard_(ss, catatan) {
  * Bagian 5.8 (Terkirim, Nihil, Belum diisi; Suhu "x dari y" memakai unit
  * aktif sekarang; form yang disembunyikan "–"), jumlah form yang belum
  * lengkap, isian (kiriman) yang belum diperiksa, dan baris dilaporkan keliru.
- * Form kustom menyusul di Tahap 9.
+ * Tahap 9: kolom I "Form kustom" ("1 dari 2", Terkirim, atau "–" jika tidak
+ * ada form kustom yang dijadwalkan hari itu), dan form kustom ikut dihitung
+ * di kolom F, G, H. Tab Data_K_<ID> dibaca lewat INDIRECT dari daftar form
+ * kustom yang tampil di M_Form, jadi form baru langsung ikut tanpa
+ * setupSpreadsheet. Form sewaktu-waktu dan form di luar jadwalnya tidak ditagih.
  */
 function pasangBlokKepatuhanDashboard_(ss, catatan) {
   var sheet = ss.getSheetByName('Dashboard');
@@ -7729,16 +8694,21 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
     '" dari "&COUNT($A$' + awal + ':$A$' + akhir + ')&" hari · Isian belum diperiksa: "&SUM($G$' + awal + ':$G$' + akhir + ')&' +
     '" · Baris dilaporkan keliru: "&SUM($H$' + awal + ':$H$' + akhir + ')&" · Periode: "&$B$3'))
     .setFontStyle('normal').setFontColor(WARNA.tinta);
-  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 8),
-    ['Tanggal', 'Stock', 'Suhu', 'Prep list', 'Waste', 'Form belum lengkap', 'Isian belum diperiksa', 'Baris dilaporkan keliru']);
-  sheet.getRange(h + 2, 1, 1, 8).setWrap(true);
+  judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 9),
+    ['Tanggal', 'Stock', 'Suhu', 'Prep list', 'Waste', 'Form belum lengkap', 'Isian belum diperiksa', 'Baris dilaporkan keliru',
+      'Form kustom']);
+  sheet.getRange(h + 2, 1, 1, 9).setWrap(true);
   [['STOCK', 'Stock'], ['SUHU', 'Suhu'], ['PREP', 'Prep list'], ['WASTE', 'Waste']].forEach(function (f, i) {
     sheet.getRange(h + 2, 2 + i).setFormula(rumusLokal_('=IFERROR(XLOOKUP("' + f[0] + '",' + fI + ',' + fN + '),"' + f[1] + '")'));
   });
   // Nama di LET tidak membedakan huruf besar dan kecil: "st" dan "ua" bertabrakan dengan sT
   // (Tanggal Data_Stock) dan uA (Aktif M_Unit), sehingga rumusnya #NAME?. Dipakai stForm dan unitAktif.
+  // Nama untuk form kustom (Tahap 9) diawali "kf" dan "ku" supaya tidak bertabrakan dengan nama lain.
+  var hariId = '"Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"';
   sheet.getRange(awal, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
     'fI,' + fI + ',fA,' + K('M_Form', 'Aktif') + ',' +
+    'kfJenis,' + K('M_Form', 'Jenis') + ',kfJadwal,' + K('M_Form', 'Jadwal') + ',kfHari,' + K('M_Form', 'Hari') + ',' +
+    'kfArsip,' + K('M_Form', 'Diarsipkan') + ',' +
     'nT,' + K('Data_Nihil', 'Tanggal') + ',nF,' + K('Data_Nihil', 'ID Form') + ',' +
     tab('s', 'Data_Stock', 'Nama Item') + tab('c', 'Data_Suhu', 'Nama Unit') + 'cW,' + K('Data_Suhu', 'Waktu Cek') + ',' +
     tab('p', 'Data_Prep', 'Item / Menu Prep') + tab('w', 'Data_Waste', 'Item / Produk') +
@@ -7751,13 +8721,28 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
       'n,IFERROR(ROWS(UNIQUE(FILTER(ARRAYFORMULA(cI&"|"&cW),cT=dd,(cW="Opening")+(cW="Middle")+(cW="Closing"),ISNUMBER(MATCH(cI,unitAktif,0))))),0),' +
       'IF(n>=nu*3,"Terkirim",IF(n=0,"Belum diisi",n&" dari "&nu*3)))))),' +
     'bp,LAMBDA(dt,ds,dst,dd,IFERROR(ROWS(UNIQUE(FILTER(ds,dt=dd,ds<>"",dst<>"Diperiksa"))),0)),' +
+    // Form kustom yang tampil dan belum dihapus, dan satu kolom tab Data_K_<ID> menurut judulnya.
+    'kfId,IFERROR(FILTER(fI,fI<>"",kfJenis="kustom",fA=TRUE,kfArsip=""),""),' +
+    'kfKol,LAMBDA(kfX,kfJ,LET(kfTab,"' + AWALAN_TAB_KUSTOM + '"&kfX&"!",kfNo,MATCH(kfJ,INDIRECT(kfTab&"1:1"),0),' +
+      'kfHuruf,SUBSTITUTE(ADDRESS(1,kfNo,4),"1",""),INDIRECT(kfTab&kfHuruf&"2:"&kfHuruf))),' +
+    'kfWajib,LAMBDA(kfX,dd,LET(kfJw,XLOOKUP(kfX,fI,kfJadwal,""),IF(kfJw="sewaktu-waktu",0,IF(kfJw="hari tertentu",' +
+      'IF(ISNUMBER(SEARCH(CHOOSE(WEEKDAY(dd),' + hariId + '),XLOOKUP(kfX,fI,kfHari,""))),1,0),1)))),' +
+    'ku,LAMBDA(dd,IFERROR(IF(INDEX(kfId,1,1)="",HSTACK("–",0,0,0),LET(' +
+      'kuW,MAP(kfId,LAMBDA(kfX,kfWajib(kfX,dd))),' +
+      'kuT,MAP(kfId,LAMBDA(kfX,IF(IFERROR(COUNTIF(kfKol(kfX,"Tanggal"),dd),0)+COUNTIFS(nT,dd,nF,kfX)>0,1,0))),' +
+      'kuB,MAP(kfId,LAMBDA(kfX,IFERROR(ROWS(UNIQUE(FILTER(kfKol(kfX,"submission_id"),kfKol(kfX,"Tanggal")=dd,' +
+        'kfKol(kfX,"submission_id")<>"",kfKol(kfX,"status")<>"Diperiksa"))),0))),' +
+      'kuF,MAP(kfId,LAMBDA(kfX,IFERROR(COUNTIFS(kfKol(kfX,"Tanggal"),dd,kfKol(kfX,"flagged_by"),"<>"),0))),' +
+      'kuNw,SUM(kuW),kuNt,SUMPRODUCT(kuW,kuT),' +
+      'HSTACK(IF(kuNw=0,"–",IF(kuNt>=kuNw,"Terkirim",kuNt&" dari "&kuNw)),kuNw-kuNt,SUM(kuB),SUM(kuF)))),HSTACK("–",0,0,0))),' +
     'hari,SEQUENCE(TODAY()-awalP+1,1,awalP,1),' +
-    'isi,REDUCE(HSTACK(' + kosong_(8) + '),hari,LAMBDA(acc,d,LET(' +
-      'a,stForm("STOCK",sT,sI,d),b,su(d),c,stForm("PREP",pT,pI,d),e,stForm("WASTE",wT,wI,d),' +
+    'isi,REDUCE(HSTACK(' + kosong_(9) + '),hari,LAMBDA(acc,d,LET(' +
+      'a,stForm("STOCK",sT,sI,d),b,su(d),c,stForm("PREP",pT,pI,d),e,stForm("WASTE",wT,wI,d),g,ku(d),' +
       'VSTACK(acc,HSTACK(d,a,b,c,e,' +
-        '(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi"),' +
-        'bp(sT,sS,sSt,d)+bp(cT,cS,cSt,d)+bp(pT,pS,pSt,d)+bp(wT,wS,wSt,d),' +
-        'COUNTIFS(sT,d,sF,"<>")+COUNTIFS(cT,d,cF,"<>")+COUNTIFS(pT,d,pF,"<>")+COUNTIFS(wT,d,wF,"<>")))))),' +
+        '(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi")+INDEX(g,1,2),' +
+        'bp(sT,sS,sSt,d)+bp(cT,cS,cSt,d)+bp(pT,pS,pSt,d)+bp(wT,wS,wSt,d)+INDEX(g,1,3),' +
+        'COUNTIFS(sT,d,sF,"<>")+COUNTIFS(cT,d,cF,"<>")+COUNTIFS(pT,d,pF,"<>")+COUNTIFS(wT,d,wF,"<>")+INDEX(g,1,4),' +
+        'INDEX(g,1,1)))))),' +
     'CHOOSEROWS(isi,SEQUENCE(ROWS(isi)-1,1,2)))'));
   sheet.getRange(awal, 1, BARIS_TABEL_KEPATUHAN, 1).setNumberFormat('d mmm');
   sheet.getRange(awal, 6, BARIS_TABEL_KEPATUHAN, 3).setNumberFormat(FORMAT.bulat);
@@ -7766,10 +8751,13 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
       .whenFormulaSatisfied(rumusLokal_('=AND(B' + awal + '<>"",B' + awal + '<>"Terkirim",B' + awal + '<>"Nihil",B' + awal + '<>"–")'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 2, BARIS_TABEL_KEPATUHAN, 4)]).build(),
     SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(rumusLokal_('=AND(I' + awal + '<>"",I' + awal + '<>"Terkirim",I' + awal + '<>"–")'))
+      .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 9, BARIS_TABEL_KEPATUHAN, 1)]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($H' + awal + '),$H' + awal + '>0)'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 8, BARIS_TABEL_KEPATUHAN, 1)]).build()
   ]);
-  catatan.push('Rumus kepatuhan dipasang: Dashboard (blok Kepatuhan)');
+  catatan.push('Rumus kepatuhan dipasang: Dashboard (blok Kepatuhan, termasuk form kustom)');
 }
 
 /* ---------- Tahap 8: blok Stock opname di Dashboard ---------- */
@@ -7971,7 +8959,7 @@ function buatKodeAcak_(panjang) {
 /* ---------- Urutan dan kebersihan tab ---------- */
 
 function aturUrutanTab_(ss) {
-  urutanTab_().forEach(function (nama, i) {
+  urutanTab_(ss).forEach(function (nama, i) {
     var sheet = ss.getSheetByName(nama);
     if (sheet && sheet.getIndex() !== i + 1) {
       ss.setActiveSheet(sheet);
@@ -7984,7 +8972,7 @@ function aturUrutanTab_(ss) {
 /** Menghapus "Sheet1"/"Lembar1" bawaan hanya jika benar-benar kosong. */
 function hapusLembarBawaanKosong_(ss, catatan) {
   var milikKita = {};
-  urutanTab_().forEach(function (n) { milikKita[n] = true; });
+  urutanTab_(ss).forEach(function (n) { milikKita[n] = true; });
   ss.getSheets().forEach(function (sheet) {
     var nama = sheet.getName();
     if (milikKita[nama]) return;
