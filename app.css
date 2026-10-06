@@ -4059,6 +4059,184 @@ body.papan-ketik .bilah-kirim {
   margin-bottom: 16px;
 }
 
+/* =========================================================================
+ * Tahap 8: Stock opname (spesifikasi tampilan Bagian 5.8) dan Daftar
+ * belanja (Bagian 5.9)
+ * ========================================================================= */
+
+/* Dashboard: tombol Stock opname dengan tanggal opname terakhir di sampingnya */
+.dashboard-opname {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 16px 0 24px;
+}
+
+.dashboard-opname .tombol {
+  flex: none;
+}
+
+.opname-tanggal {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.opname-kelompok {
+  margin-top: 16px;
+}
+
+.opname-kelompok .grid-item {
+  margin-top: 0;
+}
+
+.opname-kelompok .tabel-isian-bingkai {
+  margin-top: 0;
+}
+
+/* Kartu hitung: "Tercatat 8,5" di kiri, kolom Hitung di kanan */
+.opname-baris {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.opname-tercatat {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.opname-hitung {
+  display: grid;
+  gap: 4px;
+}
+
+.opname-hitung .isian-angka {
+  width: 120px;
+}
+
+.kartu-opname.dihitung {
+  border-color: var(--garis-isian);
+}
+
+.kartu-opname .wadah-peringatan:empty {
+  display: none;
+}
+
+.tabel-hitung .isian-angka {
+  width: 120px;
+}
+
+/* Ringkasan dan hasil opname */
+.opname-kartu {
+  display: grid;
+  gap: 16px;
+}
+
+.opname-kartu .kartu-judul {
+  margin-bottom: 0;
+}
+
+.opname-ringkas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.opname-ringkas > div {
+  min-width: 0;
+  padding: 12px;
+  background: var(--baja);
+  border-radius: 8px;
+}
+
+.opname-ringkas dt {
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.opname-ringkas dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.opname-hasil-judul {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.opname-aksi .tombol {
+  flex: 1 1 200px;
+}
+
+.opname-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.tabel-opname td,
+.tabel-opname th {
+  white-space: nowrap;
+}
+
+.tabel-opname tbody th {
+  white-space: normal;
+  min-width: 140px;
+}
+
+/* Daftar belanja: nama dan stock di kiri, kolom Order di kanan (turun ke bawah di HP sempit) */
+.belanja {
+  display: grid;
+  gap: 4px;
+}
+
+.belanja .judul-sub {
+  margin-top: 12px;
+}
+
+.belanja-baris {
+  flex-wrap: wrap;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.belanja-baris .daftar-baris-isi {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.belanja-order {
+  flex: 0 1 auto;
+  display: grid;
+  gap: 4px;
+}
+
+.belanja-order .isian-angka {
+  width: 112px;
+}
+
+.belanja-order .konversi {
+  font-size: 14px;
+  color: var(--tinta-redup);
+  max-width: 220px;
+}
+
+.belanja-order .konversi:empty {
+  display: none;
+}
+
 /* Kurangi gerak: semua geser, skala, goyang, pudar, dan denyut dimatikan.
    Perubahan langsung jadi; pesan teks tetap tampil. Indikator putar tetap ada. */
 @media (prefers-reduced-motion: reduce) {

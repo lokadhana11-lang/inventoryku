@@ -144,6 +144,14 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `aturUnitAktif {nama, aktif}` → jawaban `daftarUnit`. `bacaOutletJadwal` kini → `{ namaOutlet, zonaWaktu, jamClosing,
   jedaLaporanMenit, jadwalOpname, hariCadangan, keluarOtomatisMenit, perluPasangTrigger }`; `simpanOutletJadwal` menerima field
   mana pun dari daftar itu (hanya yang dikirim yang ditulis) dan menjawab sama ditambah `jadwalBerubah`.
+- Aksi Tahap 8 (semua khusus Pengelola): `formOpname {tanggal}` → `{ tanggal, kategori: [nama], item: [{ nama, kategori, satuan, harga,
+  tercatat }], status }`; `simpanOpname {submissionId, tanggal, waktuPerangkat, baris: [{ item, hitung }]}` → `{ sudahTerkirim, id, tanggal,
+  oleh, waktu, jumlah, berselisih, totalNilai, tanpaHarga, baris: [{ item, kategori, satuan, tercatat, hitung, selisih, nilai }] }`;
+  `detailOpname {submissionId}` → jawaban yang sama tanpa `sudahTerkirim`; `unduhPdfOpname {submissionId}` dan `unduhPdfBelanja {order: {
+  namaItem: teks }}` → `{ namaFile, mime, data }`; `daftarBelanja` → `{ tanggal, jumlah, kategori: [{ nama, item: [{ nama, satuan,
+  satuanBesar, isiSatuanBesar, stock, stokMin, stokMaks, saran: { jumlah, satuan, dasar, teks } | null }] }] }`. `status` opname = `{
+  terakhir: { id, tanggal, oleh, waktu } | null, jadwal, batasHari, hariLalu, lewat }`, juga di `beranda.opname` (Pengelola) dan
+  `dashboard.opname`; `dashboard.perhatian[]` boleh berjenis `opname`; `riwayat.peristiwa[]` opname ditambah `id` dan `nilai`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -161,7 +169,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 5 | Form Waste dan Suhu (layar isi, Data_Waste/Data_Suhu, waste mengurangi stock, Riwayat dan koreksi, PDF, email, tab Harian_Waste/Harian_Suhu, blok Waste dan Suhu di Dashboard) | Kode selesai (Code.gs v0.6, aplikasi 0.6.0; rumus sesuai lokalitas di Code.gs v0.6.1, butir 93), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Foto bukti waste ditunda (butir 81). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 6 | Prep List dan resep (Pengaturan → Resep, pengaman resep, form Prep List, Data_Prep/Data_PrepBahan, gerakan stock, koreksi jumlah resep, masa simpan di Beranda dan email, harga barang jadi dari resep, Riwayat, PDF, tab Harian_Prep, blok Prep List di Dashboard) | Kode selesai (Code.gs v0.7, aplikasi 0.7.0), diuji dengan API tiruan dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 7 | Dashboard di aplikasi dan pengelolaan master (menu Dashboard dengan dua grafik SVG, nilai stock, Pengaturan → Item, Unit, Kategori dan satuan, Outlet dan jadwal lengkap, aturan menonaktifkan master, blok Nilai stock dan Kepatuhan serta grafik tiap blok di tab Dashboard) | Kode selesai (Code.gs v0.8, aplikasi 0.8.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Perbaikan warna dan rumus tab Dashboard di Code.gs v0.8.1 (butir 118–121). Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
-| 8 | Stock opname dan daftar belanja | Belum |
+| 8 | Stock opname dan daftar belanja (layar Stock opname dari Dashboard, Data_Opname dan penyesuaian "Stock opname", laporan selisih PDF, opname di Riwayat, pengingat jadwal di Beranda/Dashboard/email, blok Stock opname di tab Dashboard, Daftar belanja di Laporan dengan PDF dan ringkasan di email) | Kode selesai (Code.gs v0.9, aplikasi 0.9.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 9 | Form kustom | Belum |
 | 10 | Rekap bulanan | Belum |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Belum |
@@ -462,7 +470,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Pengelola "Simpan ulang ke Drive" (hasilnya ditulis di bawah tombol beserta lokasi file). Form
     yang laporannya belum dibangun menonaktifkan tombol dengan tulisan "Laporan PDF … dibangun di
     tahap berikutnya, bersama formnya." Pilihan tersimpan per pengguna (`cache:laporan-pilihan`).
-    Daftar belanja dan Rekap bulanan menyusul di Tahap 8 dan 10.
+    Daftar belanja dibangun di Tahap 8 (butir 124); Rekap bulanan menyusul di Tahap 10.
 68. **Email harian** (`jalankanLaporanHarian_`, dipanggil `kirimLaporanHarian` dan
     `kirimLaporanSekarang`) lewat `MailApp` (izin kirim saja), nama pengirim "InventoryKu", subjek
     "Laporan harian {Outlet}, {Hari, tanggal}". Isi: status tiap form aktif menurut Bagian 5.8
@@ -738,7 +746,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Belum diperiksa (kiriman, 31 hari seperti Beranda), Suhu di luar standar (pengecekan hari ini, termasuk cek ulang), Di bawah stok
     minimum (item aktif), Total waste (Rp hari ini), dan Nilai stock (ketuk: lembar per kategori, total, dan daftar "Belum punya
     harga" yang membuka item itu di Pengaturan). "Satu baris" berlaku di desktop; HP dua kolom, tablet tiga kolom (lebar 320 px
-    tidak muat enam ubin). Tombol "Stock opname" (Bagian 5.6) menyusul di Tahap 8.
+    tidak muat enam ubin). Tombol "Stock opname" (Bagian 5.6) sejak Tahap 8 (butir 123).
 109. **Perlu perhatian** disusun server (`perhatianDashboard_`), urut tingkat: Masalah (unit yang pengecekan terakhirnya hari ini
     masih di luar standar, Stock Akhir minus, lewat masa simpan, laporan/cadangan gagal), Perlu ditinjau (baris dilaporkan keliru,
     permintaan reset PIN, di bawah stok minimum dengan saran order, habis besok, jadwal yang menunggu `pasangTrigger`), Menunggu
@@ -797,7 +805,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     kanan tabel bloknya, dibuat ulang setiap setupSpreadsheet menurut judulnya): Keadaan item stock (pai, warna makna status),
     Nilai stock per kategori (batang), Estimasi kerugian waste per bulan (kolom), Rata-rata suhu per unit 7 hari terakhir (garis,
     baris dan kolom ditukar), Jumlah resep per item 7 hari terakhir (batang), Kepatuhan per hari (kolom). Blok Stock opname dan
-    grafiknya menyusul di Tahap 8. Rumus ditulis gaya en-US lewat `rumusLokal_`; operasi larik di dalam LET dibungkus ARRAYFORMULA.
+    grafiknya sejak Tahap 8 (butir 126). Rumus ditulis gaya en-US lewat `rumusLokal_`; operasi larik di dalam LET dibungkus ARRAYFORMULA.
 117. **Uji Tahap 7** (di luar repo): Code.gs dijalankan di Node dengan tiruan SpreadsheetApp/Utilities/Properties/Lock/Charts
     (24 uji server: master, aturan nonaktif, nilai stock, Perlu perhatian, grafik, outlet dan jadwal, penolakan Staff, rumus
     seimbang dan bisa diubah ke gaya titik koma), dan frontend di Chromium dengan API tiruan yang memanggil `doPost` asli (16 uji
@@ -826,4 +834,56 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     ada sel isi blok berformat judul, judul blok dan format angka tetap, tidak ada penyisipan saat dijalankan ulang, 46 rumus
     seimbang dan tanpa nama ganda. Hasil rumus di Google Sheets tetap belum bisa diuji di sini.
 
+### Tahap 8
 
+118. **Versi:** Code.gs v0.9, aplikasi 0.9.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js).
+119. **Layar Stock opname** (`#/opname`, khusus Pengelola, dibuka dari tombol "Stock opname" di Dashboard, pengingat di Beranda, atau
+    butir Perlu perhatian). Tanggal opname = hari ini menurut HP (tidak ada pilihan tanggal; server menolak tanggal masa depan).
+    Kategori: "Semua kategori" (bawaan; item dikelompokkan dengan judul kategori) atau satu kategori aktif. Item: aktif di kategori
+    aktif, urut kategori lalu nama. HP/tablet kartu ("Tercatat 8,5" dan kolom Hitung), laptop/desktop tabel (No, Nama Item, Tercatat,
+    Hitung, Selisih, Satuan). Selisih tampil saat diketik: bukan nol tanda Perlu ditinjau ("Selisih −0,5 kg"), nol tanda Baik "Sesuai".
+    Hitungan per item disimpan di draft `draft:opname` (kategori, hitung per nama item huruf kecil, submissionId); hitungan kategori
+    lain tetap di draft saat kategori diganti, tetapi yang dikirim hanya item yang tampil. "Lanjut" membuka ringkasan (item dihitung,
+    berselisih, total nilai dari harga di HP, daftar item berselisih) dengan "Kembali" dan "Simpan opname". Menyimpan butuh sinyal (tidak
+    masuk antrean); gagal sambungan: hitungan tetap di draft, kirim ulang memakai submissionId yang sama. Sesudah tersimpan: "Opname
+    tersimpan. 3 item diluruskan.", item yang stock tercatatnya berubah sejak layar dibuka disebut (pesan info), hasil dari server, dan
+    "Unduh laporan selisih"; draft dihapus. Jawaban `formOpname` terakhir di `cache:opname`.
+120. **Simpan opname di server** (`aksiSimpanOpname_`): stock tercatat = Stock Akhir pada tanggal opname SAAT disimpan (`posisiStock_`).
+    Semua item yang dihitung (termasuk yang sesuai) satu baris di `Data_Opname` (Kategori, Satuan, Nilai Selisih = selisih × Harga
+    Satuan `M_Item`, kosong jika harga kosong; harga barang jadi dari resep tidak dipakai, sama dengan penyesuaian). Item berselisih juga
+    satu baris `Data_Penyesuaian` beralasan "Stock opname" dengan `submission_id` yang sama, lalu `hitungUlangStock_` mulai tanggal opname,
+    sehingga Stock Akhir hari itu = hasil hitung. "Stock opname" bukan pilihan alasan di lembar Sesuaikan stock. Hitungan minus atau
+    bukan angka ditolak; item yang sama dua kali ditolak; item yang tidak ada di `M_Item` ditolak. Satu opname = satu `submission_id`.
+    `Data_Opname` diurutkan tanggal terbaru, kategori, item, waktu.
+121. **Riwayat Stock:** satu baris "Stock opname" per opname pada tanggalnya ("3 item dihitung, 1 berselisih, nilai selisih Rp −45.000");
+    baris `Data_Penyesuaian` beralasan "Stock opname" tidak tampil terpisah (sudah terwakili opname). Pengelola mengetuknya untuk lembar
+    rincian (semua item yang dihitung) dengan "Unduh laporan selisih". Filter kategori/item menyaring baris opname seperti sebelumnya.
+122. **Laporan selisih PDF** (dibuat saat diunduh, tidak disimpan ke Drive dan tidak ikut email): judul "Laporan Selisih Stock Opname",
+    kotak info Kategori (nama atau "n kategori"), Item dihitung, Item berselisih; tabel No, Nama Item, Stock Tercatat, Hasil Hitung,
+    Selisih (bertanda +), Satuan, Nilai Selisih (Rp), dikelompokkan per kategori jika lebih dari satu, baris total; "Dihitung oleh"
+    menggantikan Diisi/Diperiksa oleh. Nama file `{YYYY-MM-DD}_Selisih_opname_{HHmm}.pdf` (jam opname). `htmlLaporan_` kini menerima
+    `isi.judul` dan `isi.bawah` untuk laporan yang bukan form harian.
+123. **Jadwal opname:** lewat jika belum pernah ada opname, atau hari sejak opname terakhir lebih dari 7 (mingguan) atau 31 (bulanan);
+    nilai `jadwal_opname` lain dibaca mingguan. Opname terakhir = tanggal terbaru di `Data_Opname`. Pengingat: Beranda Pengelola (di
+    bawah pemeriksaan: "Stock opname terakhir 9 hari lalu." atau "Belum ada stock opname.", ketuk membuka Stock opname), Dashboard
+    (butir Perlu ditinjau; di samping tombol Stock opname "Terakhir 3 Okt (3 hari lalu)", bertanda Perlu ditinjau jika lewat), dan email
+    harian (bagian "Untuk Head Kitchen dan Manager").
+124. **Daftar belanja** (kartu kedua di menu Laporan, khusus Pengelola; `cache:belanja`): item aktif dengan Stock Akhir hari ini di bawah
+    Stok Minimum, per kategori (urutan `M_Kategori`), nama abjad. Baris: nama, "Stock 4 botol · minimum 6 botol", "Saran 2 dus (24 botol)"
+    atau "Tanpa saran: stok maksimum kosong", dan kolom Order dalam satuan order (satuan besar jika item punya, dengan konversi
+    "= 24 botol"). Saran = pembulatan ke atas (Stok Maksimum − Stock Akhir) / isi satuan besar (`saranOrderAngka_`, juga dipakai
+    `saranOrder_` untuk email dan Dashboard). Jumlah yang diubah hanya ada di memori layar dan dikirim sebagai `order` saat "Unduh PDF"
+    (yang tidak diubah memakai saran, kosong dicetak "–"; mengubah angka mengembalikan tombol iPhone ke "Unduh PDF"). PDF "Daftar Belanja":
+    No, Nama Item, Stock Sekarang, Stok Minimum, Order per kategori; catatan jumlah yang diubah; "Dicetak oleh"; nama file
+    `{YYYY-MM-DD}_Daftar_belanja.pdf`. Kosong: "Semua stock di atas batas minimum." dan tombol nonaktif. Email harian: subjudul stock
+    menjadi "Daftar belanja: n item di bawah stok minimum" dengan saran ordernya (item tanpa saran ditulis begitu).
+125. **`unduhPdf(opsi)`** menerima `opsi.teks` (teks tombol, bawaan "Unduh PDF"; dipakai "Unduh laporan selisih"); aturan iPhone tetap sama.
+126. **Blok Stock opname di tab Dashboard** (15 baris, `TINGGI_BLOK_OPNAME`, disisipkan sekali sebelum blok Waste): ringkasan (opname
+    terakhir yyyy-mm-dd dan berapa hari lalu, jumlah opname dan total nilai selisih dalam periode B3, atau "Belum ada stock opname.");
+    tabel per opname dalam periode (10 terbaru, urut lama ke baru: tanggal, item dihitung, item berselisih, nilai selisih); 10 item paling
+    sering berselisih dalam periode (berapa kali, total nilai selisih). Grafik kolom "Nilai selisih tiap opname" di kolom J (Dashboard
+    kini 7 grafik).
+127. **Uji Tahap 8** (di luar repo): 23 uji server (opname sebagian, selisih plus/minus, Stock Akhir = hasil hitung, barang masuk di antara
+    membuka dan menyimpan, kiriman ulang, validasi, jadwal mingguan/bulanan, Riwayat, PDF, saran 20/12 → 2 dus, tanpa stok maksimum,
+    email, penolakan Staff, rumus seimbang), 16 uji alur Chromium (termasuk iPhone dengan lembar bagikan tiruan), dan delapan ukuran
+    Bagian 4.6; uji Tahap 7 tetap lulus.
