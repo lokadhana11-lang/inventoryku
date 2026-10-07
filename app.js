@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.11.1';
+  var VERSI_APLIKASI = '0.12.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -144,6 +144,89 @@
     }
   };
 
+  /**
+   * Foto bukti waste di HP (Tahap 11). localStorage terlalu kecil untuk foto, jadi
+   * foto disimpan di IndexedDB, satu catatan { data (base64 JPEG), mime, ukuran,
+   * waktu } per foto dengan kunci "<pengguna>|<id>"; draft dan antrean hanya
+   * menyimpan id-nya. FotoHp.siap: null (belum diperiksa), true, atau false
+   * (IndexedDB tidak ada atau ditolak browser: foto tidak bisa ditambahkan,
+   * waste tetap bisa dikirim tanpa foto).
+   */
+  var FotoHp = (function () {
+    var NAMA_DB = 'inventoryku-foto';
+    var TOKO = 'foto';
+    var janji = null;
+    var api = { siap: null };
+    function buka() {
+      if (janji) return janji;
+      janji = new Promise(function (ok, gagal) {
+        var r;
+        try {
+          if (!window.indexedDB) throw new Error('IndexedDB tidak tersedia');
+          r = window.indexedDB.open(NAMA_DB, 1);
+        } catch (err) {
+          gagal(err);
+          return;
+        }
+        r.onupgradeneeded = function () { r.result.createObjectStore(TOKO); };
+        r.onsuccess = function () { ok(r.result); };
+        r.onerror = function () { gagal(r.error || new Error('IndexedDB gagal dibuka')); };
+        r.onblocked = function () { gagal(new Error('IndexedDB terhalang')); };
+      });
+      janji.then(function () { api.siap = true; }, function () { api.siap = false; });
+      return janji;
+    }
+    function awalan() {
+      var p = penggunaKini();
+      return (p ? p.nama : '') + '|';
+    }
+    function jalankan(mode, kerja) {
+      return buka().then(function (db) {
+        return new Promise(function (ok, gagal) {
+          var tx = db.transaction(TOKO, mode);
+          var hasil;
+          var r = kerja(tx.objectStore(TOKO));
+          if (r) r.onsuccess = function () { hasil = r.result; };
+          tx.oncomplete = function () { ok(hasil); };
+          tx.onerror = tx.onabort = function () { gagal(tx.error || new Error('Penyimpanan foto gagal')); };
+        });
+      });
+    }
+    api.periksa = function () {
+      return buka().then(function () { return true; }, function () { return false; });
+    };
+    api.simpan = function (id, isi) {
+      return jalankan('readwrite', function (t) { return t.put(isi, awalan() + id); });
+    };
+    api.baca = function (id) {
+      return jalankan('readonly', function (t) { return t.get(awalan() + id); }).catch(function () { return null; });
+    };
+    api.hapus = function (ids) {
+      ids = [].concat(ids || []).filter(Boolean);
+      if (!ids.length) return Promise.resolve();
+      var a = awalan();
+      return jalankan('readwrite', function (t) {
+        ids.forEach(function (id) { t.delete(a + id); });
+      }).catch(function () {});
+    };
+    /** Membuang foto pengguna ini yang tidak dirujuk draft atau antrean lagi. */
+    api.bersihkan = function (dipakai) {
+      var a = awalan();
+      var pakai = {};
+      dipakai.forEach(function (id) { pakai[a + id] = true; });
+      return jalankan('readwrite', function (t) {
+        var r = t.openCursor();
+        r.onsuccess = function () {
+          var c = r.result;
+          if (!c) return;
+          if (String(c.key).indexOf(a) === 0 && !pakai[c.key]) c.delete();
+          c.continue();
+        };
+      }).catch(function () {});
+    };
+    return api;
+  })();
+
   /** Data server yang tersimpan di HP per pengguna: { data, waktu }. */
   var Cache = {
     baca: function (kunci) {
@@ -183,7 +266,7 @@
    * pesan berbahasa Indonesia yang siap ditampilkan; err.sesiBerakhir = true
    * jika server menolak token.
    */
-  function panggilApi(aksi, isi) {
+  function panggilApi(aksi, isi, opsi) {
     var alamat;
     try {
       alamat = alamatApi();
@@ -204,7 +287,7 @@
     var penghitung = setTimeout(function () {
       habisWaktu = true;
       if (kendali) kendali.abort();
-    }, BATAS_WAKTU_MS);
+    }, (opsi && opsi.batasWaktuMs) || BATAS_WAKTU_MS);
 
     return fetch(alamat, {
       method: 'POST',
@@ -347,7 +430,8 @@
     resep: '<path d="M3.5 11.5h17"/><path d="M5 11.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M9 4.5c-1 1.2 1 2.3 0 3.5M13 4.5c-1 1.2 1 2.3 0 3.5"/>',
     kotak: '<path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>',
     label: '<path d="M3.5 12.5v-8h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.5"/>',
-    titikTiga: '<path d="M12 5.5v.01M12 12v.01M12 18.5v.01" stroke-width="3"/>'
+    titikTiga: '<path d="M12 5.5v.01M12 12v.01M12 18.5v.01" stroke-width="3"/>',
+    kamera: '<path d="M3.5 8.5a2 2 0 0 1 2-2h2.5l1.5-2.5h5l1.5 2.5h2.5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>'
   };
 
   /** Ikon kecil 16 px untuk tanda status. */
@@ -2175,6 +2259,122 @@
 
   var antreanJalan = false;
 
+  /** Id foto bukti (di IndexedDB) yang dirujuk isian kirim; hanya kiriman Waste yang punya foto. */
+  function idFotoIsian(isi) {
+    return ((isi && isi.baris) || []).map(function (b) { return b && b.fotoId; }).filter(Boolean);
+  }
+
+  /**
+   * Mengirim satu isian (dari layar atau antrean). Foto bukti yang dirujuk lewat
+   * fotoId dibaca dari IndexedDB dan dikirim sebagai base64 di "foto"; batas waktu
+   * panggilan ditambah 20 detik per foto (unggahan dan simpan ke Drive). Foto
+   * yang sudah tidak ada di HP dikirim tanpa foto (jawaban.fotoHilang berisi nama
+   * itemnya). Setelah berhasil, fotonya dihapus dari HP.
+   */
+  function kirimIsian(aksi, isi) {
+    var ids = idFotoIsian(isi);
+    if (!ids.length) return panggilApi(aksi, isi);
+    var hilang = [];
+    return Promise.all(isi.baris.map(function (b) {
+      if (!b.fotoId) return b;
+      return FotoHp.baca(b.fotoId).then(function (f) {
+        var x = Object.assign({}, b);
+        delete x.fotoId;
+        if (f && f.data) x.foto = f.data;
+        else hilang.push(b.item);
+        return x;
+      });
+    })).then(function (baris) {
+      var ada = baris.filter(function (b) { return b.foto; }).length;
+      return panggilApi(aksi, Object.assign({}, isi, { baris: baris }),
+        { batasWaktuMs: Math.min(BATAS_WAKTU_MS + ada * 20000, 180000) });
+    }).then(function (hasil) {
+      FotoHp.hapus(ids);
+      if (hilang.length) hasil.fotoHilang = hilang;
+      return hasil;
+    });
+  }
+
+  /** Pesan sesudah kiriman Waste yang membawa foto: foto yang gagal disimpan server atau hilang dari HP. */
+  function pesanFotoKiriman(hasil) {
+    var bagian = [];
+    if (hasil && hasil.fotoGagal && hasil.fotoGagal.length) {
+      bagian.push('Foto bukti ' + daftarNama(hasil.fotoGagal) + ' gagal disimpan ke Drive, jadi waste itu tercatat tanpa foto.');
+    }
+    if (hasil && hasil.fotoHilang && hasil.fotoHilang.length) {
+      bagian.push('Foto bukti ' + daftarNama(hasil.fotoHilang) + ' sudah tidak ada di HP, jadi dikirim tanpa foto.');
+    }
+    return bagian.join(' ');
+  }
+
+  /** "Tomat", "Tomat dan Selada", "Tomat, Selada, dan Wortel". */
+  function daftarNama(nama) {
+    if (nama.length < 3) return nama.join(' dan ');
+    return nama.slice(0, -1).join(', ') + ', dan ' + nama[nama.length - 1];
+  }
+
+  /**
+   * Foto dari kamera atau galeri diperkecil di HP sebelum disimpan (Tahap 11):
+   * sisi terpanjang paling banyak 1280 px, JPEG mutu 0,7, latar putih untuk
+   * gambar transparan. Arah foto mengikuti data EXIF (browser menerapkannya saat
+   * gambar digambar ke canvas). Hasil: { data (base64), mime, ukuran (byte) }.
+   */
+  var SISI_FOTO_MAKS = 1280;
+  var MUTU_FOTO = 0.7;
+  var BATAS_FOTO_BYTE = 2 * 1024 * 1024; // sama dengan batas di server
+  function perkecilFoto(file) {
+    return new Promise(function (ok, gagal) {
+      var url;
+      try {
+        url = URL.createObjectURL(file);
+      } catch (err) {
+        gagal(new Error('Foto tidak bisa dibaca. Coba foto lain.'));
+        return;
+      }
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth;
+        var h = img.naturalHeight;
+        if (!w || !h) {
+          gagal(new Error('Foto tidak bisa dibaca. Coba foto lain.'));
+          return;
+        }
+        var skala = Math.min(1, SISI_FOTO_MAKS / Math.max(w, h));
+        var kanvas = document.createElement('canvas');
+        kanvas.width = Math.max(1, Math.round(w * skala));
+        kanvas.height = Math.max(1, Math.round(h * skala));
+        var g = kanvas.getContext('2d');
+        g.fillStyle = '#FFFFFF';
+        g.fillRect(0, 0, kanvas.width, kanvas.height);
+        g.drawImage(img, 0, 0, kanvas.width, kanvas.height);
+        var dataUrl = kanvas.toDataURL('image/jpeg', MUTU_FOTO);
+        var data = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        var ukuran = Math.floor(data.length * 3 / 4);
+        if (!data || dataUrl.indexOf('data:image/jpeg') !== 0) {
+          gagal(new Error('Foto tidak bisa diperkecil di HP ini. Coba foto lain.'));
+          return;
+        }
+        if (ukuran > BATAS_FOTO_BYTE) {
+          gagal(new Error('Foto terlalu besar (' + teksMb(ukuran) + ') walau sudah diperkecil. Batasnya ' + teksMb(BATAS_FOTO_BYTE) + '.'));
+          return;
+        }
+        ok({ data: data, mime: 'image/jpeg', ukuran: ukuran });
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        gagal(new Error('Foto tidak bisa dibaca. Coba foto lain, atau ambil dengan kamera.'));
+      };
+      img.src = url;
+    });
+  }
+
+  /** "240 KB" atau "1,4 MB". */
+  function teksMb(byte) {
+    if (byte < 1024 * 1024) return Math.max(1, Math.round(byte / 1024)) + ' KB';
+    return String(Math.round(byte / 104857.6) / 10).replace('.', ',') + ' MB';
+  }
+
   /**
    * Mengirim antrean pengguna yang sedang masuk, satu per satu, dengan
    * tokennya sendiri. Berhenti jika sinyal putus. Jika sesi habis, isian
@@ -2191,12 +2391,15 @@
     antreanJalan = true;
     var terkirim = 0;
     var berhenti = null;
+    var pesanFoto = [];
     return daftar.reduce(function (janji, e) {
       return janji.then(function () {
         if (berhenti) return null;
-        return panggilApi(e.aksi, e.isi).then(function () {
+        return kirimIsian(e.aksi, e.isi).then(function (hasil) {
           Antrean.hapus(nama, e.id);
           terkirim++;
+          var pf = pesanFotoKiriman(hasil);
+          if (pf) pesanFoto.push(pf);
         }, function (err) {
           if (err && (err.jaringan || err.sesiBerakhir)) {
             berhenti = err;
@@ -2212,7 +2415,7 @@
         return terkirim;
       }
       if (terkirim) {
-        toast(terkirim + ' isian terkirim.');
+        toast(terkirim + ' isian terkirim.' + (pesanFoto.length ? ' ' + pesanFoto.join(' ') : ''));
         if (segarkanLayar) segarkanLayar();
       }
       if (segarkanAntrean) segarkanAntrean();
@@ -2295,6 +2498,7 @@
             }).then(function (ya) {
               if (!ya) return;
               Antrean.hapus(p.nama, e.id);
+              FotoHp.hapus(idFotoIsian(e.isi));
               toast('Isian dihapus dari HP.');
               if (segarkanAntrean) segarkanAntrean();
             });
@@ -3057,6 +3261,8 @@
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
     var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
     var tombolKirim = tombol('Kirim waste', 'utama');
+    var pratinjau = {}; // id foto → data URL (pratinjau yang sudah dibaca dari IndexedDB)
+    var pesanFoto = {}; // id baris → { teks, jenis } pesan foto di baris itu
     var tombolTambah = tombol('Tambah item', 'kedua', { 'aria-haspopup': 'dialog' });
     tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
 
@@ -3123,6 +3329,8 @@
     function hapusBaris(b) {
       draft.baris = draft.baris.filter(function (x) { return x !== b; });
       if (draft.terbuka === b.id) draft.terbuka = '';
+      if (b.foto) FotoHp.hapus(b.foto.id);
+      delete pesanFoto[b.id];
       simpanDraft();
       gambarBaris();
       toast(b.item + ' dihapus dari isian.');
@@ -3132,6 +3340,111 @@
       draft.terbuka = id;
       simpanDraft();
       gambarBaris();
+    }
+
+    /*
+     * Foto bukti (opsional, satu per item; Tahap 11). Diambil dari kamera atau
+     * galeri, diperkecil di HP, disimpan di IndexedDB (FotoHp); draft hanya
+     * menyimpan { id, ukuran }.
+     */
+    var TEKS_TANPA_IDB = 'Foto bukti tidak bisa disimpan di HP ini, karena penyimpanan browser tidak tersedia. ' +
+      'Waste tetap bisa dikirim tanpa foto.';
+
+    function tampilkanPratinjau(img, b) {
+      var id = b.foto.id;
+      if (pratinjau[id]) {
+        img.src = pratinjau[id];
+        return;
+      }
+      FotoHp.baca(id).then(function (f) {
+        if (!b.foto || b.foto.id !== id) return;
+        if (f && f.data) {
+          pratinjau[id] = 'data:' + (f.mime || 'image/jpeg') + ';base64,' + f.data;
+          img.src = pratinjau[id];
+          return;
+        }
+        // Foto sudah tidak ada di HP (data browser dibersihkan): rujukannya dilepas.
+        b.foto = null;
+        pesanFoto[b.id] = { teks: 'Foto bukti ' + b.item + ' sudah tidak ada di HP. Ambil lagi jika perlu.', jenis: 'tinjau' };
+        simpanDraft();
+        gambarBaris();
+      });
+    }
+
+    function pasangFoto(b, file) {
+      pesanFoto[b.id] = { teks: 'Memproses foto…', jenis: 'info' };
+      gambarBaris();
+      perkecilFoto(file).then(function (f) {
+        var id = buatId();
+        return FotoHp.simpan(id, { data: f.data, mime: f.mime, ukuran: f.ukuran, waktu: Date.now() }).then(function () {
+          var lama = b.foto && b.foto.id;
+          b.foto = { id: id, ukuran: f.ukuran };
+          pratinjau[id] = 'data:' + f.mime + ';base64,' + f.data;
+          if (lama) FotoHp.hapus(lama);
+          delete pesanFoto[b.id];
+          simpanDraft();
+        }, function () {
+          throw new Error(FotoHp.siap === false ? TEKS_TANPA_IDB
+            : 'Foto tidak bisa disimpan di HP (ruang penyimpanan mungkin penuh). Waste tetap bisa dikirim tanpa foto.');
+        });
+      }).catch(function (err) {
+        pesanFoto[b.id] = { teks: err.message, jenis: 'masalah' };
+      }).then(function () {
+        gambarBaris();
+      });
+    }
+
+    function hapusFoto(b) {
+      if (!b.foto) return;
+      FotoHp.hapus(b.foto.id);
+      delete pratinjau[b.foto.id];
+      b.foto = null;
+      delete pesanFoto[b.id];
+      simpanDraft();
+      gambarBaris();
+      toast('Foto bukti ' + b.item + ' dihapus.');
+    }
+
+    /** Tombol ambil foto (kamera belakang) atau pilih dari galeri: label berisi input file. */
+    function tombolFoto(b, teks, kamera) {
+      var input = el('input', { type: 'file', accept: 'image/*', class: 'input-file', 'aria-label': teks + ' bukti ' + b.item });
+      if (kamera) input.setAttribute('capture', 'environment');
+      input.addEventListener('change', function () {
+        var file = input.files && input.files[0];
+        input.value = '';
+        if (file) pasangFoto(b, file);
+      });
+      return el('label', { class: 'tombol tombol-kedua tombol-file' }, [ikon('kamera'), el('span', { class: 'tombol-teks', text: teks }), input]);
+    }
+
+    /** Bagian foto bukti satu baris: pratinjau dengan Hapus foto, atau tombol ambil/pilih foto. */
+    function bagianFoto(b, diTabel) {
+      var isi = [];
+      if (!diTabel) isi.push(el('span', { class: 'kolom-label', text: 'Foto bukti (tidak wajib)' }));
+      if (b.foto) {
+        var img = el('img', { class: 'foto-pratinjau', alt: 'Foto bukti ' + b.item, width: 64, height: 64 });
+        tampilkanPratinjau(img, b);
+        isi.push(el('div', { class: 'foto-ada' }, [
+          img,
+          el('span', { class: 'foto-ket' }, [
+            diTabel ? null : el('span', { text: 'Foto tersimpan di HP' }),
+            el('span', { class: 'kolom-bantuan', text: teksMb(b.foto.ukuran || 0) })
+          ]),
+          tombol('Hapus foto', 'tautan', { 'aria-label': 'Hapus foto bukti ' + b.item, onclick: function () { hapusFoto(b); } })
+        ]));
+      } else if (FotoHp.siap === false) {
+        isi.push(el('p', { class: 'kolom-bantuan', text: TEKS_TANPA_IDB }));
+      } else {
+        var sentuh = apakahSentuh();
+        isi.push(el('div', { class: 'deret-tombol' }, [
+          sentuh ? tombolFoto(b, 'Ambil foto', true) : null,
+          tombolFoto(b, sentuh ? 'Pilih dari galeri' : 'Pilih foto', false)
+        ]));
+      }
+      var p = el('p', { class: 'pesan-formulir', 'aria-live': 'polite' });
+      if (pesanFoto[b.id]) tulisPesan(p, pesanFoto[b.id].teks, pesanFoto[b.id].jenis);
+      isi.push(p);
+      return el('div', { class: 'foto-bukti' + (diTabel ? ' foto-bukti-tabel' : ''), role: 'group', 'aria-label': 'Foto bukti ' + b.item }, isi);
     }
 
     /** Isian satu baris; dipakai kartu (HP dan tablet) dan baris tabel (laptop dan desktop). */
@@ -3185,7 +3498,8 @@
       perbarui();
       var hapus = el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari isian',
         onclick: function () { hapusBaris(b); } }, ikon('sampah'));
-      return { it: it, gKat: gKat, inQty: inQty, idQty: idQty, galatQty: galatQty, kAlasan: kAlasan, estimasi: estimasi, hapus: hapus };
+      return { it: it, gKat: gKat, inQty: inQty, idQty: idQty, galatQty: galatQty, kAlasan: kAlasan, estimasi: estimasi, hapus: hapus,
+        foto: bagianFoto(b, mediaDesktop.matches) };
     }
 
     /** Ringkasan satu baris (HP dan tablet): item yang sudah diisi diringkas; ketuk untuk membuka. */
@@ -3195,6 +3509,7 @@
       var bagian = [b.kategori || 'Kategori belum dipilih'];
       if (h.qty > 0) bagian.push(formatAngka(h.qty) + (it.satuan ? ' ' + it.satuan : ''));
       if (h.qty > 0 && it.harga != null) bagian.push(formatRupiah(h.qty * it.harga));
+      if (b.foto) bagian.push('ada foto');
       var kartu = el('div', { class: 'kartu-item waste-ringkas' }, [
         el('button', { type: 'button', class: 'waste-ringkas-tombol', 'aria-expanded': 'false',
           'aria-label': b.item + ', ' + bagian.join(', ') + (h.salah ? ', belum lengkap' : '') + '. Ketuk untuk mengubah.',
@@ -3224,6 +3539,7 @@
           x.galatQty
         ]),
         x.kAlasan.wadah,
+        x.foto,
         el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Estimasi kerugian' }), x.estimasi]),
         draft.baris.length > 1 ? tombol('Selesai', 'tautan', { onclick: function () { bukaBaris(''); } }) : null
       ]);
@@ -3242,6 +3558,7 @@
         el('td', { class: 'sel-kategori-waste' }, x.gKat.wadah),
         el('td', {}, [el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]), x.galatQty]),
         el('td', { class: 'sel-alasan' }, x.kAlasan.wadah),
+        el('td', { class: 'sel-foto' }, x.foto),
         el('td', { class: 'angka otomatis' }, x.estimasi),
         el('td', {}, x.hapus)
       ]);
@@ -3259,8 +3576,8 @@
         var badan = el('tbody');
         draft.baris.forEach(function (b, i) { badan.appendChild(barisTabel(b, i + 1)); });
         wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-waste' }, [
-          el('thead', {}, el('tr', {}, ['No', 'Item / Produk', 'Kategori waste', 'Qty', 'Alasan / keterangan', 'Estimasi kerugian', '']
-            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 || i === 5 ? 'angka' : null, text: j }); }))),
+          el('thead', {}, el('tr', {}, ['No', 'Item / Produk', 'Kategori waste', 'Qty', 'Alasan / keterangan', 'Foto bukti', 'Estimasi kerugian', '']
+            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 || i === 6 ? 'angka' : null, text: j }); }))),
           badan
         ])));
       } else {
@@ -3392,11 +3709,15 @@
       }
       if (!draft.sid) draft.sid = buatId();
       var baris = draft.baris.map(function (b) {
-        return { item: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() };
+        var x = { item: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() };
+        if (b.foto) x.fotoId = b.foto.id; // foto ikut ke antrean lewat id-nya (IndexedDB)
+        return x;
       });
+      var jumlahFoto = baris.filter(function (b) { return b.fotoId; }).length;
       var isi = { submissionId: draft.sid, tanggal: tanggal, shift: draft.shift, waktuPerangkat: new Date().toISOString(), baris: baris };
       var entri = { id: isi.submissionId, aksi: 'kirimWaste', isi: isi, formId: 'WASTE',
-        judul: 'Waste · ' + baris.length + ' item', tanggal: tanggal };
+        judul: 'Waste · ' + baris.length + ' item' + (jumlahFoto ? ', ' + jumlahFoto + ' foto' : ''), tanggal: tanggal };
+      // Foto tidak dihapus di sini: antrean masih merujuknya; kirimIsian menghapusnya setelah terkirim.
       function kosongkanIsian() {
         draft.baris = [];
         draft.terbuka = '';
@@ -3414,12 +3735,14 @@
         keAntrean();
         return;
       }
-      aturTombolProses(tombolKirim, true, 'Mengirim…');
-      jagaProses(panggilApi('kirimWaste', isi)).then(function (hasil) {
+      aturTombolProses(tombolKirim, true, jumlahFoto ? 'Mengirim foto…' : 'Mengirim…');
+      jagaProses(kirimIsian('kirimWaste', isi)).then(function (hasil) {
         aturTombolProses(tombolKirim, false);
         kosongkanIsian();
         Cache.tulis('waste', hasil.form);
         if (hasil.form.tanggal === tanggal) gambar(hasil.form);
+        var pf = pesanFotoKiriman(hasil);
+        if (pf) tulisPesan(pesan, 'Waste terkirim. ' + pf, 'tinjau');
         toast('Waste terkirim.');
       }).catch(function (err) {
         aturTombolProses(tombolKirim, false);
@@ -3469,6 +3792,20 @@
     muat();
     segarkanLayar = muat;
     segarkanAntrean = gambarStatus;
+
+    // IndexedDB diperiksa sekali; jika tidak ada, tombol foto diganti keterangan.
+    // Foto yang tidak dirujuk draft atau antrean lagi (misalnya sisa draft lama) dibuang.
+    FotoHp.periksa().then(function (ada) {
+      if (!ada) {
+        if (draft.baris.length) gambarBaris();
+        return;
+      }
+      var p = penggunaKini();
+      var dipakai = [];
+      draft.baris.forEach(function (b) { if (b.foto) dipakai.push(b.foto.id); });
+      if (p) Antrean.daftar(p.nama).forEach(function (e) { dipakai = dipakai.concat(idFotoIsian(e.isi)); });
+      FotoHp.bersihkan(dipakai);
+    });
   }
 
   /* =======================================================================
@@ -5317,6 +5654,7 @@
       });
     }
     var tanda = [];
+    if (b.foto) tanda.push(el('span', { class: 'ikon-tanda', title: 'Ada foto bukti' }, [ikon('kamera'), el('span', { class: 'sr', text: 'Ada foto bukti' })]));
     if (b.flag) tanda.push(el('span', { class: 'ikon-tanda tinjau', title: 'Dilaporkan keliru' }, [ikon('bendera'), el('span', { class: 'sr', text: 'Dilaporkan keliru' })]));
     return el('span', { class: 'ringkas-baris' }, isi.concat(tanda));
   }
@@ -6114,6 +6452,14 @@
         if (minus.length) {
           isi.push(el('p', {}, tandaStatus('masalah', 'Stock ' + minus.map(function (x) { return x.item; }).join(', ') + ' minus')));
         }
+      }
+      // Foto bukti waste (Tahap 11): semua role melihat tandanya; tautan ke Drive hanya
+      // dikirim server untuk Pengelola, karena Staff tidak punya akses ke folder Drive.
+      if (b.foto) {
+        isi.push(el('p', { class: 'kolom-bantuan foto-riwayat' }, [ikon('kamera'),
+          el('span', { text: ' Ada foto bukti' + (b.fotoUrl ? '. ' : ' (dilihat Head Kitchen atau Manager).') }),
+          b.fotoUrl ? el('a', { href: b.fotoUrl, target: '_blank', rel: 'noopener noreferrer', class: 'tautan-foto',
+            'aria-label': 'Lihat foto bukti ' + (nama ? b.nilai[nama.kunci] : '') + ' di Google Drive' }, 'Lihat foto') : null]));
       }
       if (b.flag) {
         isi.push(el('p', { class: 'pesan-formulir tinjau catatan-flag' }, [ikon('bendera'),

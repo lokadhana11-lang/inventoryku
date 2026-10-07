@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.11.1 (perbaikan butir 150: urutan Data_Suhu)
+// InventoryKu Code.gs v0.12 (Tahap 11: foto bukti waste)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -57,7 +57,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.11.1';
+var VERSI_KODE = 'v0.12';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -199,6 +199,7 @@ var AKSI_ = {
 function doPost(e) {
   var hasil;
   SS_ = null;
+  PENGGUNA_AKSI_ = null;
   resetMemoForm_();
   try {
     var body = bacaBody_(e);
@@ -214,6 +215,7 @@ function doPost(e) {
         throw galatPengguna_(aksi.pesan || 'Menu ini hanya untuk Head Kitchen dan Manager.');
       }
     }
+    PENGGUNA_AKSI_ = pengguna;
     hasil = { ok: true, data: aksi.jalankan(body, pengguna) || {} };
   } catch (err) {
     if (err && err.untukPengguna) {
@@ -295,6 +297,8 @@ function bukaSpreadsheet_() {
 
 /** Spreadsheet untuk satu permintaan (dibuka sekali, lalu dipakai ulang). */
 var SS_ = null;
+/** Pengguna aksi yang sedang dijalankan doPost (null di trigger dan editor); dipakai barisRiwayat_ untuk tautan foto. */
+var PENGGUNA_AKSI_ = null;
 function ss_() {
   if (!SS_) SS_ = bukaSpreadsheet_();
   return SS_;
@@ -2111,11 +2115,110 @@ function aksiFormWaste_(body) {
   return dataFormWaste_(body.tanggal);
 }
 
+/* ---------- Tahap 11: foto bukti waste (sistem Bagian 5.4) ---------- */
+
+var BATAS_FOTO_BYTE = 2 * 1024 * 1024;           // per foto, setelah base64 dibuka
+var BATAS_FOTO_KIRIMAN_BYTE = 15 * 1024 * 1024;  // semua foto dalam satu kiriman
+var FOLDER_FOTO_WASTE = 'Foto waste';
+
+/** "3,1 MB" */
+function ukuranMb_(byte) {
+  return (Math.round(byte / 104857.6) / 10).toString().replace('.', ',') + ' MB';
+}
+
+/**
+ * Foto bukti satu baris waste dari kiriman (base64, boleh berawalan data URL):
+ * null jika tidak ada; { bytes, mime, ext, ukuran } jika sah. Hanya JPEG, PNG,
+ * atau WebP (dikenali dari isi file, bukan dari namanya), paling besar
+ * BATAS_FOTO_BYTE.
+ */
+function bacaFotoWaste_(nilai, label) {
+  if (nilai == null || nilai === '') return null;
+  var teks = typeof nilai === 'string' ? nilai.replace(/^data:[^,]*,/, '').replace(/\s+/g, '') : '';
+  var tidakTerbaca = 'Foto bukti ' + label + ' tidak terbaca. Hapus fotonya, lalu ambil lagi.';
+  if (!teks || !/^[A-Za-z0-9+/_-]+=*$/.test(teks)) throw galatPengguna_(tidakTerbaca);
+  var kiraan = Math.floor(teks.length * 3 / 4);
+  if (kiraan > BATAS_FOTO_BYTE) {
+    throw galatPengguna_('Foto bukti ' + label + ' terlalu besar (' + ukuranMb_(kiraan) + '). Batasnya ' +
+      ukuranMb_(BATAS_FOTO_BYTE) + '. Hapus fotonya, lalu ambil lagi.');
+  }
+  var bytes;
+  try {
+    bytes = Utilities.base64Decode(teks.replace(/-/g, '+').replace(/_/g, '/'));
+  } catch (err) {
+    throw galatPengguna_(tidakTerbaca);
+  }
+  var b = function (i) { return bytes[i] & 255; };
+  var jenis = null;
+  if (b(0) === 0xFF && b(1) === 0xD8 && b(2) === 0xFF) jenis = { mime: 'image/jpeg', ext: 'jpg' };
+  else if (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4E && b(3) === 0x47) jenis = { mime: 'image/png', ext: 'png' };
+  else if (b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 &&
+    b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50) jenis = { mime: 'image/webp', ext: 'webp' };
+  if (!jenis || bytes.length < 16) throw galatPengguna_(tidakTerbaca);
+  return { bytes: bytes, mime: jenis.mime, ext: jenis.ext, ukuran: bytes.length };
+}
+
+/** Folder Laporan Kitchen/{Nama Outlet} (dipakai laporan PDF harian dan foto waste). */
+function folderOutlet_() {
+  var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
+  return cariAtauBuatFolder_(akar, (namaOutlet_() || 'Outlet').replace(/[\\/]+/g, '-'));
+}
+
+/** Folder Laporan Kitchen/{Nama Outlet}/Foto waste/{YYYY}/{MM Bulan} untuk satu tanggal waste. */
+function folderFotoWaste_(tanggal) {
+  var p = tanggal.split('-');
+  var tahun = cariAtauBuatFolder_(cariAtauBuatFolder_(folderOutlet_(), FOLDER_FOTO_WASTE), p[0]);
+  return cariAtauBuatFolder_(tahun, p[1] + ' ' + BULAN_ID[Number(p[1]) - 1]);
+}
+
+/**
+ * Menyimpan foto ke Drive: {tanggal}_{Item}_{8 huruf awal submissionId}-{no baris}.{ext}.
+ * Nama itu tetap untuk kiriman yang sama, jadi kiriman yang diulang setelah
+ * terputus di tengah jalan memakai file yang sudah ada (tidak tersimpan dua
+ * kali). Mengembalikan { url, gagal: [nama item] }; foto yang gagal disimpan
+ * tidak menggagalkan kiriman (waste tetap mengurangi stock), dan disebut di jawaban.
+ */
+function simpanFotoWaste_(tanggal, sid, daftar) {
+  var gagal = [];
+  if (!daftar.length) return gagal;
+  var folder = null;
+  try {
+    folder = folderFotoWaste_(tanggal);
+  } catch (err) {
+    console.error('Folder foto waste gagal: ' + (err && err.stack ? err.stack : err));
+  }
+  daftar.forEach(function (x) {
+    if (!folder) {
+      gagal.push(x.baris['Item / Produk']);
+      return;
+    }
+    var nama = tanggal + '_' + namaFileForm_(x.baris['Item / Produk']) + '_' + sid.slice(0, 8) + '-' + (x.no) + '.' + x.foto.ext;
+    try {
+      var file = null;
+      var ada = folder.getFilesByName(nama);
+      while (ada.hasNext()) {
+        var f = ada.next();
+        if (!f.isTrashed()) { file = f; break; }
+      }
+      if (!file) file = folder.createFile(Utilities.newBlob(x.foto.bytes, x.foto.mime, nama));
+      x.baris['Foto Bukti'] = file.getUrl();
+    } catch (err) {
+      console.error('Foto waste gagal disimpan: ' + (err && err.stack ? err.stack : err));
+      gagal.push(x.baris['Item / Produk']);
+    }
+  });
+  return gagal;
+}
+
 /**
  * Kiriman form Waste: satu baris Data_Waste per item. Satuan dan Harga Satuan
  * disalin dari M_Item saat dicatat; Estimasi Kerugian dihitung server. Waste
  * langsung mengurangi stock: rekap Stock_Harian item itu pada tanggal itu
  * (dibuat jika belum ada) dan semua rekap sesudahnya dihitung ulang.
+ * Foto bukti (opsional, satu per baris, base64 di `foto`) disimpan ke Drive
+ * sebelum kunci diambil, supaya penulis lain tidak menunggu unggahan;
+ * tautannya dicatat di kolom Foto Bukti. Kiriman ganda dikenali lebih dulu,
+ * jadi fotonya tidak disimpan lagi.
  */
 function aksiKirimWaste_(body, pengguna) {
   var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
@@ -2124,41 +2227,58 @@ function aksiKirimWaste_(body, pengguna) {
   if (SHIFT.indexOf(shift) < 0) throw galatPengguna_('Pilih shift: Pagi, Siang, atau Malam.');
   var masukan = Array.isArray(body.baris) ? body.baris : [];
   if (masukan.length > 200) throw galatPengguna_('Isian terlalu banyak untuk satu kiriman.');
+  if (adaSubmission_(wajibTabel_('Data_Waste'), konteks.sid)) {
+    return { sudahTerkirim: true, jumlah: 0, form: dataFormWaste_(tanggal) };
+  }
+
+  var master = lengkapiHargaResep_(bacaItem_());
+  var foto = [];
+  var totalFoto = 0;
+  var baru = masukan.map(function (b, i) {
+    var m = master[rapikanTeks_(b && b.item).toLowerCase()];
+    if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
+    var qty = angkaIsian_(b.qty, 'Qty ' + m.nama);
+    if (!qty) throw galatPengguna_('Isi Qty ' + m.nama + ' lebih dari 0.');
+    var kategori = String(b.kategori || '');
+    var alasan = rapikanTeks_(b.alasan).slice(0, 200);
+    periksaBarisWaste_(kategori, alasan, m.nama);
+    var baris = gabung_({
+      'Tanggal': tanggalSel_(tanggal),
+      'Shift': shift,
+      'Nama Staff': pengguna.nama,
+      'Item / Produk': m.nama,
+      'Kategori Waste': kategori,
+      'Qty': qty,
+      'Satuan': m.satuan,
+      'Alasan / Keterangan': teksAman_(alasan),
+      'Harga Satuan (Rp)': m.harga == null ? '' : m.harga,
+      'Estimasi Kerugian (Rp)': estimasiWaste_(qty, m.harga),
+      'Foto Bukti': ''
+    }, isiSistem_(konteks));
+    var f = bacaFotoWaste_(b.foto, m.nama);
+    if (f) {
+      totalFoto += f.ukuran;
+      foto.push({ baris: baris, foto: f, no: i + 1 });
+    }
+    return baris;
+  });
+  if (!baru.length) throw galatPengguna_('Tambah minimal satu item waste.');
+  if (totalFoto > BATAS_FOTO_KIRIMAN_BYTE) {
+    throw galatPengguna_('Foto dalam satu kiriman terlalu banyak (' + ukuranMb_(totalFoto) + ', batasnya ' +
+      ukuranMb_(BATAS_FOTO_KIRIMAN_BYTE) + '). Kirim sebagian item dulu.');
+  }
+  var fotoGagal = simpanFotoWaste_(tanggal, konteks.sid, foto);
 
   return denganKunci_(function () {
     var tabel = wajibTabel_('Data_Waste');
     if (adaSubmission_(tabel, konteks.sid)) {
       return { sudahTerkirim: true, jumlah: 0, form: dataFormWaste_(tanggal) };
     }
-    var master = lengkapiHargaResep_(bacaItem_());
-    var baru = masukan.map(function (b) {
-      var m = master[rapikanTeks_(b && b.item).toLowerCase()];
-      if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
-      var qty = angkaIsian_(b.qty, 'Qty ' + m.nama);
-      if (!qty) throw galatPengguna_('Isi Qty ' + m.nama + ' lebih dari 0.');
-      var kategori = String(b.kategori || '');
-      var alasan = rapikanTeks_(b.alasan).slice(0, 200);
-      periksaBarisWaste_(kategori, alasan, m.nama);
-      return gabung_({
-        'Tanggal': tanggalSel_(tanggal),
-        'Shift': shift,
-        'Nama Staff': pengguna.nama,
-        'Item / Produk': m.nama,
-        'Kategori Waste': kategori,
-        'Qty': qty,
-        'Satuan': m.satuan,
-        'Alasan / Keterangan': teksAman_(alasan),
-        'Harga Satuan (Rp)': m.harga == null ? '' : m.harga,
-        'Estimasi Kerugian (Rp)': estimasiWaste_(qty, m.harga),
-        'Foto Bukti': ''
-      }, isiSistem_(konteks));
-    });
-    if (!baru.length) throw galatPengguna_('Tambah minimal satu item waste.');
-
     tambahBarisTabel_(tabel, baru);
     urutkanTabel_(tabel, URUTAN_WASTE);
     hitungUlangStock_(baru.map(function (b) { return { item: b['Item / Produk'], dari: tanggal }; }));
-    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormWaste_(tanggal) };
+    return { sudahTerkirim: false, jumlah: baru.length, foto: foto.length - fotoGagal.length, fotoGagal: fotoGagal,
+      form: dataFormWaste_(tanggal) };
   });
 }
 
@@ -5169,6 +5289,8 @@ var RIWAYAT_FORM = {
     item: 'Item / Produk',
     kategoriDariItem: true,
     gerakStock: true,
+    // Foto bukti (Tahap 11): baris diberi tanda; tautannya hanya untuk Pengelola (barisRiwayat_).
+    foto: 'Foto Bukti',
     // Estimasi memakai harga yang disalin saat waste dicatat (Bagian 5.4).
     turunan: function (n) {
       return { 'Estimasi Kerugian (Rp)': estimasiWaste_(n['Qty'], n['Harga Satuan (Rp)']) };
@@ -5348,8 +5470,14 @@ function barisRiwayat_(def, t, b, log) {
   var flagOleh = rapikanTeks_(nilai_(t, b, 'flagged_by'));
   var ubahOleh = rapikanTeks_(nilai_(t, b, 'updated_by'));
   var cekOleh = rapikanTeks_(nilai_(t, b, 'checked_by'));
+  // Foto bukti: semua role melihat tandanya; tautan Drive hanya untuk Pengelola, karena
+  // Staff tidak punya akses ke folder Drive (sistem Bagian 7.3 dan 9.1).
+  var fotoUrl = def.foto ? rapikanTeks_(nilai_(t, b, def.foto)) : '';
+  var tautanFoto = fotoUrl && /^https:\/\//.test(fotoUrl) && PENGGUNA_AKSI_ && PENGGUNA_AKSI_.pengelola ? fotoUrl : undefined;
   return {
     rowId: rowId,
+    foto: def.foto ? !!fotoUrl : undefined,
+    fotoUrl: tautanFoto,
     nilai: nilai,
     asli: asli,
     koreksi: koreksi,
@@ -6302,7 +6430,8 @@ function isiPdfWaste_(tanggal) {
       '<td class="angka">' + (i + 1) + '</td>' +
       '<td>' + escHtml_(b['Nama Staff']) + '</td>' +
       '<td>' + escHtml_(b['Shift']) + '</td>' +
-      '<td>' + escHtml_(b['Item / Produk']) + '</td>' +
+      '<td>' + escHtml_(b['Item / Produk']) +
+        (rapikanTeks_(b['Foto Bukti']) ? '<br><span class="kecil">(ada foto bukti)</span>' : '') + '</td>' +
       '<td>' + escHtml_(b['Kategori Waste']) + '</td>' +
       '<td class="angka">' + angkaId_(Number(b['Qty']) || 0) + '</td>' +
       '<td>' + escHtml_(b['Satuan']) + '</td>' +
@@ -6321,6 +6450,10 @@ function isiPdfWaste_(tanggal) {
     '</tbody></table>';
   var catatan = ['Estimasi kerugian = Qty × Harga Satuan yang tercatat saat waste dicatat.'];
   if (adaTanpaHarga) catatan.push('Item tanpa harga satuan ditulis "–" dan tidak ikut dijumlahkan.');
+  if (baris.some(function (b) { return rapikanTeks_(b['Foto Bukti']); })) {
+    catatan.push('Foto bukti tersimpan di Google Drive, folder ' + FOLDER_LAPORAN + '/' + (namaOutlet_() || 'Outlet') + '/' +
+      FOLDER_FOTO_WASTE + '; tautannya ada di kolom Foto Bukti tab Data_Waste.');
+  }
   return { ada: baris.length > 0, info: [['Jumlah item', String(baris.length)]], tabel: tabel, catatan: catatan };
 }
 
@@ -6564,9 +6697,7 @@ function cariAtauBuatFolder_(induk, nama) {
 /** Folder Laporan Kitchen/{Nama Outlet}/{Tahun}/{MM Bulan} untuk satu tanggal. */
 function folderLaporan_(tanggal) {
   var p = tanggal.split('-');
-  var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
-  var outlet = cariAtauBuatFolder_(akar, (namaOutlet_() || 'Outlet').replace(/[\\/]+/g, '-'));
-  var tahun = cariAtauBuatFolder_(outlet, p[0]);
+  var tahun = cariAtauBuatFolder_(folderOutlet_(), p[0]);
   return cariAtauBuatFolder_(tahun, p[1] + ' ' + BULAN_ID[Number(p[1]) - 1]);
 }
 
