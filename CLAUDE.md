@@ -188,6 +188,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 8 | Stock opname dan daftar belanja (layar Stock opname dari Dashboard, Data_Opname dan penyesuaian "Stock opname", laporan selisih PDF, opname di Riwayat, pengingat jadwal di Beranda/Dashboard/email, blok Stock opname di tab Dashboard, Daftar belanja di Laporan dengan PDF dan ringkasan di email) | Kode selesai (Code.gs v0.9, aplikasi 0.9.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus dan grafik Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 9 | Form kustom (Pengaturan → Form, susun form dan pratinjau, jadwal form, M_Form/M_FormKolom, tab Data_K_<ID>, layar isi umum, Beranda, Riwayat dan koreksi, PDF umum, email, kolom Form kustom di blok Kepatuhan) | Kode selesai (Code.gs v0.10, aplikasi 0.10.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 10 | Rekap bulanan (PDF enam bagian Bagian 9.3, unduh dari menu Laporan untuk Pengelola, simpan ke Drive, email dan trigger tanggal 1, `kirimRekapSekarang`) dan pemeriksaan akhir terhadap kedua spesifikasi | Kode selesai (Code.gs v0.11, aplikasi 0.11.0), diuji dengan API tiruan (Code.gs di Node, 61 uji server), Chromium (28 uji alur termasuk iPhone, delapan ukuran) dan sapuan semua layar pada delapan ukuran (274 pemeriksaan) serta "kurangi gerak". Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `pasangTrigger` dan `kirimRekapSekarang`, deploy versi baru, uji dari HP. setupSpreadsheet tidak perlu dijalankan ulang |
+| 10+ | Perbaikan tiga penyimpangan butir 150 (7 Oktober 2026): urutan `Data_Suhu` menurut waktu cek, sakelar Aktif/Nonaktif di layar ubah staff, geser kartu Waste untuk menghapus | Kode selesai (Code.gs v0.11.1, aplikasi 0.11.1), diuji dengan API tiruan (Code.gs di Node, 8 uji server) dan Chromium (22 uji alur dengan sentuhan tiruan, delapan ukuran, "kurangi gerak"). Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (rumus `Harian_Suhu` baru), deploy versi baru, uji dari HP |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Belum |
 
 ## Keputusan tambahan
@@ -561,8 +562,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     (dipisah garis): tombol "Hapus" (bahaya) untuk staff nonaktif, atau tulisan "Nonaktifkan dulu untuk
     bisa menghapus." untuk staff aktif; tidak tampil untuk akun sendiri. Setelah dihapus, layar kembali
     ke daftar dengan pesan "Rina dihapus dari daftar staff.". Sakelar Aktif/Nonaktif di Bagian 5.7
-    tetap berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan lagi" yang sudah ada sejak
-    Tahap 1; fungsinya sama.
+    sejak aplikasi 0.11.1 benar-benar sakelar (butir 152); sebelumnya tombol "Nonaktifkan" / "Aktifkan lagi".
 77. **PDF stock per kategori.** Menu Laporan: saat form Stock dipilih, `<select>` "Kategori" (bentuk
     sama dengan layar isi Stock) di bawah pilihan form, nilai awal "Semua kategori", lalu kategori
     aktif menurut urutan `M_Kategori` (dari `infoLaporan`); pilihannya ikut tersimpan di
@@ -641,7 +641,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     server dari `M_Konfigurasi` (`suhu_chiller_min`, `suhu_chiller_maks`, `suhu_freezer_maks`; nilai kosong atau salah memakai 1,
     5, −18): Chiller normal jika di antara batas (termasuk), Freezer normal jika sama dengan atau lebih rendah. Suhu menerima
     koma, titik, "-" dan "−"; di luar −60 sampai 60 ditolak. Unit dibaca dari `M_Unit` (Tipe selain Freezer dianggap
-    Chiller). Urutan tab: tanggal terbaru, nama unit, waktu kirim. Tidak ada email seketika.
+    Chiller). Urutan tab: tanggal terbaru, nama unit, waktu kirim (sejak Code.gs v0.11.1: tanggal, unit, waktu cek, butir 151).
+    Tidak ada email seketika.
 87. **Koreksi Suhu:** Suhu (dengan tombol ±) dan Tindakan korektif. Status dihitung ulang dengan batas yang berlaku saat
     koreksi dan ikut tercatat di `Log_Perubahan`; suhu di luar standar tanpa tindakan ditolak. Riwayat Suhu memakai filter
     "Unit" (dari `M_Unit`) menggantikan Item, tanpa kategori. **Pengecekan terlewat** (Bagian 6.1): untuk tiap tanggal sejak
@@ -1058,16 +1059,17 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 150. **Belum terpenuhi atau menyimpang** (sengaja tidak diubah di Tahap 10):
     - Foto bukti waste (sistem 5.4, tampilan 5.3): belum dibangun, digabung dengan Tahap 11 (butir 81).
     - Arsip data tahunan (sistem 8.4) dan outlet tambahan (sistem 3): Tahap 11 (opsional).
-    - Waste: "geser kartu ke kiri" untuk menghapus baris (tampilan 5.3) tidak dibangun; yang ada ikon tempat sampah. Kartu yang
-      mengikuti jari butuh gerak yang dihitung JavaScript tiap bingkai, yang dilarang Bagian 8.2 butir 1.
+    - ~~Waste: "geser kartu ke kiri" untuk menghapus baris (tampilan 5.3) tidak dibangun; yang ada ikon tempat sampah. Kartu yang
+      mengikuti jari butuh gerak yang dihitung JavaScript tiap bingkai, yang dilarang Bagian 8.2 butir 1.~~ Beres di aplikasi
+      0.11.1 (butir 153).
     - Pengaturan → Form: urutan diubah dengan tombol naik/turun lalu "Simpan urutan" (butir 137), bukan pegangan geser (tampilan
       5.7), dengan alasan yang sama dan supaya bisa dipakai dengan papan ketik.
-    - Pengaturan → Staff: "sakelar Aktif/Nonaktif" (tampilan 5.7) berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan
-      lagi" (butir 76).
+    - ~~Pengaturan → Staff: "sakelar Aktif/Nonaktif" (tampilan 5.7) berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan
+      lagi" (butir 76).~~ Beres di aplikasi 0.11.1 (butir 152).
     - PDF stock semua kategori satu halaman per kategori (sistem 9.1) baru berlaku setelah pemilik menjalankan
       `ujiPemisahHalamanPdf` dan hasilnya "ya"; bawaannya satu tabel bersambung (butir 77).
-    - Urutan `Data_Suhu`: tanggal, unit, lalu waktu kirim (butir 86), bukan unit lalu waktu cek (sistem 8.4); Opening, Middle,
-      Closing biasanya dikirim berurutan, jadi hasilnya hampir selalu sama.
+    - ~~Urutan `Data_Suhu`: tanggal, unit, lalu waktu kirim (butir 86), bukan unit lalu waktu cek (sistem 8.4); Opening, Middle,
+      Closing biasanya dikirim berurutan, jadi hasilnya hampir selalu sama.~~ Beres di Code.gs v0.11.1 (butir 151).
     - Menu Laporan Pengelola punya tiga tombol utama (satu per kartu: Laporan harian, Daftar belanja yang memang disebut "tombol
       utama" di tampilan 5.9, dan Rekap bulanan), padahal tampilan Bagian 6 menyebut tombol utama satu per layar.
     - Rekap bulanan, kelengkapan Suhu, dan pengecekan terlewat memakai unit aktif dan jadwal form **sekarang**, bukan keadaan
@@ -1076,3 +1078,56 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
       pengiriman email asli, trigger asli, huruf perangkat diperbesar 200% (tampilan Bagian 9), dan pemasangan PWA di HP.
     - Catatan rapi: nomor butir 118–121 di CLAUDE.md dipakai dua kali (perbaikan Dashboard v0.8.1 dan Tahap 8); rujukan lama
       tetap, jadi tidak dinomori ulang.
+
+### Perbaikan tiga penyimpangan butir 150 (Code.gs v0.11.1, aplikasi 0.11.1, 7 Oktober 2026)
+
+151. **Urutan `Data_Suhu`** (sistem Bagian 8.4): tanggal terbaru di atas, lalu nama unit (huruf besar/kecil tidak dibedakan),
+    lalu waktu cek Opening, Middle, Closing, Cek ulang; beberapa cek ulang menurut `timestamp_server`, lalu urutan baris semula.
+    Waktu cek yang tidak dikenal di urutan terakhir. `Range.sort` tidak mengenal urutan khusus, jadi `urutkanSuhu_` (dipanggil
+    `aksiKirimSuhu_` menggantikan `urutkanTabel_`) membaca semua kolom yang ada, mengurutkan di memori, lalu menulis balik hanya
+    rentang baris yang berpindah (tidak menulis apa pun jika sudah urut). Yang ditulis hanya nilai, jadi format kolom, format
+    bersyarat, dan filter tetap; teks yang diawali `=`, `+`, `-`, atau `@` ditulis lagi lewat `teksAman_` supaya tetap teks seperti
+    saat dicatat. Baris tanpa tanggal turun ke bawah seperti pada `Range.sort` (butir 38). Seluruh tab diurutkan setiap kiriman
+    Suhu baru (kiriman ganda dan kiriman yang ditolak tidak menulis), jadi data lama ikut rapi pada kiriman berikutnya tanpa
+    menjalankan `setupSpreadsheet`. **Tidak bergantung pada urutan baris:** blok Suhu di Dashboard dan kolom Suhu di blok Kepatuhan
+    memakai COUNTIFS/AVERAGEIFS/MINIFS/MAXIFS dan "terakhir" dari `MAXIFS(timestamp_server)`; layar isi Suhu, grafik Dashboard,
+    PDF, dan email mengurutkan sendiri menurut waktu kirim. Rumus `Harian_Suhu` (A9) diubah supaya juga tidak bergantung: Nama
+    Staff dan Tindakan Korektif kini disusun Opening, Middle, Closing (dulu menurut urutan baris), dan baris cek ulang diurutkan
+    `SORT` menurut `timestamp_server`. Nama LET baru `nm` dan `tk` (butir 120). Rumus itu baru terpasang setelah
+    `setupSpreadsheet` dijalankan sekali; sampai itu, rumus lama tetap benar karena urutan tab menjaga cek ulang tetap urut waktu
+    kirim. "Diisi oleh" di bawah tabel Harian (bersama semua tab Harian) tetap berupa daftar nama menurut urutan baris.
+152. **Sakelar Aktif/Nonaktif** (tampilan 5.7) di kartu "Keadaan akun" layar ubah staff, memakai komponen `sakelarTampil` (kini
+    juga menerima `kataYa`/`kataTidak` untuk kata selain Tampil/Disembunyikan): label "Akun Rina", kata "Aktif"/"Nonaktif", lalu
+    kalimat keadaannya. Mematikan sakelar membuka konfirmasi yang sama seperti tombol lama ("Nonaktifkan Rina?"); Batal
+    mengembalikan sakelar ke Aktif. Menyalakan langsung tersimpan (sakelar nonaktif selama menyimpan; gagal → kembali ke Nonaktif
+    dengan pesan). Fokus papan ketik kembali ke sakelar setelah layar digambar ulang. Kartu ini kini juga tampil untuk akun
+    sendiri: sakelar nonaktif (jalur pudar, kata tetap terbaca) dengan keterangan di bawahnya (`aria-describedby`). Sebab
+    diperiksa dengan urutan yang sama dengan server (butir 76): Pengelola aktif terakhir (aktif, punya PIN, Head Kitchen atau
+    Manager, dihitung dari jawaban `daftarStaff`) → "Kamu / Sari adalah Head Kitchen atau Manager aktif yang terakhir. Tambah
+    atau aktifkan …"; akun sendiri → "Keadaan akunmu sendiri diubah oleh Head Kitchen atau Manager lain." Kalimat di kartu Role
+    untuk akun sendiri menjadi "Role akunmu sendiri diubah …" supaya tidak berulang. Aturan dan letak Hapus tidak berubah.
+153. **Geser kartu Waste ke kiri untuk menghapus** (tampilan 5.3), `pasangGeserHapus(kartu, hapus)` di app.js, dipasang pada kartu
+    ringkas dan kartu terbuka di HP dan tablet (tidak pada tabel laptop/desktop). Pointer Events, hanya sentuhan dan pena (bukan
+    tetikus), hanya jari pertama. Kelas `.kartu-geser` memberi `touch-action: pan-y pinch-zoom` (gulir tegak dan cubit-perbesar
+    tetap milik browser). Arah diputuskan setelah 10 px: tegak atau ke kanan dilepas ke browser; ke kiri diambil (pointer capture)
+    dan kartu mengikuti jari lewat `transform` inline (masukan langsung, bukan animasi yang dihitung tiap bingkai, Bagian 8.2 butir
+    1). Lepas setelah lebih dari sepertiga lebar kartu: kelas `.geser-keluar` (transform ke −100% dan opacity 0, 200 ms ease-in),
+    lalu pada `transitionend` (cadangan 250 ms) dipanggil `hapusBaris` yang sama dengan ikon tempat sampah (draft, penghitung, dan
+    pesan "Tomat dihapus dari isian."). Lepas sebelum batas atau `pointercancel`: kembali ke tempat (`.geser-kembali`, 150 ms
+    ease-out). Klik yang menyusul geseran ditahan 400 ms supaya kartu ringkas tidak terbuka. Geseran yang dimulai di `input`,
+    `textarea`, `select`, atau `[contenteditable]` diabaikan. "Kurangi gerak": kartu tidak mengikuti jari (juga dijaga CSS) dan
+    `hapusBaris` langsung dipanggil saat jari dilepas melewati batas (aturan lepas sama, hanya tanpa gerak). Ikon tempat sampah
+    tetap ada (bisa dipakai dengan papan ketik dan pembaca layar).
+154. **Versi:** Code.gs v0.11.1 (`VERSI_KODE` juga), aplikasi 0.11.1 (`VERSI_APLIKASI` dan `VERSI` di sw.js). Tidak ada aksi API,
+    tab, atau kolom baru.
+155. **Uji** (di luar repo): Code.gs dijalankan di Node dengan tiruan SpreadsheetApp yang meniru kutip di depan teks dan `=` sebagai
+    rumus (8 uji server: data lama urutan Tahap 5 dirapikan oleh kiriman berikutnya, 35 kiriman Suhu acak di empat tanggal dengan
+    cek ulang berulang tersusun sesuai butir 151 setelah tiap kiriman, isi sel tetap sama termasuk teks diawali `-` dan `=`, kiriman
+    ganda, tolak waktu cek yang sudah diisi tanpa menulis, tab yang sudah urut tidak ditulis, layar isi/Riwayat/PDF/Beranda/Dashboard
+    Suhu tetap jalan, rumus `Harian_Suhu` seimbang dan tanpa nama LET beda huruf; uji yang sama gagal pada Code.gs v0.11). Frontend
+    di Chromium dengan API tiruan yang memanggil `doPost` asli: 11 uji staff (aktif, Batal, nonaktif dengan konfirmasi, aktifkan
+    langsung, papan ketik, akun sendiri, akun sendiri sebagai Pengelola terakhir, Pengelola terakhir bukan akun sendiri dengan data
+    `daftarStaff` yang diubah, penolakan server, delapan ukuran untuk staff aktif, nonaktif, dan akun sendiri) dan 11 uji Waste
+    dengan sentuhan CDP (lewat batas dengan pemeriksaan transisi 200 ms ease-in, kurang dari batas, ikon sampah, mulai di kolom
+    isian, gulir tegak, "kurangi gerak", tablet 768, tabel 1366, tetikus, delapan ukuran), ditambah sapuan 16 rute pada 390 dan
+    1366 px tanpa masalah tata letak atau galat konsol.

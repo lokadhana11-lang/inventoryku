@@ -2555,6 +2555,23 @@ body.papan-ketik .bilah-kirim {
 }
 
 /* Item yang sudah diisi diringkas jadi satu baris (HP dan tablet) */
+/* Geser kartu ke kiri untuk menghapus (HP dan tablet, tampilan Bagian 5.3).
+   Gulir tegak dan cubit tetap milik browser; geseran mendatar diambil app.js. */
+.kartu-geser {
+  touch-action: pan-y pinch-zoom;
+}
+
+.kartu-geser.geser-kembali {
+  transition: transform 150ms ease-out;
+}
+
+.kartu-geser.geser-keluar {
+  transform: translateX(-100%);
+  opacity: 0;
+  transition: transform 200ms ease-in, opacity 200ms ease-in;
+  pointer-events: none;
+}
+
 .waste-ringkas {
   display: flex;
   align-items: center;
@@ -3953,6 +3970,15 @@ body.papan-ketik .bilah-kirim {
   outline-offset: 2px;
 }
 
+/* Sakelar yang tidak bisa diubah (misalnya akun sendiri): jalurnya pudar, kata tetap terbaca */
+.sakelar-input:disabled + .sakelar-jalur {
+  opacity: 0.55;
+}
+
+.sakelar-terkunci {
+  cursor: default;
+}
+
 .sakelar-teks {
   flex: 1 1 auto;
   min-width: 0;
@@ -4502,6 +4528,9 @@ textarea.isian-catatan {
   .waste-ringkas-tombol:active,
   .ubin-tombol:active,
   .baris-urut-nama:active {
+    transform: none !important;
+  }
+  .kartu-geser {
     transform: none !important;
   }
   .kerangka {
