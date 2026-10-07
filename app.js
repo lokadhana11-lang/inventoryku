@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.11.0';
+  var VERSI_APLIKASI = '0.11.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -2951,6 +2951,97 @@
     });
   }
 
+  /**
+   * Geser kartu ke kiri untuk menghapus barisnya (tampilan Bagian 5.3), hanya untuk kartu
+   * di HP dan tablet. touch-action: pan-y (CSS .kartu-geser) membiarkan gulir tegak tetap
+   * milik browser; geseran mendatar ke kiri diambil lewat Pointer Events. Selama jari
+   * menempel kartu mengikuti jari lewat transform (masukan langsung, bukan animasi per
+   * bingkai). Lepas setelah lebih dari sepertiga lebar kartu: kartu keluar dengan transisi
+   * CSS (.geser-keluar, 200 ms ease-in), lalu hapus() dipanggil, sama dengan ikon tempat
+   * sampah. Lepas sebelum batas: kartu kembali (.geser-kembali). "Kurangi gerak": kartu
+   * tidak mengikuti jari dan hapus() langsung dipanggil saat dilepas melewati batas.
+   * Geseran yang dimulai di kolom isian diabaikan. Hanya sentuhan dan pena, bukan tetikus.
+   */
+  function pasangGeserHapus(kartu, hapus) {
+    var AMBANG = 10; // px sebelum arah geseran diputuskan
+    var p = null;
+    kartu.classList.add('kartu-geser');
+
+    function kurangiGerak() {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    function lepas() {
+      if (p && kartu.hasPointerCapture && kartu.hasPointerCapture(p.id)) kartu.releasePointerCapture(p.id);
+      p = null;
+    }
+    function kembali() {
+      if (!kartu.style.transform) return;
+      kartu.classList.add('geser-kembali');
+      kartu.style.transform = '';
+      setTimeout(function () { kartu.classList.remove('geser-kembali'); }, 200);
+    }
+    kartu.addEventListener('pointerdown', function (e) {
+      if (p || e.pointerType === 'mouse' || !e.isPrimary) return;
+      if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+      p = { id: e.pointerId, x: e.clientX, y: e.clientY, arah: '', lebar: kartu.getBoundingClientRect().width, dx: 0 };
+    });
+    kartu.addEventListener('pointermove', function (e) {
+      if (!p || e.pointerId !== p.id) return;
+      var dx = e.clientX - p.x;
+      var dy = e.clientY - p.y;
+      if (!p.arah) {
+        if (Math.abs(dx) < AMBANG && Math.abs(dy) < AMBANG) return;
+        if (dx >= 0 || Math.abs(dy) >= Math.abs(dx)) {
+          p = null; // gulir tegak atau geser ke kanan: bukan urusan kartu
+          return;
+        }
+        p.arah = 'kiri';
+        kartu.classList.remove('geser-kembali');
+        if (kartu.setPointerCapture) kartu.setPointerCapture(p.id);
+      }
+      p.dx = Math.min(0, dx);
+      if (!kurangiGerak()) kartu.style.transform = 'translateX(' + p.dx + 'px)';
+    });
+    kartu.addEventListener('pointerup', function (e) {
+      if (!p || e.pointerId !== p.id) return;
+      var g = p;
+      lepas();
+      if (!g.arah) return;
+      // Klik yang mungkin menyusul geseran tidak boleh membuka atau menekan isi kartu.
+      function tahan(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+      }
+      kartu.addEventListener('click', tahan, true);
+      setTimeout(function () { kartu.removeEventListener('click', tahan, true); }, 400);
+      if (-g.dx <= g.lebar / 3) {
+        kembali();
+        return;
+      }
+      if (kurangiGerak()) {
+        hapus();
+        return;
+      }
+      var selesai = false;
+      function akhiri() {
+        if (selesai) return;
+        selesai = true;
+        hapus();
+      }
+      kartu.addEventListener('transitionend', function (ev) {
+        if (ev.target === kartu) akhiri();
+      });
+      setTimeout(akhiri, 250); // cadangan jika transitionend tidak datang
+      kartu.classList.add('geser-keluar');
+      kartu.style.transform = '';
+    });
+    kartu.addEventListener('pointercancel', function (e) {
+      if (!p || e.pointerId !== p.id) return;
+      lepas();
+      kembali();
+    });
+  }
+
   function layarWaste(k) {
     aturJudul('Waste');
     var pengelola = !!k.sesi.pengguna.pengelola;
@@ -3104,7 +3195,7 @@
       var bagian = [b.kategori || 'Kategori belum dipilih'];
       if (h.qty > 0) bagian.push(formatAngka(h.qty) + (it.satuan ? ' ' + it.satuan : ''));
       if (h.qty > 0 && it.harga != null) bagian.push(formatRupiah(h.qty * it.harga));
-      return el('div', { class: 'kartu-item waste-ringkas' }, [
+      var kartu = el('div', { class: 'kartu-item waste-ringkas' }, [
         el('button', { type: 'button', class: 'waste-ringkas-tombol', 'aria-expanded': 'false',
           'aria-label': b.item + ', ' + bagian.join(', ') + (h.salah ? ', belum lengkap' : '') + '. Ketuk untuk mengubah.',
           onclick: function () { bukaBaris(b.id); } }, [
@@ -3115,11 +3206,13 @@
         el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari isian',
           onclick: function () { hapusBaris(b); } }, ikon('sampah'))
       ]);
+      pasangGeserHapus(kartu, function () { hapusBaris(b); });
+      return kartu;
     }
 
     function kartuTerbuka(b, nomor) {
       var x = isianBaris(b, nomor);
-      return el('article', { class: 'kartu-item', 'aria-label': b.item }, [
+      var kartu = el('article', { class: 'kartu-item', 'aria-label': b.item }, [
         el('div', { class: 'kartu-item-kepala' }, [
           el('h2', { class: 'kartu-item-nama', text: b.item }),
           x.hapus
@@ -3134,6 +3227,8 @@
         el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Estimasi kerugian' }), x.estimasi]),
         draft.baris.length > 1 ? tombol('Selesai', 'tautan', { onclick: function () { bukaBaris(''); } }) : null
       ]);
+      pasangGeserHapus(kartu, function () { hapusBaris(b); });
+      return kartu;
     }
 
     function barisTabel(b, nomor) {
@@ -9315,7 +9410,10 @@
     return '#/pengaturan/form/' + encodeURIComponent(id);
   }
 
-  /** Sakelar Tampil / Disembunyikan (selalu dengan kata keadaannya). */
+  /**
+   * Sakelar (role=switch) yang selalu disertai kata keadaannya: bawaannya Tampil /
+   * Disembunyikan; kataYa dan kataTidak untuk kata lain (Wajib, Aktif / Nonaktif).
+   */
   function sakelarTampil(opsi) {
     var id = 'sakelar-' + (++nomorKolom);
     var input = el('input', { type: 'checkbox', role: 'switch', class: 'sakelar-input', id: id,
@@ -10144,6 +10242,12 @@
     });
   }
 
+  /** Head Kitchen atau Manager aktif (punya PIN) yang terakhir: tidak bisa dinonaktifkan (aturan server aksiUbahStaff_). */
+  function pengelolaTerakhir(daftar, s) {
+    function kelola(x) { return x.aktif && x.pengelola && x.punyaPin; }
+    return kelola(s) && !daftar.some(function (x) { return x !== s && kelola(x); });
+  }
+
   /** Satu staff: PIN, role, aktif, hapus. Dari pemberitahuan Beranda, lembar reset PIN langsung terbuka. */
   function layarStaffDetail(k) {
     var nama = '';
@@ -10224,24 +10328,43 @@
       }
       wadah.appendChild(el('section', { class: 'kartu' }, [
         el('h2', { class: 'kartu-judul', text: 'Role' }),
-        diriSendiri ? el('p', { class: 'kartu-teks', text: 'Role dan keadaan akunmu sendiri diubah oleh Head Kitchen atau Manager lain.' }) : null,
+        diriSendiri ? el('p', { class: 'kartu-teks', text: 'Role akunmu sendiri diubah oleh Head Kitchen atau Manager lain.' }) : null,
         gRole.wadah,
         simpanRole
       ]));
 
-      // Kartu keadaan akun
-      if (!diriSendiri) {
-        var tombolAktif = s.aktif
-          ? tombol('Nonaktifkan', 'bahaya', { onclick: nonaktifkan })
-          : tombol('Aktifkan lagi', 'kedua', { onclick: aktifkan });
-        wadah.appendChild(el('section', { class: 'kartu' }, [
-          el('h2', { class: 'kartu-judul', text: 'Keadaan akun' }),
-          el('p', { class: 'kartu-teks', text: s.aktif
-            ? 'Aktif. ' + s.nama + ' bisa masuk dan mengisi form.'
-            : 'Nonaktif. ' + s.nama + ' tidak tampil di layar Login. Isian lamanya tetap tersimpan.' }),
-          tombolAktif
-        ]));
+      // Kartu keadaan akun: sakelar Aktif / Nonaktif (tampilan Bagian 5.7). Pengelola aktif
+      // terakhir diperiksa lebih dulu daripada akun sendiri, sama dengan urutan di server.
+      var sebabKunci = pengelolaTerakhir(data.staff || [], s)
+        ? (diriSendiri ? 'Kamu' : s.nama + ' adalah') + ' Head Kitchen atau Manager aktif yang terakhir. ' +
+          'Tambah atau aktifkan Head Kitchen atau Manager lain dulu, supaya selalu ada yang bisa mengelola sistem.'
+        : (diriSendiri ? 'Keadaan akunmu sendiri diubah oleh Head Kitchen atau Manager lain.' : '');
+      var sAktif = sakelarTampil({
+        nilai: s.aktif,
+        teks: 'Akun ' + s.nama,
+        kataYa: 'Aktif',
+        kataTidak: 'Nonaktif',
+        kelas: sebabKunci ? 'sakelar-terkunci' : '',
+        labelSr: 'Akun ' + s.nama + ' aktif',
+        ubah: function (b) {
+          if (b) aktifkan(sAktif);
+          else nonaktifkan(sAktif);
+        }
+      });
+      if (sebabKunci) {
+        sAktif.input.disabled = true;
+        sAktif.input.setAttribute('aria-describedby', 'sebab-sakelar-aktif');
+      }
+      wadah.appendChild(el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Keadaan akun' }),
+        sAktif.wadah,
+        el('p', { class: 'kartu-teks', text: s.aktif
+          ? s.nama + ' bisa masuk dan mengisi form.'
+          : s.nama + ' tidak tampil di layar Login. Isian lamanya tetap tersimpan.' }),
+        sebabKunci ? el('p', { class: 'kolom-bantuan', id: 'sebab-sakelar-aktif', text: sebabKunci }) : null
+      ]));
 
+      if (!diriSendiri) {
         // Hapus (tampilan Bagian 5.7): paling bawah, terpisah, hanya untuk staff nonaktif.
         wadah.appendChild(el('div', { class: 'bagian-hapus' }, s.aktif
           ? el('p', { class: 'kolom-bantuan', text: 'Nonaktifkan dulu untuk bisa menghapus.' })
@@ -10254,7 +10377,8 @@
       }
     }
 
-    function nonaktifkan() {
+    /** Sakelar dimatikan: konfirmasi dulu; dibatalkan, sakelar kembali ke Aktif. */
+    function nonaktifkan(sakelar) {
       var s = staffKini;
       konfirmasi({
         judul: 'Nonaktifkan ' + s.nama + '?',
@@ -10263,11 +10387,22 @@
         bahaya: true,
         jalankan: function () { return panggilApi('ubahStaff', { nama: s.nama, aktif: false }); }
       }).then(function (hasil) {
-        if (!hasil) return;
+        if (!hasil) {
+          sakelar.atur(true);
+          return;
+        }
         Cache.tulis('staff', hasil);
-        gambar(hasil);
+        gambarDenganFokus(hasil);
         toast(s.nama + ' dinonaktifkan.');
       });
+    }
+
+    /** Gambar ulang; fokus kembali ke sakelar keadaan akun jika tadi di sana. */
+    function gambarDenganFokus(hasil) {
+      var tadi = document.activeElement && document.activeElement.classList.contains('sakelar-input');
+      gambar(hasil);
+      var baru = wadah.querySelector('.sakelar-input');
+      if (tadi && baru) baru.focus({ preventScroll: true });
     }
 
     function hapusStaff() {
@@ -10288,16 +10423,17 @@
       });
     }
 
-    function aktifkan(e) {
+    /** Sakelar dinyalakan: langsung tersimpan; gagal, sakelar kembali ke Nonaktif. */
+    function aktifkan(sakelar) {
       var s = staffKini;
-      var t = e.currentTarget;
-      aturTombolProses(t, true, 'Menyimpan…');
+      sakelar.input.disabled = true;
       panggilApi('ubahStaff', { nama: s.nama, aktif: true }).then(function (hasil) {
         Cache.tulis('staff', hasil);
-        gambar(hasil);
+        gambarDenganFokus(hasil);
         toast(s.nama + ' aktif lagi.');
       }).catch(function (err) {
-        aturTombolProses(t, false);
+        sakelar.input.disabled = false;
+        sakelar.atur(false);
         if (tanganiSesiBerakhir(err)) return;
         toast(pesanGalat(err), 'masalah');
       });

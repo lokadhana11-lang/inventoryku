@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.11 (Tahap 10: rekap bulanan)
+// InventoryKu Code.gs v0.11.1 (perbaikan butir 150: urutan Data_Suhu)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -57,7 +57,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.11';
+var VERSI_KODE = 'v0.11.1';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -2314,9 +2314,63 @@ function aksiKirimSuhu_(body, pengguna) {
     if (!baru.length) throw galatPengguna_('Isi suhu minimal untuk satu unit.');
 
     tambahBarisTabel_(tabel, baru);
-    urutkanTabel_(tabel, [['Tanggal', false], ['Nama Unit', true], ['timestamp_server', true]]);
+    urutkanSuhu_(tabel);
     return { sudahTerkirim: false, jumlah: baru.length, luarStandar: luar, form: dataFormSuhu_(tanggal) };
   });
+}
+
+/**
+ * Urutan Data_Suhu (spesifikasi sistem Bagian 8.4): tanggal terbaru di atas,
+ * lalu nama unit, lalu waktu cek Opening, Middle, Closing, Cek ulang; beberapa
+ * cek ulang menurut waktu kirim. Range.sort tidak mengenal urutan waktu cek,
+ * jadi baris diurutkan di memori lalu ditulis balik: hanya kolom yang ada,
+ * hanya nilainya (format kolom dan format bersyarat tetap), dan hanya rentang
+ * baris yang berpindah. Baris tanpa tanggal turun ke bawah seperti pada
+ * Range.sort. Teks yang diawali =, +, -, atau @ ditulis lagi lewat teksAman_,
+ * supaya tetap teks seperti saat pertama dicatat. Seluruh tab ikut diurutkan,
+ * jadi data lama ikut rapi pada kiriman Suhu berikutnya.
+ */
+function urutkanSuhu_(tabel) {
+  var sheet = tabel.sheet;
+  var n = sheet.getLastRow() - 1;
+  var lebar = sheet.getLastColumn();
+  if (n < 2 || lebar < 1) return;
+  var nilai = sheet.getRange(2, 1, n, lebar).getValues();
+  var zona = ss_().getSpreadsheetTimeZone();
+  var k = tabel.kol;
+  var urutWaktu = {};
+  WAKTU_CEK.forEach(function (w, i) { urutWaktu[w.toLowerCase()] = i; });
+  var kunci = nilai.map(function (b, i) {
+    var ts = k.timestamp_server === undefined ? null : b[k.timestamp_server];
+    var w = k['Waktu Cek'] === undefined ? '' : rapikanTeks_(b[k['Waktu Cek']]).toLowerCase();
+    return {
+      i: i,
+      tanggal: teksTanggal_(b[k.Tanggal], zona),
+      unit: k['Nama Unit'] === undefined ? '' : rapikanTeks_(b[k['Nama Unit']]).toLowerCase(),
+      waktu: w in urutWaktu ? urutWaktu[w] : WAKTU_CEK.length,
+      ts: ts instanceof Date && !isNaN(ts.getTime()) ? ts.getTime() : Infinity
+    };
+  });
+  kunci.sort(function (a, b) {
+    if (!a.tanggal !== !b.tanggal) return a.tanggal ? -1 : 1;
+    if (a.tanggal !== b.tanggal) return a.tanggal < b.tanggal ? 1 : -1;
+    if (a.unit !== b.unit) return a.unit < b.unit ? -1 : 1;
+    if (a.waktu !== b.waktu) return a.waktu - b.waktu;
+    if (a.ts !== b.ts) return a.ts < b.ts ? -1 : 1;
+    return a.i - b.i;
+  });
+  var awal = -1;
+  var akhir = -1;
+  kunci.forEach(function (x, posisi) {
+    if (x.i === posisi) return;
+    if (awal < 0) awal = posisi;
+    akhir = posisi;
+  });
+  if (awal < 0) return; // sudah urut
+  var tulis = kunci.slice(awal, akhir + 1).map(function (x) {
+    return nilai[x.i].map(function (v) { return typeof v === 'string' ? teksAman_(v) : v; });
+  });
+  sheet.getRange(2 + awal, 1, tulis.length, lebar).setValues(tulis);
 }
 
 /* =========================================================================
@@ -8999,7 +9053,9 @@ function pasangRumusHarianWaste_(ss, catatan) {
  * punya isian pada tanggal itu) dengan suhu Opening, Middle, dan Closing;
  * tiap cek ulang menjadi baris sendiri di bawah unitnya ("Cek ulang 15.40",
  * suhu di kolom Cek ulang). Kolom I sampai L (disembunyikan) berisi TRUE jika
- * suhu di kolom C, D, E, atau F di luar standar, untuk sorotan.
+ * suhu di kolom C, D, E, atau F di luar standar, untuk sorotan. Hasilnya tidak
+ * bergantung pada urutan baris Data_Suhu: Nama Staff dan Tindakan Korektif
+ * disusun Opening, Middle, Closing; cek ulang diurutkan menurut waktu kirim.
  */
 function rumusHarianSuhu_(ss) {
   var K = function (judul) { return kolomRumus_(ss, 'Data_Suhu', judul); };
@@ -9019,11 +9075,13 @@ function rumusHarianSuhu_(ss) {
       'tp,IFERROR(INDEX(FILTER(' + uT + ',' + uN + '=x),1),IFERROR(INDEX(FILTER(' + K('Tipe Unit') + ',' + milik + '),1),"")),' +
       'v,LAMBDA(w,IFERROR(INDEX(FILTER(' + dS + ',' + milik + ',' + dW + '=w),1),"")),' +
       'st,LAMBDA(w,COUNTIFS(' + dU + ',x,' + dT + ',tgl,' + dW + ',w,' + dSt + ',"Di Luar Standar")>0),' +
-      'staf,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(' + dN + ',' + milik + ',' + dW + '<>"Cek ulang"))),""),' +
-      'tind,IFERROR(TEXTJOIN(" / ",TRUE,FILTER(' + dW + '&": "&' + dTk + ',' + milik + ',' + dW + '<>"Cek ulang",' + dTk + '<>"")),""),' +
+      'nm,LAMBDA(w,IFERROR(INDEX(FILTER(' + dN + ',' + milik + ',' + dW + '=w),1),"")),' +
+      'tk,LAMBDA(w,IFERROR(w&": "&INDEX(FILTER(' + dTk + ',' + milik + ',' + dW + '=w,' + dTk + '<>""),1),"")),' +
+      'staf,IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(VSTACK(nm("Opening"),nm("Middle"),nm("Closing")))),""),' +
+      'tind,TEXTJOIN(" / ",TRUE,tk("Opening"),tk("Middle"),tk("Closing")),' +
       'utama,HSTACK(x,tp,v("Opening"),v("Middle"),v("Closing"),"",staf,tind,st("Opening"),st("Middle"),st("Closing"),FALSE),' +
       'nc,COUNTIFS(' + dU + ',x,' + dT + ',tgl,' + dW + ',"Cek ulang"),' +
-      'm,IF(nc=0,"",FILTER(HSTACK(' + K('timestamp_server') + ',' + dS + ',' + dN + ',' + dTk + ',' + dSt + '),' + milik + ',' + dW + '="Cek ulang")),' +
+      'm,IF(nc=0,"",SORT(FILTER(HSTACK(' + K('timestamp_server') + ',' + dS + ',' + dN + ',' + dTk + ',' + dSt + '),' + milik + ',' + dW + '="Cek ulang"),1,TRUE)),' +
       'kosong,LAMBDA(k,MAKEARRAY(nc,k,LAMBDA(r,c,""))),' +
       'cek,IF(nc=0,"",HSTACK(kosong(1),MAP(CHOOSECOLS(m,1),LAMBDA(t,"Cek ulang "&TEXT(t,"hh.mm"))),kosong(3),' +
         'CHOOSECOLS(m,2),CHOOSECOLS(m,3),CHOOSECOLS(m,4),MAKEARRAY(nc,3,LAMBDA(r,c,FALSE)),' +
