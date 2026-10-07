@@ -2555,6 +2555,94 @@ body.papan-ketik .bilah-kirim {
 }
 
 /* Item yang sudah diisi diringkas jadi satu baris (HP dan tablet) */
+/* Foto bukti waste (Tahap 11): tombol ambil/pilih foto, pratinjau kecil, tanda di Riwayat */
+.foto-bukti {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.foto-bukti .pesan-formulir:empty {
+  display: none;
+}
+
+.tombol-file {
+  position: relative;
+  cursor: pointer;
+}
+
+.tombol-file .ikon {
+  flex: none;
+}
+
+/* Input file tetap bisa difokus papan ketik; yang tampak labelnya */
+.input-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tombol-file:focus-within {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+.foto-ada {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.foto-pratinjau {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 1px solid var(--garis);
+  border-radius: 4px;
+  background: var(--baja);
+}
+
+.foto-ket {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.foto-bukti-tabel {
+  min-width: 160px;
+}
+
+.foto-bukti-tabel .foto-ada {
+  flex-wrap: wrap;
+}
+
+.foto-riwayat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.foto-riwayat .ikon {
+  width: 16px;
+  height: 16px;
+}
+
+.tautan-foto {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  color: var(--biru-malam);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 /* Geser kartu ke kiri untuk menghapus (HP dan tablet, tampilan Bagian 5.3).
    Gulir tegak dan cubit tetap milik browser; geseran mendatar diambil app.js. */
 .kartu-geser {

@@ -168,6 +168,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   tidak menambah file di Drive). Fungsi dari editor atau trigger: `kirimRekapBulanan` (trigger tanggal 1) dan `kirimRekapSekarang`
   (uji dari editor). `M_Konfigurasi` mendapat baris `rekap_terakhir` (dibuat otomatis); nilai yang diawali "Gagal" ikut
   `beranda.peringatanSistem` dan butir `sistem` di `dashboard.perhatian`.
+- Aksi Tahap 11 (foto bukti waste): `kirimWaste.baris[]` boleh membawa `foto` (base64 JPEG/PNG/WebP, boleh berawalan data URL,
+  paling besar 2 MB per foto dan 15 MB per kiriman) → jawaban ditambah `foto` (jumlah yang tersimpan) dan `fotoGagal: [nama item]`.
+  `riwayat`/`detailKiriman`/jawaban pemeriksaan: baris Waste membawa `foto: true|false` untuk semua role dan `fotoUrl` (tautan
+  Drive) hanya untuk Pengelola.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -189,7 +193,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 9 | Form kustom (Pengaturan → Form, susun form dan pratinjau, jadwal form, M_Form/M_FormKolom, tab Data_K_<ID>, layar isi umum, Beranda, Riwayat dan koreksi, PDF umum, email, kolom Form kustom di blok Kepatuhan) | Kode selesai (Code.gs v0.10, aplikasi 0.10.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 10 | Rekap bulanan (PDF enam bagian Bagian 9.3, unduh dari menu Laporan untuk Pengelola, simpan ke Drive, email dan trigger tanggal 1, `kirimRekapSekarang`) dan pemeriksaan akhir terhadap kedua spesifikasi | Kode selesai (Code.gs v0.11, aplikasi 0.11.0), diuji dengan API tiruan (Code.gs di Node, 61 uji server), Chromium (28 uji alur termasuk iPhone, delapan ukuran) dan sapuan semua layar pada delapan ukuran (274 pemeriksaan) serta "kurangi gerak". Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `pasangTrigger` dan `kirimRekapSekarang`, deploy versi baru, uji dari HP. setupSpreadsheet tidak perlu dijalankan ulang |
 | 10+ | Perbaikan tiga penyimpangan butir 150 (7 Oktober 2026): urutan `Data_Suhu` menurut waktu cek, sakelar Aktif/Nonaktif di layar ubah staff, geser kartu Waste untuk menghapus | Kode selesai (Code.gs v0.11.1, aplikasi 0.11.1), diuji dengan API tiruan (Code.gs di Node, 8 uji server) dan Chromium (22 uji alur dengan sentuhan tiruan, delapan ukuran, "kurangi gerak"). Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (rumus `Harian_Suhu` baru), deploy versi baru, uji dari HP |
-| 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Belum |
+| 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
 
@@ -313,7 +317,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 29. **Penyimpanan di HP** (localStorage): `inventoryku:sesi`, `inventoryku:infoLogin`, dan per
     pengguna `inventoryku:p:<nama>:draft:<id>`, `:antrean`, `:cache:<layar>`. Lewat `Draft`,
     `Antrean`, dan `Cache` di app.js. Draft Tahap 1 dipakai di lembar Tambah staff (tanpa PIN)
-    dan kolom Penerima email. PIN tidak pernah disimpan di HP.
+    dan kolom Penerima email. PIN tidak pernah disimpan di HP. Foto bukti waste disimpan di IndexedDB, bukan
+    localStorage (Tahap 11, butir 159).
 30. **Pola bersama di app.js** untuk layar berikutnya: router `#/...` (`RUTE`, menu per role, rute
     `pengelola: true` dialihkan ke Beranda untuk Staff); `muatData` (data tersimpan dulu dengan
     "Memperbarui…", kerangka jika belum ada, tidak menggambar ulang jika jawaban server sama);
@@ -605,6 +610,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 80. **Versi:** Code.gs v0.6, aplikasi 0.6.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js).
 81. **Foto bukti waste** (opsional di spesifikasi) belum dibangun: butuh unggahan ke Drive dan ruang di HP, jadi digabung
     dengan Tahap 11 (opsional: foto bukti waste). Kolom `Foto Bukti` di `Data_Waste` sudah ada dan dibiarkan kosong.
+    Dibangun di Tahap 11 (butir 156–163).
 82. **Layar Waste** (`#/waste`): Tanggal (Hari ini, Kemarin, Pengelola "Tanggal lain"), Shift (Pagi, Siang, Malam; wajib),
     "Tambah item" membuka lembar pencarian item aktif. Per item: Kategori waste (lima tombol), Qty (satuan dari `M_Item`),
     Alasan / keterangan (wajib hanya untuk Lainnya, paling panjang 200 huruf), dan Estimasi kerugian yang langsung dihitung
@@ -1057,7 +1063,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     di Pengaturan → Staff dan PIN) hanya setinggi 24 px; kini sasaran sentuhnya 44 px (padding dengan margin negatif, tinggi
     baris tabel tidak berubah), sesuai Bagian 9.
 150. **Belum terpenuhi atau menyimpang** (sengaja tidak diubah di Tahap 10):
-    - Foto bukti waste (sistem 5.4, tampilan 5.3): belum dibangun, digabung dengan Tahap 11 (butir 81).
+    - ~~Foto bukti waste (sistem 5.4, tampilan 5.3): belum dibangun, digabung dengan Tahap 11 (butir 81).~~ Beres di Code.gs v0.12,
+      aplikasi 0.12.0 (butir 156–163).
     - Arsip data tahunan (sistem 8.4) dan outlet tambahan (sistem 3): Tahap 11 (opsional).
     - ~~Waste: "geser kartu ke kiri" untuk menghapus baris (tampilan 5.3) tidak dibangun; yang ada ikon tempat sampah. Kartu yang
       mengikuti jari butuh gerak yang dihitung JavaScript tiap bingkai, yang dilarang Bagian 8.2 butir 1.~~ Beres di aplikasi
@@ -1131,3 +1138,66 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dengan sentuhan CDP (lewat batas dengan pemeriksaan transisi 200 ms ease-in, kurang dari batas, ikon sampah, mulai di kolom
     isian, gulir tegak, "kurangi gerak", tablet 768, tabel 1366, tetikus, delapan ukuran), ditambah sapuan 16 rute pada 390 dan
     1366 px tanpa masalah tata letak atau galat konsol.
+
+### Tahap 11: foto bukti waste (Code.gs v0.12, aplikasi 0.12.0, 7 Oktober 2026)
+
+156. **Versi:** Code.gs v0.12 (`VERSI_KODE` juga), aplikasi 0.12.0 (`VERSI_APLIKASI` dan `VERSI` di sw.js). Tidak ada tab, kolom,
+    atau rumus Sheet baru (kolom `Foto Bukti` sudah ada sejak Tahap 0), jadi `setupSpreadsheet` tidak perlu dijalankan ulang.
+    Izin Google tidak bertambah: DriveApp (buat folder dan file) sudah dipakai sejak Tahap 4.
+157. **Layar Waste** (tampilan 5.3): tiap item boleh punya satu foto bukti (tidak wajib), di bawah Alasan / keterangan, berjudul
+    "Foto bukti (tidak wajib)". Perangkat sentuh: dua tombol, "Ambil foto" (`<input type=file accept="image/*"
+    capture="environment">`, langsung kamera belakang) dan "Pilih dari galeri" (tanpa `capture`, karena `capture` di Android dan
+    iPhone melewati galeri); laptop/desktop satu tombol "Pilih foto". Tombol berupa label berisi input file yang tersembunyi tetapi
+    tetap bisa difokus papan ketik. Sesudah dipilih: pratinjau 64 px, "Foto tersimpan di HP", ukurannya, dan "Hapus foto"; memilih
+    lagi mengganti foto lama. Kartu ringkas menulis "· ada foto"; tabel laptop/desktop punya kolom "Foto bukti" (tanpa kalimat
+    "Foto tersimpan di HP" supaya ringkas). Pesan per item (memproses, tidak terbaca, terlalu besar, penyimpanan penuh) tampil di
+    bawah tombol foto. Menghapus baris (ikon sampah atau geser) ikut membuang fotonya.
+158. **Diperkecil di HP** (`perkecilFoto`): semua perangkat, bukan hanya HP (aturan sama, lebih sederhana). Gambar dibuka lewat
+    `<img>` dari object URL lalu digambar ke canvas: sisi terpanjang paling banyak 1280 px (gambar kecil tidak diperbesar), latar
+    putih (untuk PNG transparan), `toDataURL('image/jpeg', 0.7)`. Arah foto mengikuti EXIF karena browser modern menerapkannya saat
+    gambar digambar ke canvas. Gambar yang tidak bisa dibuka browser (misalnya HEIC di browser yang tidak mendukungnya): "Foto tidak
+    bisa dibaca. Coba foto lain, atau ambil dengan kamera." Hasil di atas 2 MB ditolak di HP dengan batas yang sama dengan server.
+159. **Foto di HP: IndexedDB** (`FotoHp`), basis data `inventoryku-foto`, satu tempat `foto`, kunci `<nama pengguna>|<id>`, isi
+    `{ data (base64), mime, ukuran, waktu }`. Draft Waste (`draft:waste`) hanya menyimpan `foto: { id, ukuran }`, antrean hanya
+    `fotoId` per baris, sehingga localStorage tetap kecil. `kirimIsian(aksi, isi)` (app.js) dipakai layar Waste dan antrean: foto
+    dibaca dari IndexedDB, dikirim sebagai `foto` (base64) per baris, batas waktu panggilan ditambah 20 detik per foto (paling lama
+    3 menit), dan foto dihapus dari HP hanya setelah server menjawab berhasil (termasuk `sudahTerkirim`). Tanpa sinyal, kiriman dan
+    fotonya menunggu di HP; foto ikut hilang saat isian antrean yang gagal dihapus dari lembar "Isian di HP". Judul isian di antrean
+    menyebut jumlah fotonya ("Waste · 2 item, 1 foto"). Foto yang sudah hilang dari HP saat dikirim (data browser dibersihkan) dikirim
+    tanpa foto dan disebut di pesan sesudah terkirim. Saat layar Waste dibuka, foto milik pengguna itu yang tidak dirujuk draft atau
+    antrean lagi dibuang (`FotoHp.bersihkan`); foto pengguna lain tidak disentuh. **IndexedDB tidak tersedia** (atau ditolak browser):
+    tombol foto diganti "Foto bukti tidak bisa disimpan di HP ini, karena penyimpanan browser tidak tersedia. Waste tetap bisa
+    dikirim tanpa foto." Penyimpanan penuh saat menyimpan foto: "Foto tidak bisa disimpan di HP (ruang penyimpanan mungkin penuh).
+    Waste tetap bisa dikirim tanpa foto."
+160. **Server** (`aksiKirimWaste_`, `bacaFotoWaste_`, `simpanFotoWaste_`): `foto` per baris boleh berawalan data URL; jenisnya
+    dikenali dari isi file (JPEG, PNG, WebP; lainnya "Foto bukti Tomat tidak terbaca. Hapus fotonya, lalu ambil lagi."). Batas
+    2 MB per foto (`BATAS_FOTO_BYTE`, "Foto bukti Selada terlalu besar (3 MB). Batasnya 2 MB. …", diperiksa dari panjang base64
+    sebelum dibuka) dan 15 MB per kiriman (`BATAS_FOTO_KIRIMAN_BYTE`). Semua pemeriksaan (item, qty, kategori, foto) selesai sebelum
+    apa pun ditulis, jadi kiriman yang ditolak tidak meninggalkan file. Urutan: kiriman ganda dikenali lebih dulu (tanpa menyimpan
+    foto lagi) → foto disimpan ke Drive **sebelum** kunci diambil, supaya penulis lain tidak menunggu unggahan → di dalam kunci
+    `submission_id` diperiksa lagi, baris ditulis, stock dihitung ulang. Folder `Laporan Kitchen/{Nama Outlet}/Foto waste/{YYYY}/{MM
+    Bulan}/` (`folderFotoWaste_`, memakai `folderOutlet_` bersama folder laporan), nama file `{tanggal}_{Item}_{8 huruf awal
+    submissionId}-{no baris}.{jpg|png|webp}`. Nama itu tetap untuk kiriman yang sama, jadi kiriman yang diulang setelah terputus di
+    tengah (foto sudah tersimpan, baris belum) memakai file yang ada. Kolom `Foto Bukti` berisi tautan file (`getUrl()`), teks
+    biasa yang bisa diklik di Sheet. File tidak dibagikan khusus: yang bisa membukanya adalah akun yang diberi akses ke folder
+    `Laporan Kitchen` (sistem 7.3). Jika Drive gagal menyimpan foto, waste tetap tercatat (stock tetap turun) tanpa foto itu, dan
+    jawaban `fotoGagal` membuat HP menulis "Waste terkirim. Foto bukti Tomat gagal disimpan ke Drive, jadi waste itu tercatat tanpa
+    foto." (di layar, atau di pesan "n isian terkirim." untuk antrean).
+161. **Riwayat Waste** (keputusan): semua role melihat tanda foto (ikon kamera di daftar, "Ada foto bukti" di detail), tetapi
+    **tautan ke Drive hanya untuk Pengelola** ("Lihat foto", tab baru). Staff membaca "Ada foto bukti (dilihat Head Kitchen atau
+    Manager)." karena Staff tidak punya akses ke folder Drive (sistem 7.3 dan 9.1), jadi tautan hanya akan membuka halaman tolak
+    akses. Tautan tidak dikirim server ke Staff sama sekali: `doPost` mencatat pengguna aksi di `PENGGUNA_AKSI_`, dan
+    `barisRiwayat_` hanya mengisi `fotoUrl` jika pengguna itu Pengelola (berlaku untuk `riwayat`, `detailKiriman`, dan jawaban
+    laporkan/koreksi/periksa). Foto tidak bisa ditambah, diganti, atau dihapus dari Riwayat (koreksi Waste tidak menyentuh kolom
+    `Foto Bukti`); foto yang keliru diurus pemilik langsung di Drive.
+162. **PDF Waste:** baris yang punya foto diberi tulisan kecil "(ada foto bukti)" di bawah nama item, dan catatan di bawah tabel
+    menyebut folder Drive-nya. Foto tidak dimasukkan ke PDF (ukuran file). Email harian dan tab `Harian_Waste` tidak berubah.
+163. **Uji Tahap 11** (di luar repo): Code.gs di Node dengan tiruan SpreadsheetApp dan Drive (folder dan file di memori): 12 uji server
+    (tanpa foto, dua foto JPEG dan PNG di folder dan nama yang benar, kiriman ganda, kiriman diulang setelah foto tersimpan,
+    terlalu besar, bukan gambar, batas 15 MB per kiriman, Drive gagal, Riwayat/detail/laporan kekeliruan Staff tanpa tautan dan
+    Pengelola dengan tautan, koreksi tidak mengubah foto, PDF, kiriman Staff). Chromium dengan API tiruan yang memanggil `doPost`
+    asli dan PNG 2400×1600 (10 MB): 13 uji (tombol kamera/galeri dan `capture`, foto diperkecil ke 1280×853 JPEG di IndexedDB,
+    tetap ada setelah layar dibuka lagi, Hapus foto, kirim dengan dan tanpa foto, tanpa sinyal lalu sinyal kembali, jawaban putus
+    sesudah server menyimpan lalu kirim ulang tanpa file ganda, foto 3 MB ditolak di layar dan di antrean lalu Hapus membuang
+    fotonya, Riwayat Pengelola dan Staff, tanpa IndexedDB, hapus baris dan pembersihan foto yatim, tabel laptop, delapan ukuran
+    untuk layar Waste berfoto dan detail Riwayat berfoto). Uji Suhu, staff, geser kartu Waste, dan sapuan 16 rute tetap lulus.
