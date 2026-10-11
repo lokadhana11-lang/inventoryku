@@ -5,7 +5,13 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.6, 5 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.7, 11 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.6 (arah premium, dipilih pemilik dari pratinjau 11 Oktober 2026):
+> kepala navy berisi ringkasan di setiap layar (Bagian 4.2, 4.3, dan 4.7), bayangan lembut
+> menggantikan garis tepi kartu, tekstur garis halus di permukaan navy, angka utama yang
+> lebih besar, sudut baru (Bagian 2, 3, 4.4, dan 6), tiket berikon dengan potongan sobek
+> (Bagian 5.2), nilai stock di kepala Dashboard dan ubin berikon (Bagian 5.6), grafik riwayat
+> harga (Bagian 5.7), dan grafik kosong yang tetap menggambar sumbunya (Bagian 5.6).
 > Diperbarui 11 Oktober 2026: riwayat harga item. Harga sekarang, lembar "Ganti harga", dan
 > "Riwayat harga" di Pengaturan → Item (Bagian 5.7); baris selisih karena perubahan harga di
 > lembar Nilai stock (Bagian 5.6).
@@ -36,9 +42,9 @@ bekerja. Tugas utamanya mengisi angka dengan cepat dan benar.
 Dari dua hal itu, lima keputusan desain:
 
 1. **Sinematik di bingkai, bukan di form.** Kesan sinematik (navy pekat, huruf besar,
-   kontras kuat) dipakai di layar Login, kepala Beranda, dan bar navigasi. Layar isi form
-   tetap terang dan polos. Form bertema gelap sulit dibaca di bawah lampu dapur dan mudah
-   silau di layar yang berminyak.
+   kontras kuat) dipakai di layar Login, kepala navy setiap layar, dan bar navigasi. Kepala
+   itu membawa judul dan angka utama layarnya (Bagian 4.7). Isian di bawahnya tetap terang:
+   form bertema gelap sulit dibaca di bawah lampu dapur dan mudah silau di layar yang berminyak.
 2. **Satu elemen khas: rel tiket.** Beranda menampilkan setiap form sebagai tiket yang
    tergantung di rel, seperti tiket pesanan di pass dapur. Tiap tiket menunjukkan status
    hari ini, sehingga staff langsung tahu apa yang belum diisi. Relnya sekaligus menjadi
@@ -73,6 +79,10 @@ Rasio kontras sudah dihitung (standar WCAG: teks minimal 4,5; garis komponen min
 | Rel Padam | `#5A6F8F` | Ruas rel tiket yang belum terisi | Di atas Navy Pass: 3,2 |
 | Garis | `#C5CEDA` | Pemisah dan tepi kartu (dekoratif) | |
 | Garis Isian | `#6F7E96` | Tepi kolom isian | Di atas Kertas: 4,1 |
+| Garis Halus | `#E3E8EF` | Pemisah di dalam kartu (dekoratif) | |
+| Navy Dalam | `#071528` | Klip tiket di rel | |
+| Navy Lapis | `#132B4D` | Permukaan di atas navy (kotak angka utama, chip di kepala) | Teks putih di atasnya: 13,6 |
+| Garis Navy | `#24406A` | Tepi dan pemisah di atas navy, tekstur garis kepala | |
 
 **Makna status** (selalu disertai ikon dan kata, tidak pernah warna saja)
 
@@ -83,8 +93,16 @@ Rasio kontras sudah dihitung (standar WCAG: teks minimal 4,5; garis komponen min
 | Perlu ditinjau | `#B54708` | `#FFFAEB` | 5,2 | Dilaporkan keliru, Perlu reorder, Stock bahan tidak cukup, Habis besok, Opname lewat jadwal |
 | Menunggu | `#3B5374` | `#EEF2F7` | 7,0 | Menunggu kirim, Belum diisi, Nihil |
 
-Aturan: tidak ada gradasi warna, tidak ada foto latar, tidak ada bayangan tebal. Kedalaman
-ditunjukkan dengan garis tipis dan beda warna latar.
+Aturan: tidak ada gradasi warna dan tidak ada foto latar. Kedalaman ditunjukkan dengan
+bayangan lembut berlapis dan beda warna latar:
+
+- **Bayangan kartu:** `0 1px 2px` dan `0 8px 24px`, warna Navy Pass dengan kepekatan 6% dan
+  8%. Menggantikan garis tepi kartu. Pemisah di dalam kartu tetap garis (Garis Halus).
+- **Bayangan tiket** (tiket Beranda, kotak angka yang menggantung di kepala): `0 2px 4px` dan
+  `0 14px 28px`, Navy Dalam 18% dan 16%, supaya terlihat tergantung.
+- **Tekstur kepala navy:** garis horizontal 1 px berwarna Garis Navy tiap 28 px, memudar ke
+  atas, seperti kertas bergaris di pass dapur. Ini satu-satunya pengecualian aturan gradasi
+  (pudarnya), hanya di permukaan navy, dan tidak pernah di belakang teks isian.
 
 **Laporan PDF dan tab Harian di spreadsheet**
 
@@ -112,11 +130,13 @@ Satu keluarga dengan dua lebar, supaya seragam tetapi judul tetap berkarakter:
 
 | Peran | Huruf | Ukuran / tebal |
 |---|---|---|
-| Tanggal di kepala Beranda | Barlow Condensed | 40 px, 600 |
-| Judul layar | Barlow Condensed | 28 px, 600 |
+| Tanggal di kepala Beranda | Barlow Condensed | 44 px, 600 (hari ditulis terpisah di atasnya) |
+| Judul layar (di kepala navy) | Barlow Condensed | 34 px, 600 (28 px di layar pendek) |
 | Judul tiket dan kartu | Barlow | 18 px, 600 |
 | Teks isi dan isian form | Barlow | 16 px, 400 |
 | Angka yang diisi | Barlow | 20 px, 500 |
+| Angka utama (nilai stock, stock dan harga di kepala, angka ubin Dashboard) | Barlow Condensed | 28 sampai 40 px, 600 |
+| Hari di kepala Beranda | Barlow | 16 px, 600, Lampu Pass |
 | Keterangan, satuan | Barlow | 14 px, 400 |
 
 - Barlow dan Barlow Condensed adalah huruf bebas lisensi (OFL). File hurufnya disimpan
@@ -149,12 +169,13 @@ Dashboard memuat tombol Stock opname. Jumlah menu utama tetap lima.
 
 ### 4.2 HP dan tablet (di bawah 1.024 px)
 
-Bar navigasi navy di **bawah**, supaya terjangkau ibu jari. Kepala layar navy tipis di atas.
-Tablet ikut aturan ini karena sama-sama dipakai dengan jari.
+Bar navigasi navy di **bawah**, supaya terjangkau ibu jari. Kepala layar navy di atas
+(Bagian 4.7). Tablet ikut aturan ini karena sama-sama dipakai dengan jari.
 
 ```
 ┌──────────────────────────────┐
-│▓ Riwayat            ● Online ▓│  kepala navy: judul layar + status sinyal
+│▓ ‹ Pengaturan       ● Online ▓│  kepala navy: kembali + status sinyal
+│▓ Riwayat                     ▓│  judul layar, lalu ringkasan layar (jika ada)
 ├──────────────────────────────┤
 │                              │
 │   isi layar, 1 kolom         │
@@ -196,11 +217,34 @@ Titik lebar hanya dua: **600 px** (kartu form menjadi dua kolom) dan **1.024 px*
 navigasi pindah ke atas, tabel menggantikan kartu, dua kolom di Dashboard dan Riwayat).
 Aturan untuk semua lebar layar ada di Bagian 4.6.
 
+Di bawah bar atas, kepala navy layar itu (Bagian 4.7) melebar selebar layar, dengan isinya
+di tengah selebar isi layar.
+
+### 4.7 Kepala navy setiap layar
+
+- Setiap layar dibuka dengan kepala navy (Navy Pass dengan tekstur garis halus, Bagian 2):
+  tautan kembali (jika ada) dan, di HP dan tablet, status sinyal; judul layar 34 px; lalu
+  ringkasan layar itu jika ada. Beranda memakai kepalanya sendiri (Bagian 5.2).
+- **Ringkasan di kepala**, hanya untuk angka yang memang utama di layar itu:
+  - Pengaturan → Item (ubah): kategori, satuan, dan keadaan sebagai chip, lalu dua angka
+    berdampingan: "Stock hari ini" dan "Harga sekarang" (dengan "sejak 7 Okt").
+  - Dashboard: kotak "Nilai stock" (Navy Lapis) berisi nilai, selisih karena perubahan harga
+    bulan ini (Lampu Pass), dan jumlah item yang belum punya harga; ketuk untuk lembar Nilai
+    stock.
+  - Layar lain: judul saja. Tombol "Tambah" di layar daftar ikut di kepala, di kanan judul.
+- Di HP dan tablet kepala ini menggantikan judul di bar atas dan ikut bergulir bersama isi;
+  bar navigasi bawah tetap. Di laptop dan desktop bar atas tetap di tempatnya dan kepala
+  berada di bawahnya.
+- **Kotak yang menggantung.** Di Dashboard, ubin angka ringkas menumpuk sebagian di tepi
+  bawah kepala navy, seperti tiket di rel Beranda, dengan bayangan tiket.
+- Pita sinyal (offline) tampil di atas kepala navy.
+- Layar pendek (tinggi di bawah 500 px): judul 28 px dan ringkasan berjajar satu baris.
+
 ### 4.4 Jarak dan bentuk
 
 - Kelipatan jarak: 4, 8, 12, 16, 24, 32 px. Tepi layar: 16 px di HP, 24 px di tablet dan
   desktop.
-- Sudut: tiket 4 px (seperti kertas), kolom isian 8 px, tombol 10 px.
+- Sudut: tiket 6 px (seperti kertas), kartu dan ubin 14 px, kolom isian dan tombol 10 px.
 - Tinggi kolom isian dan tombol: 48 px. Jarak antar sasaran sentuh minimal 8 px.
 
 ### 4.5 Nama dan ikon aplikasi
@@ -347,9 +391,16 @@ Satu-satunya layar yang sepenuhnya navy.
 ```
 
 - Kepala navy mengisi kira-kira sepertiga atas layar. Tiket Kertas menumpuk sebagian di
-  atasnya, sehingga terlihat tergantung di rel.
-- Tiap tiket: nama form, status hari ini, lalu siapa dan jam berapa terakhir mengisi.
-  Status ditunjukkan dengan tanda status (ikon dan kata), tanpa strip warna di sisi tiket.
+  atasnya, sehingga terlihat tergantung di rel. Tanggal ditulis dalam dua baris: nama hari
+  (16 px, Lampu Pass) lalu tanggal (44 px). Kemajuan ditulis dengan angkanya diperbesar:
+  "**1** dari 4 form terisi".
+- Tiap tiket: ikon form dalam kotak kecil berlatar Baja (Stock: kotak, Suhu: termometer,
+  Prep list: panci, Waste: tempat sampah, form kustom: lembar), nama form, dan status hari
+  ini. Di bawahnya, dipisah garis putus-putus dengan dua takik setengah lingkaran di tepinya
+  (potongan sobek seperti tiket pesanan), satu baris kecil: siapa dan jam berapa terakhir
+  mengisi, atau "Wajib hari ini" / "Tidak ditagih hari ini" jika belum ada isian, dengan
+  panah kecil. Klip Navy Dalam di tengah atas tiket. Bayangan tiket (Bagian 2), tanpa garis
+  tepi. Status ditunjukkan dengan tanda status (ikon dan kata), tanpa strip warna di sisi tiket.
 - Ketuk tiket untuk membuka form. Form yang sudah terkirim tetap bisa dibuka untuk
   menambah isian (misalnya kategori stock lain, barang datang berikutnya, atau waste berikutnya).
 - **Rel sebagai garis kemajuan.** Rel terbagi menjadi ruas yang sama lebar, satu ruas per
@@ -550,8 +601,14 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.6 Dashboard (Pengelola)
 
-- Angka ringkas hari ini dalam satu baris: form terisi, belum diperiksa, suhu di luar
-  standar, item di bawah stok minimum, total waste (Rp), dan nilai stock (Rp).
+- **Nilai stock** di kepala navy (Bagian 4.7): angka utama 40 px, selisih karena perubahan
+  harga bulan ini, dan jumlah item yang belum punya harga. Ketuk untuk lembar Nilai stock.
+- Angka ringkas hari ini sebagai ubin yang menggantung di tepi kepala: form terisi (dengan
+  cincin kemajuan kecil berwarna Lampu Pass di atas jalur Garis Halus, selalu disertai
+  angkanya), belum diperiksa, suhu di luar standar, item di bawah stok minimum, dan total
+  waste (Rp). Tiap ubin punya ikon kecil di kanan labelnya dan angka Barlow Condensed 30 px.
+  HP dan tablet: dua kolom, "Form terisi" selebar dua kolom. Laptop/desktop: satu baris.
+- Daftar "Perlu perhatian": tiap baris diawali ubin ikon (Bagian 6) berwarna makna statusnya.
 - Tombol "Stock opname" di bagian atas, dengan tanggal opname terakhir di sampingnya.
 - Di bawahnya daftar "Perlu perhatian", diurutkan dari yang paling mendesak.
 - **Dua grafik kecil** di bawah daftar itu. Di laptop/desktop keduanya berada di kolom kanan.
@@ -596,6 +653,9 @@ Satu-satunya layar yang sepenuhnya navy.
     tertinggi; jumlah pengecekan di luar standar), sehingga isinya terbaca tanpa melihat
     gambarnya.
   - Tampil langsung, tanpa animasi. Tinggi grafik waste 120 px; lebarnya mengikuti kartu.
+  - **Grafik kosong** tetap menggambar bentuknya: grafik waste menampilkan sumbu dan nama
+    hari dengan kalimat kosong di tengah; grafik suhu menampilkan pita batas normal unit aktif
+    tanpa titik.
   - Datanya datang bersama angka ringkas dalam satu panggilan ke server.
 - **Lembar Nilai stock** (dibuka dari angka ringkas nilai stock): nilai per kategori, total,
   daftar item yang belum punya harga, dan satu baris "Selisih karena perubahan harga bulan ini"
@@ -644,9 +704,14 @@ Satu-satunya layar yang sepenuhnya navy.
   untuk catatan sebelum tanggal ini.", dan tombol "Simpan harga". Tanggal yang sudah punya harga
   menggantikan harga tanggal itu, dengan kalimat "Harga Rp 15.000 yang berlaku mulai 7 Okt
   diganti." Setelah disimpan: "Harga Tomat tersimpan."
+- Di atas daftar riwayat ada grafik tangga kecil (SVG, tanpa animasi): harga tiap perubahan
+  dari yang paling lama sampai hari ini, titik di harga sekarang, dengan label harga terendah
+  dan tertinggi. Tampil jika ada dua harga atau lebih.
 - Di bawah harga sekarang tampil "Riwayat harga": 10 perubahan terakhir, terbaru di atas. Tiap
   baris: tanggal berlaku ("Sejak awal" untuk harga awal), harga, naik atau turun dibanding harga
-  sebelumnya ditulis dengan kata ("naik Rp 2.000", "turun Rp 500"), dan siapa yang mencatat.
+  sebelumnya ditulis dengan kata dan panah ("↗ naik Rp 2.000" bertanda Perlu ditinjau, "↘ turun
+  Rp 500" bertanda Baik), dan siapa yang mencatat, dalam garis waktu dengan titik di kiri.
+- Harga sekarang dan stock hari ini juga tampil di kepala navy layar item (Bagian 4.7).
 - Item baru menampilkan ajakan setelah disimpan: "Isi stok pembuka sekarang?" yang membuka
   Sesuaikan stock dengan alasan Stok pembuka.
 - Sakelar "Datang dalam kemasan besar". Jika dinyalakan, muncul dua isian: satuan besar
@@ -747,13 +812,15 @@ Satu-satunya layar yang sepenuhnya navy.
 
 | Komponen | Aturan |
 |---|---|
-| Tombol utama | Latar Biru Malam, teks putih, tinggi 48 px. Satu per layar. |
+| Tombol utama | Latar Biru Malam, teks putih, tinggi 48 px. Satu per layar. Di kepala navy (misalnya Tambah): latar Kertas, teks Navy Pass. |
 | Tombol kedua | Latar Kertas, tepi Garis Isian, teks Tinta. |
 | Tombol berbahaya | Teks Masalah, selalu dengan konfirmasi. |
 | Kolom isian | Latar Kertas, tepi Garis Isian 1 px, tinggi 48 px. Saat aktif: tepi Biru Malam 2 px. |
-| Kartu / tiket | Latar Kertas, tepi Garis 1 px, tanpa bayangan. |
+| Kartu / tiket | Latar Kertas, tanpa garis tepi, bayangan kartu atau bayangan tiket (Bagian 2). Kartu bersudut 14 px, tiket 6 px. |
+| Kepala navy | Di setiap layar: kembali, judul, ringkasan (Bagian 4.7). |
+| Ubin ikon | Kotak 40 px bersudut 12 px berlatar warna makna status (atau Baja), berisi ikon. Dipakai di daftar Perlu perhatian dan di tiket; selalu disertai teks, jadi warnanya bukan satu-satunya tanda. |
 | Keadaan tekan | Tombol, tiket, dan baris yang bisa diketuk sedikit menggelap dan mengecil saat ditekan (Bagian 8). Efek hover hanya untuk mouse. |
-| Rel kemajuan | Garis 3 px di kepala Beranda, terbagi menjadi ruas dengan celah 4 px. Ruas terisi berwarna Lampu Pass, ruas lain Rel Padam. Selalu disertai tulisan kemajuannya (Bagian 5.2). |
+| Rel kemajuan | Garis 6 px bersudut bulat di kepala Beranda, terbagi menjadi ruas dengan celah 6 px. Ruas terisi berwarna Lampu Pass, ruas lain Rel Padam. Selalu disertai tulisan kemajuannya (Bagian 5.2). |
 | Tanda status | Kapsul kecil: ikon + kata, warna sesuai tabel makna status. |
 | Pita sinyal | Muncul di bawah kepala layar saat offline: "Tidak ada sinyal. Isian disimpan di HP dan dikirim nanti." |
 | Pesan singkat (toast) | Di atas bar navigasi, hilang setelah 4 detik. |
@@ -890,7 +957,7 @@ di tiap kartu setiap kali layar dibuka, dan gerak hiasan yang berulang tanpa hen
 |---|---|
 | Tema gelap di layar isi form | Sulit dibaca di bawah lampu dapur, silau di layar berminyak |
 | Foto atau video latar | Memperlambat aplikasi dan mengganggu keterbacaan angka |
-| Gradasi warna dan efek kaca | Tidak menambah informasi; membuat tampilan tidak bersih |
+| Gradasi warna dan efek kaca | Tidak menambah informasi; membuat tampilan tidak bersih. Satu-satunya pengecualian: pudarnya tekstur garis di kepala navy (Bagian 2) |
 | Lebih dari satu warna aksen | Aksen akan berebut dengan warna makna status |
 | Animasi masuk di setiap kartu, animasi saat menggulir, latar bergerak, angka berhitung naik | Memperlambat pengisian dan menyita tenaga HP |
 | Library animasi dan library grafik | Menambah berat unduhan; CSS dan SVG sudah cukup |
@@ -920,3 +987,4 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
+| Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
