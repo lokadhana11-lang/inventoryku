@@ -6,6 +6,9 @@
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
 > Versi 1.6, 5 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Diperbarui 11 Oktober 2026: riwayat harga item. Harga sekarang, lembar "Ganti harga", dan
+> "Riwayat harga" di Pengaturan → Item (Bagian 5.7); baris selisih karena perubahan harga di
+> lembar Nilai stock (Bagian 5.6).
 > Perubahan sejak versi 1.5: tombol "Keluar" dan pesan keluar otomatis (Bagian 5.1 dan
 > 5.2), hapus staff yang sudah nonaktif (Bagian 5.7), dan pilihan kategori saat mengunduh
 > PDF stock (Bagian 5.5).
@@ -594,6 +597,11 @@ Satu-satunya layar yang sepenuhnya navy.
     gambarnya.
   - Tampil langsung, tanpa animasi. Tinggi grafik waste 120 px; lebarnya mengikuti kartu.
   - Datanya datang bersama angka ringkas dalam satu panggilan ke server.
+- **Lembar Nilai stock** (dibuka dari angka ringkas nilai stock): nilai per kategori, total,
+  daftar item yang belum punya harga, dan satu baris "Selisih karena perubahan harga bulan ini"
+  (positif = nilai stock naik karena harga naik; cara hitung di spesifikasi sistem Bagian 8.5).
+  Ketuk baris itu untuk rincian per item: tanggal berlaku, harga lama dan baru, stock saat itu,
+  dan selisihnya.
 - Tombol "Buka dashboard di Google Sheets" untuk grafik lengkap dan pilihan periode.
 - Layar ini tetap ringkasan: hanya dua grafik itu. Tren lain ada di spreadsheet.
 
@@ -627,7 +635,18 @@ Satu-satunya layar yang sepenuhnya navy.
 **Pengaturan → Item:**
 
 - Isian: nama, kategori, satuan, harga satuan, stok minimum, dan stok maksimum (opsional,
-  dipakai untuk saran order).
+  dipakai untuk saran order). Item baru mengisi harga pertamanya di isian harga satuan.
+- **Harga satuan punya riwayat** (spesifikasi sistem Bagian 5.1). Setelah item punya harga,
+  isian harga diganti dengan tulisan "Harga sekarang Rp 15.000 (sejak 7 Okt)" dan tombol
+  "Ganti harga". Harga awal yang berlaku sejak awal ditulis "Harga sekarang Rp 15.000".
+- Tombol "Ganti harga" membuka lembar: "Harga baru", "Berlaku mulai" (Hari ini, atau tanggal
+  lain yang sudah lewat, misalnya tanggal faktur), kalimat "Harga lama Rp 15.000 tetap dipakai
+  untuk catatan sebelum tanggal ini.", dan tombol "Simpan harga". Tanggal yang sudah punya harga
+  menggantikan harga tanggal itu, dengan kalimat "Harga Rp 15.000 yang berlaku mulai 7 Okt
+  diganti." Setelah disimpan: "Harga Tomat tersimpan."
+- Di bawah harga sekarang tampil "Riwayat harga": 10 perubahan terakhir, terbaru di atas. Tiap
+  baris: tanggal berlaku ("Sejak awal" untuk harga awal), harga, naik atau turun dibanding harga
+  sebelumnya ditulis dengan kata ("naik Rp 2.000", "turun Rp 500"), dan siapa yang mencatat.
 - Item baru menampilkan ajakan setelah disimpan: "Isi stok pembuka sekarang?" yang membuka
   Sesuaikan stock dengan alasan Stok pembuka.
 - Sakelar "Datang dalam kemasan besar". Jika dinyalakan, muncul dua isian: satuan besar
