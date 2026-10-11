@@ -172,6 +172,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   paling besar 2 MB per foto dan 15 MB per kiriman) → jawaban ditambah `foto` (jumlah yang tersimpan) dan `fotoGagal: [nama item]`.
   `riwayat`/`detailKiriman`/jawaban pemeriksaan: baris Waste membawa `foto: true|false` untuk semua role dan `fotoUrl` (tautan
   Drive) hanya untuk Pengelola.
+- Arah premium (aplikasi 0.14.0) tidak mengubah API.
 - Riwayat harga item (11 Oktober 2026): `gantiHarga {nama, harga, berlakuMulai: 'yyyy-mm-dd'}` (khusus Pengelola; hari ini atau
   tanggal lewat) → jawaban `daftarItem` ditambah `hargaDisimpan: { nama, harga, berlakuMulai, mengganti }`. `daftarItem` ditambah
   `riwayatHargaSiap` dan per item `hargaSejak` ('' = sejak awal, null = belum punya riwayat), `riwayatHarga: [{ berlakuMulai, harga,
@@ -201,6 +202,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 10 | Rekap bulanan (PDF enam bagian Bagian 9.3, unduh dari menu Laporan untuk Pengelola, simpan ke Drive, email dan trigger tanggal 1, `kirimRekapSekarang`) dan pemeriksaan akhir terhadap kedua spesifikasi | Kode selesai (Code.gs v0.11, aplikasi 0.11.0), diuji dengan API tiruan (Code.gs di Node, 61 uji server), Chromium (28 uji alur termasuk iPhone, delapan ukuran) dan sapuan semua layar pada delapan ukuran (274 pemeriksaan) serta "kurangi gerak". Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `pasangTrigger` dan `kirimRekapSekarang`, deploy versi baru, uji dari HP. setupSpreadsheet tidak perlu dijalankan ulang |
 | 10+ | Perbaikan tiga penyimpangan butir 150 (7 Oktober 2026): urutan `Data_Suhu` menurut waktu cek, sakelar Aktif/Nonaktif di layar ubah staff, geser kartu Waste untuk menghapus | Kode selesai (Code.gs v0.11.1, aplikasi 0.11.1), diuji dengan API tiruan (Code.gs di Node, 8 uji server) dan Chromium (22 uji alur dengan sentuhan tiruan, delapan ukuran, "kurangi gerak"). Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (rumus `Harian_Suhu` baru), deploy versi baru, uji dari HP |
 | 11+ | Riwayat harga item (keputusan pemilik 11 Oktober 2026): `M_HargaItem`, Ganti harga dan Riwayat harga di Pengaturan → Item, harga yang berlaku pada tanggal untuk waste/penyesuaian/opname/nilai stock/resep/rekap, selisih karena perubahan harga di Dashboard dan rekap bulanan, rumus bahan terpakai di tab Dashboard | Kode selesai (Code.gs v0.13, aplikasi 0.13.0), diuji dengan API tiruan (Code.gs di Node, 26 uji harga + 32 pemeriksaan regresi) dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HargaItem` dan harga awal), deploy versi baru, uji dari HP |
+| 11++ | Arah premium, spesifikasi tampilan 1.7 (dipilih pemilik dari pratinjau 11 Oktober 2026): kepala navy berisi ringkasan di setiap layar, bayangan lembut, tekstur navy, angka utama besar, tiket berikon dengan sobek, Nilai stock di kepala Dashboard dan ubin menggantung, grafik tangga harga, grafik kosong bersumbu | Kode selesai (aplikasi 0.14.0; Code.gs tidak berubah), diuji di Chromium (13 uji alur, sapuan semua rute Pengelola dan Staff pada delapan ukuran dan "kurangi gerak": 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1303,3 +1305,44 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Sheets (butir 168; jika galat, `periksaSelRumus_` mencatatnya di log setupSpreadsheet); baris harga awal (sejak awal) tidak bisa
     dibetulkan dari aplikasi (butir 166); blok Nilai stock di Sheet tetap memakai Harga Satuan `M_Item`, jadi selisih karena
     perubahan harga hanya ada di aplikasi dan rekap bulanan, tidak di tab Dashboard (spesifikasi tidak memintanya di Sheet).
+
+### Arah premium, spesifikasi tampilan 1.7 (aplikasi 0.14.0, 11 Oktober 2026)
+
+175. **Asal:** pemilik memilih "pakai arah ini" dari pratinjau perbandingan (artifact "InventoryKu Tampilan Premium"). Spesifikasi
+    tampilan naik ke versi 1.7: Bagian 1 (sinematik di kepala setiap layar), 2 (token Garis Halus, Navy Dalam, Navy Lapis, Garis
+    Navy; bayangan lembut menggantikan garis tepi kartu; tekstur garis halus hanya di navy), 3 (angka utama Barlow Condensed,
+    judul layar 34 px, hari di atas tanggal Beranda), 4.2/4.3 dan Bagian baru 4.7 (kepala navy setiap layar), 4.4 (sudut tiket 6,
+    kartu 14, isian dan tombol 10), 5.2 (tiket berikon, potongan sobek, rel 6 px), 5.6 (Nilai stock di kepala, ubin berikon yang
+    menggantung, cincin Form terisi, ubin ikon di Perlu perhatian, grafik kosong bersumbu), 5.7 (grafik tangga harga, garis waktu
+    naik/turun), 6 (komponen), 10 dan 11. Code.gs tidak berubah.
+176. **Kepala navy bersama** (`pasangKepalaLayar` di router, dipanggil setelah `rute.layar`): layar tetap menulis `tautanKembali`,
+    `h1.judul-layar` atau `.kepala-isi` (judul + Tambah), dan `.kepala-ringkas` di awal `.layar-isi`; router MEMINDAHKAN (bukan
+    menyalin) ketiganya ke `header.kepala-layar` selebar layar, jadi rujukan layar ke judul tetap hidup. Layar tanpa h1 (detail
+    Riwayat di HP) mendapat judul dari bar (`data-dari-bar`, ikut `aturJudul`). `.layar-isi.kepala-gantung` membuat kepala
+    `gantung` (Dashboard). Beranda tetap punya `beranda-kepala` sendiri. Kelas `ada-kepala` di `#aplikasi`: di HP dan tablet
+    bar atas disembunyikan seperti di Beranda (kepala ikut bergulir, judul tidak lagi menempel di atas; bar navigasi bawah tetap),
+    status sinyal ada di baris atas kepala; di desktop bar atas tetap dan sinyal kepala disembunyikan. Pita sinyal ditaruh di
+    atas kepala navy (`tempatkanPita`). Tombol utama di kepala (Tambah) berlatar Kertas dengan teks Navy Pass.
+177. **Ringkasan di kepala** hanya untuk dua layar: Pengaturan → Item (chip kategori, satuan, keadaan; Stock hari ini dan Harga
+    sekarang dengan "sejak …"; diperbarui `perbaruiRingkas` juga saat isian sedang diketik) dan Dashboard (`kotakNilaiStock`:
+    nilai, selisih harga bulan ini, item tanpa harga; tombol membuka lembar Nilai stock; penanda "Memperbarui…" ikut di kepala
+    supaya ubin tetap menempel di tepinya). Layar lain cukup judul.
+178. **Dashboard:** ubin Nilai stock pindah ke kepala, jadi angka ringkas tinggal lima ubin berikon (HP dan tablet dua kolom dengan
+    "Form terisi" selebar dua kolom dan cincin kemajuan; desktop lima sejajar, cincin disembunyikan) yang menumpuk 40 px (desktop
+    56 px) di tepi kepala dengan bayangan tiket. Perlu perhatian: tiap baris diawali `ubinIkon(tingkat, ikon)` menurut jenis
+    (`IKON_PERHATIAN`), judulnya tebal dengan kata tingkat untuk pembaca layar ("Perlu ditinjau: …"); tanda status kapsul tidak
+    dipakai lagi di daftar ini. Grafik waste kosong menggambar garis dasar dan nama hari dengan kalimatnya di tengah; grafik suhu
+    kosong menggambar pita batas unit aktif tanpa titik.
+179. **Grafik tangga harga:** anak tangga sama lebar per harga (urutan, bukan skala waktu, supaya perubahan yang berdekatan tetap
+    terbaca), dari 10 riwayat yang dikirim server; garis SVG `preserveAspectRatio="none"` dengan `vector-effect:
+    non-scaling-stroke`, label harga terendah/tertinggi, tanggal awal dan "Hari ini", serta titik harga sekarang berupa HTML
+    supaya tidak gepeng; `role="img"` dengan uraian lengkap. Tampil jika ada dua harga atau lebih.
+180. **Tekstur navy:** `repeating-linear-gradient` garis 1 px tiap 28 px (Garis Navy 55%) ditutup lapisan `::after` yang memudar dari
+    navy di atas, di `beranda-kepala`, `kepala-layar`, dan pita di bawah rel. Hanya di permukaan navy (Bagian 2 versi 1.7).
+181. **Uji** (di luar repo): 13 uji alur Chromium (11 uji riwayat harga yang disesuaikan dengan struktur baru, kepala navy pada 21 rute
+    di 390 dan 1366 px tanpa judul ganda, Beranda/Dashboard 1.7) dan sapuan semua rute Pengelola (26) dan Staff (4) pada delapan
+    ukuran Bagian 4.6 plus "kurangi gerak" di 390 dan 1366 px: 292 pemeriksaan tanpa gulir ke samping, elemen keluar layar
+    (selain bingkai gulir tabel dan pilihan form), teks terpotong, sasaran sentuh di bawah 44 px, tombol yang menimpa judul,
+    animasi saat "kurangi gerak", atau galat konsol. Uji server riwayat harga tetap lulus.
+182. **Belum diuji di sini:** tampilan di HP asli (poni dan jarak aman, papan ketik iPhone dengan kepala yang kini ikut bergulir),
+    huruf perangkat diperbesar 200%, dan PWA terpasang.
