@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.12 (Tahap 11: foto bukti waste)
+// InventoryKu Code.gs v0.13 (riwayat harga item)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -43,6 +43,10 @@
  *                        jadwal form, Riwayat, PDF umum, email, Kepatuhan).
  * - Tahap 10           : rekap bulanan PDF (unduh dari menu Laporan, simpan ke
  *                        Drive, email tiap tanggal 1).
+ * - Tahap 11           : foto bukti waste.
+ * - 11 Oktober 2026    : riwayat harga item (M_HargaItem, aksi gantiHarga,
+ *                        harga yang berlaku pada tanggal untuk semua nilai
+ *                        rupiah, selisih karena perubahan harga).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -57,7 +61,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.12';
+var VERSI_KODE = 'v0.13';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -119,6 +123,8 @@ var AKSI_ = {
     pesan: 'Pengaturan item hanya untuk Head Kitchen dan Manager.' },
   simpanItem: { jalankan: aksiSimpanItem_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
+  gantiHarga: { jalankan: aksiGantiHarga_, pengelola: true,
+    pesan: 'Harga hanya bisa diganti Head Kitchen atau Manager.' },
   daftarKategoriSatuan: { jalankan: aksiDaftarKategoriSatuan_, pengelola: true,
     pesan: 'Pengaturan kategori dan satuan hanya untuk Head Kitchen dan Manager.' },
   simpanKategori: { jalankan: aksiSimpanKategori_, pengelola: true,
@@ -820,6 +826,7 @@ var KUNCI_MASTER = {
   M_Resep: 'Item Hasil',
   M_ResepBahan: 'Item Hasil',
   M_Item: 'Nama Item',
+  M_HargaItem: 'Nama Item',
   M_Kategori: 'Nama Kategori',
   M_Unit: 'Nama Unit'
 };
@@ -1660,6 +1667,280 @@ function bacaKategori_() {
 }
 
 /* =========================================================================
+ * Riwayat harga item (11 Oktober 2026; spesifikasi sistem Bagian 5.1 dan 8.5)
+ * ========================================================================= */
+
+var TAB_HARGA = 'M_HargaItem';
+var RIWAYAT_HARGA_TAMPIL = 10;
+var OLEH_HARGA_AWAL = 'Harga awal';
+
+/** Riwayat harga yang sudah dibaca dalam permintaan ini (dibuang resetMemoForm_ dan setelah harga ditulis). */
+var MEMO_HARGA_ = null;
+
+/**
+ * M_HargaItem: { ada (tab ada), item: { namaKecil: [{ mulai ('' = sejak awal, atau
+ * 'yyyy-mm-dd'), harga, oleh, pada (Date atau null), nomor }] } }, tiap item urut
+ * Berlaku Mulai (kosong lebih dulu). Baris tanpa nama atau tanpa harga angka
+ * dilewati. Dua baris item yang sama dengan Berlaku Mulai yang sama (diisi tangan):
+ * yang lebih atas di Sheet dipakai, sama dengan rumus tab Dashboard.
+ */
+function bacaRiwayatHarga_() {
+  if (MEMO_HARGA_) return MEMO_HARGA_;
+  var t = bacaTabel_(TAB_HARGA);
+  var hasil = { ada: !!t, item: {} };
+  if (t) {
+    var zona = ss_().getSpreadsheetTimeZone();
+    t.baris.forEach(function (b, i) {
+      var nama = rapikanTeks_(nilai_(t, b, 'Nama Item'));
+      var harga = angkaAtauNull_(nilai_(t, b, 'Harga Satuan (Rp)'));
+      if (!nama || harga == null) return;
+      var mentah = nilai_(t, b, 'Berlaku Mulai');
+      var mulai = mentah === '' || mentah == null ? '' : teksTanggal_(mentah, zona);
+      if (mulai && !tanggalSah_(mulai)) return; // tanggal tidak terbaca
+      var pada = nilai_(t, b, 'Dicatat Pada');
+      var daftar = hasil.item[nama.toLowerCase()] = hasil.item[nama.toLowerCase()] || [];
+      if (daftar.some(function (x) { return x.mulai === mulai; })) return;
+      daftar.push({ mulai: mulai, harga: harga, oleh: rapikanTeks_(nilai_(t, b, 'Dicatat Oleh')),
+        pada: pada instanceof Date ? pada : null, nomor: i + 2 });
+    });
+    Object.keys(hasil.item).forEach(function (k) {
+      hasil.item[k].sort(function (a, b) { return a.mulai < b.mulai ? -1 : a.mulai > b.mulai ? 1 : 0; });
+    });
+  }
+  return MEMO_HARGA_ = hasil;
+}
+
+/**
+ * Harga satu item yang berlaku pada tanggal itu: baris dengan Berlaku Mulai
+ * terbesar yang tidak melewati tanggal (kosong = sejak awal); null jika belum
+ * ada. Item yang sama sekali belum punya riwayat (tab M_HargaItem belum dibuat,
+ * atau item diisi tangan di Sheet) memakai Harga Satuan di M_Item untuk semua
+ * tanggal. m: baris bacaItem_().
+ */
+function hargaPada_(m, tanggal) {
+  var daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()];
+  if (!daftar || !daftar.length) return m.hargaMItem !== undefined ? m.hargaMItem : m.harga;
+  var h = null;
+  daftar.forEach(function (x) { if (x.mulai <= tanggal) h = x.harga; });
+  return h;
+}
+
+/** Baris riwayat yang berlaku pada tanggal itu (untuk "sejak"), atau null. */
+function barisHargaPada_(nama, tanggal) {
+  var daftar = bacaRiwayatHarga_().item[nama.toLowerCase()] || [];
+  var x = null;
+  daftar.forEach(function (d) { if (d.mulai <= tanggal) x = d; });
+  return x;
+}
+
+/**
+ * Salinan master item dengan harga yang berlaku pada tanggal itu (Bagian 5.1).
+ * Harga Satuan M_Item tetap ada di hargaMItem. master opsional (bacaItem_()).
+ */
+function itemPadaTanggal_(tanggal, master) {
+  master = master || bacaItem_();
+  var hasil = {};
+  Object.keys(master).forEach(function (k) {
+    var m = gabung_(master[k], {});
+    if (m.hargaMItem === undefined) m.hargaMItem = m.harga;
+    m.harga = hargaPada_(m, tanggal);
+    hasil[k] = m;
+  });
+  return hasil;
+}
+
+/**
+ * Selisih karena perubahan harga (Bagian 8.5) untuk perubahan yang berlaku
+ * mulai tanggal dari sampai sampai: tiap kali harga berlaku berganti dari h0 ke
+ * h1 pada tanggal D, selisih = Stock Akhir pada D−1 × (h1 − h0). Perubahan dari
+ * belum punya harga ke harga pertama tidak dihitung; harga baru yang sama dengan
+ * harga lama bukan perubahan. Jawaban: { dari, sampai, total, item: [{ nama,
+ * kategori, satuan, selisih, perubahan: [{ tanggal, dari, ke, stock, selisih }] }] }
+ * (item urut nilai selisih terbesar, perubahan urut tanggal).
+ */
+function selisihHarga_(master, rekap, dari, sampai) {
+  var riwayat = bacaRiwayatHarga_();
+  var item = [];
+  var total = 0;
+  Object.keys(riwayat.item).forEach(function (k) {
+    var m = master[k];
+    if (!m) return;
+    var daftar = riwayat.item[k];
+    var perubahan = [];
+    var jumlah = 0;
+    for (var i = 1; i < daftar.length; i++) {
+      var d = daftar[i];
+      var h0 = daftar[i - 1].harga;
+      if (!d.mulai || d.mulai < dari || d.mulai > sampai || d.harga === h0) continue;
+      var stock = posisiStock_(rekap.item[k], geserTanggal_(d.mulai, -1)).akhir;
+      var nilai = stock * (d.harga - h0);
+      jumlah += nilai;
+      perubahan.push({ tanggal: d.mulai, dari: h0, ke: d.harga, stock: stock, selisih: Math.round(nilai) });
+    }
+    if (!perubahan.length) return;
+    total += jumlah;
+    item.push({ nama: m.nama, kategori: m.kategori, satuan: m.satuan, selisih: Math.round(jumlah), perubahan: perubahan });
+  });
+  item.sort(function (a, b) { return Math.abs(b.selisih) - Math.abs(a.selisih) || a.nama.localeCompare(b.nama, 'id'); });
+  return { dari: dari, sampai: sampai, total: Math.round(total), item: item };
+}
+
+/**
+ * Riwayat harga satu item untuk Pengaturan → Item: harga sekarang, sejak
+ * kapan ('' = sejak awal; null = belum punya riwayat), dan 10 perubahan
+ * terakhir (terbaru dulu) dengan beda terhadap harga sebelumnya.
+ */
+function infoHargaItem_(m, hari) {
+  var daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+  var kini = barisHargaPada_(m.nama, hari);
+  var riwayat = daftar.map(function (x, i) {
+    return {
+      berlakuMulai: x.mulai,
+      harga: x.harga,
+      beda: i ? Math.round((x.harga - daftar[i - 1].harga) * 100) / 100 : null,
+      oleh: x.oleh,
+      waktu: x.pada ? x.pada.toISOString() : null
+    };
+  }).reverse().slice(0, RIWAYAT_HARGA_TAMPIL);
+  return {
+    harga: daftar.length ? (kini ? kini.harga : null) : m.harga,
+    hargaSejak: daftar.length ? (kini ? kini.mulai : null) : null,
+    riwayatHarga: riwayat,
+    jumlahRiwayatHarga: daftar.length
+  };
+}
+
+/** Menyamakan Harga Satuan di M_Item dengan harga yang berlaku hari ini. Dipanggil di dalam kunci, setelah M_HargaItem ditulis. */
+function samakanHargaMItem_(nama) {
+  MEMO_HARGA_ = null;
+  var t = wajibTabel_('M_Item');
+  var nomor = barisMaster_(t, 'Nama Item', nama);
+  if (!nomor) return;
+  var m = bacaItem_()[nama.toLowerCase()];
+  var kini = hargaPada_(m, hariIni_());
+  if (kini !== m.harga) tulisBarisMaster_(t, nomor, { 'Harga Satuan (Rp)': kini == null ? '' : kini });
+}
+
+/** Satu baris baru M_HargaItem (di dalam kunci). mulai: '' (sejak awal) atau 'yyyy-mm-dd'. */
+function tambahBarisHarga_(nama, mulai, harga, oleh, kini) {
+  tambahBarisMaster_(TAB_HARGA, {
+    'Nama Item': nama,
+    'Berlaku Mulai': mulai ? tanggalSel_(mulai) : '',
+    'Harga Satuan (Rp)': harga,
+    'Dicatat Oleh': oleh,
+    'Dicatat Pada': kini
+  });
+  MEMO_HARGA_ = null;
+}
+
+/**
+ * Ganti harga (Bagian 5.1), khusus Pengelola. body: { nama, harga,
+ * berlakuMulai: 'yyyy-mm-dd' (hari ini atau tanggal yang sudah lewat) }.
+ * Menambah baris M_HargaItem; tanggal yang sudah punya baris untuk item itu
+ * menggantikan harganya dan tercatat di Log_Perubahan. Item yang belum punya
+ * riwayat tetapi sudah punya Harga Satuan di M_Item (diisi tangan) mendapat
+ * baris harga awal dulu, supaya harga lamanya tetap berlaku sebelum tanggal ini.
+ * Lalu Harga Satuan M_Item disamakan dengan harga hari ini. Data yang sudah
+ * tersimpan (estimasi waste, nilai selisih) tidak dihitung ulang.
+ * Jawaban: daftarItem ditambah hargaDisimpan: { nama, harga, berlakuMulai, mengganti }.
+ */
+function aksiGantiHarga_(body, pengguna) {
+  var harga = angkaOpsional_(body.harga, 'Harga baru', 2);
+  if (harga == null) throw galatPengguna_('Isi harga baru.');
+  var mulai = String(body.berlakuMulai || '');
+  if (!tanggalSah_(mulai)) throw galatPengguna_('Tanggal berlaku mulai tidak terbaca. Pilih tanggal lagi.');
+  if (mulai > hariIni_()) throw galatPengguna_('Harga tidak bisa berlaku mulai tanggal yang belum tiba. Pilih hari ini atau tanggal yang sudah lewat.');
+
+  return denganKunci_(function () {
+    var m = bacaItem_()[rapikanTeks_(body.nama).toLowerCase()];
+    if (!m) throw galatPengguna_('Item ' + rapikanTeks_(body.nama) + ' tidak ditemukan. Kembali ke daftar item.');
+    var t = bacaTabel_(TAB_HARGA);
+    if (!t) throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    MEMO_HARGA_ = null;
+    var kini = new Date();
+    var daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+    if (!daftar.length && m.harga != null) {
+      tambahBarisHarga_(m.nama, '', m.harga, OLEH_HARGA_AWAL, kini);
+      daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+    }
+    var sama = null;
+    daftar.forEach(function (x) { if (x.mulai === mulai) sama = x; });
+    if (sama) {
+      if (sama.harga === harga) {
+        throw galatPengguna_('Harga ' + m.nama + ' yang berlaku mulai ' + tanggalPendekId_(mulai) + ' sudah ' + rupiahId_(harga) + '.');
+      }
+      t = wajibTabel_(TAB_HARGA);
+      tulisBarisMaster_(t, sama.nomor, { 'Harga Satuan (Rp)': harga, 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini });
+      catatLog_(TAB_HARGA, m.nama + ' · ' + mulai, pengguna, kini, [['Harga Satuan (Rp)', String(sama.harga), String(harga)]]
+        .concat(sama.oleh !== pengguna.nama ? [['Dicatat Oleh', sama.oleh, pengguna.nama]] : []));
+      MEMO_HARGA_ = null;
+    } else {
+      tambahBarisHarga_(m.nama, mulai, harga, pengguna.nama, kini);
+    }
+    samakanHargaMItem_(m.nama);
+    var data = dataItem_();
+    data.hargaDisimpan = { nama: m.nama, harga: harga, berlakuMulai: mulai, mengganti: !!sama };
+    return data;
+  });
+}
+
+/** Mengganti Nama Item di semua baris M_HargaItem item itu (di dalam kunci). */
+function gantiNamaRiwayatHarga_(namaLama, namaBaru) {
+  var t = wajibTabel_(TAB_HARGA);
+  var c = t.kol['Nama Item'];
+  t.baris.forEach(function (b, i) {
+    if (rapikanTeks_(b[c]).toLowerCase() === namaLama.toLowerCase()) t.sheet.getRange(i + 2, c + 1).setValue(namaBaru);
+  });
+  MEMO_HARGA_ = null;
+}
+
+/** "7 Okt" dari "2026-10-07". */
+function tanggalPendekId_(tanggal) {
+  var p = String(tanggal).split('-');
+  return Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1].slice(0, 3);
+}
+
+/**
+ * setupSpreadsheet: tiap item yang sudah punya Harga Satuan di M_Item tetapi
+ * belum punya baris di M_HargaItem mendapat satu baris dengan Berlaku Mulai
+ * kosong (berlaku sejak awal). Aman dijalankan ulang.
+ */
+function isiHargaAwal_(ss, catatan) {
+  var tItem = ss.getSheetByName('M_Item');
+  var tHarga = ss.getSheetByName(TAB_HARGA);
+  if (!tItem || !tHarga || tItem.getLastRow() < 2) return;
+  var kItem = posisiKolom_(tItem, { nama: 'Nama Item', harga: 'Harga Satuan (Rp)' });
+  var kHarga = posisiKolom_(tHarga, { nama: 'Nama Item', mulai: 'Berlaku Mulai', harga: 'Harga Satuan (Rp)',
+    oleh: 'Dicatat Oleh', pada: 'Dicatat Pada' });
+  var ada = {};
+  if (tHarga.getLastRow() >= 2) {
+    tHarga.getRange(2, kHarga.nama, tHarga.getLastRow() - 1, 1).getValues().forEach(function (r) {
+      var n = rapikanTeks_(r[0]).toLowerCase();
+      if (n) ada[n] = true;
+    });
+  }
+  var lebar = tHarga.getLastColumn();
+  var kini = new Date();
+  var baru = [];
+  tItem.getRange(2, 1, tItem.getLastRow() - 1, tItem.getLastColumn()).getValues().forEach(function (r) {
+    var nama = rapikanTeks_(r[kItem.nama - 1]);
+    var harga = angkaAtauNull_(r[kItem.harga - 1]);
+    if (!nama || harga == null || ada[nama.toLowerCase()]) return;
+    ada[nama.toLowerCase()] = true;
+    var baris = [];
+    for (var i = 0; i < lebar; i++) baris.push('');
+    baris[kHarga.nama - 1] = nama;
+    baris[kHarga.harga - 1] = harga;
+    baris[kHarga.oleh - 1] = OLEH_HARGA_AWAL;
+    baris[kHarga.pada - 1] = kini;
+    baru.push(baris);
+  });
+  if (!baru.length) return;
+  tHarga.getRange(barisBaruMaster_(tHarga, kHarga.nama, baru.length), 1, baru.length, lebar).setValues(baru);
+  catatan.push(TAB_HARGA + ': harga awal ' + baru.length + ' item ditambahkan (berlaku sejak awal)');
+}
+
+/* =========================================================================
  * Tahap 2: rekap stock (spesifikasi sistem Bagian 5.5)
  * ========================================================================= */
 
@@ -2022,6 +2303,8 @@ function aksiSesuaikanStock_(body, pengguna) {
       throw galatPengguna_('Stock ' + m.nama + ' tercatat ' + teksAngka_(tercatat) + ' ' + m.satuan +
         '. Tidak ada selisih yang perlu disimpan.');
     }
+    // Nilai selisih memakai harga yang berlaku pada tanggal penyesuaian (Bagian 5.7), disalin saat dicatat.
+    var harga = hargaPada_(m, tanggal);
     tambahBarisTabel_(tabel, [gabung_({
       'Tanggal': tanggalSel_(tanggal),
       'Kategori': m.kategori,
@@ -2030,7 +2313,7 @@ function aksiSesuaikanStock_(body, pengguna) {
       'Stock Sebenarnya': sebenarnya,
       'Selisih': selisih,
       'Satuan': m.satuan,
-      'Nilai Selisih (Rp)': m.harga == null ? '' : Math.round(selisih * m.harga),
+      'Nilai Selisih (Rp)': harga == null ? '' : Math.round(selisih * harga),
       'Alasan': alasan,
       'Catatan': catatan
     }, isiSistem_(konteks))]);
@@ -2066,15 +2349,16 @@ function periksaBarisWaste_(kategori, alasan, label) {
 }
 
 /**
- * Data layar isi Waste: item aktif (satuan dan harga dari M_Item; harga
- * barang jadi yang kosong dari resepnya), pilihan
+ * Data layar isi Waste: item aktif (satuan dari M_Item; harga yang berlaku
+ * pada tanggal waste, Bagian 5.4; harga barang jadi yang kosong dari resepnya
+ * dengan harga bahan pada tanggal itu), pilihan
  * kategori waste dan shift, waste yang sudah tercatat pada tanggal itu, dan
  * tanda nihil.
  */
 function dataFormWaste_(tanggal) {
   var zona = ss_().getSpreadsheetTimeZone();
-  // Harga barang jadi yang kosong dihitung dari resepnya (Bagian 5.3, Tahap 6).
-  var master = lengkapiHargaResep_(bacaItem_());
+  // Harga pada tanggal waste; barang jadi yang kosong dihitung dari resepnya (Bagian 5.3, Tahap 6).
+  var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
   var item = Object.keys(master).filter(function (k) { return master[k].aktif; }).map(function (k) {
     var m = master[k];
     return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga };
@@ -2211,8 +2495,9 @@ function simpanFotoWaste_(tanggal, sid, daftar) {
 }
 
 /**
- * Kiriman form Waste: satu baris Data_Waste per item. Satuan dan Harga Satuan
- * disalin dari M_Item saat dicatat; Estimasi Kerugian dihitung server. Waste
+ * Kiriman form Waste: satu baris Data_Waste per item. Satuan disalin dari
+ * M_Item, Harga Satuan dari harga yang berlaku pada tanggal waste (Bagian
+ * 5.4), saat dicatat; Estimasi Kerugian dihitung server. Waste
  * langsung mengurangi stock: rekap Stock_Harian item itu pada tanggal itu
  * (dibuat jika belum ada) dan semua rekap sesudahnya dihitung ulang.
  * Foto bukti (opsional, satu per baris, base64 di `foto`) disimpan ke Drive
@@ -2231,7 +2516,7 @@ function aksiKirimWaste_(body, pengguna) {
     return { sudahTerkirim: true, jumlah: 0, form: dataFormWaste_(tanggal) };
   }
 
-  var master = lengkapiHargaResep_(bacaItem_());
+  var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
   var foto = [];
   var totalFoto = 0;
   var baru = masukan.map(function (b, i) {
@@ -2658,7 +2943,7 @@ function ringkasResep_(r, master) {
 /** Jawaban Pengaturan → Resep: semua resep (aktif dulu, abjad) dan daftar item dengan harga efektif. */
 function dataResep_() {
   var resep = bacaResep_();
-  var master = lengkapiHargaResep_(bacaItem_(), resep);
+  var master = lengkapiHargaResep_(itemPadaTanggal_(hariIni_()), resep);
   var daftar = Object.keys(resep).map(function (k) { return ringkasResep_(resep[k], master); }).sort(function (a, b) {
     return (b.aktif ? 1 : 0) - (a.aktif ? 1 : 0) || a.itemHasil.localeCompare(b.itemHasil, 'id');
   });
@@ -3252,13 +3537,17 @@ function dataItem_() {
   });
   var item = Object.keys(master).map(function (k) {
     var m = master[k];
+    var h = infoHargaItem_(m, hari);
     return {
       nama: m.nama,
       kategori: m.kategori,
       satuan: m.satuan,
       satuanBesar: m.satuanBesar,
       isiSatuanBesar: m.isiSatuanBesar,
-      harga: m.harga,
+      harga: h.harga,
+      hargaSejak: h.hargaSejak,
+      riwayatHarga: h.riwayatHarga,
+      jumlahRiwayatHarga: h.jumlahRiwayatHarga,
       stokMin: m.stokMin,
       stokMaks: m.stokMaks,
       aktif: m.aktif,
@@ -3271,6 +3560,7 @@ function dataItem_() {
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   return {
     hariIni: hari,
+    riwayatHargaSiap: bacaRiwayatHarga_().ada,
     item: item,
     kategori: bacaSemuaKategori_().map(function (k) { return { nama: k.nama, aktif: k.aktif }; }),
     satuan: bacaSatuan_()
@@ -3291,8 +3581,14 @@ function aksiDaftarItem_() {
  * - Satuan besar opsional: berbeda dari satuan dasar, isinya lebih dari 0.
  *   Mengubah isinya tidak mengubah catatan lama.
  * - Item baru langsung aktif; stock-nya nol sampai stok pembuka diisi.
+ * - Harga (riwayat harga, Bagian 5.1): hanya untuk item yang belum punya harga
+ *   (item baru, atau item lama tanpa harga). Harga pertama ini berlaku sejak
+ *   awal dan ditulis ke M_Item dan M_HargaItem. Item yang sudah punya harga
+ *   mengganti harganya lewat aksi gantiHarga; harga yang dikirim di sini
+ *   diabaikan jika sama dengan harga sekarang atau kosong, dan ditolak jika
+ *   berbeda. Mengganti nama ikut mengganti nama di M_HargaItem.
  */
-function aksiSimpanItem_(body) {
+function aksiSimpanItem_(body, pengguna) {
   var nama = periksaNama_(body.nama, 'Nama item', PANJANG_ITEM_MAKS);
   var harga = angkaOpsional_(body.harga, 'Harga satuan', 2);
   var stokMin = angkaOpsional_(body.stokMin, 'Stok minimum', 3);
@@ -3340,22 +3636,34 @@ function aksiSimpanItem_(body) {
       if (besar.toLowerCase() === satuan.toLowerCase()) throw galatPengguna_('Satuan besar harus berbeda dari satuan dasar.');
       if (!(isi > 0)) throw galatPengguna_('Isi berapa ' + satuan + ' dalam 1 ' + besar + ', lebih dari 0.');
     }
+    var riwayatLama = lama ? (bacaRiwayatHarga_().item[lama.nama.toLowerCase()] || []) : [];
+    var punyaHarga = !!lama && (riwayatLama.length > 0 || lama.harga != null);
+    var hargaAwal = !punyaHarga && harga != null;
+    if (punyaHarga && harga != null && harga !== hargaPada_(lama, hariIni_())) {
+      throw galatPengguna_('Harga ' + lama.nama + ' diganti lewat tombol Ganti harga, supaya harga lamanya tetap tercatat. ' +
+        'Muat ulang aplikasi jika tombolnya belum ada.');
+    }
+    if (hargaAwal && !bacaRiwayatHarga_().ada) {
+      throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     var nilai = {
       'Nama Item': nama,
       'Kategori': kategori,
       'Satuan': satuan,
       'Satuan Besar': besar,
       'Isi per Satuan Besar': besar ? isi : '',
-      'Harga Satuan (Rp)': harga == null ? '' : harga,
       'Stok Minimum': stokMin == null ? '' : stokMin,
       'Stok Maksimum': stokMaks == null ? '' : stokMaks
     };
+    if (!punyaHarga) nilai['Harga Satuan (Rp)'] = harga == null ? '' : harga;
     if (lama) {
       tulisBarisMaster_(t, barisMaster_(t, 'Nama Item', lama.nama), nilai);
+      if (nama !== lama.nama && riwayatLama.length) gantiNamaRiwayatHarga_(lama.nama, nama);
     } else {
       nilai['Aktif'] = true;
       tambahBarisMaster_('M_Item', nilai);
     }
+    if (hargaAwal) tambahBarisHarga_(nama, '', harga, pengguna ? pengguna.nama : OLEH_HARGA_AWAL, new Date());
     var data = dataItem_();
     data.disimpan = nama;
     return data;
@@ -3750,8 +4058,9 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
 var HARI_GRAFIK_WASTE = 7;
 
 /**
- * Nilai stock (Bagian 8.5): Stock Akhir pada tanggal itu × Harga Satuan yang
- * berlaku sekarang di M_Item. Yang dihitung: item aktif, dan item nonaktif yang
+ * Nilai stock (Bagian 8.5): Stock Akhir pada tanggal itu × harga yang berlaku
+ * pada tanggal itu (riwayat harga; untuk hari ini sama dengan Harga Satuan di
+ * M_Item). Yang dihitung: item aktif, dan item nonaktif yang
  * stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah
  * (tanpaHarga). Harga barang jadi dari resep tidak dipakai di sini, supaya
  * angkanya sama dengan blok Nilai stock di tab Dashboard. Stock minus ikut
@@ -3773,11 +4082,12 @@ function nilaiStock_(master, rekap, tanggal) {
     var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
     if (!m.aktif && !akhir) return;
     var kat = namaKat[m.kategori.toLowerCase()] || m.kategori || 'Tanpa kategori';
-    if (m.harga == null) {
+    var harga = hargaPada_(m, tanggal);
+    if (harga == null) {
       tanpa.push({ nama: m.nama, kategori: kat, satuan: m.satuan, stock: akhir, aktif: m.aktif });
       return;
     }
-    var nilai = akhir * m.harga;
+    var nilai = akhir * harga;
     var x = per[kat.toLowerCase()] = per[kat.toLowerCase()] || { kategori: kat, nilai: 0, jumlahItem: 0 };
     x.nilai += nilai;
     x.jumlahItem++;
@@ -3973,6 +4283,7 @@ function aksiDashboard_(body) {
     form: form,
     stock: ringkasStockHari_(tanggal, master, rekap),
     nilai: nilaiStock_(master, rekap, tanggal),
+    selisihHarga: selisihHarga_(master, rekap, tanggal.slice(0, 8) + '01', tanggal),
     waste: grafikWaste_(tanggal, zona),
     suhu: grafikSuhu_(tanggal, zona),
     masaSimpan: masaSimpan_(tanggal),
@@ -3996,7 +4307,7 @@ function aksiDashboard_(body) {
       wasteCatatan: hariIniWaste.catatan,
       nilaiStock: d.nilai.total
     },
-    nilaiStock: d.nilai,
+    nilaiStock: gabung_(d.nilai, { selisihHarga: d.selisihHarga }),
     perhatian: perhatianDashboard_(d),
     grafikWaste: d.waste,
     grafikSuhu: d.suhu,
@@ -4081,7 +4392,7 @@ function dataFormOpname_(tanggal) {
     var kat = urut[m.kategori.toLowerCase()];
     if (!m.aktif || !kat) return;
     dipakai[kat.nama] = true;
-    item.push({ nama: m.nama, kategori: kat.nama, satuan: m.satuan, harga: m.harga,
+    item.push({ nama: m.nama, kategori: kat.nama, satuan: m.satuan, harga: hargaPada_(m, tanggal),
       tercatat: posisiStock_(rekap.item[k], tanggal).akhir, _u: kat.i });
   });
   item.sort(function (a, b) { return a._u - b._u || a.nama.localeCompare(b.nama, 'id'); });
@@ -4147,7 +4458,7 @@ function ringkasOpname_(sid) {
  * juga mendapat baris Data_Penyesuaian beralasan "Stock opname" (submission_id
  * sama dengan opname), lalu rekap item itu dihitung ulang mulai tanggal opname,
  * sehingga Stock Akhir hari itu sama dengan hasil hitung. Nilai selisih =
- * selisih × Harga Satuan di M_Item (kosong jika harga kosong). Opname yang
+ * selisih × harga yang berlaku pada tanggal opname (kosong jika belum punya harga). Opname yang
  * sudah pernah masuk dijawab sudahTerkirim: true.
  */
 function aksiSimpanOpname_(body, pengguna) {
@@ -4179,7 +4490,8 @@ function aksiSimpanOpname_(body, pengguna) {
       if (!m) throw galatPengguna_('Item ' + h.nama + ' tidak ada di daftar item. Muat ulang layar ini.');
       var tercatat = posisiStock_(rekap.item[m.nama.toLowerCase()], tanggal).akhir;
       var selisih = bulat_(h.hitung - tercatat);
-      var nilai = m.harga == null ? '' : Math.round(selisih * m.harga);
+      var harga = hargaPada_(m, tanggal);
+      var nilai = harga == null ? '' : Math.round(selisih * harga);
       var dasar = { 'Tanggal': tanggalSel_(tanggal), 'Kategori': m.kategori, 'Nama Item': m.nama, 'Stock Tercatat': tercatat,
         'Selisih': selisih, 'Satuan': m.satuan, 'Nilai Selisih (Rp)': nilai };
       barisOpname.push(gabung_(gabung_(dasar, { 'Hasil Hitung': h.hitung }), isiSistem_(konteks)));
@@ -4238,7 +4550,7 @@ function aksiUnduhPdfOpname_(body) {
   });
   tabel += '<tr class="total"><td colspan="6">Total nilai selisih</td><td class="angka">' + rupiahId_(o.totalNilai) + '</td></tr></table>';
   var catatan = ['Selisih = hasil hitung − stock tercatat saat opname disimpan. Item yang berselisih diluruskan dengan penyesuaian beralasan Stock opname.',
-    'Nilai selisih = selisih × harga satuan saat opname.' + (o.tanpaHarga ? ' ' + o.tanpaHarga + ' item berselisih belum punya harga (–), tidak ikut total.' : '')];
+    'Nilai selisih = selisih × harga satuan yang berlaku pada tanggal opname.' + (o.tanpaHarga ? ' ' + o.tanpaHarga + ' item berselisih belum punya harga (–), tidak ikut total.' : '')];
   var html = htmlLaporan_('', o.tanggal, {
     judul: 'Laporan Selisih Stock Opname',
     info: [['Kategori', kategori.length > 1 ? kategori.length + ' kategori' : (kategori[0] || '–')],
@@ -4399,6 +4711,7 @@ var MEMO_FORM_ = {};
 
 function resetMemoForm_() {
   MEMO_FORM_ = {};
+  MEMO_HARGA_ = null;
 }
 
 function normalJenisKolom_(nilai) {
@@ -7243,8 +7556,11 @@ function akhirBulan_(bulan) {
  * kelengkapan form dan pengecekan suhu terlewat dinilai sampai kemarin
  * (hari ini belum selesai). Kelengkapan dinilai mulai isian pertama di
  * aplikasi, supaya hari sebelum aplikasi dipakai tidak dihitung tidak lengkap.
- * Nilai rupiah stock memakai Harga Satuan sekarang (seperti nilai stock di
- * Dashboard); nilai selisih opname dan estimasi waste memakai nilai yang
+ * Nilai rupiah stock memakai riwayat harga (Bagian 8.5): gerakan tiap hari ×
+ * harga yang berlaku hari itu, nilai stock akhir bulan × harga pada tanggal
+ * itu, dan selisih karena perubahan harga per kategori. Karena itu angka bulan
+ * yang sudah lewat hanya berubah jika riwayat harganya diubah untuk tanggal di
+ * bulan itu. Nilai selisih opname dan estimasi waste memakai nilai yang
  * tercatat saat itu.
  */
 function dataRekapBulan_(bulan) {
@@ -7287,35 +7603,46 @@ function dataRekapBulan_(bulan) {
   function grup(kategori) {
     var nama = namaKat[String(kategori).toLowerCase()] || kategori || 'Tanpa kategori';
     var k = nama.toLowerCase();
-    return grupKat[k] = grupKat[k] || { kategori: nama, item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, nilaiAkhir: 0, adaHarga: false,
-      adaAkhir: false };
+    return grupKat[k] = grupKat[k] || { kategori: nama, item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, selisihHarga: 0,
+      nilaiAkhir: 0, adaHarga: false, adaAkhir: false, adaSelisih: false };
   }
   var tanpaHarga = [];
   var bergerak = 0;
   Object.keys(rekap.item).forEach(function (k) {
     var m = master[k];
     if (!m) return;
-    var g = gerakanKosong_();
     var ada = false;
-    rekap.item[k].forEach(function (x) {
-      if (x.tanggal < dari || x.tanggal > sampai) return;
-      ada = true;
-      Object.keys(g).forEach(function (j) { g[j] = bulat_(g[j] + x[j]); });
+    var x = null;
+    // Nilai bahan terpakai hanya untuk item yang bukan hasil resep (Bagian 8.5).
+    var bahan = !(resep[k] && resep[k].aktif);
+    rekap.item[k].forEach(function (r) {
+      if (r.tanggal < dari || r.tanggal > sampai) return;
+      if (!ada) {
+        ada = true;
+        x = grup(m.kategori);
+        x.item++;
+      }
+      // Gerakan hari itu × harga yang berlaku hari itu (Bagian 8.5).
+      var harga = hargaPada_(m, r.tanggal);
+      if (harga == null) {
+        if (tanpaHarga.indexOf(m.nama) < 0) tanpaHarga.push(m.nama);
+        return;
+      }
+      x.adaHarga = true;
+      x.masuk += r.masuk * harga;
+      if (bahan) x.terpakai += (r.keluar + r.dipakaiPrep) * harga;
+      x.penyesuaian += r.penyesuaian * harga;
     });
     if (!ada) return;
     adaIsian = true;
     bergerak++;
-    var x = grup(m.kategori);
-    x.item++;
-    if (m.harga == null) {
-      tanpaHarga.push(m.nama);
-      return;
-    }
-    x.adaHarga = true;
-    x.masuk += g.masuk * m.harga;
-    // Nilai bahan terpakai hanya untuk item yang bukan hasil resep (Bagian 8.5).
-    if (!(resep[k] && resep[k].aktif)) x.terpakai += (g.keluar + g.dipakaiPrep) * m.harga;
-    x.penyesuaian += g.penyesuaian * m.harga;
+  });
+  // Selisih karena perubahan harga yang berlaku mulai tanggal di bulan ini (Bagian 8.5).
+  var selisih = selisihHarga_(master, rekap, dari, sampai);
+  selisih.item.forEach(function (s) {
+    var x = grup(s.kategori);
+    x.selisihHarga += s.selisih;
+    x.adaSelisih = true;
   });
   var nilai = nilaiStock_(master, rekap, sampai);
   nilai.perKategori.forEach(function (n) {
@@ -7330,9 +7657,9 @@ function dataRekapBulan_(bulan) {
     var u = urutKat[nama.toLowerCase()];
     return u == null ? 1e6 : u;
   };
-  var total = { item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, nilaiAkhir: nilai.total };
+  var total = { item: 0, masuk: 0, terpakai: 0, penyesuaian: 0, selisihHarga: selisih.total, nilaiAkhir: nilai.total };
   var daftarKat = Object.keys(grupKat).map(function (k) { return grupKat[k]; }).filter(function (x) {
-    return x.item || x.nilaiAkhir;
+    return x.item || x.nilaiAkhir || x.adaSelisih;
   }).sort(function (a, b) {
     return posisiKat(a.kategori) - posisiKat(b.kategori) || a.kategori.localeCompare(b.kategori, 'id');
   });
@@ -7345,11 +7672,14 @@ function dataRekapBulan_(bulan) {
     // Kategori yang semua itemnya belum punya harga: nilainya kosong (–), bukan Rp 0.
     if (!x.adaHarga) x.masuk = x.terpakai = x.penyesuaian = null;
     if (!x.adaAkhir) x.nilaiAkhir = null;
+    x.selisihHarga = x.adaSelisih ? Math.round(x.selisihHarga) : null;
     delete x.adaHarga;
     delete x.adaAkhir;
+    delete x.adaSelisih;
   });
   tanpaHarga.sort(function (a, b) { return a.localeCompare(b, 'id'); });
-  hasil.stock = { kategori: daftarKat, total: total, bergerak: bergerak, tanpaHarga: tanpaHarga };
+  hasil.stock = { kategori: daftarKat, total: total, bergerak: bergerak, tanpaHarga: tanpaHarga,
+    perubahanHarga: selisih.item.length };
 
   /* ---------- Stock opname: tiap opname dan nilai selisihnya; item paling sering berselisih ---------- */
   var opname = {};
@@ -7661,19 +7991,27 @@ function isiPdfRekap_(d) {
 
   // Stock
   var s = d.stock;
+  var rpTanda = function (n) { return n == null ? '–' : (n > 0 ? '+' : '') + rupiahId_(n); };
   html += '<h2>Stock</h2>' + tabelRekap_([
-    { judul: 'Kategori', lebar: 22 }, { judul: 'Item bergerak', lebar: 11, angka: true },
-    { judul: 'Masuk (Rp)', lebar: 16, angka: true }, { judul: 'Bahan terpakai (Rp)', lebar: 17, angka: true },
-    { judul: 'Penyesuaian (Rp)', lebar: 16, angka: true }, { judul: 'Nilai stock akhir bulan (Rp)', lebar: 18, angka: true }
+    { judul: 'Kategori', lebar: 18 }, { judul: 'Item bergerak', lebar: 9, angka: true },
+    { judul: 'Masuk (Rp)', lebar: 14, angka: true }, { judul: 'Bahan terpakai (Rp)', lebar: 15, angka: true },
+    { judul: 'Penyesuaian (Rp)', lebar: 14, angka: true }, { judul: 'Selisih harga (Rp)', lebar: 13, angka: true },
+    { judul: 'Nilai stock akhir bulan (Rp)', lebar: 17, angka: true }
   ], s.kategori.map(function (x) {
-    return [e(x.kategori), x.item ? String(x.item) : '–', rp(x.masuk), rp(x.terpakai), rp(x.penyesuaian), rp(x.nilaiAkhir)];
-  }), ['Total', String(s.total.item), rp(s.total.masuk), rp(s.total.terpakai), rp(s.total.penyesuaian), rp(s.total.nilaiAkhir)],
+    return [e(x.kategori), x.item ? String(x.item) : '–', rp(x.masuk), rp(x.terpakai), rp(x.penyesuaian), rpTanda(x.selisihHarga),
+      rp(x.nilaiAkhir)];
+  }), ['Total', String(s.total.item), rp(s.total.masuk), rp(s.total.terpakai), rp(s.total.penyesuaian), rpTanda(s.total.selisihHarga),
+    rp(s.total.nilaiAkhir)],
   'Tidak ada gerakan stock dan belum ada stock bernilai pada bulan ini.');
-  html += catatan('Nilai = jumlah × harga satuan sekarang di daftar item. Bahan terpakai = stock keluar + dipakai prep, ' +
+  html += catatan('Nilai masuk, bahan terpakai, dan penyesuaian = jumlah per hari × harga satuan yang berlaku pada hari itu ' +
+    '(riwayat harga di daftar item). Bahan terpakai = stock keluar + dipakai prep, ' +
     'tanpa barang jadi hasil resep (biayanya sudah terhitung saat bahannya dipakai). Penyesuaian termasuk hasil stock opname. ' +
-    'Nilai stock akhir bulan = stock akhir pada ' + tanggalSedangId_(d.sampai) + '.');
+    'Selisih harga = stock akhir sehari sebelum harga baru berlaku × (harga baru − harga lama), untuk harga yang berganti pada bulan ini; ' +
+    'positif berarti nilai stock naik karena harga naik. ' +
+    'Nilai stock akhir bulan = stock akhir × harga satuan yang berlaku pada ' + tanggalSedangId_(d.sampai) + '.');
   if (s.tanpaHarga.length) {
-    html += catatan(s.tanpaHarga.length + ' item belum punya harga dan tidak ikut dihitung: ' + daftarNamaSingkat_(s.tanpaHarga) + '.');
+    html += catatan(s.tanpaHarga.length + ' item belum punya harga (pada sebagian atau semua harinya) dan tidak ikut dihitung ' +
+      'untuk hari tanpa harga: ' + daftarNamaSingkat_(s.tanpaHarga) + '.');
   }
 
   // Stock opname
@@ -7840,7 +8178,11 @@ function htmlEmailRekap_(d, x) {
   html += bagian('Stock', [
     'Nilai stock akhir bulan: <b>' + rupiahId_(s.total.nilaiAkhir) + '</b>',
     'Masuk ' + rupiahId_(s.total.masuk) + ', bahan terpakai ' + rupiahId_(s.total.terpakai) + ', penyesuaian ' + rupiahId_(s.total.penyesuaian) +
-      ' (' + s.bergerak + ' item bergerak)'
+      ' (' + s.bergerak + ' item bergerak)',
+    s.perubahanHarga
+      ? 'Selisih karena perubahan harga: ' + (s.total.selisihHarga > 0 ? '+' : '') + rupiahId_(s.total.selisihHarga) +
+        ' (' + s.perubahanHarga + ' item berganti harga)'
+      : 'Tidak ada perubahan harga pada bulan ini'
   ].concat(s.tanpaHarga.length ? [s.tanpaHarga.length + ' item belum punya harga, tidak ikut dihitung'] : []));
   html += bagian('Stock opname', [d.opname.daftar.length
     ? d.opname.daftar.length + ' kali, total nilai selisih ' + rupiahId_(d.opname.totalNilai)
@@ -8184,6 +8526,16 @@ var TAB_MASTER = [
     ]
   },
   {
+    nama: 'M_HargaItem',
+    kolom: [
+      k_('Nama Item', 'teks', { sumber: 'M_Item!A2:A' }),
+      k_('Berlaku Mulai', 'tanggal'),
+      k_('Harga Satuan (Rp)', 'rupiah'),
+      k_('Dicatat Oleh'),
+      k_('Dicatat Pada', 'waktu')
+    ]
+  },
+  {
     nama: 'M_Resep',
     kolom: [
       k_('Item Hasil', 'teks', { sumber: 'M_Item!A2:A' }),
@@ -8433,6 +8785,8 @@ function setupSpreadsheet() {
     }), 'M_Satuan', catatan);
     isiBarisAwal_(ss.getSheetByName('M_Form'), FORM_BAWAAN, 'M_Form', catatan);
     isiKonfigurasiAwal_(ss.getSheetByName('M_Konfigurasi'), catatan);
+    // Riwayat harga (11 Oktober 2026): harga awal untuk item yang belum punya riwayat.
+    isiHargaAwal_(ss, catatan);
 
     // Tahap 9: tab data tiap form kustom (juga yang diarsipkan) dibuat atau dilengkapi.
     resetMemoForm_();
@@ -9549,14 +9903,20 @@ function pasangRingkasStockDashboard_(ss, catatan) {
 
 /**
  * LET bersama blok Nilai stock (Bagian 8.5). Sama dengan nilaiStock_ di
- * aplikasi: Stock Akhir terkini × Harga Satuan di M_Item; yang dihitung item
- * aktif dan item nonaktif yang stock-nya belum nol (ikut); item tanpa harga
- * tidak dihitung. Bahan terpakai per periode B3 = (Stock Keluar + Dipakai
- * Prep) × Harga Satuan, hanya untuk item yang tidak punya resep aktif.
+ * aplikasi: Stock Akhir terkini × Harga Satuan di M_Item (= harga yang berlaku
+ * hari ini); yang dihitung item aktif dan item nonaktif yang stock-nya belum
+ * nol (ikut); item tanpa harga tidak dihitung. Bahan terpakai per periode B3 =
+ * (Stock Keluar + Dipakai Prep) tiap hari × harga yang berlaku hari itu menurut
+ * M_HargaItem, hanya untuk item yang tidak punya resep aktif.
+ * Harga per hari (prH, satu nilai per baris Stock_Harian dalam periode): baris
+ * M_HargaItem item itu dengan Berlaku Mulai terbesar yang tidak melewati
+ * tanggalnya (MAXIFS; kosong = sejak awal: MAXIFS menjadi 0 dan sel kosong
+ * sama dengan 0, jadi FILTER menemukan baris harga awal); item tanpa baris di
+ * M_HargaItem memakai Harga Satuan M_Item; belum punya harga = 0. Tanpa LAMBDA
+ * bersarang: satu MAP atas baris periode, lalu SUMPRODUCT per item.
  */
 function letNilaiStock_(ss) {
   var K = function (tab, judul) { return kolomRumus_(ss, tab, judul); };
-  var periode = 'shT,">="&awalP,shT,"<="&TODAY()';
   return AWAL_PERIODE_ +
     'shT,' + K('Stock_Harian', 'Tanggal') + ',shI,' + K('Stock_Harian', 'Nama Item') + ',' +
     'shA,' + K('Stock_Harian', 'Stock Akhir') + ',shK,' + K('Stock_Harian', 'Stock Keluar') + ',' +
@@ -9569,12 +9929,22 @@ function letNilaiStock_(ss) {
     'ac,FILTER(' + K('M_Item', 'Aktif') + ',iN<>""),' +
     'kN,' + K('M_Kategori', 'Nama Kategori') + ',kU,' + K('M_Kategori', 'Urutan') + ',' +
     'rH,' + K('M_Resep', 'Item Hasil') + ',rA,' + K('M_Resep', 'Aktif') + ',' +
+    'hgM,' + K('M_Item', 'Harga Satuan (Rp)') + ',' +
+    'rwN,' + K('M_HargaItem', 'Nama Item') + ',rwT,' + K('M_HargaItem', 'Berlaku Mulai') + ',' +
+    'rwH,' + K('M_HargaItem', 'Harga Satuan (Rp)') + ',' +
     'ak,MAP(it,LAMBDA(x,LET(lt,MAXIFS(shT,shI,x,shT,"<="&TODAY()),IF(lt=0,0,IFERROR(INDEX(FILTER(shA,shI=x,shT=lt),1),0))))),' +
     'ikut,ARRAYFORMULA(((ac=TRUE)+(ak<>0))>0),' +
     'ber,ARRAYFORMULA(ISNUMBER(hg)),' +
     'nv,ARRAYFORMULA(IF(ber,ak*hg,0)),' +
-    'bt,MAP(it,hg,LAMBDA(x,h,IF(AND(ISNUMBER(h),COUNTIFS(rH,x,rA,TRUE)=0),' +
-      '(SUMIFS(shK,shI,x,' + periode + ')+SUMIFS(shD,shI,x,' + periode + '))*h,0))),' +
+    'prS,ARRAYFORMULA((shI<>"")*(shT>=awalP)*(shT<=TODAY())),' +
+    'prT,IFERROR(FILTER(shT,prS),""),' +
+    'prI,IFERROR(FILTER(shI,prS),""),' +
+    'prK,IFERROR(FILTER(shK,prS),0),' +
+    'prD,IFERROR(FILTER(shD,prS),0),' +
+    'prH,IF(INDEX(prT,1,1)="",0,MAP(prI,prT,LAMBDA(x,d,IF(COUNTIF(rwN,x)=0,IFERROR(N(XLOOKUP(x,iN,hgM)),0),' +
+      'LET(rwM,MAXIFS(rwT,rwN,x,rwT,"<="&d),IFERROR(N(INDEX(FILTER(rwH,rwN=x,rwT=rwM),1)),0)))))),' +
+    'bt,IF(INDEX(prT,1,1)="",MAP(it,LAMBDA(x,0)),MAP(it,LAMBDA(x,IF(COUNTIFS(rH,x,rA,TRUE)>0,0,' +
+      'SUMPRODUCT((prI=x)*prK*prH)+SUMPRODUCT((prI=x)*prD*prH))))),' +
     'kt,ARRAYFORMULA(IF(ka="","Tanpa kategori",ka)),';
 }
 

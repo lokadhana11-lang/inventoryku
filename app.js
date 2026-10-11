@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.12.0';
+  var VERSI_APLIKASI = '0.13.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -7399,9 +7399,29 @@
         el('td', { class: 'angka' }, el('strong', { class: 'angka-satuan', text: formatRupiah(n.total) }))]))
     ])) : kotakKosong('Belum ada item yang punya harga.');
     var tanpa = n.tanpaHarga || [];
+    var sh = n.selisihHarga || null;
+    var barisSelisih = null;
+    if (sh) {
+      var judulSelisih = 'Selisih karena perubahan harga bulan ini';
+      var ketSelisih = sh.item.length
+        ? sh.item.length + ' item berganti harga sejak ' + tanggalPendek(sh.dari) + '. Ketuk untuk rinciannya.'
+        : 'Tidak ada harga yang berganti sejak ' + tanggalPendek(sh.dari) + '.';
+      var isiSelisih = [
+        el('span', { class: 'daftar-baris-isi' }, [
+          el('span', { class: 'daftar-baris-judul', text: judulSelisih }),
+          el('span', { class: 'daftar-baris-ket', text: ketSelisih })
+        ]),
+        el('strong', { class: 'angka-satuan', text: formatRupiahTanda(sh.total) })
+      ];
+      barisSelisih = sh.item.length
+        ? el('button', { type: 'button', class: 'daftar-baris', 'aria-haspopup': 'dialog',
+          onclick: function () { bukaSelisihHarga(n); } }, isiSelisih.concat([ikon('kanan')]))
+        : el('div', { class: 'daftar-baris daftar-baris-diam' }, isiSelisih);
+    }
     var isi = [
       el('p', { class: 'kartu-teks', text: 'Stock Akhir × harga satuan yang berlaku sekarang. Item tanpa harga tidak ikut dihitung.' }),
       tabel,
+      barisSelisih ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Selisih karena perubahan harga' }, barisSelisih) : null,
       el('h3', { class: 'judul-sub', text: 'Belum punya harga (' + tanpa.length + ')' }),
       tanpa.length ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Item belum punya harga' }, tanpa.map(function (x) {
         return el('a', { class: 'daftar-baris', href: hrefItem(x.nama) }, [
@@ -7415,6 +7435,41 @@
       })) : el('p', { text: 'Semua item sudah punya harga.' })
     ];
     bukaLembar({ judul: 'Nilai stock ' + formatRupiah(n.total), isi: isi, aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+  }
+
+  /** "+Rp 12.000", "Rp −4.500", atau "Rp 0". */
+  function formatRupiahTanda(n) {
+    return (Math.round(n) > 0 ? '+' : '') + formatRupiah(n);
+  }
+
+  /**
+   * Rincian selisih karena perubahan harga bulan ini (spesifikasi sistem Bagian 8.5):
+   * per item, tiap perubahan dengan harga lama dan baru, stock sehari sebelumnya, dan selisihnya.
+   */
+  function bukaSelisihHarga(n) {
+    var sh = n.selisihHarga;
+    var isi = [
+      el('p', { class: 'kartu-teks', text: 'Tiap kali harga berganti: stock akhir sehari sebelumnya × (harga baru − harga lama). ' +
+        'Positif berarti nilai stock naik karena harga naik. Perubahan sejak ' + tanggalPendek(sh.dari) + '.' }),
+      el('div', { class: 'daftar', role: 'list', 'aria-label': 'Selisih harga per item' }, sh.item.map(function (x) {
+        return el('div', { class: 'daftar-baris daftar-baris-diam', role: 'listitem' }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: x.nama }),
+            x.perubahan.map(function (c) {
+              return el('span', { class: 'daftar-baris-ket', text: tanggalPendek(c.tanggal) + ': ' + formatRupiah(c.dari) + ' → ' +
+                formatRupiah(c.ke) + ' per ' + x.satuan + ', stock ' + formatAngka(c.stock) + ' ' + x.satuan + ', ' +
+                formatRupiahTanda(c.selisih) });
+            })
+          ]),
+          el('strong', { class: 'angka-satuan', text: formatRupiahTanda(x.selisih) })
+        ]);
+      }))
+    ];
+    bukaLembar({
+      judul: 'Selisih harga ' + formatRupiahTanda(sh.total),
+      isi: isi,
+      aksi: [{ teks: 'Kembali', jenis: 'kedua', klik: function (t, l) { l.tutup(true); bukaNilaiStock(n); } }]
+    });
   }
 
   /** Lembar daftar item dari Perlu perhatian (stock minus, di bawah stok minimum); ketuk untuk riwayat item. */
@@ -8701,6 +8756,9 @@
       var it = itemKini;
       var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
       var bisaNama = baru || it.bisaGantiNama;
+      // Riwayat harga (spesifikasi sistem Bagian 5.1): item yang sudah punya harga menggantinya lewat
+      // lembar Ganti harga; isian harga hanya untuk harga pertama.
+      var punyaHarga = !baru && (it.harga != null || (it.jumlahRiwayatHarga || 0) > 0);
       var satuanTerkunci = !baru && it.punyaCatatan;
 
       var kNama = kolomIsian({ label: 'Nama item', maxlength: 60, nilai: isi.nama,
@@ -8789,7 +8847,7 @@
         tulisPesan(pesan, '');
         var nama = String(isi.nama || '').trim().replace(/\s+/g, ' ');
         var angka = function (v) { return bacaAngka(v); };
-        var harga = angka(isi.harga);
+        var harga = punyaHarga ? null : angka(isi.harga);
         var min = angka(isi.stokMin);
         var maks = angka(isi.stokMaks);
         var isiBesar = angka(isi.isi);
@@ -8850,7 +8908,8 @@
       });
 
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [kNama.wadah, kKat.wadah, kSat.wadah, bagianKemasan]));
-      wadah.appendChild(el('section', { class: 'kartu formulir' }, [kHarga.wadah, kMin.wadah, kMaks.wadah]));
+      if (punyaHarga) wadah.appendChild(kartuHarga(it));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, punyaHarga ? [kMin.wadah, kMaks.wadah] : [kHarga.wadah, kMin.wadah, kMaks.wadah]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
 
       if (!baru) {
@@ -8880,6 +8939,153 @@
         }
         wadah.appendChild(el('section', { class: 'kartu' }, keadaan));
       }
+    }
+
+    /** "7 Okt", atau "7 Okt 2025" jika bukan tahun ini. */
+    function tanggalHarga(iso) {
+      return tanggalPendek(iso) + (iso.slice(0, 4) === String(new Date().getFullYear()) ? '' : ' ' + iso.slice(0, 4));
+    }
+
+    /** Kartu harga satuan: harga sekarang (sejak kapan), Ganti harga, dan 10 perubahan terakhir. */
+    function kartuHarga(it) {
+      var sekarang = it.harga == null ? 'belum ada'
+        : formatRupiah(it.harga) + (it.hargaSejak ? ' (sejak ' + tanggalHarga(it.hargaSejak) + ')' : '');
+      var riwayat = it.riwayatHarga || [];
+      var isiKartu = [
+        el('h2', { class: 'kartu-judul', text: 'Harga satuan' }),
+        el('p', { class: 'riwayat-item-sekarang' }, ['Harga sekarang ', el('strong', { class: 'angka-satuan', text: sekarang })]),
+        el('p', { class: 'kartu-teks', text: 'Per 1 ' + (it.satuan || 'satuan dasar') + '. Harga baru berlaku mulai tanggal yang dipilih; ' +
+          'catatan sebelum tanggal itu tetap memakai harga lama.' }),
+        tombol('Ganti harga', 'kedua', { 'aria-haspopup': 'dialog', onclick: function () { bukaGantiHarga(it); } })
+      ];
+      if (riwayat.length) {
+        isiKartu.push(el('h3', { class: 'judul-sub', text: 'Riwayat harga' }));
+        isiKartu.push(el('ul', { class: 'riwayat-harga', 'aria-label': 'Riwayat harga ' + it.nama }, riwayat.map(function (r) {
+          var beda = r.beda == null || !r.beda ? (r.beda === 0 ? 'sama' : '') : (r.beda > 0 ? 'naik ' : 'turun ') + formatRupiah(Math.abs(r.beda));
+          return el('li', {}, [
+            el('span', { class: 'riwayat-harga-utama' }, [
+              el('strong', { class: 'angka-satuan', text: formatRupiah(r.harga) }),
+              beda ? el('span', { class: 'riwayat-harga-beda', text: beda }) : null
+            ]),
+            el('span', { class: 'daftar-baris-ket', text: (r.berlakuMulai ? 'Mulai ' + tanggalHarga(r.berlakuMulai) : 'Sejak awal') +
+              (r.oleh ? ' · ' + r.oleh : '') })
+          ]);
+        })));
+        if ((it.jumlahRiwayatHarga || 0) > riwayat.length) {
+          isiKartu.push(el('p', { class: 'kolom-bantuan', text: riwayat.length + ' perubahan terakhir dari ' + it.jumlahRiwayatHarga +
+            '. Semuanya ada di tab M_HargaItem.' }));
+        }
+      }
+      return el('section', { class: 'kartu' }, isiKartu);
+    }
+
+    /**
+     * Lembar Ganti harga (tampilan Bagian 5.7): harga baru, berlaku mulai (hari ini atau
+     * tanggal yang sudah lewat), dan kalimat akibatnya terhadap catatan lama.
+     */
+    function bukaGantiHarga(it) {
+      var hariIni = tanggalIso(new Date());
+      var riwayat = (it.riwayatHarga || []).slice().reverse(); // lama ke baru
+      var lengkap = (it.jumlahRiwayatHarga || 0) <= riwayat.length;
+      var kHargaBaru = kolomIsian({ label: 'Harga baru (Rp)', inputmode: 'decimal', kelas: 'isian-angka',
+        bantuan: 'Per 1 ' + (it.satuan || 'satuan dasar') + '.' });
+      var gMulai = grupPilihan('Berlaku mulai', ['Hari ini', 'Tanggal lain'], 'Hari ini');
+      var lain = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Tanggal berlaku mulai' });
+      lain.hidden = true;
+      gMulai.wadah.appendChild(lain);
+      var akibat = el('p', { class: 'kartu-teks', 'aria-live': 'polite' });
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+
+      function tanggalDipilih() {
+        return gMulai.nilai() === 'Tanggal lain' ? lain.value : hariIni;
+      }
+      function perbaruiAkibat() {
+        var tg = tanggalDipilih();
+        if (!tg) {
+          akibat.textContent = 'Pilih tanggal berlaku mulai.';
+          return;
+        }
+        var sama = null;
+        var sebelum = null;
+        var sesudah = null;
+        riwayat.forEach(function (r) {
+          if (r.berlakuMulai === tg) sama = r;
+          else if (r.berlakuMulai < tg) sebelum = r;
+          else if (!sesudah) sesudah = r;
+        });
+        var teks;
+        if (sama) {
+          teks = 'Harga ' + formatRupiah(sama.harga) + ' yang berlaku mulai ' + tanggalHarga(tg) + ' diganti.';
+        } else if (sebelum) {
+          teks = 'Harga lama ' + formatRupiah(sebelum.harga) + ' tetap dipakai untuk catatan sebelum tanggal ini.';
+        } else if (!riwayat.length && it.harga != null) {
+          teks = 'Harga lama ' + formatRupiah(it.harga) + ' tetap dipakai untuk catatan sebelum tanggal ini.';
+        } else if (lengkap) {
+          teks = 'Sebelum tanggal ini ' + it.nama + ' belum punya harga.';
+        } else {
+          teks = 'Harga lama tetap dipakai untuk catatan sebelum tanggal ini.';
+        }
+        if (sesudah) {
+          teks += ' Harga ' + formatRupiah(sesudah.harga) + ' tetap berlaku mulai ' + tanggalHarga(sesudah.berlakuMulai) + '.';
+        }
+        akibat.textContent = teks;
+      }
+      gMulai.input.forEach(function (i) {
+        i.addEventListener('change', function () {
+          lain.hidden = gMulai.nilai() !== 'Tanggal lain';
+          perbaruiAkibat();
+        });
+      });
+      lain.addEventListener('change', perbaruiAkibat);
+      perbaruiAkibat();
+
+      bukaLembar({
+        judul: 'Ganti harga ' + it.nama,
+        isi: [
+          el('p', { class: 'kartu-teks', text: 'Harga sekarang ' + (it.harga == null ? 'belum ada' : formatRupiah(it.harga)) +
+            (it.satuan ? ' per ' + it.satuan : '') + '.' }),
+          kHargaBaru.wadah, gMulai.wadah, akibat, pesan
+        ],
+        aksi: [
+          { teks: 'Batal', jenis: 'kedua' },
+          {
+            teks: 'Simpan harga',
+            jenis: 'utama',
+            klik: function (t, l) {
+              tulisPesan(pesan, '');
+              var harga = bacaAngka(kHargaBaru.input.value);
+              var tg = tanggalDipilih();
+              var ok = kHargaBaru.galat(harga === null ? 'Isi harga baru.'
+                : (isNaN(harga) ? 'Isi angka 0 atau lebih, misalnya 15000.' : ''));
+              var okTanggal = gMulai.galat(!tg ? 'Pilih tanggal berlaku mulai.'
+                : (tg > hariIni ? 'Pilih hari ini atau tanggal yang sudah lewat.' : ''));
+              if (!ok) {
+                kHargaBaru.input.focus();
+                return;
+              }
+              if (!okTanggal) {
+                lain.focus();
+                return;
+              }
+              aturTombolProses(t, true, 'Menyimpan…');
+              l.sibuk(true);
+              panggilApi('gantiHarga', { nama: it.nama, harga: harga, berlakuMulai: tg }).then(function (hasil) {
+                l.sibuk(false);
+                l.tutup();
+                Cache.tulis('item', hasil);
+                if (!diketik) isi = null;
+                gambar(hasil);
+                toast('Harga ' + it.nama + ' tersimpan.');
+              }).catch(function (err) {
+                l.sibuk(false);
+                aturTombolProses(t, false);
+                if (tanganiSesiBerakhir(err)) return;
+                tulisPesan(pesan, pesanGalat(err), 'masalah');
+              });
+            }
+          }
+        ]
+      });
     }
 
     function nonaktifkan() {

@@ -16,6 +16,9 @@
 > Ditambah aturan unduh PDF di iPhone dan iPad (Bagian 9.1).
 > Diperbarui 5 Oktober 2026: tombol Keluar dan keluar otomatis (Bagian 7.2), hapus staff
 > yang sudah nonaktif (Bagian 5.1), dan PDF stock per kategori (Bagian 9.1).
+> Diperbarui 11 Oktober 2026: riwayat harga item. Harga satuan punya riwayat (`M_HargaItem`,
+> Bagian 5.1); setiap nilai rupiah memakai harga yang berlaku pada tanggalnya (Bagian 8.5),
+> dan selisih karena perubahan harga dilaporkan (Bagian 8.5 dan 9.3).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -98,7 +101,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Stock Inventory | Tanpa hitung fisik harian. Stock Akhir dihitung otomatis: Awal + Masuk + Hasil Prep − Keluar − Dipakai Prep − Waste + Penyesuaian. Form boleh dikirim berkali-kali sehari; tiap kiriman menambah, tidak menimpa. |
 | Stock opname | Berkala, oleh Pengelola. Hasil hitung barang nyata meluruskan stock dan menghasilkan laporan selisih (Bagian 5.7). |
 | Daftar belanja | Otomatis dari item di bawah stok minimum, dengan saran jumlah order. Hanya Pengelola. |
-| Nilai stock | Nilai rupiah stock dan pemakaian bahan tampil di dashboard. Hanya Pengelola. |
+| Nilai stock | Nilai rupiah stock dan pemakaian bahan tampil di dashboard. Hanya Pengelola. Harga satuan punya riwayat: setiap nilai rupiah memakai harga yang berlaku pada tanggal gerakan atau tanggal yang dinilai (Bagian 8.5). |
 | Masa simpan | Tiap resep bisa punya masa simpan. Aplikasi mengingatkan barang jadi yang lewat masa simpan. |
 | Tanda nihil | Form yang memang kosong hari itu ditandai "Tidak ada hari ini", supaya tidak dilaporkan belum diisi (Bagian 5.8). |
 | Cadangan data | Salinan spreadsheet otomatis tiap minggu; empat salinan terakhir disimpan |
@@ -107,7 +110,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Resep | Pengelola mengisi Master Resep. Prep List diisi dalam jumlah resep; stock barang jadi bertambah dan stock bahan berkurang otomatis (Bagian 5.3). |
 | Satuan | Satu item satu satuan dasar, tanpa konversi umum (kg ke gr). Satuan besar opsional per item untuk barang datang, misalnya 1 dus = 12 botol (Bagian 5.1). |
 | Kategori stock | Dikelola Pengelola. Form, tab Harian, dan PDF stock tersusun per kategori. PDF stock bisa diunduh untuk satu kategori saja (Bagian 9.1). |
-| Nominal waste | Estimasi kerugian (Rp) = qty × harga satuan. Harga satuan diisi Pengelola di master Item. |
+| Nominal waste | Estimasi kerugian (Rp) = qty × harga satuan yang berlaku pada tanggal waste. Harga satuan diisi Pengelola di master Item dan punya riwayat (Bagian 5.1). |
 | Waste dan stock | Waste punya form sendiri dan langsung mengurangi stock. Stock Keluar yang diketik staff hanya pemakaian langsung, di luar prep dan waste. |
 | Koreksi data | Hanya oleh Pengelola. Staff tidak bisa mengubah data setelah submit. |
 | Menu Riwayat | Ada, untuk semua role. Staff hanya melihat. |
@@ -290,6 +293,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Unit` | Nama Unit, Tipe (Chiller/Freezer), Aktif | Dropdown unit, validasi suhu |
 | `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
 | `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang |
+| `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
 | `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
 | `M_Kategori` | Nama Kategori, Urutan, Aktif | Dropdown kategori di Stock Inventory; urutan kelompok di tab Harian dan PDF |
@@ -297,6 +301,20 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_FormKolom` | ID Form, Urutan, Label, Jenis Kolom, Pilihan, Wajib, Bagian (kepala / baris), Aktif | Susunan kolom tiap form kustom |
 | `M_Satuan` | Satuan, Jenis (Berat / Isi / Hitungan / Kemasan), Aktif | Daftar satuan yang sah |
 | `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis |
+
+**Riwayat harga item (`M_HargaItem`):**
+
+- Harga yang berlaku pada tanggal T = baris item itu dengan Berlaku Mulai terbesar yang tidak
+  melewati T. Baris dengan Berlaku Mulai kosong berlaku sejak awal. Sebelum baris pertama,
+  item belum punya harga.
+- Kolom Harga Satuan di `M_Item` tetap ada dan selalu sama dengan harga yang berlaku hari ini
+  (diperbarui aplikasi), supaya rumus Sheet dan tampilan "harga sekarang" tetap sederhana.
+- Mengganti harga = menambah baris baru dengan tanggal berlaku mulai: hari ini atau tanggal yang
+  sudah lewat (misalnya tanggal faktur), tidak boleh masa depan. Tanggal yang sama dengan baris
+  yang sudah ada menggantikan baris itu (untuk membetulkan salah ketik) dan tercatat di
+  `Log_Perubahan`. Riwayat harga tidak bisa dihapus dari aplikasi.
+- Harga awal: saat pertama dipasang, tiap item yang sudah punya harga mendapat satu baris dengan
+  Berlaku Mulai kosong, artinya berlaku sejak awal.
 
 **Daftar satuan awal** (diisi `setupSpreadsheet`; Pengelola bisa menambah):
 
@@ -399,7 +417,8 @@ hanya ilustrasi; Pengelola mengisinya dari takaran dapur sendiri.
   langsung maupun lewat resep lain. Server menolaknya.
 - Satu item hasil hanya punya satu resep aktif.
 - Jika Harga Satuan barang jadi dikosongkan, sistem menghitungnya dari harga bahan satu
-  resep dibagi hasil per resep. Harga ini dipakai untuk estimasi kerugian waste.
+  resep dibagi hasil per resep, memakai harga bahan yang berlaku pada tanggal yang dinilai
+  (Bagian 5.1). Harga ini dipakai untuk estimasi kerugian waste.
 
 **Form Prep List:**
 
@@ -455,7 +474,7 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
 | Qty | Number | Per baris |
 | Satuan | Otomatis | Dari `M_Item` |
 | Alasan / Keterangan | Text | Wajib jika kategori "Lainnya" |
-| Harga Satuan (Rp) | Otomatis | Disalin dari `M_Item` **saat dicatat**, agar perubahan harga tidak mengubah data lama |
+| Harga Satuan (Rp) | Otomatis | Harga yang berlaku pada **tanggal waste** (bukan hari ini, Bagian 5.1), disalin saat dicatat. Sesudahnya tidak berubah lagi walau riwayat harga diubah kemudian. |
 | Estimasi Kerugian (Rp) | Otomatis | Qty × Harga Satuan |
 | Foto Bukti | File (opsional) | Disimpan ke Drive, link dicatat di Sheet |
 
@@ -601,6 +620,9 @@ meluruskannya. Keduanya hanya untuk Pengelola.
 - Penyesuaian adalah gerakan baru pada tanggalnya. Rekap hari-hari sebelumnya tidak diubah.
 - Disimpan di `Data_Penyesuaian`: tanggal, item, stock tercatat, stock sebenarnya,
   selisih, nilai selisih (Rp), alasan, catatan, dan kolom sistem.
+- **Nilai selisih (Rp)** penyesuaian dan opname = selisih × harga yang berlaku pada tanggal
+  penyesuaian atau opname (Bagian 5.1), disalin saat dicatat seperti waste: tidak berubah lagi
+  walau riwayat harga diubah kemudian.
 
 **Stock opname (banyak item sekaligus):**
 
@@ -939,14 +961,22 @@ Tab Data adalah sumber semua tampilan lain, jadi kerapiannya dijaga oleh script:
   - Server mengirim angka ringkas dan data kedua grafik dalam satu jawaban, supaya layar
     ini cukup memanggil server sekali.
 
-**Cara menghitung nilai:**
+**Cara menghitung nilai** (harga dari riwayat harga, Bagian 5.1):
 
-- Nilai stock memakai Harga Satuan yang berlaku sekarang di `M_Item`. Item tanpa harga
-  tidak dihitung dan dicantumkan dalam daftar "belum punya harga".
-- Nilai bahan terpakai = (Stock Keluar + Dipakai Prep) × Harga Satuan, hanya untuk item
-  yang bukan hasil resep. Barang jadi tidak dihitung lagi, karena biayanya sudah terhitung
-  saat bahannya dipakai.
-- Nilai waste dan nilai selisih opname dilaporkan terpisah.
+- **Nilai stock pada tanggal T** = Stock Akhir pada T × harga yang berlaku pada T. Bukan harga
+  saat barang dibeli: tidak ada FIFO atau harga rata-rata. Item yang belum punya harga pada T
+  tidak dihitung dan dicantumkan dalam daftar "belum punya harga". Nilai stock saat ini memakai
+  harga hari ini, yaitu Harga Satuan di `M_Item`.
+- **Nilai masuk, bahan terpakai, dan penyesuaian** = jumlah gerakan per hari × harga yang
+  berlaku pada hari itu. Bahan terpakai = Stock Keluar + Dipakai Prep, hanya untuk item yang
+  bukan hasil resep. Barang jadi tidak dihitung lagi, karena biayanya sudah terhitung saat
+  bahannya dipakai.
+- **Selisih karena perubahan harga:** untuk tiap item, setiap kali harga berlaku berganti dari
+  h0 ke h1 pada tanggal D, selisih = Stock Akhir item pada D−1 × (h1 − h0). Positif berarti nilai
+  stock naik karena harga naik. Perubahan dari "belum punya harga" ke harga pertama tidak
+  dihitung sebagai selisih.
+- Nilai waste dan nilai selisih opname dilaporkan terpisah, memakai nilai yang tercatat saat
+  dicatat.
 
 ---
 
@@ -1032,9 +1062,13 @@ Dibuat otomatis tiap tanggal 1 untuk bulan sebelumnya, disimpan ke Drive di
 `Laporan Kitchen/{Nama Outlet}/{Tahun}/Rekap_{YYYY-MM}.pdf`, dan dikirim ke penerima email.
 Bisa juga diunduh dari menu Laporan untuk bulan mana pun.
 
+Nilai rupiah dihitung dengan cara Bagian 8.5 (harga yang berlaku pada tiap tanggal). Karena
+itu angka rekap bulan yang sudah lewat tidak berubah lagi, kecuali riwayat harganya diubah
+untuk tanggal di bulan itu.
+
 | Bagian | Isi |
 |---|---|
-| Stock | Total masuk, bahan terpakai, dan penyesuaian per kategori; nilai stock akhir bulan |
+| Stock | Total masuk, bahan terpakai, dan penyesuaian per kategori; selisih karena perubahan harga per kategori; nilai stock akhir bulan |
 | Stock opname | Tanggal tiap opname dan nilai selisihnya; item yang paling sering berselisih |
 | Waste | Total jumlah dan nilai (Rp) per kategori waste; sepuluh item dengan nilai waste terbesar |
 | Prep | Total resep dan hasil per item |
@@ -1125,7 +1159,10 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 - [ ] **Hasil prep selalu mengikuti resep.** Staff tidak mengetik hasil nyata; jika hasil
       nyata sering berbeda, Pengelola memperbaiki angka di Master Resep.
 - [ ] **Harga barang jadi** yang dikosongkan dihitung dari harga bahan resepnya.
-- [ ] **Nilai stock memakai harga yang berlaku sekarang**, bukan harga saat barang dibeli.
+- [x] **Harga item punya riwayat** (keputusan pemilik, 11 Oktober 2026). Nilai stock pada
+      suatu tanggal memakai harga yang berlaku pada tanggal itu, bukan harga saat barang dibeli
+      (tanpa FIFO atau rata-rata). Gerakan dinilai dengan harga hari gerakannya, dan selisih
+      karena perubahan harga dilaporkan terpisah (Bagian 5.1 dan 8.5).
 
 **Akses**
 

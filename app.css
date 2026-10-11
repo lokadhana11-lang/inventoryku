@@ -4628,3 +4628,43 @@ textarea.isian-catatan {
     animation: putar 800ms linear infinite !important;
   }
 }
+
+/* ---------- Riwayat harga item (11 Oktober 2026) ---------- */
+.daftar-baris.daftar-baris-diam {
+  cursor: default;
+}
+
+.daftar-baris.daftar-baris-diam:active {
+  background: var(--kertas);
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .daftar-baris.daftar-baris-diam:hover { background: var(--kertas); }
+}
+
+.riwayat-harga {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  border-top: 1px solid var(--garis);
+}
+
+.riwayat-harga li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--garis);
+}
+
+.riwayat-harga-utama {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.riwayat-harga-beda {
+  font-size: 14px;
+  color: var(--tinta-redup);
+}

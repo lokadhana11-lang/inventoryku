@@ -172,6 +172,13 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   paling besar 2 MB per foto dan 15 MB per kiriman) → jawaban ditambah `foto` (jumlah yang tersimpan) dan `fotoGagal: [nama item]`.
   `riwayat`/`detailKiriman`/jawaban pemeriksaan: baris Waste membawa `foto: true|false` untuk semua role dan `fotoUrl` (tautan
   Drive) hanya untuk Pengelola.
+- Riwayat harga item (11 Oktober 2026): `gantiHarga {nama, harga, berlakuMulai: 'yyyy-mm-dd'}` (khusus Pengelola; hari ini atau
+  tanggal lewat) → jawaban `daftarItem` ditambah `hargaDisimpan: { nama, harga, berlakuMulai, mengganti }`. `daftarItem` ditambah
+  `riwayatHargaSiap` dan per item `hargaSejak` ('' = sejak awal, null = belum punya riwayat), `riwayatHarga: [{ berlakuMulai, harga,
+  beda, oleh, waktu }]` (10 terakhir, terbaru dulu), `jumlahRiwayatHarga`; `harga` = harga yang berlaku hari ini. `simpanItem` hanya
+  menulis harga untuk item yang belum punya harga (harga berbeda untuk item berharga ditolak). `formWaste.item[].harga` dan
+  `formOpname.item[].harga` = harga yang berlaku pada `tanggal`. `dashboard.nilaiStock` ditambah `selisihHarga: { dari, sampai, total,
+  item: [{ nama, kategori, satuan, selisih, perubahan: [{ tanggal, dari, ke, stock, selisih }] }] }` (bulan berjalan).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -193,6 +200,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 9 | Form kustom (Pengaturan → Form, susun form dan pratinjau, jadwal form, M_Form/M_FormKolom, tab Data_K_<ID>, layar isi umum, Beranda, Riwayat dan koreksi, PDF umum, email, kolom Form kustom di blok Kepatuhan) | Kode selesai (Code.gs v0.10, aplikasi 0.10.0), diuji dengan API tiruan (Code.gs di Node) dan Chromium pada delapan ukuran. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet`, deploy versi baru, uji dari HP |
 | 10 | Rekap bulanan (PDF enam bagian Bagian 9.3, unduh dari menu Laporan untuk Pengelola, simpan ke Drive, email dan trigger tanggal 1, `kirimRekapSekarang`) dan pemeriksaan akhir terhadap kedua spesifikasi | Kode selesai (Code.gs v0.11, aplikasi 0.11.0), diuji dengan API tiruan (Code.gs di Node, 61 uji server), Chromium (28 uji alur termasuk iPhone, delapan ukuran) dan sapuan semua layar pada delapan ukuran (274 pemeriksaan) serta "kurangi gerak". Konversi PDF Google dan email asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `pasangTrigger` dan `kirimRekapSekarang`, deploy versi baru, uji dari HP. setupSpreadsheet tidak perlu dijalankan ulang |
 | 10+ | Perbaikan tiga penyimpangan butir 150 (7 Oktober 2026): urutan `Data_Suhu` menurut waktu cek, sakelar Aktif/Nonaktif di layar ubah staff, geser kartu Waste untuk menghapus | Kode selesai (Code.gs v0.11.1, aplikasi 0.11.1), diuji dengan API tiruan (Code.gs di Node, 8 uji server) dan Chromium (22 uji alur dengan sentuhan tiruan, delapan ukuran, "kurangi gerak"). Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (rumus `Harian_Suhu` baru), deploy versi baru, uji dari HP |
+| 11+ | Riwayat harga item (keputusan pemilik 11 Oktober 2026): `M_HargaItem`, Ganti harga dan Riwayat harga di Pengaturan → Item, harga yang berlaku pada tanggal untuk waste/penyesuaian/opname/nilai stock/resep/rekap, selisih karena perubahan harga di Dashboard dan rekap bulanan, rumus bahan terpakai di tab Dashboard | Kode selesai (Code.gs v0.13, aplikasi 0.13.0), diuji dengan API tiruan (Code.gs di Node, 26 uji harga + 32 pemeriksaan regresi) dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HargaItem` dan harga awal), deploy versi baru, uji dari HP |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -715,7 +723,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 98. **Harga barang jadi** (Bagian 5.3): Harga Satuan kosong dihitung dari harga bahan satu resep aktif dibagi hasil per resep
     (`lengkapiHargaResep_`, bahan barang jadi ikut dihitung dari resepnya; dibulatkan 2 angka di belakang koma). Jika ada bahan
     tanpa harga, harganya tetap kosong. Dipakai estimasi waste (`formWaste`, `kirimWaste`, tersalin ke `Data_Waste` saat dicatat)
-    dan perkiraan biaya di Pengaturan → Resep. Penyesuaian stock tetap memakai Harga Satuan `M_Item` saja.
+    dan perkiraan biaya di Pengaturan → Resep. Penyesuaian stock tetap memakai harga item itu sendiri saja. Sejak Code.gs v0.13
+    harga bahan diambil dari riwayat harga pada tanggal yang dinilai (tanggal waste; hari ini untuk Pengaturan → Resep), butir 164.
 99. **Data_Prep:** satu baris per item. Item beresep: Jumlah Resep, Hasil per 1 Resep, Hasil, Baik Sampai (tanggal + masa simpan,
     kosong jika resep tanpa masa simpan), Qty kosong. Item tanpa resep: Qty saja (Hasil kosong, jadi stock tidak bergerak).
     `Data_PrepBahan`: satu baris per bahan per baris prep (Jumlah Resep, Qty per 1 Resep, Qty Terpakai, Satuan), `prep_row_id` =
@@ -787,15 +796,16 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     standar segitiga Masalah, memakai status yang tersimpan; skala Chiller batas ± 4 °C, Freezer batas −12 sampai +4 (−30 sampai −14);
     di luar skala ditaruh di tepi. Penanda adalah SVG kecil yang diletakkan dengan `left: %` (lingkaran tidak gepeng). Di bawah
     480 px pita turun ke baris kedua. Ketuk baris: daftar jam, suhu, status, pengisi, dan tindakan.
-111. **Nilai stock** (`nilaiStock_` dan blok Nilai stock di Sheet, cara hitung sama): Stock Akhir terkini × Harga Satuan di `M_Item`
-    sekarang. Dihitung: item aktif, dan item nonaktif yang stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah.
+111. **Nilai stock** (`nilaiStock_` dan blok Nilai stock di Sheet, cara hitung sama): Stock Akhir pada tanggal itu × harga yang berlaku
+    pada tanggal itu (riwayat harga, butir 164; untuk hari ini sama dengan Harga Satuan di `M_Item`, yang dipakai Sheet). Dihitung: item aktif, dan item nonaktif yang stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah.
     Harga barang jadi dari resep (butir 98) tidak dipakai di sini supaya aplikasi dan Sheet sama; barang jadi tanpa harga muncul di
     daftar "belum punya harga". Stock minus ikut dihitung apa adanya (nilainya minus). Nilai bahan terpakai (hanya di Sheet) =
-    (Stock Keluar + Dipakai Prep) × harga, untuk item yang tidak punya baris aktif di `M_Resep`, dalam periode B3.
+    (Stock Keluar + Dipakai Prep) tiap hari × harga yang berlaku hari itu menurut `M_HargaItem` (sejak Code.gs v0.13, butir 168),
+    untuk item yang tidak punya baris aktif di `M_Resep`, dalam periode B3.
 112. **Pengaturan → Item** (`#/pengaturan/item`, `-baru`, `/<nama>`): daftar per kategori (urutan kategori) lalu kelompok Nonaktif,
     dengan pencarian; tanda Nonaktif, Belum punya harga, Kategori nonaktif. Layar ubah: nama, kategori dan satuan dasar (`<select>`;
     pilihan nonaktif hanya tampil jika itu nilai sekarang), sakelar "Datang dalam kemasan besar" (`role=switch`, kata Ya/Tidak) dengan
-    kalimat "1 [dus] berisi [12] botol", harga (2 angka di belakang koma), stok minimum, stok maksimum. Draft `draft:item:<nama>` /
+    kalimat "1 [dus] berisi [12] botol", harga (2 angka di belakang koma; sejak Code.gs v0.13 hanya untuk harga pertama, butir 167 dan 169), stok minimum, stok maksimum. Draft `draft:item:<nama>` /
     `draft:item:+baru`, jawaban `cache:item`. Nama hanya bisa diganti selama item belum punya catatan stock (Stock_Harian, semua
     sumber gerakan termasuk prep tanpa resep, Data_Opname) dan belum dirujuk resep apa pun; satuan dasar terkunci setelah ada
     catatan stock (keduanya tampil terkunci berlatar Baja; server juga menolak). Isian yang belum diketik digambar ulang dengan data
@@ -1003,9 +1013,10 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     menghasilkan PDF dengan "Keterangan: Belum ada isian pada bulan ini." dan kalimat kosong di tiap bagian.
     - **Stock:** satu baris per kategori (urutan `M_Kategori`): item bergerak, Masuk, Bahan terpakai, Penyesuaian, dan Nilai stock
       akhir bulan, semuanya dalam rupiah, ditambah baris total. Satuan item berbeda-beda, jadi jumlah per kategori hanya bermakna
-      sebagai nilai. Nilai = jumlah (dari rekap `Stock_Harian` bulan itu) × Harga Satuan **sekarang**, sama dengan nilai stock di
-      Dashboard. Bahan terpakai = (Stock Keluar + Dipakai Prep) × harga untuk item tanpa resep aktif (Bagian 8.5, butir 111).
-      Penyesuaian termasuk hasil stock opname. Nilai stock akhir bulan = `nilaiStock_` pada tanggal terakhir. Kategori yang semua
+      sebagai nilai. Sejak Code.gs v0.13 (butir 167): nilai = jumlah per hari (dari rekap `Stock_Harian` bulan itu) × harga yang
+      berlaku pada hari itu, bukan harga sekarang. Bahan terpakai = (Stock Keluar + Dipakai Prep) × harga untuk item tanpa resep
+      aktif (Bagian 8.5, butir 111). Penyesuaian termasuk hasil stock opname. Kolom "Selisih harga (Rp)" per kategori dan total
+      (Bagian 8.5). Nilai stock akhir bulan = `nilaiStock_` pada tanggal terakhir, dengan harga yang berlaku pada tanggal itu. Kategori yang semua
       itemnya belum punya harga ditulis "–"; nama item tanpa harga (yang bergerak atau stock-nya bukan nol) disebut di catatan.
     - **Stock opname:** satu baris per opname (tanggal, dihitung oleh, item dihitung, item berselisih, nilai selisih yang tercatat
       di `Data_Opname`), urut lama ke baru, dengan total; lalu paling banyak 10 item yang paling sering berselisih (berapa kali,
@@ -1201,3 +1212,94 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     sesudah server menyimpan lalu kirim ulang tanpa file ganda, foto 3 MB ditolak di layar dan di antrean lalu Hapus membuang
     fotonya, Riwayat Pengelola dan Staff, tanpa IndexedDB, hapus baris dan pembersihan foto yatim, tabel laptop, delapan ukuran
     untuk layar Waste berfoto dan detail Riwayat berfoto). Uji Suhu, staff, geser kartu Waste, dan sapuan 16 rute tetap lulus.
+
+### Riwayat harga item (Code.gs v0.13, aplikasi 0.13.0, 11 Oktober 2026)
+
+164. **Keputusan pemilik:** harga satuan punya riwayat (tab master `M_HargaItem`: Nama Item, Berlaku Mulai, Harga Satuan (Rp),
+    Dicatat Oleh, Dicatat Pada; spesifikasi sistem Bagian 5.1 dan 8.5, tampilan Bagian 5.6 dan 5.7). Satu fungsi bersama:
+    `bacaRiwayatHarga_()` membaca tab sekali per permintaan (`MEMO_HARGA_`, dibuang `resetMemoForm_` dan setiap kali harga
+    ditulis), `hargaPada_(m, tanggal)` memberi harga yang berlaku (baris dengan Berlaku Mulai terbesar yang tidak melewati tanggal;
+    kosong = sejak awal), `itemPadaTanggal_(tanggal)` memberi salinan master dengan harga tanggal itu. Item yang sama sekali belum
+    punya baris riwayat (tab belum dibuat, atau item diisi tangan di Sheet) memakai Harga Satuan `M_Item` untuk semua tanggal,
+    sama dengan rumus Sheet. Dua baris item yang sama dengan tanggal yang sama (diisi tangan): yang lebih atas dipakai.
+    Baris yang tanggalnya tidak terbaca atau harganya bukan angka dilewati.
+165. **Yang memakai harga tanggal:** estimasi waste (`formWaste` dan `kirimWaste`, tanggal waste; harga barang jadi dari resep
+    memakai harga bahan tanggal itu), Nilai Selisih penyesuaian dan opname (tanggal penyesuaian/opname; `formOpname.item[].harga`
+    juga), nilai stock (`nilaiStock_` pada tanggal yang dinilai), Pengaturan → Resep (hari ini), Dashboard aplikasi, dan rekap
+    bulanan. Nilai yang sudah tersimpan (Harga Satuan dan Estimasi Kerugian di `Data_Waste`, Nilai Selisih di `Data_Penyesuaian`
+    dan `Data_Opname`) tidak dihitung ulang saat riwayat diubah; koreksi Waste tetap memakai harga yang tercatat di baris (butir 84).
+    Email harian tidak menghitung harga (total waste memakai estimasi yang tersimpan), jadi tidak berubah.
+166. **Mengganti harga** (aksi `gantiHarga`, khusus Pengelola): harga wajib (0 atau lebih, 2 angka di belakang koma), Berlaku Mulai
+    hari ini atau tanggal yang sudah lewat (masa depan ditolak di HP dan server). Tanggal yang sudah punya baris untuk item itu:
+    Harga Satuan, Dicatat Oleh, dan Dicatat Pada baris itu ditimpa, dan `Log_Perubahan` mencatat Tab `M_HargaItem`, row_id
+    "Tomat · 2026-10-06", kolom Harga Satuan (Rp) (dan Dicatat Oleh jika orangnya berbeda); harga yang sama persis ditolak dengan
+    pesan. Item tanpa riwayat tetapi berharga di `M_Item` mendapat baris harga awal (Berlaku Mulai kosong, Dicatat Oleh "Harga
+    awal") lebih dulu, supaya harga lamanya tetap berlaku sebelum tanggal itu. Sesudahnya Harga Satuan `M_Item` disamakan dengan
+    harga hari ini (`samakanHargaMItem_`). Baris harga awal (sejak awal) tidak bisa dibetulkan dari aplikasi, karena lembar Ganti
+    harga hanya menawarkan Hari ini atau tanggal lain; pemilik Sheet membetulkannya langsung di `M_HargaItem` (proteksi peringatan).
+    Riwayat tidak bisa dihapus dari aplikasi.
+167. **Harga pertama dan `simpanItem`:** item baru, atau item lama yang belum punya harga sama sekali, mengisi harga di isian item
+    seperti dulu; harga itu ditulis ke `M_Item` dan satu baris `M_HargaItem` dengan Berlaku Mulai kosong (sejak awal, oleh
+    pengguna itu). Item yang sudah punya harga: isian harga diganti kartu "Harga satuan" (lihat butir 169) dan `simpanItem`
+    mengabaikan harga yang kosong atau sama dengan harga sekarang (aplikasi lama mengirim harga sekarang), dan menolak harga yang
+    berbeda ("... diganti lewat tombol Ganti harga ..."). Mengganti nama item (hanya selama belum punya catatan, butir 112) ikut
+    mengganti nama di semua baris `M_HargaItem` item itu.
+    **Rekap bulanan:** gerakan per hari (masuk, bahan terpakai, penyesuaian) × harga yang berlaku hari itu; hari tanpa harga tidak
+    dihitung dan itemnya disebut di catatan ("belum punya harga pada sebagian atau semua harinya"). Kolom baru "Selisih harga (Rp)"
+    per kategori dan total (bertanda +), dari perubahan harga yang berlaku mulai tanggal di bulan itu; "–" untuk kategori tanpa
+    perubahan harga. Catatan PDF dan ringkasan email ("Selisih karena perubahan harga: +Rp 182.000 (2 item berganti harga)")
+    diperbarui. Angka bulan lalu berubah hanya jika riwayat harga untuk tanggal di bulan itu diubah (diuji).
+168. **Selisih karena perubahan harga** (`selisihHarga_(master, rekap, dari, sampai)`): untuk tiap dua baris riwayat berurutan
+    (h0, lalu h1 yang berlaku mulai D, D di dalam periode, h1 ≠ h0): Stock Akhir pada D−1 × (h1 − h0); perubahan dari belum punya
+    harga ke harga pertama tidak ada (tidak ada h0). Selisih per perubahan dan per item dibulatkan ke rupiah, total dari nilai
+    tanpa bulat. Item urut nilai selisih terbesar (mutlak). Dashboard aplikasi: bulan berjalan (tanggal 1 sampai tanggal Dashboard).
+    **Rumus tab Dashboard** (blok Nilai stock, `letNilaiStock_`): nilai stock tetap Stock Akhir × Harga Satuan `M_Item` (= harga hari
+    ini); bahan terpakai per periode B3 kini memakai harga harian: baris `Stock_Harian` dalam periode difilter sekali (`prS`, `prT`,
+    `prI`, `prK`, `prD`), satu MAP menghitung harga tiap baris (`prH`: `MAXIFS` Berlaku Mulai ≤ tanggal, lalu `FILTER` harga dengan
+    tanggal itu; MAXIFS 0 dan sel kosong sama dengan 0, jadi baris harga awal ikut ketemu; item tanpa baris riwayat memakai `M_Item`
+    lewat `XLOOKUP` skalar), lalu `SUMPRODUCT` per item. Tanpa LAMBDA bersarang dan tanpa `XLOOKUP(1,(…)*(…))` (butir 120a); nama
+    LET baru (`hgM`, `rwN`, `rwT`, `rwH`, `rwM`, `pr*`) tidak bertabrakan beda huruf (butir 120b). Rumus baru terpasang setelah
+    `setupSpreadsheet`; hasilnya di Google Sheets belum bisa diuji di sini.
+169. **Pengaturan → Item** (tampilan 5.7): item berharga menampilkan kartu "Harga satuan": "Harga sekarang Rp 15.000 (sejak 7 Okt)"
+    (tanpa "sejak" untuk harga awal; tahun ditulis jika bukan tahun ini), keterangan per satuan, tombol "Ganti harga", lalu "Riwayat
+    harga" (10 terakhir, terbaru di atas: harga, "naik Rp 2.000"/"turun Rp 500"/"sama" dalam kata, "Mulai 7 Okt" atau "Sejak awal",
+    pencatat; jika lebih dari 10: "10 perubahan terakhir dari 13. Semuanya ada di tab M_HargaItem."). Lembar "Ganti harga Tomat":
+    harga sekarang, "Harga baru (Rp)", "Berlaku mulai" (Hari ini / Tanggal lain dengan pemilih tanggal, maksimal hari ini), dan
+    kalimat akibat yang berubah langsung: "Harga Rp 15.000 yang berlaku mulai 7 Okt diganti." (tanggal yang sudah punya harga),
+    "Harga lama Rp 13.000 tetap dipakai untuk catatan sebelum tanggal ini." (ditambah "Harga Rp 15.000 tetap berlaku mulai 12 Okt."
+    jika ada perubahan sesudahnya), atau "Sebelum tanggal ini Tomat belum punya harga."; tombol "Batal" dan "Simpan harga"; galat
+    tampil di lembar. Sesudah tersimpan: pesan "Harga Tomat tersimpan." dan layar digambar ulang (isian yang sedang diketik tetap).
+    Butuh sinyal (tidak masuk antrean), seperti Pengaturan lain.
+170. **Lembar Nilai stock** (Dashboard): baris "Selisih karena perubahan harga bulan ini" (nilai bertanda, "n item berganti harga
+    sejak 1 Okt. Ketuk untuk rinciannya." atau "Tidak ada harga yang berganti sejak 1 Okt." sebagai baris diam). Ketukan membuka
+    lembar "Selisih harga +Rp 139.000": penjelasan rumus, lalu per item tiap perubahan ("6 Okt: Rp 13.000 → Rp 15.000 per kg, stock
+    26 kg, +Rp 52.000") dan selisih item; tombol "Kembali" membuka lagi lembar Nilai stock. **Layar Waste:** tidak berubah; ia sudah
+    memuat ulang `formWaste` saat tanggal diganti, jadi perkiraan estimasi di HP memakai harga tanggal waste. Tanpa sinyal untuk
+    tanggal yang belum pernah dimuat, HP memakai harga dari data terakhir (perkiraan saja; server menghitung ulang saat menerima).
+171. **setupSpreadsheet:** membuat tab `M_HargaItem` (master, warna dan proteksi peringatan seperti master lain, dropdown Nama Item
+    dari `M_Item`, format tanggal, rupiah, dan waktu; masuk `KUNCI_MASTER`, jadi ikut dirapikan butir 79), lalu `isiHargaAwal_`
+    menambah satu baris harga awal (Berlaku Mulai kosong, Dicatat Oleh "Harga awal") untuk tiap item yang punya Harga Satuan di
+    `M_Item` tetapi belum punya baris riwayat. Menjalankan ulang tidak menggandakan baris. Sebelum setupSpreadsheet dijalankan,
+    aplikasi tetap jalan dengan harga `M_Item` (butir 164); Ganti harga dan harga pertama item menolak dengan petunjuk menjalankan
+    setupSpreadsheet.
+172. **Uji** (di luar repo; tiruan Apps Script ditulis ulang karena tiruan tahap sebelumnya tidak tersimpan): Code.gs di Node dengan
+    tiruan SpreadsheetApp/Utilities/Properties/Drive/Mail dan data September–Oktober dengan harga Tomat berubah tiap minggu: 26 uji
+    (harga per tanggal, waste kemarin dengan harga kemarin, ganti harga mundur, membetulkan tanggal yang sama dengan Log_Perubahan,
+    rekap September dihitung tangan termasuk selisih harga, rekap bulan lalu tetap setelah harga Oktober diganti dan berubah jika
+    harga September diubah, selisih harga Dashboard, item belum punya harga, harga barang jadi dari resep pada tiga tanggal,
+    penyesuaian dan opname, setupSpreadsheet dua kali, harga awal untuk item yang diisi tangan, simpanItem menolak harga berbeda,
+    ganti nama, Staff ditolak, rumus seimbang dan nama LET aman) ditambah 32 pemeriksaan regresi (Beranda, semua form, Riwayat,
+    koreksi Waste, PDF harian, rekap, belanja, opname, email harian dan rekap). Chromium dengan API tiruan yang memanggil `doPost`
+    asli: lihat butir 173.
+173. **Uji Chromium** (di luar repo; API tiruan lewat `context.route` yang memanggil `doPost` asli di tiruan Node): 11 uji (kartu
+    harga dan riwayat dengan naik/turun; lembar Ganti harga dengan kalimat akibat untuk tanggal yang sudah punya harga, tanggal
+    lain, dan perubahan sesudahnya, tanggal masa depan ditolak, simpan; angka salah dan penolakan server tampil di lembar; item
+    tanpa harga tetap punya isian harga; item baru lalu kartu harga; riwayat lebih dari 10; lembar Nilai stock dengan baris selisih
+    dan rinciannya (+Rp 139.000 dihitung tangan); Waste hari ini Rp 29.000 vs kemarin Rp 30.000 untuk 2 kg; delapan ukuran
+    Bagian 4.6 untuk layar item, lembar Ganti harga (tombol Simpan harga terlihat), lembar Nilai stock, rincian selisih, dan Waste;
+    "kurangi gerak" tanpa animasi; tanpa galat konsol), ditambah sapuan 22 rute pada 390 dan 1366 px tanpa gulir ke samping, kotak
+    galat, atau galat konsol.
+174. **Belum terpenuhi atau menyimpang** (riwayat harga): hasil rumus bahan terpakai di tab Dashboard belum bisa diuji di Google
+    Sheets (butir 168; jika galat, `periksaSelRumus_` mencatatnya di log setupSpreadsheet); baris harga awal (sejak awal) tidak bisa
+    dibetulkan dari aplikasi (butir 166); blok Nilai stock di Sheet tetap memakai Harga Satuan `M_Item`, jadi selisih karena
+    perubahan harga hanya ada di aplikasi dan rekap bulanan, tidak di tab Dashboard (spesifikasi tidak memintanya di Sheet).
