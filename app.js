@@ -1192,7 +1192,7 @@
    * memasang kelas; geraknya CSS. Mati saat "kurangi gerak" atau tanpa IntersectionObserver.
    */
   var PILIH_UNGKAP = '.layar-isi > :not(.bilah-kirim):not(.kepala-ringkas):not(.memperbarui), ' +
-    '.layar-isi .kartu, .layar-isi .tabel-bingkai, .beranda-bawah > *';
+    '.layar-isi .kartu, .layar-isi .kartu-item, .layar-isi .kelompok, .layar-isi .tabel-bingkai, .beranda-bawah > *';
 
   function pasangUngkap() {
     var main = $('#layar');

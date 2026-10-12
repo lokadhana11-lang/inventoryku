@@ -910,10 +910,13 @@ permintaan maaf dan tidak ada kode teknis.
 
 ---
 
-## 8. Gerak
+## 8. Gerak (penuh gerak)
 
-Versi 1.8 (permintaan pemilik 12 Oktober 2026): aplikasi terasa hidup di setiap layar, bukan
-hanya saat mengetuk. Gerak tetap tidak boleh memperlambat pekerjaan: ketukan dijawab seketika,
+Versi 1.8 (permintaan pemilik 12 Oktober 2026): **penuh gerak** ("full animasi"). Aplikasi terasa
+hidup di setiap layar, bukan hanya saat mengetuk: setiap layar masuk dengan gerak, setiap bagian
+yang digulir muncul dengan gerak, angka dan grafik naik ke tempatnya, dan permukaan navy tidak
+pernah benar-benar diam. Bagian 8.1 mendaftar setiap gerak; Bagian 8.4 menunjukkan gerak apa yang
+terlihat di tiap layar. Gerak tetap tidak boleh memperlambat pekerjaan: ketukan dijawab seketika,
 isian langsung bisa diketik, dan data tidak menunggu gerak selesai. Semua gerak di bawah mati
 saat perangkat diatur "kurangi gerak".
 
@@ -974,6 +977,28 @@ saat perangkat diatur "kurangi gerak".
 Angka yang berhitung naik (butuh JavaScript tiap bingkai), gerak yang menggerakkan ukuran,
 warna, atau bayangan, efek paralaks, dan gerak yang berulang cepat tanpa henti.
 
+### 8.4 Gerak per layar
+
+Semua layar memakai pola bersama: **ganti layar** (isi kepala navy dan bagian isi naik satu per
+satu), **muncul saat digulir** (bagian yang semula di bawah layar), **cahaya navy** di kepala, dan
+gerak **menu**, **tekan**, **lembar**, serta **pesan singkat** (Bagian 8.1). Tambahan per layar:
+
+| Layar | Gerak yang terlihat |
+|---|---|
+| Login | Pembuka Login sekali setiap aplikasi dibuka (lencana, pembatas, nama, outlet, tombol nama bertahap); cahaya navy di seluruh layar; titik PIN muncul; enam titik bergoyang saat PIN salah. Berganti langkah (nama → PIN → kembali) tidak mengulang pembuka. |
+| Beranda | Pembuka sekali setiap aplikasi dibuka (lencana dan pembatas di baris merek, tanggal muncul, ruas rel terbentang); tiket turun ke rel setiap Beranda dibuka; jumlah form terisi naik; cap pada tiket yang baru Terkirim atau Nihil; ruas rel menyala; momen selesai dengan kilau di rel; pemberitahuan di bawah tiket naik bertahap. |
+| Isi form (Stock, Suhu, Prep list, Waste, form kustom) | Kepala dan bagian layar naik bertahap; kartu item yang berada di bawah layar muncul saat digulir; bilah kirim di bawah tetap diam (tidak pernah tersembunyi); kartu Waste mengikuti jari saat digeser untuk dihapus. Kolom isian bisa diketik sejak layar tampil. |
+| Riwayat | Pilihan dan daftar kiriman naik bertahap; kiriman di bawah layar muncul saat digulir; cap pada tanda Diperiksa setelah Tandai diperiksa. |
+| Laporan | Kartu Laporan harian, Daftar belanja, dan Rekap bulanan naik bertahap. |
+| Dashboard | Nilai stock di kepala naik; ubin menggantung naik bertahap dengan angkanya; cincin Form terisi berputar ke tempatnya; daftar Perlu perhatian dan grafik muncul saat digulir; batang waste tumbuh satu per satu; titik suhu muncul satu per satu. |
+| Pengaturan | Daftar dan kartu naik bertahap; di layar item, Stock hari ini dan Harga sekarang di kepala naik dan grafik tangga harga naik. |
+| Lembar dan dialog | Lembar naik dari bawah, dialog memudar; isinya tidak bergerak lagi supaya bisa langsung diisi. |
+
+Isi yang digambar ulang karena data baru dari server tidak mengulang gerak masuk (Bagian 8.2
+butir 5); hanya angka dan grafik yang nilainya berubah yang naik lagi. Saat perangkat diatur
+"kurangi gerak", semua layar tampil langsung tanpa gerak apa pun dari tabel ini kecuali
+indikator putar.
+
 ---
 
 ## 9. Aksesibilitas dan Batas Minimum
@@ -1018,7 +1043,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Bar navigasi di laptop/desktop | Di atas |
 | Bar navigasi di HP | Di bawah |
 | Bar navigasi di tablet | Di bawah sampai lebar 1.023 px; di atas mulai 1.024 px |
-| Gerak | Versi 1.8 (12 Oktober 2026): penuh gerak di setiap layar (masuk bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan), tetap hanya CSS, hanya `transform` dan `opacity`, dan mati saat "kurangi gerak" (Bagian 8) |
+| Gerak | Versi 1.8 (12 Oktober 2026): penuh gerak ("full animasi") di setiap layar: masuk bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan. Tetap hanya CSS, hanya `transform` dan `opacity`, dan mati saat "kurangi gerak" (Bagian 8, daftar per layar di Bagian 8.4) |
 | Garis kemajuan hari ini | Digabung dengan rel tiket di kepala Beranda (Bagian 5.2) |
 | Momen selesai | Rel menyala penuh dan tulisan "Semua form hari ini sudah terisi" |
 | Grafik di Dashboard aplikasi | Dua grafik kecil: waste 7 hari terakhir dan suhu hari ini (Bagian 5.6) |

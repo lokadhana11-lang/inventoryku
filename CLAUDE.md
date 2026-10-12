@@ -1380,7 +1380,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Beranda dibuka).
 187. **Muncul saat digulir** (`pasangUngkap`, dipanggil `mulai`): `MutationObserver` pada `#layar` (diperiksa di microtask, sebelum
     layar dilukis) memberi `data-ungkap` pada calon (`PILIH_UNGKAP`: anak `.layar-isi` selain bilah kirim, ringkasan kepala, dan
-    penanda memperbarui; `.kartu`; `.tabel-bingkai`; anak `.beranda-bawah`), lalu `.ungkap` hanya pada yang seluruhnya di bawah
+    penanda memperbarui; `.kartu`; `.kartu-item` (kartu item form); `.kelompok` (kelompok per tanggal di Riwayat dan
+    per kategori di Pengaturan); `.tabel-bingkai`; anak `.beranda-bawah`), lalu `.ungkap` hanya pada yang seluruhnya di bawah
     layar, tidak menempel (`sticky`/`fixed`), dan tidak berada di dalam calon lain yang belum tampil. `IntersectionObserver`
     memberi `.ungkap-tampil`, dan 600 ms kemudian kedua kelas dilepas supaya gerak tekan kembali normal. Transisi hanya pada
     `.ungkap.ungkap-tampil`, jadi menyembunyikan tidak memudar. Grafik di bagian yang belum tampil menunda geraknya sampai tampil.
