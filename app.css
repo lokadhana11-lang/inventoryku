@@ -1,5 +1,5 @@
 /* InventoryKu — gaya bersama. Warna, huruf, jarak, tata letak, dan gerak mengikuti
-   spesifikasi/spesifikasi_tampilan_ui.md (Bagian 2, 3, 4, 6, 8).
+   spesifikasi/spesifikasi_tampilan_ui.md (Bagian 2, 3, 4, 6, 8; gerak versi 1.8 di bagian akhir file).
    Tiga susunan: HP (< 600 px), tablet (600–1.023 px), desktop (≥ 1.024 px).
    Layar pendek (tinggi < 500 px) punya aturan sendiri. */
 
@@ -79,6 +79,8 @@
   --tepi: 16px;
   --tinggi-bar: 56px;
   --tinggi-menu: 64px;
+  --jarak-menu: 8px; /* bar bawah mengambang di atas tepi layar (1.8) */
+  --ruang-menu: calc(var(--tinggi-menu) + var(--aman-bawah) + var(--jarak-menu));
   --papan-ketik: 0px; /* tinggi papan ketik yang menutupi layar (diisi app.js, iPhone) */
 
   /* Jarak aman tepi layar HP */
@@ -98,6 +100,7 @@
   :root {
     --tinggi-bar: 64px;
     --tinggi-menu: 0px;
+    --jarak-menu: 0px;
   }
 }
 
@@ -105,6 +108,7 @@
   :root {
     --tinggi-bar: 48px;
     --tinggi-menu: 48px;
+    --jarak-menu: 6px;
   }
 }
 
@@ -120,7 +124,7 @@ html {
   text-size-adjust: 100%;
   /* Kolom yang difokus tidak tertutup bar atas atau bar bawah. */
   scroll-padding-top: calc(var(--tinggi-bar) + var(--aman-atas) + 16px);
-  scroll-padding-bottom: calc(var(--tinggi-menu) + var(--aman-bawah) + 16px);
+  scroll-padding-bottom: calc(var(--ruang-menu) + 16px);
 }
 
 body {
@@ -259,9 +263,29 @@ svg {
   min-height: 44px;
 }
 
-.merek .ikon-buku {
-  width: 28px;
-  height: 28px;
+/* Nama dan outlet di samping lencana (bar desktop) */
+.merek-teks {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.merek-ku {
+  color: var(--lampu-pass);
+}
+
+.merek-outlet {
+  max-width: 180px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--teks-di-navy);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.merek-outlet:empty {
+  display: none;
 }
 
 .merek-nama {
@@ -313,27 +337,34 @@ svg {
   background: currentColor;
 }
 
-/* Menu utama. HP dan tablet: bar bawah. Desktop: di bar atas. */
+/* Menu utama. HP dan tablet: bar bawah yang mengambang (versi 1.8). Desktop: di bar atas. */
 .menu {
   position: fixed;
   z-index: 30;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: var(--navy-pass);
-  padding-bottom: var(--aman-bawah);
-  padding-left: var(--aman-kiri);
-  padding-right: var(--aman-kanan);
+  bottom: calc(var(--aman-bawah) + var(--jarak-menu));
+  padding-left: max(12px, var(--aman-kiri));
+  padding-right: max(12px, var(--aman-kanan));
+  pointer-events: none;
 }
 
 .menu-grup {
   position: relative;
+  isolation: isolate;
   display: flex;
   max-width: 600px;
   margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--garis-navy);
+  border-radius: 20px;
+  background-color: var(--navy-pass);
+  box-shadow: var(--bayang-tiket);
+  pointer-events: auto;
 }
 
 .menu-item {
+  position: relative;
   flex: 1 1 0;
   min-width: 0;
   min-height: var(--tinggi-menu);
@@ -429,7 +460,7 @@ svg {
 .layar {
   display: block;
   outline: none;
-  padding-bottom: calc(var(--tinggi-menu) + var(--aman-bawah));
+  padding-bottom: calc(var(--ruang-menu) + 8px);
 }
 
 body.papan-ketik .layar {
@@ -520,12 +551,18 @@ body.papan-ketik .layar {
     min-width: 0;
     background: none;
     padding: 0;
+    pointer-events: auto;
   }
 
   .menu-grup {
     max-width: none;
     margin: 0;
     gap: 4px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
   .menu-item {
@@ -1305,7 +1342,7 @@ body.papan-ketik .layar {
   z-index: 60;
   left: 0;
   right: 0;
-  bottom: calc(var(--tinggi-menu) + var(--aman-bawah) + 12px + var(--papan-ketik));
+  bottom: calc(var(--ruang-menu) + 12px + var(--papan-ketik));
   display: flex;
   justify-content: center;
   padding: 0 var(--pad-kanan) 0 var(--pad-kiri);
@@ -1480,10 +1517,8 @@ body.papan-ketik .lembar-aksi {
   padding-top: 4vh;
 }
 
-.login-merek .ikon-buku {
-  width: 44px;
-  height: 44px;
-  margin-bottom: 8px;
+.login-merek .lencana {
+  margin-bottom: 12px;
 }
 
 .login-nama-aplikasi {
@@ -1725,7 +1760,8 @@ body.papan-ketik .lembar-aksi {
   .login-kanan { grid-area: kanan; gap: 8px; }
   .login-bawah { grid-area: bawah; align-self: end; }
   .login-merek { padding-top: 0; }
-  .login-merek .ikon-buku { width: 32px; height: 32px; margin-bottom: 0; }
+  .login-merek .lencana { width: 44px; height: 44px; border-radius: 12px; margin-bottom: 0; }
+  .login-merek .lencana .ikon-buku { width: 28px; height: 28px; }
   .login-nama-aplikasi { font-size: 32px; }
   .tombol-angka { min-height: 48px; font-size: 24px; }
   .tombol-nama { min-height: 48px; }
@@ -1740,7 +1776,7 @@ body.papan-ketik .lembar-aksi {
   .login-merek {
     padding-top: 0;
   }
-  .login.langkah-pin .login-merek .ikon-buku,
+  .login.langkah-pin .login-merek .lencana,
   .login.langkah-pin .login-outlet {
     display: none;
   }
@@ -1846,7 +1882,9 @@ body.papan-ketik .lembar-aksi {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  display: grid;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
@@ -2163,9 +2201,9 @@ body.papan-ketik .lembar-aksi {
   animation: muncul 400ms ease-out both;
 }
 
-.pembuka .tiket.gerak {
-  animation: tiket-turun 150ms ease-out both;
-  animation-delay: calc(var(--urut, 0) * 50ms);
+.tiket.gerak {
+  animation: tiket-turun 360ms var(--ayun-lembut) backwards;
+  animation-delay: calc(var(--urut, 0) * 60ms + 80ms);
 }
 
 /* Pemberitahuan untuk Pengelola di bawah tiket */
@@ -2280,6 +2318,7 @@ body.papan-ketik .lembar-aksi {
   display: grid;
   gap: 2px;
   justify-items: center;
+  align-content: center;
 }
 
 .tombol-nama-ket {
@@ -2548,7 +2587,7 @@ body.papan-ketik .lembar-aksi {
 .bilah-kirim {
   position: sticky;
   z-index: 15;
-  bottom: calc(var(--tinggi-menu) + var(--aman-bawah));
+  bottom: var(--ruang-menu);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -5387,5 +5426,435 @@ textarea.isian-catatan {
   }
   .kepala-angka-nilai {
     font-size: 24px;
+  }
+}
+
+
+/* =========================================================================
+ * Versi 1.8: bar, logo, dan gerak (spesifikasi tampilan Bagian 4.2, 4.3, 4.5, dan 8)
+ * Semua gerak hanya transform dan opacity, dibuat CSS; app.js hanya memasang kelas.
+ * "Kurangi gerak" mematikan semuanya (aturan prefers-reduced-motion di atas dan di bawah).
+ * ========================================================================= */
+
+:root {
+  --ayun-masuk: cubic-bezier(0.2, 0.8, 0.2, 1);      /* masuk: cepat lalu melambat */
+  --ayun-lembut: cubic-bezier(0.25, 1.1, 0.4, 1.06); /* sedikit melewati tempatnya, untuk benda kecil */
+}
+
+/* ---------- Logo: lencana ---------- */
+.lencana {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--garis-navy);
+  border-radius: 12px;
+  background: var(--navy-lapis);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 16px rgba(7, 21, 40, 0.35);
+}
+
+.lencana .ikon-buku {
+  width: 26px;
+  height: 26px;
+}
+
+.lencana .ikon-buku-pembatas {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  transition: transform 200ms var(--ayun-masuk);
+}
+
+.lencana-besar {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+}
+
+.lencana-besar .ikon-buku {
+  width: 44px;
+  height: 44px;
+}
+
+.merek .lencana {
+  width: 40px;
+  height: 40px;
+}
+
+/* Pembuka logo: lencana membesar ke tempatnya, lalu pembatas amber turun */
+.lencana-buka,
+.login-buka .lencana,
+.pembuka .beranda-merek .lencana {
+  animation: lencana-masuk 480ms var(--ayun-lembut) backwards;
+}
+
+.lencana-buka .ikon-buku-pembatas,
+.login-buka .lencana .ikon-buku-pembatas,
+.pembuka .beranda-merek .ikon-buku-pembatas {
+  animation: pembatas-turun 420ms var(--ayun-lembut) 260ms backwards;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .merek:hover .ikon-buku-pembatas { transform: translateY(1.5px); }
+}
+
+/* Nama di Login: dua warna, naik setelah lencana */
+.login-nama-aplikasi .merek-ku { color: var(--lampu-pass); }
+
+.login-buka .login-nama-aplikasi,
+.login-buka .login-outlet {
+  animation: naik-masuk 420ms var(--ayun-masuk) backwards;
+  animation-delay: 160ms;
+}
+
+.login-buka .login-outlet { animation-delay: 240ms; }
+
+.login-buka .login-kanan > *,
+.login-buka .tombol-nama {
+  animation: naik-masuk 360ms var(--ayun-masuk) backwards;
+  animation-delay: 300ms;
+}
+
+.login-buka .tombol-nama:nth-child(2) { animation-delay: 345ms; }
+.login-buka .tombol-nama:nth-child(3) { animation-delay: 390ms; }
+.login-buka .tombol-nama:nth-child(4) { animation-delay: 435ms; }
+.login-buka .tombol-nama:nth-child(5) { animation-delay: 480ms; }
+.login-buka .tombol-nama:nth-child(n+6) { animation-delay: 525ms; }
+
+/* Baris merek di kepala Beranda (HP dan tablet; desktop sudah punya merek di bar) */
+.beranda-merek {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: auto;
+  padding-bottom: 16px;
+}
+
+.beranda-merek .lencana {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.beranda-merek .ikon-buku {
+  width: 20px;
+  height: 20px;
+}
+
+.beranda-merek-nama {
+  font-family: var(--huruf-sempit);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--kertas);
+}
+
+.beranda-merek-nama .merek-ku { color: var(--lampu-pass); }
+
+@media (min-width: 1024px) {
+  .beranda-merek { display: none; }
+}
+
+@media (max-height: 499px) {
+  .beranda-merek { padding-bottom: 8px; }
+}
+
+/* ---------- Bar navigasi ---------- */
+/* Pil menu aktif di bar bawah: digeser app.js dengan transform; lebarnya sama untuk semua menu */
+.menu-pil {
+  position: absolute;
+  z-index: -1;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 0;
+  border-radius: 14px;
+  background: var(--navy-lapis);
+  box-shadow: inset 0 0 0 1px var(--garis-navy);
+  opacity: 0;
+  transition: transform 320ms var(--ayun-lembut), opacity 200ms ease-out;
+  pointer-events: none;
+}
+
+.menu-pil.terlihat { opacity: 1; }
+
+.menu-pil.tanpa-gerak { transition: none; }
+
+.menu-penanda { z-index: 1; }
+
+/* Ikon menu yang baru aktif melonjak sedikit */
+.menu-item .ikon {
+  transition: transform 200ms var(--ayun-masuk);
+}
+
+.menu-item[aria-current='page'] .ikon {
+  animation: ikon-lonjak 380ms var(--ayun-lembut);
+}
+
+/* Desktop: bar atas bertepi Garis Navy; pil tiap menu memudar di tempat */
+@media (min-width: 1024px) {
+  .bar {
+    box-shadow: inset 0 -1px 0 var(--garis-navy);
+  }
+  .menu-pil { display: none; }
+  .menu-item { isolation: isolate; }
+  .menu-item::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 12px 2px;
+    border-radius: 10px;
+    background: var(--navy-lapis);
+    box-shadow: inset 0 0 0 1px var(--garis-navy);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: transform 200ms var(--ayun-masuk), opacity 200ms ease-out;
+  }
+  .menu-item[aria-current='page']::before {
+    opacity: 1;
+    transform: none;
+  }
+  .menu-penanda { bottom: 6px; }
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .menu-item:hover::before { opacity: 0.6; transform: none; }
+  .menu-item[aria-current='page']:hover::before { opacity: 1; }
+}
+
+/* ---------- Cahaya pelan di permukaan navy ---------- */
+/* Satu bercak Garis Navy yang bergeser pelan di belakang isi kepala (latar bergerak, 1.8).
+   Hanya transform; berhenti saat "kurangi gerak" (bercak tetap diam di tempatnya). */
+.beranda-kepala,
+.kepala-layar {
+  overflow: hidden;
+}
+
+.beranda-kepala::after,
+.kepala-layar::after {
+  z-index: -2;
+}
+
+.beranda-kepala::before,
+.kepala-layar::before,
+.masuk:not(.terang)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -60%;
+  left: -25%;
+  width: 70%;
+  height: 220%;
+  background: radial-gradient(closest-side, rgba(52, 92, 150, 0.42), rgba(52, 92, 150, 0));
+  pointer-events: none;
+  animation: cahaya-geser 16s ease-in-out infinite alternate;
+}
+
+.masuk:not(.terang) {
+  position: relative;
+  isolation: isolate;
+}
+
+.masuk:not(.terang)::before {
+  position: fixed;
+  top: -20%;
+  height: 90%;
+  width: 90%;
+}
+
+/* ---------- Ganti layar: kepala dan isi naik bertahap ---------- */
+.layar.layar-masuk > * {
+  animation: none;
+}
+
+.layar.layar-masuk .kepala-layar-isi > *,
+.layar.layar-masuk .layar-isi > :nth-child(-n+8),
+.layar.layar-masuk .beranda-bawah > :nth-child(-n+4) {
+  animation: naik-masuk 340ms var(--ayun-masuk) backwards;
+}
+
+.layar.layar-masuk .kepala-layar-isi > :nth-child(2) { animation-delay: 40ms; }
+.layar.layar-masuk .kepala-layar-isi > :nth-child(3) { animation-delay: 80ms; }
+.layar.layar-masuk .layar-isi > :nth-child(1) { animation-delay: 90ms; }
+.layar.layar-masuk .layar-isi > :nth-child(2) { animation-delay: 130ms; }
+.layar.layar-masuk .layar-isi > :nth-child(3) { animation-delay: 170ms; }
+.layar.layar-masuk .layar-isi > :nth-child(4) { animation-delay: 210ms; }
+.layar.layar-masuk .layar-isi > :nth-child(5) { animation-delay: 250ms; }
+.layar.layar-masuk .layar-isi > :nth-child(6) { animation-delay: 290ms; }
+.layar.layar-masuk .layar-isi > :nth-child(7) { animation-delay: 330ms; }
+.layar.layar-masuk .layar-isi > :nth-child(8) { animation-delay: 370ms; }
+.layar.layar-masuk .beranda-bawah > * { animation-delay: 320ms; }
+
+/* Angka utama naik ke tempatnya (bukan berhitung) */
+.layar.layar-masuk .kepala-angka-nilai,
+.kepala-nilai-angka,
+.ubin-nilai,
+.pembuka .beranda-tanggal > span:last-child,
+.kemajuan-angka {
+  animation: angka-naik 520ms var(--ayun-masuk) 140ms backwards;
+}
+
+.kemajuan-angka { display: inline-block; }
+
+/* Rel Beranda: ruas terbentang dari kiri saat pembuka; momen selesai: kilau sekali lewat */
+.pembuka .rel-ruas {
+  transform-origin: 0 50%;
+  animation: ruas-bentang 520ms var(--ayun-masuk) 200ms backwards;
+}
+
+.rel {
+  position: relative;
+  overflow: hidden;
+}
+
+.rel.kilau::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  opacity: 0;
+  pointer-events: none;
+  animation: kilau-rel 900ms ease-in-out 200ms;
+}
+
+/* Muncul saat digulir (app.js memasang .ungkap pada bagian di bawah layar) */
+.ungkap {
+  animation: none !important;
+}
+
+/* Transisi hanya saat naik (bukan saat disembunyikan, yang terjadi sebelum layar dilukis) */
+.ungkap.ungkap-tampil {
+  transition: transform 460ms var(--ayun-masuk), opacity 360ms ease-out;
+}
+
+.ungkap:not(.ungkap-tampil) {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+/* ---------- Grafik ---------- */
+.grafik-waste-svg .batang.tumbuh {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: batang-tumbuh 560ms var(--ayun-masuk) backwards;
+  animation-delay: calc(var(--i, 0) * 50ms + 120ms);
+}
+
+.suhu-titik-satu .penanda-suhu {
+  animation: titik-muncul 340ms var(--ayun-lembut) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 160ms);
+}
+
+.cincin {
+  animation: cincin-putar 640ms var(--ayun-masuk) 120ms backwards;
+}
+
+.grafik-harga {
+  animation: naik-masuk 420ms var(--ayun-masuk) 120ms backwards;
+}
+
+/* Grafik di bagian yang belum terungkap: geraknya menunggu sampai bagian itu tampil */
+.ungkap:not(.ungkap-tampil) .batang.tumbuh,
+.ungkap:not(.ungkap-tampil) .penanda-suhu,
+.ungkap:not(.ungkap-tampil) .cincin,
+.ungkap:not(.ungkap-tampil) .grafik-harga {
+  animation: none;
+}
+
+/* ---------- Sentuhan dan arahan tetikus ---------- */
+.tiket,
+.ubin-tombol,
+.kepala-nilai {
+  transition: transform 180ms var(--ayun-masuk), background-color 100ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tiket:hover,
+  .ubin-tombol:hover,
+  .kepala-nilai:hover {
+    transform: translateY(-3px);
+  }
+  .tiket:active,
+  .ubin-tombol:active,
+  .kepala-nilai:active {
+    transform: translateY(-1px) scale(0.98);
+  }
+}
+
+/* ---------- Bingkai gerak ---------- */
+@keyframes naik-masuk {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes angka-naik {
+  from { opacity: 0; transform: translateY(45%); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes lencana-masuk {
+  from { opacity: 0; transform: scale(0.75) rotate(-8deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pembatas-turun {
+  from { opacity: 0; transform: translateY(-120%) scaleY(0.5); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes ikon-lonjak {
+  0% { transform: none; }
+  45% { transform: translateY(-3px) scale(1.14); }
+  100% { transform: none; }
+}
+
+@keyframes cahaya-geser {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(110%, 12%, 0); }
+}
+
+@keyframes ruas-bentang {
+  from { opacity: 0; transform: scaleX(0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes kilau-rel {
+  0% { opacity: 0; transform: translateX(-100%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(260%); }
+}
+
+@keyframes batang-tumbuh {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+
+@keyframes titik-muncul {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes cincin-putar {
+  from { opacity: 0; transform: rotate(-120deg) scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+
+/* "Kurangi gerak": aturan umum di atas mematikan animasi dan transisi; yang diungkap tetap tampil */
+@media (prefers-reduced-motion: reduce) {
+  .ungkap:not(.ungkap-tampil) {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .tiket:hover,
+  .ubin-tombol:hover,
+  .kepala-nilai:hover,
+  .merek:hover .ikon-buku-pembatas {
+    transform: none !important;
+  }
+  .rel.kilau::after {
+    display: none;
   }
 }

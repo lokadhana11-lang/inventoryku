@@ -172,7 +172,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   paling besar 2 MB per foto dan 15 MB per kiriman) → jawaban ditambah `foto` (jumlah yang tersimpan) dan `fotoGagal: [nama item]`.
   `riwayat`/`detailKiriman`/jawaban pemeriksaan: baris Waste membawa `foto: true|false` untuk semua role dan `fotoUrl` (tautan
   Drive) hanya untuk Pengelola.
-- Arah premium (aplikasi 0.14.0) tidak mengubah API.
+- Arah premium (aplikasi 0.14.0) dan bar, logo, serta gerak versi 1.8 (aplikasi 0.15.0) tidak mengubah API.
 - Riwayat harga item (11 Oktober 2026): `gantiHarga {nama, harga, berlakuMulai: 'yyyy-mm-dd'}` (khusus Pengelola; hari ini atau
   tanggal lewat) → jawaban `daftarItem` ditambah `hargaDisimpan: { nama, harga, berlakuMulai, mengganti }`. `daftarItem` ditambah
   `riwayatHargaSiap` dan per item `hargaSejak` ('' = sejak awal, null = belum punya riwayat), `riwayatHarga: [{ berlakuMulai, harga,
@@ -203,6 +203,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 10+ | Perbaikan tiga penyimpangan butir 150 (7 Oktober 2026): urutan `Data_Suhu` menurut waktu cek, sakelar Aktif/Nonaktif di layar ubah staff, geser kartu Waste untuk menghapus | Kode selesai (Code.gs v0.11.1, aplikasi 0.11.1), diuji dengan API tiruan (Code.gs di Node, 8 uji server) dan Chromium (22 uji alur dengan sentuhan tiruan, delapan ukuran, "kurangi gerak"). Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (rumus `Harian_Suhu` baru), deploy versi baru, uji dari HP |
 | 11+ | Riwayat harga item (keputusan pemilik 11 Oktober 2026): `M_HargaItem`, Ganti harga dan Riwayat harga di Pengaturan → Item, harga yang berlaku pada tanggal untuk waste/penyesuaian/opname/nilai stock/resep/rekap, selisih karena perubahan harga di Dashboard dan rekap bulanan, rumus bahan terpakai di tab Dashboard | Kode selesai (Code.gs v0.13, aplikasi 0.13.0), diuji dengan API tiruan (Code.gs di Node, 26 uji harga + 32 pemeriksaan regresi) dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HargaItem` dan harga awal), deploy versi baru, uji dari HP |
 | 11++ | Arah premium, spesifikasi tampilan 1.7 (dipilih pemilik dari pratinjau 11 Oktober 2026): kepala navy berisi ringkasan di setiap layar, bayangan lembut, tekstur navy, angka utama besar, tiket berikon dengan sobek, Nilai stock di kepala Dashboard dan ubin menggantung, grafik tangga harga, grafik kosong bersumbu | Kode selesai (aplikasi 0.14.0; Code.gs tidak berubah), diuji di Chromium (13 uji alur, sapuan semua rute Pengelola dan Staff pada delapan ukuran dan "kurangi gerak": 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
+| 11+++ | Bar, logo, nama, dan gerak, spesifikasi tampilan 1.8 (permintaan pemilik 12 Oktober 2026): bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana, nama dua warna, baris merek di kepala Beranda, isi layar naik bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan | Kode selesai (aplikasi 0.15.0; Code.gs tidak berubah), diuji di Chromium (11 uji gerak baru, 13 uji alur lama, sapuan 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1346,3 +1347,63 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     animasi saat "kurangi gerak", atau galat konsol. Uji server riwayat harga tetap lulus.
 182. **Belum diuji di sini:** tampilan di HP asli (poni dan jarak aman, papan ketik iPhone dengan kepala yang kini ikut bergulir),
     huruf perangkat diperbesar 200%, dan PWA terpasang.
+
+### Bar, logo, nama, dan gerak, spesifikasi tampilan 1.8 (aplikasi 0.15.0, 12 Oktober 2026)
+
+183. **Asal:** pemilik meminta menu bar, task bar, logo, dan nama dibuat premium, serta "website full animasi agar tidak
+    monoton". Permintaan ini bertentangan dengan Bagian 8 versi 1.7 (gerak hanya sebagai jawaban atas tindakan; tanpa animasi
+    masuk tiap kartu, animasi saat menggulir, dan latar bergerak), jadi spesifikasi tampilan naik ke 1.8: Bagian 1 butir 5,
+    2 (cahaya navy), 4.2, 4.3, 4.5, 5.2, 8 (ditulis ulang), 10, dan 11. Yang dipertahankan dari ATURAN TETAP: hanya CSS, hanya
+    `transform` dan `opacity`, mati saat "kurangi gerak", tanpa library. "Full animasi" ditafsirkan sebagai gerak di setiap layar
+    (masuk, gulir, angka, grafik, latar navy), bukan angka yang berhitung naik atau paralaks (butuh JavaScript tiap bingkai).
+    Code.gs tidak berubah.
+184. **Bar bawah mengambang** (HP dan tablet): `.menu` kini lapisan tembus (`pointer-events: none`) dan `.menu-grup` berupa kapsul
+    (sudut 20, tepi Garis Navy, bayangan tiket) 12 px dari tepi dan `--jarak-menu` (8 px, 6 px di layar pendek, 0 di desktop) di
+    atas jarak aman. Token baru `--ruang-menu` = tinggi menu + jarak aman + jarak, dipakai `.layar` (ditambah 8 px), bilah kirim,
+    pesan singkat, dan `scroll-padding-bottom`. Pil menu aktif `.menu-pil` (dibuat `gambarMenu`, digeser `letakkanPenanda`):
+    karena semua menu di bar bawah sama lebar, lebarnya diatur langsung dan hanya `transform` yang bertransisi; kali pertama dan
+    `tanpaGerak` tanpa transisi. Desktop: pil per menu lewat `::before` yang memudar dan membesar dari 90%, garis amber di bawah
+    (6 px dari tepi), bar bertepi bawah Garis Navy. Ikon menu yang baru aktif melonjak sekali (`ikon-lonjak`).
+185. **Logo dan nama:** `lencana(kelas)` dan `namaMerek(kelas, tag)` di app.js; `index.html` memuat lencana yang sama di bar atas
+    dengan `.lencana-buka` (gerak saat bar pertama tampil) dan `#merek-outlet` (nama outlet; diisi `gambarMenu`,
+    `perbaruiPengguna`, dan setelah nama outlet disimpan; dipotong dengan elipsis di 180 px, nama lengkap tetap di Beranda dan
+    Login). `aria-label` merek tetap "InventoryKu, ke Beranda"; isi merek `aria-hidden`. Kepala Beranda dibuka `.beranda-merek`
+    (HP dan tablet); `.beranda-kepala-isi` kini flex kolom dan baris merek memakai `margin-bottom: auto`, sehingga tanggal dan rel
+    tetap di bawah. Ikon PWA tidak berubah. Perbaikan kecil: teks tombol nama di Login kini di tengah tegak (`align-content`).
+186. **Gerak masuk:** router memasang `.layar-masuk` seperti dulu dan kini melepasnya setelah 900 ms (dijaga `nomorLayar`), jadi
+    hanya isi pertama layar yang bergerak; data yang digambar ulang sesudahnya diam. CSS: anak `.kepala-layar-isi` dan delapan
+    anak pertama `.layar-isi` (serta pemberitahuan Beranda) memakai `naik-masuk` dengan jeda bertambah. Tiket kini turun setiap
+    Beranda dibuka (`gerak = !tiketSudahTampil`), pembuka (lencana, tanggal, rel terbentang) tetap sekali. Login: `.login-buka`
+    sekali per pemuatan halaman (`loginBukaSudah`) dan dilepas setelah 1,5 detik, jadi berganti langkah tidak mengulang gerak.
+    Angka utama (`kepala-nilai-angka`, `ubin-nilai`, `kemajuan-angka`, dan `kepala-angka-nilai` hanya saat masuk layar karena
+    ringkasan item diperbarui saat mengetik) memakai `angka-naik`. Momen selesai menambah `.rel.kilau` (sekali, bukan setiap
+    Beranda dibuka).
+187. **Muncul saat digulir** (`pasangUngkap`, dipanggil `mulai`): `MutationObserver` pada `#layar` (diperiksa di microtask, sebelum
+    layar dilukis) memberi `data-ungkap` pada calon (`PILIH_UNGKAP`: anak `.layar-isi` selain bilah kirim, ringkasan kepala, dan
+    penanda memperbarui; `.kartu`; `.tabel-bingkai`; anak `.beranda-bawah`), lalu `.ungkap` hanya pada yang seluruhnya di bawah
+    layar, tidak menempel (`sticky`/`fixed`), dan tidak berada di dalam calon lain yang belum tampil. `IntersectionObserver`
+    memberi `.ungkap-tampil`, dan 600 ms kemudian kedua kelas dilepas supaya gerak tekan kembali normal. Transisi hanya pada
+    `.ungkap.ungkap-tampil`, jadi menyembunyikan tidak memudar. Grafik di bagian yang belum tampil menunda geraknya sampai tampil.
+    Tidak dipasang saat "kurangi gerak" atau tanpa `IntersectionObserver`.
+188. **Grafik:** batang waste tumbuh (`.batang.tumbuh`, `--i`) hanya pada gambar pertama; mengetuk kolom menggambar ulang tanpa
+    gerak (`gambarBatang(pilih, awal)`). Titik suhu muncul bertahap (`--i` pada `.suhu-titik-satu`, paling banyak 7 jeda), cincin
+    Form terisi berputar masuk (svg-nya, bukan lingkaran yang ber-atribut `transform`), grafik harga naik. `svgEl` kini melewati
+    atribut bernilai `null`.
+189. **Cahaya navy:** `::before` di `.beranda-kepala`, `.kepala-layar` (keduanya kini `overflow: hidden`; lapisan pudar `::after`
+    turun ke `z-index: -2`), dan layar Login (`.masuk:not(.terang)`, `position: fixed`), animasi `cahaya-geser` 16 detik bolak-balik,
+    hanya `transform`. Saat "kurangi gerak" bercaknya diam. Arahan tetikus mengangkat tiket, ubin bertombol, dan kotak Nilai stock
+    3 px. Kurva bersama `--ayun-masuk` dan `--ayun-lembut` (sedikit melewati tempatnya, hanya untuk benda kecil, Bagian 8.2 butir 4).
+190. **Uji** (di luar repo, `uji_gerak.js`): 11 uji Chromium dengan API tiruan yang memanggil `doPost` asli: semua `@keyframes` dan
+    transisi di stylesheet hanya `transform`/`opacity` (latar hanya keadaan tekan); kapsul bar bawah 12 px dari tepi dan 8 px dari
+    bawah, pil tepat di menu aktif dan bergeser 320 ms dengan ikon melonjak; isi terakhir tidak tertutup kapsul dan kapsul di dalam
+    layar pada 320×568, 390×844, 768×1024, dan 844×390 untuk empat layar; merek desktop (lencana, "Ku" amber, outlet, pil
+    `::before`, merek Beranda tersembunyi); merek Beranda HP dan pembukanya, tiket turun lagi saat kembali ke Beranda tanpa
+    pembuka; ganti layar bertahap lalu kelas dilepas; muncul saat digulir di Dashboard 390 (tersembunyi, tampil saat digulir,
+    batang tumbuh saat itu, kelas dilepas, ketukan kolom tanpa gerak); angka naik dan arahan tetikus 3 px di desktop; Login
+    sekali; "kurangi gerak" tanpa animasi atau transisi yang berjalan, tanpa `.ungkap`, pil langsung pindah; gerak yang terus
+    berjalan hanya `cahaya-geser`; tanpa galat konsol. 13 uji alur lama dan sapuan 292 pemeriksaan (delapan ukuran, semua rute,
+    "kurangi gerak") tetap lulus.
+191. **Belum diuji di sini:** rasa gerak di HP asli (terutama HP Android murah: cahaya navy dan muncul saat digulir dibuat hanya
+    dengan `transform`/`opacity`, tetapi kelancarannya perlu dilihat langsung), kapsul bar bawah di iPhone dengan garis beranda
+    (jarak aman), dan PWA terpasang. Jika terasa berat atau berlebihan, gerak bisa dikurangi tanpa mengubah tata letak.
+
