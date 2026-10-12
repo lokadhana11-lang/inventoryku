@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.13 (riwayat harga item)
+// InventoryKu Code.gs v0.14 (memuat lebih cepat)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -61,7 +61,7 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.13';
+var VERSI_KODE = 'v0.14';
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -81,37 +81,37 @@ var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
  * menggantikan pesan penolakan umum untuk Staff.
  */
 var AKSI_ = {
-  ping: { jalankan: aksiPing_, tanpaToken: true },
-  infoLogin: { jalankan: aksiInfoLogin_, tanpaToken: true },
+  ping: { jalankan: aksiPing_, bacaSaja: true, tanpaToken: true },
+  infoLogin: { jalankan: aksiInfoLogin_, bacaSaja: true, tanpaToken: true },
   login: { jalankan: aksiLogin_, tanpaToken: true },
   lupaPin: { jalankan: aksiLupaPin_, tanpaToken: true },
   pasang: { jalankan: aksiPasang_, tanpaToken: true },
   pulihkan: { jalankan: aksiPulihkan_, tanpaToken: true },
   keluar: { jalankan: aksiKeluar_, tanpaToken: true },
-  beranda: { jalankan: aksiBeranda_ },
-  daftarStaff: { jalankan: aksiDaftarStaff_, pengelola: true },
+  beranda: { jalankan: aksiBeranda_, bacaSaja: true },
+  daftarStaff: { jalankan: aksiDaftarStaff_, bacaSaja: true, pengelola: true },
   tambahStaff: { jalankan: aksiTambahStaff_, pengelola: true },
   ubahStaff: { jalankan: aksiUbahStaff_, pengelola: true },
   aturPin: { jalankan: aksiAturPin_, pengelola: true },
   hapusStaff: { jalankan: aksiHapusStaff_, pengelola: true,
     pesan: 'Menghapus staff hanya bisa dilakukan Head Kitchen atau Manager.' },
-  bacaOutletJadwal: { jalankan: aksiBacaOutletJadwal_, pengelola: true,
+  bacaOutletJadwal: { jalankan: aksiBacaOutletJadwal_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan outlet dan jadwal hanya untuk Head Kitchen dan Manager.' },
   simpanOutletJadwal: { jalankan: aksiSimpanOutletJadwal_, pengelola: true,
     pesan: 'Pengaturan outlet dan jadwal hanya bisa diubah Head Kitchen atau Manager.' },
-  bacaPenerima: { jalankan: aksiBacaPenerima_, pengelola: true },
+  bacaPenerima: { jalankan: aksiBacaPenerima_, bacaSaja: true, pengelola: true },
   simpanPenerima: { jalankan: aksiSimpanPenerima_, pengelola: true },
-  formStock: { jalankan: aksiFormStock_ },
+  formStock: { jalankan: aksiFormStock_, bacaSaja: true },
   kirimStock: { jalankan: aksiKirimStock_ },
   tandaiNihil: { jalankan: aksiTandaiNihil_ },
   sesuaikanStock: { jalankan: aksiSesuaikanStock_, pengelola: true },
-  formWaste: { jalankan: aksiFormWaste_ },
+  formWaste: { jalankan: aksiFormWaste_, bacaSaja: true },
   kirimWaste: { jalankan: aksiKirimWaste_ },
-  formSuhu: { jalankan: aksiFormSuhu_ },
+  formSuhu: { jalankan: aksiFormSuhu_, bacaSaja: true },
   kirimSuhu: { jalankan: aksiKirimSuhu_ },
-  formPrep: { jalankan: aksiFormPrep_ },
+  formPrep: { jalankan: aksiFormPrep_, bacaSaja: true },
   kirimPrep: { jalankan: aksiKirimPrep_ },
-  daftarResep: { jalankan: aksiDaftarResep_, pengelola: true,
+  daftarResep: { jalankan: aksiDaftarResep_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan resep hanya untuk Head Kitchen dan Manager.' },
   simpanResep: { jalankan: aksiSimpanResep_, pengelola: true,
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
@@ -119,13 +119,13 @@ var AKSI_ = {
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
   aturItemAktif: { jalankan: aksiAturItemAktif_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
-  daftarItem: { jalankan: aksiDaftarItem_, pengelola: true,
+  daftarItem: { jalankan: aksiDaftarItem_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan item hanya untuk Head Kitchen dan Manager.' },
   simpanItem: { jalankan: aksiSimpanItem_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
   gantiHarga: { jalankan: aksiGantiHarga_, pengelola: true,
     pesan: 'Harga hanya bisa diganti Head Kitchen atau Manager.' },
-  daftarKategoriSatuan: { jalankan: aksiDaftarKategoriSatuan_, pengelola: true,
+  daftarKategoriSatuan: { jalankan: aksiDaftarKategoriSatuan_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan kategori dan satuan hanya untuk Head Kitchen dan Manager.' },
   simpanKategori: { jalankan: aksiSimpanKategori_, pengelola: true,
     pesan: 'Kategori hanya bisa diubah Head Kitchen atau Manager.' },
@@ -137,17 +137,17 @@ var AKSI_ = {
     pesan: 'Satuan hanya bisa diubah Head Kitchen atau Manager.' },
   aturSatuanAktif: { jalankan: aksiAturSatuanAktif_, pengelola: true,
     pesan: 'Satuan hanya bisa diubah Head Kitchen atau Manager.' },
-  daftarUnit: { jalankan: aksiDaftarUnit_, pengelola: true,
+  daftarUnit: { jalankan: aksiDaftarUnit_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan unit hanya untuk Head Kitchen dan Manager.' },
   simpanUnit: { jalankan: aksiSimpanUnit_, pengelola: true,
     pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
   aturUnitAktif: { jalankan: aksiAturUnitAktif_, pengelola: true,
     pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
-  dashboard: { jalankan: aksiDashboard_, pengelola: true,
+  dashboard: { jalankan: aksiDashboard_, bacaSaja: true, pengelola: true,
     pesan: 'Dashboard hanya untuk Head Kitchen dan Manager.' },
-  riwayat: { jalankan: aksiRiwayat_ },
-  detailKiriman: { jalankan: aksiDetailKiriman_ },
-  riwayatItem: { jalankan: aksiRiwayatItem_ },
+  riwayat: { jalankan: aksiRiwayat_, bacaSaja: true },
+  detailKiriman: { jalankan: aksiDetailKiriman_, bacaSaja: true },
+  riwayatItem: { jalankan: aksiRiwayatItem_, bacaSaja: true },
   laporkanKeliru: { jalankan: aksiLaporkanKeliru_ },
   tandaiDiperiksa: { jalankan: aksiTandaiDiperiksa_, pengelola: true,
     pesan: 'Tandai diperiksa hanya bisa dilakukan Head Kitchen atau Manager.' },
@@ -157,29 +157,29 @@ var AKSI_ = {
     pesan: 'Koreksi hanya bisa dilakukan Head Kitchen atau Manager. Laporkan kekeliruan supaya Pengelola mengoreksinya.' },
   tutupLaporan: { jalankan: aksiTutupLaporan_, pengelola: true,
     pesan: 'Menutup laporan kekeliruan hanya bisa dilakukan Head Kitchen atau Manager.' },
-  infoLaporan: { jalankan: aksiInfoLaporan_ },
-  unduhPdf: { jalankan: aksiUnduhPdf_ },
+  infoLaporan: { jalankan: aksiInfoLaporan_, bacaSaja: true },
+  unduhPdf: { jalankan: aksiUnduhPdf_, bacaSaja: true },
   simpanPdfDrive: { jalankan: aksiSimpanPdfDrive_, pengelola: true,
     pesan: 'Simpan ulang ke Drive hanya bisa dilakukan Head Kitchen atau Manager.' },
-  formOpname: { jalankan: aksiFormOpname_, pengelola: true,
+  formOpname: { jalankan: aksiFormOpname_, bacaSaja: true, pengelola: true,
     pesan: 'Stock opname hanya untuk Head Kitchen dan Manager.' },
   simpanOpname: { jalankan: aksiSimpanOpname_, pengelola: true,
     pesan: 'Stock opname hanya bisa disimpan Head Kitchen atau Manager.' },
-  detailOpname: { jalankan: aksiDetailOpname_, pengelola: true,
+  detailOpname: { jalankan: aksiDetailOpname_, bacaSaja: true, pengelola: true,
     pesan: 'Rincian stock opname hanya untuk Head Kitchen dan Manager.' },
-  unduhPdfOpname: { jalankan: aksiUnduhPdfOpname_, pengelola: true,
+  unduhPdfOpname: { jalankan: aksiUnduhPdfOpname_, bacaSaja: true, pengelola: true,
     pesan: 'Laporan selisih opname hanya untuk Head Kitchen dan Manager.' },
-  daftarBelanja: { jalankan: aksiDaftarBelanja_, pengelola: true,
+  daftarBelanja: { jalankan: aksiDaftarBelanja_, bacaSaja: true, pengelola: true,
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
-  unduhPdfBelanja: { jalankan: aksiUnduhPdfBelanja_, pengelola: true,
+  unduhPdfBelanja: { jalankan: aksiUnduhPdfBelanja_, bacaSaja: true, pengelola: true,
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
-  unduhPdfRekap: { jalankan: aksiUnduhPdfRekap_, pengelola: true,
+  unduhPdfRekap: { jalankan: aksiUnduhPdfRekap_, bacaSaja: true, pengelola: true,
     pesan: 'Rekap bulanan hanya untuk Head Kitchen dan Manager.' },
-  formKustom: { jalankan: aksiFormKustom_ },
+  formKustom: { jalankan: aksiFormKustom_, bacaSaja: true },
   kirimKustom: { jalankan: aksiKirimKustom_ },
-  daftarForm: { jalankan: aksiDaftarForm_, pengelola: true,
+  daftarForm: { jalankan: aksiDaftarForm_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan form hanya untuk Head Kitchen dan Manager.' },
-  detailForm: { jalankan: aksiDetailForm_, pengelola: true,
+  detailForm: { jalankan: aksiDetailForm_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan form hanya untuk Head Kitchen dan Manager.' },
   simpanForm: { jalankan: aksiSimpanForm_, pengelola: true,
     pesan: 'Form hanya bisa dibuat dan diubah Head Kitchen atau Manager.' },
@@ -204,16 +204,23 @@ var AKSI_ = {
  */
 function doPost(e) {
   var hasil;
+  var mulai = Date.now();
+  var nama = '';
   SS_ = null;
   PENGGUNA_AKSI_ = null;
   resetMemoForm_();
+  lupakanMemoTab_();
+  MEMO_TAB_AKTIF_ = false;
+  DALAM_KUNCI_ = 0;
   try {
     var body = bacaBody_(e);
-    var nama = typeof body.action === 'string' ? body.action : '';
+    nama = typeof body.action === 'string' ? body.action : '';
     if (!nama || !Object.prototype.hasOwnProperty.call(AKSI_, nama)) {
       throw galatPengguna_('Aksi tidak dikenal. Muat ulang aplikasi, lalu coba lagi.');
     }
     var aksi = AKSI_[nama];
+    // Aksi yang hanya membaca (dan login): tiap tab dibaca sekali per permintaan (Code.gs v0.14).
+    MEMO_TAB_AKTIF_ = !!aksi.bacaSaja || nama === 'login' || nama === 'keluar';
     var pengguna = null;
     if (!aksi.tanpaToken) {
       pengguna = periksaSesi_(body.token);
@@ -232,6 +239,10 @@ function doPost(e) {
       hasil = { ok: false, pesan: 'Terjadi kesalahan di server. Coba lagi beberapa saat lagi.' };
     }
   }
+  // Lama tiap aksi di log Eksekusi Apps Script, untuk melihat bagian yang lambat.
+  console.log('Aksi ' + (nama || '?') + ': ' + (Date.now() - mulai) + ' ms' + (hasil.ok ? '' : ' (gagal)'));
+  MEMO_TAB_AKTIF_ = false;
+  lupakanMemoTab_();
   return balasJson_(hasil);
 }
 
@@ -310,6 +321,82 @@ function ss_() {
   return SS_;
 }
 
+/* ---------- Membaca tab sekali per permintaan (Code.gs v0.14) ----------
+ * Setiap baca ke Sheet adalah satu perjalanan ke server Google (puluhan sampai ratusan ms).
+ * nilaiTab_ membaca seluruh isi tab dalam satu panggilan. Pada aksi yang hanya membaca
+ * (AKSI_ bacaSaja, login, keluar) hasilnya disimpan selama permintaan itu, jadi tab yang
+ * sama tidak dibaca berulang. Di dalam denganKunci_ (semua penulisan) simpanan dibuang
+ * dan tidak dipakai, sehingga penulisan selalu membaca isi terbaru.
+ */
+var MEMO_TAB_ = {};
+var MEMO_TAB_AKTIF_ = false;
+var DALAM_KUNCI_ = 0;
+var ZONA_SHEET_ = null;
+
+function lupakanMemoTab_() {
+  MEMO_TAB_ = {};
+  ZONA_SHEET_ = null;
+}
+
+function memoTabDipakai_() {
+  return MEMO_TAB_AKTIF_ && !DALAM_KUNCI_;
+}
+
+/** Seluruh isi tab (baris pertama = judul), [] untuk tab kosong. Salinan, jadi boleh diubah pemanggil. */
+function nilaiTab_(sheet) {
+  var pakai = memoTabDipakai_();
+  var nama = sheet.getName();
+  var nilai = pakai && Object.prototype.hasOwnProperty.call(MEMO_TAB_, nama) ? MEMO_TAB_[nama] : null;
+  if (!nilai) {
+    nilai = sheet.getDataRange().getValues();
+    if (nilai.length === 1 && nilai[0].length === 1 && nilai[0][0] === '') nilai = [];
+    if (pakai) MEMO_TAB_[nama] = nilai;
+  }
+  return pakai ? nilai.map(function (r) { return r.slice(); }) : nilai;
+}
+
+/** Judul kolom baris 1. Dari simpanan jika ada; jika tidak, hanya baris 1 yang dibaca. */
+function judulTab_(sheet) {
+  if (memoTabDipakai_()) return nilaiTab_(sheet)[0] || [];
+  var lastCol = sheet.getLastColumn();
+  return lastCol ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+}
+
+/** Zona waktu spreadsheet, dibaca sekali per permintaan. */
+function zonaSheet_() {
+  if (!ZONA_SHEET_) ZONA_SHEET_ = ss_().getSpreadsheetTimeZone();
+  return ZONA_SHEET_;
+}
+
+/* ---------- Simpanan jawaban Beranda di server (CacheService, Code.gs v0.14) ----------
+ * Jawaban Beranda disimpan 2 menit per pengguna dan tanggal. Setiap penulisan lewat
+ * denganKunci_ mengganti "versi data", jadi simpanan lama tidak terpakai lagi dan kiriman baru
+ * langsung terlihat. Perubahan yang diketik langsung di Sheet terlihat paling lambat 2 menit.
+ */
+var LAMA_SIMPAN_BERANDA_DETIK = 120;
+
+function versiData_() {
+  try {
+    var c = CacheService.getScriptCache();
+    var v = c.get('versi_data');
+    if (!v) {
+      v = String(Date.now());
+      c.put('versi_data', v, 21600);
+    }
+    return v;
+  } catch (err) {
+    return '';
+  }
+}
+
+function tandaiDataBerubah_() {
+  try {
+    CacheService.getScriptCache().put('versi_data', String(Date.now()) + '-' + Math.floor(Math.random() * 1e6), 21600);
+  } catch (err) {
+    console.error('Versi data tidak bisa diganti: ' + err);
+  }
+}
+
 function ambilTab_(nama) {
   var sheet = ss_().getSheetByName(nama);
   if (!sheet) {
@@ -320,8 +407,7 @@ function ambilTab_(nama) {
 
 /** Peta { kunci: nomor kolom } dari judul kolom di baris 1. */
 function posisiKolom_(sheet, peta) {
-  var lastCol = sheet.getLastColumn();
-  var judul = lastCol ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  var judul = judulTab_(sheet);
   var hasil = {};
   Object.keys(peta).forEach(function (kunci) {
     var i = -1;
@@ -337,15 +423,43 @@ function posisiKolom_(sheet, peta) {
   return hasil;
 }
 
+/** Seperti posisiKolom_, dari judul yang sudah dibaca. */
+function posisiKolomJudul_(judul, peta, namaTab) {
+  var hasil = {};
+  Object.keys(peta).forEach(function (kunci) {
+    var i = -1;
+    for (var c = 0; c < judul.length; c++) {
+      if (String(judul[c]).trim() === peta[kunci]) { i = c; break; }
+    }
+    if (i < 0) {
+      throw galatPengguna_('Kolom ' + peta[kunci] + ' tidak ada di tab ' + namaTab +
+        '. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+    }
+    hasil[kunci] = i + 1;
+  });
+  return hasil;
+}
+
 /** Menjalankan fn di dalam kunci skrip, supaya dua permintaan tidak saling menimpa. */
-function denganKunci_(fn) {
+/**
+ * Menjalankan fn di dalam kunci skrip, supaya dua permintaan tidak saling menimpa.
+ * Simpanan baca per permintaan tidak dipakai di dalamnya dan dibuang sesudahnya, dan
+ * versi data diganti supaya simpanan Beranda di server tidak terpakai lagi.
+ * tanpaUbahData: true untuk login (hanya menulis sesi di Script Properties).
+ */
+function denganKunci_(fn, tanpaUbahData) {
   var kunci = LockService.getScriptLock();
   if (!kunci.tryLock(15000)) {
     throw galatPengguna_('Server sedang sibuk. Coba lagi sebentar lagi.');
   }
+  DALAM_KUNCI_++;
+  lupakanMemoTab_();
   try {
     return fn();
   } finally {
+    DALAM_KUNCI_--;
+    lupakanMemoTab_();
+    if (!tanpaUbahData) tandaiDataBerubah_();
     kunci.releaseLock();
   }
 }
@@ -423,8 +537,7 @@ var KOLOM_STAFF_DIHAPUS = 'Dihapus';
 
 /** Nomor kolom berjudul tertentu, atau 0 jika belum ada. */
 function posisiKolomOpsional_(sheet, judul) {
-  var lastCol = sheet.getLastColumn();
-  var baris = lastCol ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  var baris = judulTab_(sheet);
   for (var c = 0; c < baris.length; c++) {
     if (String(baris[c]).trim() === judul) return c + 1;
   }
@@ -441,12 +554,12 @@ function posisiKolomOpsional_(sheet, judul) {
  */
 function bacaStaff_(termasukDihapus) {
   var sheet = ambilTab_('M_Staff');
-  var kol = posisiKolom_(sheet, KOLOM_STAFF);
-  kol.dihapus = posisiKolomOpsional_(sheet, KOLOM_STAFF_DIHAPUS);
+  var nilai = nilaiTab_(sheet); // satu panggilan: judul dan isi
+  var kol = posisiKolomJudul_(nilai[0] || [], KOLOM_STAFF, 'M_Staff');
+  kol.dihapus = (nilai[0] || []).map(function (j) { return String(j).trim(); }).indexOf(KOLOM_STAFF_DIHAPUS) + 1;
   var daftar = [];
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues().forEach(function (r, i) {
+  if (nilai.length >= 2) {
+    nilai.slice(1).forEach(function (r, i) {
       var nama = rapikanTeks_(r[kol.nama - 1]);
       if (!nama) return;
       if (!termasukDihapus && kol.dihapus && String(r[kol.dihapus - 1] == null ? '' : r[kol.dihapus - 1]).trim() !== '') return;
@@ -641,9 +754,9 @@ function bacaKonfigurasi_() {
   var sheet = ambilTab_('M_Konfigurasi');
   var nilai = {};
   var baris = {};
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function (r, i) {
+  var isi = nilaiTab_(sheet);
+  if (isi.length >= 2) {
+    isi.slice(1).forEach(function (r, i) {
       var kunci = String(r[0]).trim().toLowerCase();
       if (kunci && !baris[kunci]) {
         baris[kunci] = i + 2;
@@ -686,7 +799,7 @@ function keluarOtomatisMenit_(nilai) {
 /** Zona waktu sistem: yang terdeteksi saat pemasangan, atau zona spreadsheet. */
 function zonaWaktu_() {
   var zona = String(bacaKonfigurasi_().nilai.zona_waktu || '').trim();
-  return zona || ss_().getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  return zona || zonaSheet_() || Session.getScriptTimeZone();
 }
 
 /** Zona waktu IANA dari perangkat, misalnya "Asia/Jakarta". */
@@ -697,7 +810,9 @@ function zonaSah_(zona) {
 
 function namaOutlet_() {
   var sheet = ambilTab_('M_Outlet');
-  return rapikanTeks_(sheet.getRange(2, posisiKolom_(sheet, { nama: 'Nama Outlet' }).nama).getValue());
+  var isi = nilaiTab_(sheet);
+  var c = posisiKolomJudul_(isi[0] || [], { nama: 'Nama Outlet' }, 'M_Outlet').nama;
+  return rapikanTeks_(isi.length >= 2 ? isi[1][c - 1] : '');
 }
 
 /* ---------- Kode Pemasangan ---------- */
@@ -903,7 +1018,7 @@ function aksiLogin_(body) {
   var nama = rapikanTeks_(body.nama);
   if (!nama) throw galatPengguna_('Pilih nama dulu.');
   var pin = periksaFormatPin_(body.pin);
-  return denganKunci_(function () {
+  var sesi = denganKunci_(function () {
     var staff = cariStaff_(bacaStaff_().daftar, nama);
     if (!staff || !staff.aktif || !staff.hash) {
       throw galatPengguna_('Nama ' + nama + ' tidak bisa masuk. Muat ulang layar Login, atau minta Head Kitchen atau Manager memeriksa akunnya.');
@@ -922,7 +1037,24 @@ function aksiLogin_(body) {
     g = catatGagal_(props, kunci, g);
     if (g.s) throw galatPengguna_('Terkunci 15 menit. Minta Head Kitchen atau Manager mereset PIN.');
     throw galatPengguna_('PIN salah. Sisa ' + (BATAS_SALAH - g.j) + ' percobaan.');
-  });
+  }, true);
+  return lampirkanBeranda_(sesi, body);
+}
+
+/**
+ * Login, pemasangan, dan pemulihan langsung membawa data Beranda (Code.gs v0.14), supaya HP
+ * tidak perlu satu panggilan lagi sesudah PIN benar. Dihitung di luar kunci. Jika gagal,
+ * login tetap berhasil dan HP memuat Beranda sendiri.
+ */
+function lampirkanBeranda_(sesi, body) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.tanggal || ''))) return sesi;
+  try {
+    PENGGUNA_AKSI_ = sesi.pengguna;
+    sesi.beranda = aksiBeranda_(body, sesi.pengguna);
+  } catch (err) {
+    console.error('Beranda untuk login gagal: ' + (err && err.stack ? err.stack : err));
+  }
+  return sesi;
 }
 
 /** Lupa PIN: mencatat waktu permintaan. Satu permintaan aktif per staff. */
@@ -952,7 +1084,7 @@ function aksiPasang_(body) {
   if (!rapikanKode_(body.kode)) throw galatPengguna_('Isi Kode Pemasangan.');
   var zona = zonaSah_(body.zonaWaktu) ? body.zonaWaktu : '';
 
-  return denganKunci_(function () {
+  var sesi = denganKunci_(function () {
     var info = bacaStaff_();
     if (adaPengelolaSiap_(info.daftar)) {
       throw galatPengguna_('Pemasangan sudah selesai. Masuk dengan PIN di layar Login.');
@@ -979,6 +1111,7 @@ function aksiPasang_(body) {
       tulisKonfigurasi_('zona_waktu', zona);
       try {
         ss_().setSpreadsheetTimeZone(zona);
+        ZONA_SHEET_ = null;
       } catch (err) {
         console.error('Zona waktu spreadsheet tidak bisa diubah: ' + err);
       }
@@ -986,6 +1119,7 @@ function aksiPasang_(body) {
     hanguskanKodePemasangan_();
     return buatSesi_(staff);
   });
+  return lampirkanBeranda_(sesi, body);
 }
 
 /** Pulihkan akses Pengelola: Kode Pemasangan baru + PIN baru untuk seorang Pengelola. */
@@ -995,7 +1129,7 @@ function aksiPulihkan_(body) {
   var pin = periksaFormatPin_(body.pin);
   if (!rapikanKode_(body.kode)) throw galatPengguna_('Isi Kode Pemasangan.');
 
-  return denganKunci_(function () {
+  var sesi = denganKunci_(function () {
     var info = bacaStaff_();
     var staff = cariStaff_(info.daftar, nama);
     if (!staff || !staff.aktif || !apakahPengelola_(staff.role)) {
@@ -1009,6 +1143,7 @@ function aksiPulihkan_(body) {
     hanguskanKodePemasangan_();
     return buatSesi_(staff);
   });
+  return lampirkanBeranda_(sesi, body);
 }
 
 /** Keluar (tombol Keluar dan keluar otomatis): menghapus sesi yang dikirim. Tidak gagal jika sesi sudah habis. */
@@ -1043,6 +1178,40 @@ function aksiBeranda_(body, pengguna) {
   var tanggal = /^\d{4}-\d{2}-\d{2}$/.test(String(body.tanggal || ''))
     ? body.tanggal
     : Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd');
+  // Simpanan 2 menit di server (Code.gs v0.14): hanya selama tidak ada penulisan sejak itu.
+  var kunciSimpan = 'beranda|' + versiData_() + '|' + tanggal + '|' + pengguna.nama.toLowerCase() + '|' + pengguna.role;
+  var simpanan = bacaSimpananBeranda_(kunciSimpan);
+  if (simpanan) {
+    simpanan.h.pengguna = pengguna;
+    if (pengguna.pengelola && body.alamatAplikasi && body.alamatAplikasi !== simpanan.a) simpanAlamatAplikasi_(body.alamatAplikasi);
+    return simpanan.h;
+  }
+  var hasil = berandaBaru_(tanggal, body, pengguna);
+  // Kunci dibuat ulang: simpanAlamatAplikasi_ bisa saja baru saja mengganti versi data.
+  simpanBeranda_('beranda|' + versiData_() + '|' + tanggal + '|' + pengguna.nama.toLowerCase() + '|' + pengguna.role,
+    { h: hasil, a: String(body.alamatAplikasi || '') });
+  return hasil;
+}
+
+function bacaSimpananBeranda_(kunci) {
+  try {
+    var teks = CacheService.getScriptCache().get(kunci);
+    return teks ? JSON.parse(teks) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function simpanBeranda_(kunci, isi) {
+  try {
+    var teks = JSON.stringify(isi);
+    if (teks.length < 90000) CacheService.getScriptCache().put(kunci, teks, LAMA_SIMPAN_BERANDA_DETIK);
+  } catch (err) {
+    console.error('Simpanan Beranda gagal: ' + err);
+  }
+}
+
+function berandaBaru_(tanggal, body, pengguna) {
   var hasil = {
     pengguna: pengguna,
     namaOutlet: namaOutlet_(),
@@ -1123,9 +1292,9 @@ function bacaDaftarForm_(termasukArsip) {
   var kHari = posisiKolomOpsional_(sheet, 'Hari');
   var kArsip = posisiKolomOpsional_(sheet, 'Diarsipkan');
   var daftar = [];
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues().forEach(function (r, i) {
+  var isi = nilaiTab_(sheet);
+  if (isi.length >= 2) {
+    isi.slice(1).forEach(function (r, i) {
       var id = rapikanTeks_(r[kol.id - 1]).toUpperCase();
       if (!id) return;
       var jenis = rapikanTeks_(r[kol.jenis - 1]).toLowerCase() === 'kustom' ? 'kustom' : 'bawaan';
@@ -1181,7 +1350,7 @@ function wajibPada_(f, tanggal) {
  * status : belum | sebagian (Suhu) | terkirim | nihil.
  */
 function kelengkapanForm_(tanggal) {
-  var zonaSheet = ss_().getSpreadsheetTimeZone();
+  var zonaSheet = zonaSheet_();
   var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zonaSheet, ['ID Form']);
   return bacaDaftarForm_().filter(function (f) { return f.aktif; }).map(function (f) {
     var dasar = {
@@ -1212,9 +1381,10 @@ function statusSuhu_(dasar, tanggal, zonaSheet) {
   var unit = {};
   var jumlahUnit = 0;
   var sheet = ambilTab_('M_Unit');
-  var kol = posisiKolom_(sheet, { nama: 'Nama Unit', aktif: 'Aktif' });
-  if (sheet.getLastRow() >= 2) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().forEach(function (r) {
+  var isiUnit = nilaiTab_(sheet);
+  var kol = posisiKolomJudul_(isiUnit[0] || [], { nama: 'Nama Unit', aktif: 'Aktif' }, 'M_Unit');
+  if (isiUnit.length >= 2) {
+    isiUnit.slice(1).forEach(function (r) {
       var nama = rapikanTeks_(r[kol.nama - 1]).toLowerCase();
       var aktif = r[kol.aktif - 1] === true || String(r[kol.aktif - 1]).toUpperCase() === 'TRUE';
       if (nama && aktif && !unit[nama]) {
@@ -1249,15 +1419,16 @@ function statusSuhu_(dasar, tanggal, zonaSheet) {
  */
 function bacaBarisTanggal_(namaTab, tanggal, zonaSheet, kolomLain) {
   var sheet = ss_().getSheetByName(namaTab);
-  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
-  var lebar = sheet.getLastColumn();
-  var judul = sheet.getRange(1, 1, 1, lebar).getValues()[0].map(function (j) { return String(j).trim(); });
+  if (!sheet) return [];
+  var isi = nilaiTab_(sheet); // satu panggilan: judul dan isi
+  if (isi.length < 2) return [];
+  var judul = isi[0].map(function (j) { return String(j).trim(); });
   var iTanggal = judul.indexOf('Tanggal');
   if (iTanggal < 0) return [];
   var iOleh = judul.indexOf('submitted_by');
   var iWaktu = judul.indexOf('timestamp_server');
   var hasil = [];
-  sheet.getRange(2, 1, sheet.getLastRow() - 1, lebar).getValues().forEach(function (r) {
+  isi.slice(1).forEach(function (r) {
     if (teksTanggal_(r[iTanggal], zonaSheet) !== tanggal) return;
     var baris = {
       oleh: iOleh >= 0 ? rapikanTeks_(r[iOleh]) : '',
@@ -1485,7 +1656,7 @@ function periksaTanggalIsian_(tanggal, pengguna) {
 
 /** Tanggal untuk sel Sheet (tengah malam menurut zona waktu spreadsheet). */
 function tanggalSel_(tanggal) {
-  return Utilities.parseDate(tanggal, ss_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  return Utilities.parseDate(tanggal, zonaSheet_(), 'yyyy-MM-dd');
 }
 
 function periksaSubmissionId_(sid) {
@@ -1502,9 +1673,8 @@ function periksaSubmissionId_(sid) {
 function bacaTabel_(nama) {
   var sheet = ss_().getSheetByName(nama);
   if (!sheet) return null;
-  var lebar = sheet.getLastColumn();
-  var tinggi = sheet.getLastRow();
-  var semua = lebar && tinggi ? sheet.getRange(1, 1, tinggi, lebar).getValues() : [[]];
+  var semua = nilaiTab_(sheet); // satu panggilan (dulu tiga)
+  if (!semua.length) semua = [[]];
   var judul = semua[0].map(function (j) { return String(j).trim(); });
   var kol = {};
   judul.forEach(function (j, i) {
@@ -1689,7 +1859,7 @@ function bacaRiwayatHarga_() {
   var t = bacaTabel_(TAB_HARGA);
   var hasil = { ada: !!t, item: {} };
   if (t) {
-    var zona = ss_().getSpreadsheetTimeZone();
+    var zona = zonaSheet_();
     t.baris.forEach(function (b, i) {
       var nama = rapikanTeks_(nilai_(t, b, 'Nama Item'));
       var harga = angkaAtauNull_(nilai_(t, b, 'Harga Satuan (Rp)'));
@@ -1980,7 +2150,7 @@ function hitungAkhir_(awal, g) {
 /** Rekap per item dari Stock_Harian: { tabel, item: { namaKecil: [{ nomor, tanggal, nama, kategori, satuan, awal, ..., akhir }] } }. */
 function bacaRekap_() {
   var t = wajibTabel_('Stock_Harian');
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var item = {};
   t.baris.forEach(function (b, i) {
     var nama = rapikanTeks_(nilai_(t, b, 'Nama Item')).toLowerCase();
@@ -2023,7 +2193,7 @@ function posisiStock_(rekapItem, tanggal) {
 
 /** Gerakan per item per tanggal dari semua sumber, hanya untuk item yang diminta. */
 function bacaGerakan_(itemKecil) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var hasil = {};
   SUMBER_STOCK.forEach(function (s) {
     var t = bacaTabel_(s.tab);
@@ -2140,7 +2310,7 @@ var URUTAN_DATA = [['Tanggal', false], ['Kategori', true], ['Nama Item', true], 
  * dan tanda nihil.
  */
 function dataFormStock_(tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var master = bacaItem_();
   var kategori = bacaKategori_();
   var namaKategori = {};
@@ -2250,7 +2420,7 @@ function aksiTandaiNihil_(body, pengguna) {
   if (!form || idForm === 'SUHU') throw galatPengguna_('Form ini tidak bisa ditandai nihil.');
 
   return denganKunci_(function () {
-    var zona = ss_().getSpreadsheetTimeZone();
+    var zona = zonaSheet_();
     var tabel = wajibTabel_('Data_Nihil');
     var punyaForm = function (n) { return rapikanTeks_(n['ID Form']).toUpperCase() === idForm; };
     var ada = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(punyaForm);
@@ -2356,7 +2526,7 @@ function periksaBarisWaste_(kategori, alasan, label) {
  * tanda nihil.
  */
 function dataFormWaste_(tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   // Harga pada tanggal waste; barang jadi yang kosong dihitung dari resepnya (Bagian 5.3, Tahap 6).
   var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
   var item = Object.keys(master).filter(function (k) { return master[k].aktif; }).map(function (k) {
@@ -2623,7 +2793,7 @@ function bacaUnit_() {
  * tanggal itu (termasuk cek ulang), urut waktu kirim.
  */
 function dataFormSuhu_(tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var isian = bacaBarisTanggal_('Data_Suhu', tanggal, zona,
     ['Waktu Cek', 'Nama Unit', 'Tipe Unit', 'Suhu (°C)', 'Status Suhu', 'Tindakan Korektif']).map(function (b) {
     return {
@@ -2677,7 +2847,7 @@ function aksiKirimSuhu_(body, pengguna) {
     var batas = batasSuhu_();
     var sudah = {};
     if (waktu !== 'Cek ulang') {
-      bacaBarisTanggal_('Data_Suhu', tanggal, ss_().getSpreadsheetTimeZone(), ['Nama Unit', 'Waktu Cek']).forEach(function (b) {
+      bacaBarisTanggal_('Data_Suhu', tanggal, zonaSheet_(), ['Nama Unit', 'Waktu Cek']).forEach(function (b) {
         if (rapikanTeks_(b['Waktu Cek']).toLowerCase() === waktu.toLowerCase()) sudah[rapikanTeks_(b['Nama Unit']).toLowerCase()] = b;
       });
     }
@@ -2741,7 +2911,7 @@ function urutkanSuhu_(tabel) {
   var lebar = sheet.getLastColumn();
   if (n < 2 || lebar < 1) return;
   var nilai = sheet.getRange(2, 1, n, lebar).getValues();
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var k = tabel.kol;
   var urutWaktu = {};
   WAKTU_CEK.forEach(function (w, i) { urutWaktu[w.toLowerCase()] = i; });
@@ -3087,7 +3257,7 @@ function aksiAturResepAktif_(body) {
  * nihil. Disimpan di HP supaya form bisa dibuka tanpa sinyal.
  */
 function dataFormPrep_(tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var master = bacaItem_();
   var resep = bacaResep_();
   var rekap = bacaRekap_();
@@ -3268,7 +3438,7 @@ function masaSimpan_(tanggal) {
   var hasil = { lewat: [], habisBesok: [] };
   var t = bacaTabel_('Data_Prep');
   if (!t || t.kol['Baik Sampai'] === undefined) return hasil;
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var perItem = {};
   var adaMasa = {};
   t.baris.forEach(function (b) {
@@ -3922,7 +4092,7 @@ function aksiAturUnitAktif_(body) {
 /** "21:30" dari teks jj:mm atau jj.mm (atau nilai waktu Sheet); '' jika tidak sah. */
 function jamSah_(nilai) {
   if (nilai instanceof Date && !isNaN(nilai.getTime())) {
-    return Utilities.formatDate(nilai, ss_().getSpreadsheetTimeZone(), 'HH:mm');
+    return Utilities.formatDate(nilai, zonaSheet_(), 'HH:mm');
   }
   var m = String(nilai == null ? '' : nilai).trim().match(/^(\d{1,2})[:.](\d{2})$/);
   if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return '';
@@ -4027,6 +4197,7 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
       tulisKonfigurasi_('zona_waktu', baru.zonaWaktu);
       try {
         ss_().setSpreadsheetTimeZone(baru.zonaWaktu);
+        ZONA_SHEET_ = null;
       } catch (err) {
         console.error('Zona waktu spreadsheet tidak bisa diubah: ' + err);
       }
@@ -4274,7 +4445,7 @@ function alamatDashboardSheet_() {
 function aksiDashboard_(body) {
   var hari = hariIni_();
   var tanggal = tanggalSah_(body.tanggal) && body.tanggal <= hari ? body.tanggal : hari;
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var master = bacaItem_();
   var rekap = bacaRekap_();
   var form = kelengkapanForm_(tanggal);
@@ -4346,7 +4517,7 @@ function statusOpname_() {
   var hasil = { terakhir: null, jadwal: jadwal, batasHari: BATAS_HARI_OPNAME[jadwal], hariLalu: null, lewat: true };
   var t = bacaTabel_('Data_Opname');
   if (t) {
-    var zona = ss_().getSpreadsheetTimeZone();
+    var zona = zonaSheet_();
     t.baris.forEach(function (b) {
       var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
       var w = nilai_(t, b, 'timestamp_server');
@@ -4413,7 +4584,7 @@ function aksiFormOpname_(body) {
 /** Satu opname dari Data_Opname menurut submission_id: { id, tanggal, oleh, waktu, jumlah, berselisih, totalNilai, tanpaHarga, baris }. */
 function ringkasOpname_(sid) {
   var t = wajibTabel_('Data_Opname');
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var urut = {};
   bacaSemuaKategori_().forEach(function (k, i) { urut[k.nama.toLowerCase()] = i; });
   var hasil = null;
@@ -5309,7 +5480,7 @@ function nilaiKolomKustom_(c, mentah, label, master) {
 function nilaiTersimpanKustom_(c, v) {
   if (v === '' || v == null) return '';
   if (c.jenis === 'Angka') return isFinite(Number(v)) ? Number(v) : rapikanTeks_(v);
-  if (c.jenis === 'Jam' && v instanceof Date) return Utilities.formatDate(v, ss_().getSpreadsheetTimeZone(), 'HH:mm');
+  if (c.jenis === 'Jam' && v instanceof Date) return Utilities.formatDate(v, zonaSheet_(), 'HH:mm');
   return rapikanTeks_(v);
 }
 
@@ -5323,7 +5494,7 @@ function kataIsi_(c) {
  * dibuka tanpa sinyal.
  */
 function dataFormKustom_(f, tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var def = definisiForm_(f, false);
   var kiriman = bacaBarisTanggal_(tabDataForm_(f.id), tanggal, zona, ['submission_id']);
   var sid = {};
@@ -5764,7 +5935,7 @@ function barisRiwayat_(def, t, b, log) {
     var v = nilai_(t, b, k.judul);
     if (k.normal) v = k.normal(v);
     var angka = k.jenis === 'angka' || k.jenis === 'rupiah';
-    nilai[k.kunci] = angka ? angkaAtauNull_(v) : (k.jenis === 'tanggal' ? teksTanggal_(v, ss_().getSpreadsheetTimeZone()) : rapikanTeks_(v));
+    nilai[k.kunci] = angka ? angkaAtauNull_(v) : (k.jenis === 'tanggal' ? teksTanggal_(v, zonaSheet_()) : rapikanTeks_(v));
     // Kolom "jikaAda" yang kosong (misalnya kolom form kustom yang sudah dihapus) tidak tampil di kartu.
     if (k.jikaAda && nilai[k.kunci] === '') nilai[k.kunci] = null;
     if (k.asli) {
@@ -5866,7 +6037,7 @@ function urutTerbaru_(a, b) {
 function kirimanRiwayat_(def, r, f) {
   var t = bacaTabel_(def.tab);
   if (!t) return [];
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var master = f.kategori && def.kategoriDariItem ? bacaItem_() : null;
   var pilih = t.baris.filter(function (b) {
     var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
@@ -5892,7 +6063,7 @@ function kirimanSatu_(def, sid) {
   if (!t || !sid) return null;
   var pilih = t.baris.filter(function (b) { return String(nilai_(t, b, 'submission_id') || '') === sid; });
   if (!pilih.length) return null;
-  return susunKiriman_(def, t, pilih, bacaLogKoreksi_(def.tab), ss_().getSpreadsheetTimeZone())[0];
+  return susunKiriman_(def, t, pilih, bacaLogKoreksi_(def.tab), zonaSheet_())[0];
 }
 
 /**
@@ -5901,7 +6072,7 @@ function kirimanSatu_(def, sid) {
  * Riwayat Stock.
  */
 function peristiwaRiwayat_(form, def, r, f) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var hasil = [];
   function dalam(t, b) {
     var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
@@ -5994,7 +6165,7 @@ function peristiwaRiwayat_(form, def, r, f) {
 function suhuTerlewat_(r, f) {
   var t = bacaTabel_('Data_Suhu');
   if (!t) return [];
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var pertama = '';
   var ada = {};
   t.baris.forEach(function (b) {
@@ -6031,7 +6202,7 @@ function masukAsliPerHari_(dari, sampai) {
   var t = bacaTabel_('Data_Stock');
   var hasil = {};
   if (!t) return hasil;
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var kumpul = {};
   t.baris.forEach(function (b) {
     var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
@@ -6403,7 +6574,7 @@ function aksiKoreksi_(body, pengguna) {
       var nilai = {};
       c.t.judul.forEach(function (j, i) { if (j) nilai[j] = c.b[i]; });
       def.setelahKoreksi({
-        tanggal: teksTanggal_(nilai_(c.t, c.b, 'Tanggal'), ss_().getSpreadsheetTimeZone()),
+        tanggal: teksTanggal_(nilai_(c.t, c.b, 'Tanggal'), zonaSheet_()),
         nilai: nilai
       }, pengguna, kini);
     }
@@ -6436,7 +6607,7 @@ function ringkasPemeriksaan_() {
   var sampai = hariIni_();
   var dari = geserTanggal_(sampai, -(BATAS_RIWAYAT_HARI - 1));
   var hasil = { dari: dari, sampai: sampai, belumDiperiksa: 0, dilaporkan: 0, formBelum: '', formDilaporkan: '' };
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   bacaDaftarForm_().forEach(function (f) {
     var def = f.aktif ? defRiwayat_(f.id) : null;
     var t = def ? bacaTabel_(def.tab) : null;
@@ -6627,7 +6798,7 @@ function isiPdfStock_(tanggal, opsi) {
     if (r) grup.adaRekap = true;
     grup.item.push({ m: m, pos: posisiStock_(rekap.item[k], tanggal), asli: asli[k + '|' + tanggal] || '' });
   });
-  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, ss_().getSpreadsheetTimeZone(), ['Kategori']);
+  var kiriman = bacaBarisTanggal_('Data_Stock', tanggal, zonaSheet_(), ['Kategori']);
   var urutKat = kategori.map(function (k) { return k.nama.toLowerCase(); });
   var kunciKat = Object.keys(perKat).filter(function (k) { return perKat[k].adaRekap; }).sort(function (a, b) {
     var ia = urutKat.indexOf(a);
@@ -6713,7 +6884,7 @@ function rupiahId_(n) {
 function barisDataTanggal_(namaTab, tanggal) {
   var t = bacaTabel_(namaTab);
   if (!t) return [];
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   return t.baris.filter(function (b) {
     return teksTanggal_(nilai_(t, b, 'Tanggal'), zona) === tanggal && String(nilai_(t, b, 'submission_id') || '');
   }).map(function (b) {
@@ -6796,7 +6967,7 @@ function bahanPrepTanggal_(tanggal) {
 function isiPdfPrep_(tanggal) {
   var baris = barisDataTanggal_('Data_Prep', tanggal);
   var bahan = bahanPrepTanggal_(tanggal);
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var isi = baris.map(function (b, i) {
     var beresep = b['Hasil per 1 Resep'] !== '' && b['Hasil per 1 Resep'] != null;
     var bs = teksTanggal_(b['Baik Sampai'], zona);
@@ -7203,7 +7374,7 @@ function ringkasSuhuHari_(tanggal) {
 
 /** Prep satu tanggal untuk email: satu baris per item prep, urut waktu kirim. */
 function ringkasPrepHari_(tanggal) {
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   return barisDataTanggal_('Data_Prep', tanggal).map(function (b) {
     var beresep = b['Hasil per 1 Resep'] !== '' && b['Hasil per 1 Resep'] != null;
     return {
@@ -7572,7 +7743,7 @@ function dataRekapBulan_(bulan) {
   var berjalan = akhirBulan >= hari;
   var sampai = berjalan ? hari : akhirBulan;
   var akhirNilai = berjalan ? geserTanggal_(hari, -1) : akhirBulan;
-  var zona = ss_().getSpreadsheetTimeZone();
+  var zona = zonaSheet_();
   var memo = {};
   function tabel(nama) {
     if (!Object.prototype.hasOwnProperty.call(memo, nama)) memo[nama] = bacaTabel_(nama);

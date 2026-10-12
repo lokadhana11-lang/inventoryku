@@ -19,6 +19,9 @@
 > Diperbarui 11 Oktober 2026: riwayat harga item. Harga satuan punya riwayat (`M_HargaItem`,
 > Bagian 5.1); setiap nilai rupiah memakai harga yang berlaku pada tanggalnya (Bagian 8.5),
 > dan selisih karena perubahan harga dilaporkan (Bagian 8.5 dan 9.3).
+> Diperbarui 12 Oktober 2026: memuat lebih cepat (Bagian 4.2 "Waktu tanggap" dan Bagian 11).
+> Login membawa data Beranda, server membaca tiap tab sekali per permintaan dan menyimpan
+> jawaban Beranda sebentar, dan alamat API diambil dari salinan di HP.
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -194,6 +197,20 @@ Google Sheets
 - **Waktu tanggap.** Satu panggilan ke Apps Script bisa makan beberapa detik. Karena itu
   aplikasi menampilkan data yang tersimpan di HP lebih dulu, lalu memperbaruinya setelah
   server menjawab; dan beberapa data yang dibutuhkan satu layar diminta dalam satu panggilan.
+  Diperbarui 12 Oktober 2026 (pemilik: membuka aplikasi terasa lama, juga di iPhone):
+  - **Login membawa Beranda.** Login, pemasangan pertama, dan pemulihan akses menerima tanggal
+    perangkat dan langsung menjawab data Beranda, jadi sesudah PIN benar tidak ada panggilan
+    kedua. Jika Beranda gagal dihitung, login tetap berhasil dan HP memuatnya sendiri.
+  - **Setiap tab dibaca sekali per permintaan,** dalam satu panggilan ke Sheet. Pada aksi yang
+    hanya membaca, isi tab disimpan selama permintaan itu, sehingga tab yang sama tidak dibaca
+    berulang. Penulisan selalu membaca isi terbaru.
+  - **Jawaban Beranda disimpan 2 menit di server** per pengguna dan tanggal, dan langsung tidak
+    terpakai begitu ada penulisan apa pun dari aplikasi. Perubahan yang diketik langsung di Sheet
+    terlihat paling lambat 2 menit kemudian.
+  - **Lama tiap aksi dicatat** di log Eksekusi Apps Script ("Aksi beranda: 1840 ms"), supaya bagian
+    yang lambat bisa dilihat pemilik.
+  - **Lama keluar otomatis** (Bagian 7.2) ikut menentukan seberapa sering orang harus login lagi;
+    Pengelola bisa menaikkannya ke 15 atau 30 menit.
 
 **Setelan deploy:**
 
@@ -1126,6 +1143,9 @@ Tampilan (warna, huruf, tata letak per perangkat, layar, teks antarmuka) diatur 
   terbuka layar penuh.
 - **Bisa dibuka tanpa sinyal:** service worker menyimpan halaman aplikasi dan master data
   terakhir (item, resep, unit, kategori, susunan form), sehingga form tetap bisa dibuka dan diisi.
+- **Tidak menunggu jaringan saat dibuka** (12 Oktober 2026): alamat API (`config.js`) dipakai dari
+  salinan di HP dan diperbarui di latar, sehingga alamat API yang baru diganti pemilik terpakai
+  pada pembukaan berikutnya. Hanya pembukaan pertama di sebuah HP yang mengambilnya dari jaringan.
 - **Draft otomatis:** isian disimpan di HP selama mengisi, sehingga tidak hilang jika
   aplikasi tertutup.
 - **Antrean submit saat offline:** submit tanpa sinyal masuk antrean di HP dengan tanda

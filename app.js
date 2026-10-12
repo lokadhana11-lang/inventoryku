@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.15.0';
+  var VERSI_APLIKASI = '0.15.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -923,6 +923,7 @@
    *    tampil pesan dan "Coba lagi".
    * opsi: { kunciCache, ambil() → Promise, gambar(data, dariHp), kerangka(),
    *         galat(pesan, cobaLagi), penanda: elemen .memperbarui,
+   *         cukupSimpanan() → true jika data tersimpan baru saja datang dari server,
    *         dariHp() → data|null dan simpanHp(data) (pengganti kunciCache) }
    * Jawaban yang datang setelah pengguna pindah layar diabaikan.
    */
@@ -934,6 +935,11 @@
       simpanan = dariHp ? { data: dariHp } : null;
     } else if (opsi.kunciCache) {
       simpanan = Cache.baca(opsi.kunciCache);
+    }
+    if (simpanan && opsi.cukupSimpanan && opsi.cukupSimpanan()) {
+      // Data tersimpan baru saja datang dari server (misalnya bersama login): tidak perlu meminta lagi.
+      opsi.gambar(simpanan.data, true);
+      return Promise.resolve();
     }
     if (simpanan) {
       opsi.gambar(simpanan.data, true);
@@ -1374,6 +1380,16 @@
     kirimAntrean();
   }
 
+  /**
+   * Login, pemasangan, dan pemulihan meminta data Beranda sekaligus (Code.gs v0.14), jadi
+   * Beranda tampil tanpa panggilan kedua: tanggal perangkat dan alamat aplikasi seperti aksi beranda.
+   */
+  function isiBerandaLogin() {
+    return { tanggal: tanggalIso(new Date()), alamatAplikasi: location.origin + location.pathname };
+  }
+
+  var berandaDariLogin = 0; // waktu (ms) Beranda terakhir datang bersama login
+
   /** Sesi baru dari login, pemasangan pertama, atau pemulihan akses. */
   function simpanSesiBaru(data) {
     Sesi.tulis({
@@ -1384,6 +1400,18 @@
     });
     simpanMenitKeluarOtomatis(data.keluarOtomatisMenit);
     catatDipakai(true);
+    berandaDariLogin = 0;
+    if (data.beranda) {
+      Cache.tulis('beranda', data.beranda);
+      berandaDariLogin = Date.now();
+    }
+  }
+
+  /** Beranda yang baru datang bersama login (30 detik terakhir) dipakai langsung, sekali, tanpa memanggil server lagi. */
+  function pakaiBerandaLogin() {
+    var segar = berandaDariLogin && Date.now() - berandaDariLogin < 30000;
+    berandaDariLogin = 0;
+    return !!segar;
   }
 
   /**
@@ -1896,7 +1924,7 @@
     function kirimPin() {
       aturSibuk(true);
       tulisPesanLogin('Memeriksa PIN…', 'proses');
-      panggilApi('login', { nama: keadaan.nama, pin: keadaan.pin }).then(function (data) {
+      panggilApi('login', Object.assign({ nama: keadaan.nama, pin: keadaan.pin }, isiBerandaLogin())).then(function (data) {
         login = null;
         document.removeEventListener('keydown', ketikKeyboard);
         ketikLoginKini = null;
@@ -2071,7 +2099,9 @@
         nama: kNama.input.value,
         role: gRole.nilai(),
         pin: kPin.input.value,
-        zonaWaktu: zona
+        zonaWaktu: zona,
+        tanggal: isiBerandaLogin().tanggal,
+        alamatAplikasi: isiBerandaLogin().alamatAplikasi
       }).then(function (data) {
         Simpan.hapus(AWALAN + 'infoLogin');
         simpanSesiBaru(data);
@@ -2149,7 +2179,9 @@
       panggilApi('pulihkan', {
         kode: kKode.input.value,
         nama: gNama.nilai(),
-        pin: kPin.input.value
+        pin: kPin.input.value,
+        tanggal: isiBerandaLogin().tanggal,
+        alamatAplikasi: isiBerandaLogin().alamatAplikasi
       }).then(function (data) {
         simpanSesiBaru(data);
         masukAplikasi('PIN baru tersimpan. Selamat datang, ' + data.pengguna.nama + '.');
@@ -2388,6 +2420,7 @@
     function muat() {
       return muatData({
         kunciCache: 'beranda',
+        cukupSimpanan: pakaiBerandaLogin,
         ambil: function () {
           // Alamat aplikasi untuk tautan di email harian (server hanya menyimpannya dari Pengelola).
           return panggilApi('beranda', { tanggal: tanggalIso(new Date()), alamatAplikasi: location.origin + location.pathname });

@@ -67,7 +67,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Aksi tanpa token: `ping` → `{ namaSpreadsheet, waktuServer }`; `infoLogin` → `{ perluPemasangan,
   namaOutlet, staff: [{ nama, pengelola, punyaPin }] }`; `login {nama, pin}`, `pasang {kode,
   namaOutlet, nama, role, pin, zonaWaktu}`, `pulihkan {kode, nama, pin}` → `{ token,
-  berlakuSampai, pengguna: { nama, role, pengelola }, namaOutlet, keluarOtomatisMenit }`; `lupaPin {nama}` →
+  berlakuSampai, pengguna: { nama, role, pengelola }, namaOutlet, keluarOtomatisMenit }` (sejak Code.gs v0.14 ketiganya
+  menerima juga `tanggal` dan `alamatAplikasi`; dengan `tanggal`, jawabannya ditambah `beranda` = jawaban aksi `beranda`); `lupaPin {nama}` →
   `{ sudahAda, waktu }`; `keluar {token}` → `{}`.
 - Aksi bertoken: `beranda {tanggal}` → `{ pengguna, namaOutlet, tanggal, form: [{ id, nama, jenis,
   wajib, status: belum|sebagian|terkirim|nihil, lengkap, detail, terakhir: { oleh, waktu } }],
@@ -204,6 +205,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 11+ | Riwayat harga item (keputusan pemilik 11 Oktober 2026): `M_HargaItem`, Ganti harga dan Riwayat harga di Pengaturan → Item, harga yang berlaku pada tanggal untuk waste/penyesuaian/opname/nilai stock/resep/rekap, selisih karena perubahan harga di Dashboard dan rekap bulanan, rumus bahan terpakai di tab Dashboard | Kode selesai (Code.gs v0.13, aplikasi 0.13.0), diuji dengan API tiruan (Code.gs di Node, 26 uji harga + 32 pemeriksaan regresi) dan Chromium. Rumus Sheet belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HargaItem` dan harga awal), deploy versi baru, uji dari HP |
 | 11++ | Arah premium, spesifikasi tampilan 1.7 (dipilih pemilik dari pratinjau 11 Oktober 2026): kepala navy berisi ringkasan di setiap layar, bayangan lembut, tekstur navy, angka utama besar, tiket berikon dengan sobek, Nilai stock di kepala Dashboard dan ubin menggantung, grafik tangga harga, grafik kosong bersumbu | Kode selesai (aplikasi 0.14.0; Code.gs tidak berubah), diuji di Chromium (13 uji alur, sapuan semua rute Pengelola dan Staff pada delapan ukuran dan "kurangi gerak": 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11+++ | Bar, logo, nama, dan gerak, spesifikasi tampilan 1.8 (permintaan pemilik 12 Oktober 2026): bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna, baris merek di kepala Beranda, isi layar naik bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan | Kode selesai (aplikasi 0.15.0; Code.gs tidak berubah), diuji di Chromium (11 uji gerak baru, 13 uji alur lama, sapuan 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
+| 11++++ | Memuat lebih cepat (keluhan pemilik 12 Oktober 2026): login membawa Beranda, tiap tab dibaca sekali per permintaan, jawaban Beranda disimpan 2 menit di server, lama aksi di log, `config.js` dari salinan di HP | Kode selesai (Code.gs v0.14, aplikasi 0.15.1), diuji dengan API tiruan (11 uji server baru, jawaban 12 aksi sama dengan sebelum, 26 uji harga dan 32 pemeriksaan regresi) dan Chromium (4 uji baru, uji lama, sapuan delapan ukuran). Waktu di Google asli belum bisa diukur di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -284,7 +286,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Naikkan keduanya di setiap rilis frontend. Pola nomor: `0.<tahap+1>.<perbaikan>`; Tahap 1 = 0.2.0.
 19. **Service worker:** file aplikasi (halaman, CSS, JS, huruf, ikon, manifest) diambil dari cache
     lebih dulu; `config.js` dari jaringan lebih dulu (batas 4 detik) supaya alamat API bisa diganti
-    tanpa rilis; navigasi selalu dijawab `index.html`. POST ke API tidak disentuh. Versi baru
+    tanpa rilis (sejak aplikasi 0.15.1: salinan di cache dipakai langsung dan diperbarui di latar, butir 196); navigasi selalu dijawab `index.html`. POST ke API tidak disentuh. Versi baru
     langsung aktif (`skipWaiting`) dan halaman dimuat ulang otomatis hanya jika tidak ada lembar
     atau kolom yang sedang diisi; jika ada, versi baru dipakai saat aplikasi dibuka lagi.
 20. **Sesi** disimpan di Script Properties (`SESI_<hash token>`; token mentahnya tidak disimpan),
@@ -1435,3 +1437,52 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tombol, gerak yang terus berjalan di Login hanya kelima jenis itu, jeda huruf dan tombol, langkah PIN dan Ganti nama,
     delapan ukuran (tanpa gulir samping, isi tidak keluar layar, tiket tidak menimpa isi, panel hanya di desktop), dan
     "kurangi gerak" di Login.
+
+### Memuat lebih cepat (Code.gs v0.14, aplikasi 0.15.1, 12 Oktober 2026)
+
+194. **Asal:** pemilik mengeluh membuka aplikasi lama (juga di iPhone) dan bertanya apakah karena Apps Script, atau perlu
+    pindah ke Supabase/Firebase. Dipilih "Saran 1": percepat Apps Script yang ada dulu; pindah backend (Supabase dengan
+    salinan ke Google Sheets) baru dipertimbangkan jika masih lambat. Spesifikasi sistem Bagian 4.2 dan 11. Tampilan tidak
+    berubah.
+195. **Penyebab yang ditemukan** (diukur dengan tiruan Sheet yang menghitung panggilan baca; satu panggilan di Google asli
+    biasanya puluhan sampai ratusan ms): Beranda Pengelola 73 panggilan baca (`M_Konfigurasi` 7 kali, `M_Staff` 6, `M_Form`
+    5; tiap baca 2–4 panggilan: `getLastRow`, `getLastColumn`, judul, isi), Beranda Staff 39, Dashboard 85, login 12 lalu
+    Beranda lagi; ditambah `config.js` yang ditunggu sampai 4 detik di sinyal lemah, dan keluar otomatis 5 menit yang membuat
+    hampir setiap pembukaan dimulai dari login.
+196. **Aplikasi (0.15.1):** service worker memakai `config.js` dari cache langsung (`cacheLaluPerbarui`, pembaruan di latar
+    dengan `event.waitUntil`; tanpa salinan tetap `jaringanDulu`). Login, pemasangan, dan pemulihan mengirim `tanggal` dan
+    `alamatAplikasi` (`isiBerandaLogin`); `simpanSesiBaru` menyimpan `data.beranda` ke `cache:beranda` dan mencatat waktunya,
+    lalu `muatData` dengan `cukupSimpanan: pakaiBerandaLogin` menggambar Beranda dari situ tanpa memanggil server (sekali,
+    paling lama 30 detik sesudah login). Membuka Beranda lagi memanggil server seperti biasa. Server lama (tanpa `beranda`)
+    tetap jalan: Beranda dimuat seperti dulu.
+197. **Server (Code.gs v0.14):** `nilaiTab_(sheet)` membaca seluruh tab dengan satu `getDataRange().getValues()`; pada aksi
+    `bacaSaja` (ditandai di `AKSI_`), `login`, dan `keluar` hasilnya disimpan di `MEMO_TAB_` selama permintaan (salinan per
+    baris dikembalikan, jadi pemanggil boleh mengubahnya). `denganKunci_` menaikkan `DALAM_KUNCI_`, membuang simpanan saat masuk
+    dan keluar, dan simpanan tidak dipakai di dalamnya, jadi semua penulisan membaca isi terbaru. `judulTab_` (dipakai
+    `posisiKolom_` dan `posisiKolomOpsional_`) memakai simpanan jika ada, selain itu tetap hanya membaca baris 1 (supaya
+    penulisan ke tab besar tidak membaca seluruh tab). Diubah memakai `nilaiTab_`: `bacaTabel_` (dulu tiga panggilan),
+    `bacaStaff_` (`posisiKolomJudul_`), `bacaKonfigurasi_`, `namaOutlet_`, `bacaDaftarForm_`, M_Unit di `statusSuhu_`,
+    `bacaBarisTanggal_`. Zona waktu spreadsheet lewat `zonaSheet_()` (sekali per permintaan; dibuang saat zona diganti).
+    `doPost` mematikan simpanan di akhir permintaan.
+198. **Simpanan Beranda di server:** `aksiBeranda_` memakai CacheService (`beranda|<versi data>|<tanggal>|<nama>|<role>`,
+    120 detik, isi `{ h: jawaban, a: alamat aplikasi }`); `berandaBaru_` menghitung seperti dulu. Setiap keluar dari
+    `denganKunci_` mengganti `versi_data` (`tandaiDataBerubah_`), kecuali login (`denganKunci_(fn, true)`, hanya menulis sesi),
+    jadi kiriman, koreksi, perubahan staff, Lupa PIN, dan pengaturan langsung terlihat. Yang tidak lewat kunci (ketikan
+    langsung di Sheet, trigger yang menulis tanpa kunci) terlihat paling lambat 2 menit. `pengguna` di jawaban selalu diganti
+    hasil `periksaSesi_` yang baru. CacheService tidak butuh izin Google baru.
+199. **Login membawa Beranda** (`lampirkanBeranda_`): dihitung sesudah kunci dilepas, hanya jika `tanggal` sah; galat dicatat
+    di log dan login tetap berhasil tanpa `beranda`. Berlaku untuk `login`, `pasang`, dan `pulihkan`.
+200. **Log lama aksi:** setiap `doPost` menulis `Aksi <nama>: <ms> ms` (ditambah "(gagal)") ke log Eksekusi Apps Script.
+201. **Hasil di tiruan** (jumlah panggilan baca ke Sheet; sebelum → sesudah): infoLogin 10 → 2, login 12 → 17 (sekarang
+    termasuk Beranda; dulu login 12 + Beranda 73), Beranda Pengelola 69–73 → 11 (1 jika diambil dari simpanan), Beranda Staff
+    39 → 10, formStock 23 → 6, formWaste 21 → 7, Riwayat 48 → 10, Dashboard 85 → 14, daftarItem 49 → 24, kirimStock 66 → 26.
+    Jawaban 12 aksi sama persis dengan Code.gs v0.13 (selain milidetik waktu kirim uji). Waktu di Google asli belum bisa
+    diukur di sini; lihat log Eksekusi sesudah deploy.
+202. **Uji** (di luar repo): `uji_muat.js` (11 uji Node: simpanan Beranda dan penggantian versi oleh kiriman, Lupa PIN, ubah
+    role, ketikan langsung di Sheet sesudah simpanan habis, login dengan dan tanpa tanggal, PIN salah tetap dihitung, Beranda
+    rusak tidak menggagalkan login, login tidak mengganti versi data, batas jumlah baca, isi terbaru di dalam kunci, log), tiruan
+    Sheet kini menghitung panggilan baca dan mencatat setiap penulisan yang terjadi saat simpanan baca dipakai (nol di semua uji),
+    `ukur_muat.js` (jumlah baca dan perbandingan jawaban), `uji_muat_chromium.js` (4 uji: login tanpa panggilan Beranda kedua dan
+    membuka Beranda lagi memanggil server, server lama tanpa `beranda`, `config.js` yang ditunda 6 detik tidak menahan pembukaan
+    kedua (service worker 0.15.0: 4.041 ms, 0.15.1: di bawah 2 detik), pembukaan pertama tetap dari jaringan), ditambah uji lama.
+
