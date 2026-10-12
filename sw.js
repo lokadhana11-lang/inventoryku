@@ -5,7 +5,7 @@
    dibuang. Permintaan ke API (POST ke Apps Script) tidak disentuh. */
 'use strict';
 
-var VERSI = '0.15.0';
+var VERSI = '0.15.1';
 var AWALAN_CACHE = 'inventoryku-';
 var CACHE = AWALAN_CACHE + VERSI;
 
@@ -64,9 +64,11 @@ self.addEventListener('fetch', function (event) {
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // config.js (alamat API) bisa diubah pemilik tanpa rilis baru: ambil dari jaringan dulu.
+  // config.js (alamat API) bisa diubah pemilik tanpa rilis baru. Salinan di HP dipakai langsung
+  // supaya aplikasi tidak menunggu jaringan saat dibuka (aplikasi 0.15.1); salinannya diperbarui
+  // di latar, jadi alamat baru terpakai pada pembukaan berikutnya.
   if (url.pathname.slice(-10) === '/config.js') {
-    event.respondWith(jaringanDulu(req));
+    event.respondWith(cacheLaluPerbarui(event, req));
     return;
   }
 
@@ -86,6 +88,19 @@ self.addEventListener('fetch', function (event) {
     })
   );
 });
+
+/** Salinan di cache langsung dipakai dan diperbarui dari jaringan di latar; tanpa salinan, jaringan dulu. */
+function cacheLaluPerbarui(event, req) {
+  return caches.match(req, { ignoreSearch: true, cacheName: CACHE }).then(function (simpanan) {
+    if (!simpanan) return jaringanDulu(req);
+    event.waitUntil(fetch(req, { cache: 'no-cache' }).then(function (res) {
+      if (res && res.ok) {
+        return caches.open(CACHE).then(function (cache) { return cache.put(req, res); });
+      }
+    }).catch(function () { /* tanpa sinyal: salinan lama tetap dipakai */ }));
+    return simpanan;
+  });
+}
 
 /** Jaringan dulu dengan batas 4 detik; jika gagal, pakai salinan di cache. */
 function jaringanDulu(req) {
