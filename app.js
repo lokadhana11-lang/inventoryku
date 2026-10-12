@@ -1637,16 +1637,18 @@
   }
 
   /**
-   * Logo (tampilan Bagian 4.5, versi 1.8): ikon buku di dalam lencana Navy Lapis berbingkai
-   * Garis Navy. Pembatas amber turun ke tempatnya saat logo pertama tampil (.lencana-buka).
+   * Logo (tampilan Bagian 4.5, versi 1.8): buku terbuka (halaman Kertas bergaris, pita amber)
+   * di dalam lencana Navy Lapis berbingkai Garis Navy. Saat logo pertama tampil (.lencana-buka),
+   * halaman membuka dari tengah lalu pita amber turun.
    */
   function lencana(kelas) {
     var t = document.createElement('template');
     t.innerHTML = '<span class="lencana' + (kelas ? ' ' + kelas : '') + '" aria-hidden="true">' +
-      '<svg class="ikon-buku" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-      '<path class="ikon-buku-sampul" d="M5 6a1.5 1.5 0 0 1 1.5-1.5H19v12H6.5A1.5 1.5 0 0 0 5 18z"/>' +
-      '<path class="ikon-buku-sampul" d="M5 18a1.5 1.5 0 0 0 1.5 1.5H19v-3"/>' +
-      '<path class="ikon-buku-pembatas" d="M11 4.5h3v5.25l-1.5-1.1-1.5 1.1z"/></svg></span>';
+      '<svg class="ikon-buku" viewBox="7 11 50 44" aria-hidden="true" focusable="false">' +
+      '<path class="ikon-buku-kiri" d="M31 20.5C24.5 16 16 14.6 9 16v31c7-1.4 15.5 0 22 4.5z"/>' +
+      '<path class="ikon-buku-kanan" d="M33 20.5C39.5 16 48 14.6 55 16v31c-7-1.4-15.5 0-22 4.5z"/>' +
+      '<path class="ikon-buku-garis" d="M14 25.5c4.5-.4 8.6.6 12.5 2.6M14 31.5c4.5-.4 8.6.6 12.5 2.6M14 37.5c4.5-.4 8.6.6 12.5 2.6"/>' +
+      '<path class="ikon-buku-pembatas" d="M39.5 18.2h7v18l-3.5-2.7-3.5 2.7z"/></svg></span>';
     return t.content.firstChild;
   }
 

@@ -209,20 +209,21 @@ svg {
   stroke-linejoin: round;
 }
 
+/* Logo buku terbuka (tampilan Bagian 4.5): halaman kiri Kertas, kanan Garis Halus,
+   garis halaman Teks di Navy, pita Lampu Pass. */
 .ikon-buku {
   width: 32px;
   height: 32px;
+}
+.ikon-buku-kiri { fill: var(--kertas); }
+.ikon-buku-kanan { fill: var(--garis-halus); }
+.ikon-buku-garis {
   fill: none;
-  stroke-width: 1.6;
+  stroke: var(--teks-di-navy);
+  stroke-width: 1.8;
   stroke-linecap: round;
-  stroke-linejoin: round;
 }
-.ikon-buku-sampul { stroke: var(--kertas); }
-.ikon-buku-pembatas {
-  fill: var(--lampu-pass);
-  stroke: var(--lampu-pass);
-  stroke-width: 0.8;
-}
+.ikon-buku-pembatas { fill: var(--lampu-pass); }
 
 /* =========================================================================
  * Bingkai aplikasi: bar navy, menu, pita sinyal
@@ -5455,8 +5456,8 @@ textarea.isian-catatan {
 }
 
 .lencana .ikon-buku {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 
 .lencana .ikon-buku-pembatas {
@@ -5472,8 +5473,8 @@ textarea.isian-catatan {
 }
 
 .lencana-besar .ikon-buku {
-  width: 44px;
-  height: 44px;
+  width: 50px;
+  height: 50px;
 }
 
 .merek .lencana {
@@ -5481,17 +5482,41 @@ textarea.isian-catatan {
   height: 40px;
 }
 
-/* Pembuka logo: lencana membesar ke tempatnya, lalu pembatas amber turun */
+/* Pembuka logo: lencana membesar ke tempatnya, halaman membuka dari tengah,
+   garis halaman muncul, lalu pita amber turun */
 .lencana-buka,
 .login-buka .lencana,
 .pembuka .beranda-merek .lencana {
   animation: lencana-masuk 480ms var(--ayun-lembut) backwards;
 }
 
+.lencana .ikon-buku-kiri,
+.lencana .ikon-buku-kanan {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+}
+
+.lencana .ikon-buku-kanan { transform-origin: 0 50%; }
+
+.lencana-buka .ikon-buku-kiri,
+.lencana-buka .ikon-buku-kanan,
+.login-buka .lencana .ikon-buku-kiri,
+.login-buka .lencana .ikon-buku-kanan,
+.pembuka .beranda-merek .ikon-buku-kiri,
+.pembuka .beranda-merek .ikon-buku-kanan {
+  animation: halaman-buka 520ms var(--ayun-masuk) 120ms backwards;
+}
+
+.lencana-buka .ikon-buku-garis,
+.login-buka .lencana .ikon-buku-garis,
+.pembuka .beranda-merek .ikon-buku-garis {
+  animation: muncul 300ms ease-out 480ms backwards;
+}
+
 .lencana-buka .ikon-buku-pembatas,
 .login-buka .lencana .ikon-buku-pembatas,
 .pembuka .beranda-merek .ikon-buku-pembatas {
-  animation: pembatas-turun 420ms var(--ayun-lembut) 260ms backwards;
+  animation: pembatas-turun 440ms var(--ayun-lembut) 520ms backwards;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -5537,8 +5562,8 @@ textarea.isian-catatan {
 }
 
 .beranda-merek .ikon-buku {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .beranda-merek-nama {
@@ -5797,6 +5822,11 @@ textarea.isian-catatan {
 
 @keyframes lencana-masuk {
   from { opacity: 0; transform: scale(0.75) rotate(-8deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes halaman-buka {
+  from { opacity: 0; transform: scaleX(0); }
   to { opacity: 1; transform: none; }
 }
 

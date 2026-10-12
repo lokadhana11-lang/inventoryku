@@ -1,9 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Ikon InventoryKu: buku bergaya garis (Kertas) di atas Navy Pass, pembatas Lampu Pass. -->
-  <rect width="512" height="512" rx="112" fill="#0B1F3A"/>
-  <g transform="translate(256 256) scale(18.5) translate(-12 -12)" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M5 6a1.5 1.5 0 0 1 1.5-1.5H19v12H6.5A1.5 1.5 0 0 0 5 18z" stroke="#FFFFFF"/>
-    <path d="M5 18a1.5 1.5 0 0 0 1.5 1.5H19v-3" stroke="#FFFFFF"/>
-    <path d="M11 4.5h3v5.25l-1.5-1.1-1.5 1.1z" fill="#F2A93B" stroke="#F2A93B" stroke-width="0.8"/>
+  <!-- Ikon InventoryKu (tampilan Bagian 4.5, versi 1.8): buku terbuka, halaman Kertas bergaris, pita Lampu Pass, di atas Navy Pass bertekstur garis dan bercahaya. Sumber ikon-192/512. -->
+  <defs>
+    <radialGradient id="cahaya" cx="28%" cy="18%" r="85%">
+      <stop offset="0" stop-color="#1B3E6B"/>
+      <stop offset="0.6" stop-color="#0B1F3A"/>
+      <stop offset="1" stop-color="#081830"/>
+    </radialGradient>
+    <clipPath id="bingkai"><rect width="512" height="512" rx="112"/></clipPath>
+  </defs>
+  <g clip-path="url(#bingkai)">
+    <rect width="512" height="512" fill="url(#cahaya)"/>
+    <g stroke="#24406A" stroke-opacity="0.45" stroke-width="4"><line x1="0" y1="64.5" x2="512" y2="64.5"/><line x1="0" y1="128.5" x2="512" y2="128.5"/><line x1="0" y1="192.5" x2="512" y2="192.5"/><line x1="0" y1="256.5" x2="512" y2="256.5"/><line x1="0" y1="320.5" x2="512" y2="320.5"/><line x1="0" y1="384.5" x2="512" y2="384.5"/><line x1="0" y1="448.5" x2="512" y2="448.5"/></g>
+  </g>
+  <g transform="translate(256 256) scale(8) translate(-32 -33)">
+    <path d="M31 20.5C24.5 16 16 14.6 9 16v31c7-1.4 15.5 0 22 4.5z" fill="#FFFFFF"/>
+    <path d="M33 20.5C39.5 16 48 14.6 55 16v31c-7-1.4-15.5 0-22 4.5z" fill="#E3E8EF"/>
+    <path d="M14 25.5c4.5-.4 8.6.6 12.5 2.6M14 31.5c4.5-.4 8.6.6 12.5 2.6M14 37.5c4.5-.4 8.6.6 12.5 2.6" fill="none" stroke="#A9B8CF" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M39.5 18.2h7v18l-3.5-2.7-3.5 2.7z" fill="#F2A93B"/>
   </g>
 </svg>

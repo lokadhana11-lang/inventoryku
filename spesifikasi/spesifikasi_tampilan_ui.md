@@ -38,7 +38,7 @@
 
 ## 1. Arah Desain
 
-**Nama aplikasi:** InventoryKu. **Ikon:** buku (Bagian 4.5).
+**Nama aplikasi:** InventoryKu. **Ikon:** buku terbuka (Bagian 4.5).
 
 **Permintaan pemilik:** sederhana, modern, minimalis, sinematik, ada bar navigasi berwarna
 navy, tampilan bersih.
@@ -271,12 +271,18 @@ di tengah selebar isi layar.
 
 - **Nama:** InventoryKu, ditulis menyambung dengan I dan K kapital. Nama ini tampil di
   bawah ikon setelah aplikasi di-install, di layar Login, dan di bar navigasi laptop/desktop.
-- **Ikon:** buku sederhana bergaya garis, warna Kertas, di atas latar Navy Pass. Pembatas
-  bukunya berwarna Lampu Pass (amber), satu-satunya aksen.
-- **Logo di dalam aplikasi** (versi 1.8): ikon buku di dalam **lencana** Navy Lapis bertepi
+- **Ikon: buku terbuka** (versi 1.8, dipilih pemilik dari pratinjau logo 12 Oktober 2026,
+  pilihan B). Dua halaman berbentuk bidang padat yang melengkung dari tengah: halaman kiri
+  Kertas dengan tiga garis tulisan Teks di Navy (seperti buku catatan dapur), halaman kanan Garis
+  Halus, dan pita pembatas Lampu Pass (amber) yang tergantung di halaman kanan, satu-satunya
+  aksen. Latar Navy Pass dengan cahaya lembut di kiri atas dan tekstur garis navy (Bagian 2).
+  Bidang padat dipilih supaya tetap terbaca di 16–24 px; ikon garis versi 1.7 terlalu tipis di
+  ukuran itu.
+- **Logo di dalam aplikasi** (versi 1.8): buku terbuka di dalam **lencana** Navy Lapis bertepi
   Garis Navy dengan bayangan lembut. Ukuran: 72 px (sudut 20) di Login, 40 px (sudut 12) di bar
-  atas, 32 px (sudut 10) di kepala Beranda HP dan tablet. Saat pertama tampil, lencana membesar
-  ke tempatnya lalu pembatas amber turun ke buku (Bagian 8).
+  atas, 32 px (sudut 10) di kepala Beranda HP dan tablet. Favicon: buku terbuka tanpa garis
+  tulisan di atas Navy Pass. Saat pertama tampil, lencana membesar ke tempatnya, kedua halaman
+  membuka dari tengah, garis tulisan muncul, lalu pita amber turun (Bagian 8).
 - **Nama di dalam aplikasi** (versi 1.8): Barlow Condensed, "Inventory" berwarna Kertas dan "Ku"
   berwarna Lampu Pass. Dua warna ini hanya dipakai di atas navy (Login, bar atas, kepala Beranda).
 - Bentuk dibuat sederhana supaya tetap terbaca pada ukuran kecil: tanpa tulisan di dalam ikon.
@@ -924,8 +930,8 @@ saat perangkat diatur "kurangi gerak".
 
 | Gerak | Kapan | Bentuk | Lama |
 |---|---|---|---|
-| Pembuka Login | Sekali setiap aplikasi dibuka | Lencana membesar ke tempatnya, pembatas amber turun ke buku, lalu nama, outlet, dan tombol nama naik bertahap | Lencana 480 ms; pembatas 420 ms mulai 260 ms; tombol nama 360 ms, jeda 45 ms, mulai 300 ms |
-| Pembuka Beranda | Sekali setiap aplikasi dibuka | Lencana dan pembatas seperti di Login, tanggal muncul perlahan, ruas rel terbentang dari kiri | Tanggal 400 ms; rel 520 ms mulai 200 ms |
+| Pembuka Login | Sekali setiap aplikasi dibuka | Lencana membesar ke tempatnya, dua halaman buku membuka dari tengah, garis tulisan muncul, pita amber turun, lalu nama, outlet, dan tombol nama naik bertahap | Lencana 480 ms; halaman 520 ms mulai 120 ms; garis 300 ms mulai 480 ms; pita 440 ms mulai 520 ms; tombol nama 360 ms, jeda 45 ms, mulai 300 ms |
+| Pembuka Beranda | Sekali setiap aplikasi dibuka | Lencana, halaman, dan pita seperti di Login, tanggal muncul perlahan, ruas rel terbentang dari kiri | Tanggal 400 ms; rel 520 ms mulai 200 ms |
 | Tiket turun | Setiap Beranda dibuka | Tiket turun ke rel satu per satu | Tiap tiket 360 ms, jeda 60 ms, paling banyak 8 tiket yang bergerak |
 | Ganti layar | Pindah layar | Isi kepala navy dan bagian isi layar naik 14 px sambil menjadi jelas, satu per satu; bingkai navy tetap diam. Hanya isi pertama layar; data yang tiba sesudahnya tampil tanpa gerak | 340 ms; jeda 40 ms; paling banyak 8 bagian |
 | Muncul saat digulir | Bagian yang berada di bawah layar saat layar dibuka masuk ke layar | Naik 18 px sambil menjadi jelas, sekali per bagian | 460 ms |
@@ -1039,7 +1045,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Gaya sinematik | Hanya di bingkai: Login, kepala Beranda, bar navigasi. Layar isi form tetap terang. |
 | Warna laporan PDF dan tab Harian | Navy, seragam dengan website (Bagian 2) |
 | Nama aplikasi | InventoryKu |
-| Ikon aplikasi | Buku (Bagian 4.5) |
+| Ikon aplikasi | Buku terbuka dengan pita amber (pilihan B dari pratinjau logo 12 Oktober 2026, Bagian 4.5) |
 | Bar navigasi di laptop/desktop | Di atas |
 | Bar navigasi di HP | Di bawah |
 | Bar navigasi di tablet | Di bawah sampai lebar 1.023 px; di atas mulai 1.024 px |
@@ -1052,5 +1058,5 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
-| Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
+| Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
