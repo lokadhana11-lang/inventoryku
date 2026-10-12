@@ -393,7 +393,25 @@ Satu-satunya layar yang sepenuhnya navy.
   Angka menitnya mengikuti pengaturan. Keterangan hilang setelah sebuah nama dipilih.
   Tidak ada hitung mundur atau peringatan sebelum keluar.
 - Di tablet dan desktop, isi layar Login berada di tengah dengan lebar maksimal 420 px.
-  Latar navy tetap memenuhi layar.
+  Latar navy tetap memenuhi layar. Di laptop dan desktop (lebar 1.024 px ke atas, tinggi
+  700 px ke atas) isinya berada di **panel** Navy Lapis tembus 72%, bersudut 24 px, bertepi
+  Garis Navy, lebar maksimal 460 px, dengan bayangan dalam (versi 1.8).
+- **Suasana Login** (versi 1.8, permintaan pemilik 12 Oktober 2026 supaya Login tidak
+  sederhana dan monoton). Di belakang isi, hiasan yang tidak bisa disentuh dan tidak dibaca
+  pembaca layar:
+  - **Rel tiket** di tepi atas: garis Lampu Pass tipis yang berpendar, dengan lima tiket kecil
+    Navy Lapis (klip, dua garis tulisan, garis sobek putus-putus) yang berayun pelan, di kiri
+    dan kanan supaya tidak menutupi isi. Tidak tampil di layar setinggi di bawah 700 px.
+  - **Uap dapur:** tujuh bercak putih sangat tipis yang naik pelan dari bawah lalu hilang.
+  - **Cahaya:** cahaya navy (Bagian 2) dan cahaya hangat Lampu Pass yang sangat tipis di kanan
+    bawah, bergeser berlawanan arah.
+  - **Halo:** lingkar Lampu Pass tipis di sekitar lencana yang membesar dan memudar setiap
+    3,4 detik, seperti lampu pemanas di pass.
+- **Nama aplikasi** muncul huruf demi huruf saat pembuka. Pembaca layar membaca "InventoryKu"
+  utuh.
+- **Tombol nama** (versi 1.8): kotak Navy Lapis bersudut 14 px dengan inisial nama di lingkaran
+  Biru Malam (huruf Lampu Pass), lalu nama di kanannya. Tombol angka PIN: Navy Lapis bersudut
+  16 px, bertepi Garis Navy.
 
 ### 5.2 Beranda (rel tiket)
 
@@ -930,7 +948,9 @@ saat perangkat diatur "kurangi gerak".
 
 | Gerak | Kapan | Bentuk | Lama |
 |---|---|---|---|
-| Pembuka Login | Sekali setiap aplikasi dibuka | Lencana membesar ke tempatnya, dua halaman buku membuka dari tengah, garis tulisan muncul, pita amber turun, lalu nama, outlet, dan tombol nama naik bertahap | Lencana 480 ms; halaman 520 ms mulai 120 ms; garis 300 ms mulai 480 ms; pita 440 ms mulai 520 ms; tombol nama 360 ms, jeda 45 ms, mulai 300 ms |
+| Pembuka Login | Sekali setiap aplikasi dibuka | Rel tiket turun; lencana membesar ke tempatnya, dua halaman buku membuka dari tengah, garis tulisan muncul, pita amber turun; nama muncul huruf demi huruf; lalu outlet, pilihan nama, tombol nama, dan tautan bawah bertahap; di desktop panel naik | Rel 600 ms; lencana 480 ms; halaman 520 ms mulai 120 ms; pita 440 ms mulai 520 ms; huruf 520 ms, jeda 35 ms, mulai 200 ms; tombol nama 380 ms, jeda 50 ms, mulai 680 ms; tautan bawah mulai 1 detik; panel 600 ms |
+| Langkah Login | Pilih nama, atau "Ganti nama" | Isi langkah baru masuk dari kanan; titik PIN muncul satu per satu; tombol angka muncul bertahap | Langkah 360 ms; titik 300 ms, jeda 40 ms; tombol angka 320 ms, jeda 28 ms; tombol nama jeda 45 ms |
+| Suasana Login | Selama layar Login tampil | Tiket berayun ±3,5°; uap naik dan memudar; cahaya hangat bergeser; halo lencana membesar dan memudar | Ayun 4,6–7,4 detik bolak-balik; uap 10–18 detik; cahaya 20 detik; halo 3,4 detik |
 | Pembuka Beranda | Sekali setiap aplikasi dibuka | Lencana, halaman, dan pita seperti di Login, tanggal muncul perlahan, ruas rel terbentang dari kiri | Tanggal 400 ms; rel 520 ms mulai 200 ms |
 | Tiket turun | Setiap Beranda dibuka | Tiket turun ke rel satu per satu | Tiap tiket 360 ms, jeda 60 ms, paling banyak 8 tiket yang bergerak |
 | Ganti layar | Pindah layar | Isi kepala navy dan bagian isi layar naik 14 px sambil menjadi jelas, satu per satu; bingkai navy tetap diam. Hanya isi pertama layar; data yang tiba sesudahnya tampil tanpa gerak | 340 ms; jeda 40 ms; paling banyak 8 bagian |
@@ -972,7 +992,9 @@ saat perangkat diatur "kurangi gerak".
    ulang karena data baru tidak bergerak lagi (kecuali angka dan grafik yang nilainya berubah).
 6. **Gerak yang terus berjalan:** cahaya navy (sangat pelan, hanya `transform`), ditambah paling
    banyak satu lagi (kerangka memuat atau indikator putar) yang berhenti begitu data tiba atau
-   proses selesai.
+   proses selesai. Pengecualian: layar Login, yang tidak dipakai untuk bekerja, boleh punya
+   suasana yang terus bergerak (rel tiket berayun, uap, cahaya hangat, halo lencana; Bagian
+   5.1), semuanya pelan dan hanya `transform` dan `opacity`.
 7. **Kurangi gerak.** Jika perangkat diatur "kurangi gerak" (`prefers-reduced-motion`),
    semua gerak masuk, geser, skala, goyang, denyut, cahaya, dan muncul saat digulir dimatikan.
    Semua bagian langsung tampil, perubahan keadaan langsung jadi, dan pesan teksnya tetap
@@ -991,7 +1013,7 @@ gerak **menu**, **tekan**, **lembar**, serta **pesan singkat** (Bagian 8.1). Tam
 
 | Layar | Gerak yang terlihat |
 |---|---|
-| Login | Pembuka Login sekali setiap aplikasi dibuka (lencana, pembatas, nama, outlet, tombol nama bertahap); cahaya navy di seluruh layar; titik PIN muncul; enam titik bergoyang saat PIN salah. Berganti langkah (nama → PIN → kembali) tidak mengulang pembuka. |
+| Login | Pembuka Login sekali setiap aplikasi dibuka: rel tiket turun, lencana membesar dan bukunya membuka, nama muncul huruf demi huruf, lalu outlet, tombol nama, dan tautan bawah bertahap; di desktop panelnya naik sambil membesar dari 97%. Suasana yang terus bergerak (Bagian 5.1): tiket berayun, uap naik, dua cahaya bergeser, halo lencana. Pilih nama: langkah PIN masuk dari kanan, enam titik PIN muncul satu per satu, tombol angka muncul bertahap. "Ganti nama": tombol nama masuk lagi dari kanan. Titik PIN terisi; enam titik bergoyang saat PIN salah. Berganti langkah tidak mengulang pembuka. |
 | Beranda | Pembuka sekali setiap aplikasi dibuka (lencana dan pembatas di baris merek, tanggal muncul, ruas rel terbentang); tiket turun ke rel setiap Beranda dibuka; jumlah form terisi naik; cap pada tiket yang baru Terkirim atau Nihil; ruas rel menyala; momen selesai dengan kilau di rel; pemberitahuan di bawah tiket naik bertahap. |
 | Isi form (Stock, Suhu, Prep list, Waste, form kustom) | Kepala dan bagian layar naik bertahap; kartu item yang berada di bawah layar muncul saat digulir; bilah kirim di bawah tetap diam (tidak pernah tersembunyi); kartu Waste mengikuti jari saat digeser untuk dihapus. Kolom isian bisa diketik sejak layar tampil. |
 | Riwayat | Pilihan dan daftar kiriman naik bertahap; kiriman di bawah layar muncul saat digulir; cap pada tanda Diperiksa setelah Tandai diperiksa. |

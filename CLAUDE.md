@@ -1419,3 +1419,19 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     di `index.html`: buku terbuka tanpa garis tulisan di atas Navy Pass bersudut 14. Nama berkas tidak berubah, jadi
     `manifest.webmanifest` dan `sw.js` tetap; versi aplikasi tetap 0.15.0 karena 0.15.0 belum dirilis. HP yang sudah memasang
     aplikasi bisa tetap menampilkan ikon lama sampai aplikasi dipasang ulang dari browser.
+193. **Login penuh gerak** (permintaan pemilik 12 Oktober 2026: "halaman login masih terlihat sederhana dan monoton";
+    spesifikasi tampilan Bagian 5.1, 8.1, 8.2 butir 6, dan 8.4). `latarLogin()` menaruh `.login-latar` (fixed, `aria-hidden`,
+    `pointer-events: none`, di bawah `.login` yang kini `z-index: 1`) berisi cahaya hangat, rel tiket (garis amber dan lima
+    `.latar-tiket` yang berayun dari klipnya, posisi lewat `nth-child`), dan tujuh `.latar-uap`. Rel tidak tampil di layar
+    setinggi di bawah 700 px (di sana Login dipadatkan dan tiket menimpa lencana). Lencana dibungkus `.lencana-panggung` dengan
+    `.lencana-halo` (lingkar amber, mulai 1,5 detik, lalu tiap 3,4 detik); aturan layar pendek kini menyembunyikan panggungnya.
+    `namaMerekHuruf()`: h1 ber-`aria-label` "InventoryKu", huruf `aria-hidden` dengan `--i`. Tombol nama: `.tombol-nama-inisial`
+    (`aria-hidden`; `aria-label` tombol tetap nama) dan `.tombol-nama-teks`. Langkah: `.login-siapa` dan tombol nama setelah
+    "Ganti nama" (`keadaan.gerakNama`, kelas `.langkah-masuk` di grid) memakai `langkah-masuk`; titik dan tombol angka diberi
+    `--i` dan memakai `titik-masuk`/`angka-masuk`. Desktop (≥ 1.024 × 700): `.login` menjadi panel; `#masuk` di Login
+    `display: flow-root` supaya margin panel tidak memperlihatkan latar terang. "Kurangi gerak": aturan umum mematikan semua
+    animasi; uap dan halo berkeadaan awal `opacity: 0` sehingga tidak tampil, tiket diam. Layar terang (Pemasangan pertama,
+    Pulihkan akses) tidak berubah. Uji (di luar repo, `uji_gerak.js`, kini 14): suasana tidak bisa disentuh dan tidak menutupi
+    tombol, gerak yang terus berjalan di Login hanya kelima jenis itu, jeda huruf dan tombol, langkah PIN dan Ganti nama,
+    delapan ukuran (tanpa gulir samping, isi tidak keluar layar, tiket tidak menimpa isi, panel hanya di desktop), dan
+    "kurangi gerak" di Login.
