@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.14.0';
+  var VERSI_APLIKASI = '0.15.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1081,7 +1081,10 @@
         el('span', { text: m.label })
       ]));
     });
+    grup.insertBefore(el('span', { class: 'menu-pil', 'aria-hidden': 'true' }), grup.firstChild);
     grup.appendChild(el('span', { class: 'menu-penanda', 'aria-hidden': 'true' }));
+    var outletMerek = $('#merek-outlet');
+    if (outletMerek) outletMerek.textContent = (Sesi.baca() || {}).namaOutlet || '';
     var tombolBar = $('#bar-pengguna');
     kosongkan(tombolBar);
     if (p) {
@@ -1102,13 +1105,28 @@
     letakkanPenanda(tanpaGerak);
   }
 
-  /** Garis amber digeser dengan transform (bukan left/width) supaya ringan. */
+  /**
+   * Garis amber dan pil menu aktif digeser dengan transform (bukan left) supaya ringan.
+   * Pil hanya di bar bawah (HP dan tablet), tempat semua menu sama lebar, jadi lebarnya
+   * tidak ikut bergerak; di desktop pil tiap menu memudar di tempat (app.css).
+   */
   function letakkanPenanda(tanpaGerak) {
     var grup = $('#menu-grup');
     var penanda = grup && grup.querySelector('.menu-penanda');
     if (!penanda) return;
     var aktif = grup.querySelector('[aria-current="page"]');
+    var pil = grup.querySelector('.menu-pil');
     penanda.classList.toggle('tanpa-gerak', !!tanpaGerak);
+    if (pil) {
+      pil.classList.toggle('tanpa-gerak', !!tanpaGerak || !pil.classList.contains('terlihat'));
+      if (aktif && aktif.offsetWidth) {
+        pil.style.width = Math.max(0, aktif.offsetWidth - 8) + 'px';
+        pil.style.transform = 'translateX(' + (aktif.offsetLeft + 4) + 'px)';
+        pil.classList.add('terlihat');
+      } else {
+        pil.classList.remove('terlihat');
+      }
+    }
     if (!aktif || !aktif.offsetWidth) {
       penanda.style.transform = 'translateX(0) scaleX(0)';
       return;
@@ -1165,6 +1183,55 @@
     ]);
     main.insertBefore(el('header', { class: 'kepala-layar' + (isi.classList.contains('kepala-gantung') ? ' gantung' : '') }, kepalaIsi), isi);
     return true;
+  }
+
+  /**
+   * Muncul saat digulir (tampilan Bagian 8, versi 1.8). Bagian layar yang berada di bawah
+   * layar saat digambar diberi kelas .ungkap (pudar dan turun 16 px, app.css); begitu masuk
+   * layar, .ungkap-tampil membuatnya naik ke tempatnya, sekali saja. JavaScript hanya
+   * memasang kelas; geraknya CSS. Mati saat "kurangi gerak" atau tanpa IntersectionObserver.
+   */
+  var PILIH_UNGKAP = '.layar-isi > :not(.bilah-kirim):not(.kepala-ringkas):not(.memperbarui), ' +
+    '.layar-isi .kartu, .layar-isi .kartu-item, .layar-isi .kelompok, .layar-isi .tabel-bingkai, .beranda-bawah > *';
+
+  function pasangUngkap() {
+    var main = $('#layar');
+    if (!main || !window.IntersectionObserver || !window.MutationObserver) return;
+    var kurangiGerak = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    var pengamat = new IntersectionObserver(function (catatan) {
+      catatan.forEach(function (c) {
+        if (!c.isIntersecting) return;
+        var e = c.target;
+        e.classList.add('ungkap-tampil');
+        pengamat.unobserve(e);
+        // Setelah naik, kelasnya dilepas supaya gerak tekan bagian itu kembali seperti biasa.
+        setTimeout(function () { e.classList.remove('ungkap', 'ungkap-tampil'); }, 600);
+      });
+    }, { rootMargin: '0px 0px -24px 0px' });
+    var tertunda = false;
+    function periksa() {
+      tertunda = false;
+      if (kurangiGerak.matches) return;
+      var batas = window.innerHeight;
+      Array.prototype.forEach.call(main.querySelectorAll(PILIH_UNGKAP), function (e) {
+        if (e.hasAttribute('data-ungkap')) return;
+        e.setAttribute('data-ungkap', '');
+        // Sudah ikut muncul bersama induknya, atau menempel (bilah bawah): tidak diungkap sendiri.
+        if (e.parentElement && e.parentElement.closest('.ungkap:not(.ungkap-tampil)')) return;
+        var r = e.getBoundingClientRect();
+        if (!r.height || r.top < batas) return;
+        var pos = getComputedStyle(e).position;
+        if (pos === 'sticky' || pos === 'fixed') return;
+        e.classList.add('ungkap');
+        pengamat.observe(e);
+      });
+    }
+    new MutationObserver(function () {
+      if (tertunda) return;
+      tertunda = true;
+      // Microtask: sebelum layar dilukis, jadi tidak ada kedip.
+      Promise.resolve().then(periksa);
+    }).observe(main, { childList: true, subtree: true });
   }
 
   /** Mengganti alamat #/... tanpa memicu hashchange (layar digambar oleh pemanggil). */
@@ -1266,6 +1333,9 @@
     main.classList.remove('layar-masuk');
     void main.offsetWidth; // mulai ulang gerak ganti layar
     main.classList.add('layar-masuk');
+    // Gerak masuk hanya untuk isi pertama layar; isi yang digambar ulang sesudahnya (data dari server) diam.
+    var nomorMasuk = nomorLayar;
+    setTimeout(function () { if (nomorMasuk === nomorLayar) main.classList.remove('layar-masuk'); }, 900);
     $('#aplikasi').classList.toggle('di-beranda', rute.menu === 'beranda' && jalur === '/');
     aturMenuAktif(rute.menu);
     rute.layar({ wadah: main, cocok: cocok, sesi: sesi });
@@ -1566,17 +1636,45 @@
     });
   }
 
+  /**
+   * Logo (tampilan Bagian 4.5, versi 1.8): buku terbuka (halaman Kertas bergaris, pita amber)
+   * di dalam lencana Navy Lapis berbingkai Garis Navy. Saat logo pertama tampil (.lencana-buka),
+   * halaman membuka dari tengah lalu pita amber turun.
+   */
+  function lencana(kelas) {
+    var t = document.createElement('template');
+    t.innerHTML = '<span class="lencana' + (kelas ? ' ' + kelas : '') + '" aria-hidden="true">' +
+      '<svg class="ikon-buku" viewBox="7 11 50 44" aria-hidden="true" focusable="false">' +
+      '<path class="ikon-buku-kiri" d="M31 20.5C24.5 16 16 14.6 9 16v31c7-1.4 15.5 0 22 4.5z"/>' +
+      '<path class="ikon-buku-kanan" d="M33 20.5C39.5 16 48 14.6 55 16v31c-7-1.4-15.5 0-22 4.5z"/>' +
+      '<path class="ikon-buku-garis" d="M14 25.5c4.5-.4 8.6.6 12.5 2.6M14 31.5c4.5-.4 8.6.6 12.5 2.6M14 37.5c4.5-.4 8.6.6 12.5 2.6"/>' +
+      '<path class="ikon-buku-pembatas" d="M39.5 18.2h7v18l-3.5-2.7-3.5 2.7z"/></svg></span>';
+    return t.content.firstChild;
+  }
+
+  /** Nama aplikasi dua warna: "Inventory" Kertas, "Ku" Lampu Pass (hanya di atas navy). */
+  function namaMerek(kelas, tag) {
+    return el(tag || 'span', { class: kelas }, ['Inventory', el('span', { class: 'merek-ku', text: 'Ku' })]);
+  }
+
+  /**
+   * Nama di Login: huruf demi huruf naik saat pembuka (tampilan Bagian 5.1, versi 1.8).
+   * Pembaca layar membaca label utuhnya, bukan huruf satu per satu.
+   */
+  function namaMerekHuruf() {
+    var anak = [];
+    'InventoryKu'.split('').forEach(function (h, i) {
+      anak.push(el('span', { class: 'huruf' + (i >= 9 ? ' merek-ku' : ''), style: '--i:' + i, 'aria-hidden': 'true', text: h }));
+    });
+    return el('h1', { class: 'login-nama-aplikasi', 'aria-label': 'InventoryKu' }, anak);
+  }
+
   function merekLogin(namaOutlet) {
     var outlet = el('p', { class: 'login-outlet', text: namaOutlet || '' });
-    var t = document.createElement('template');
-    t.innerHTML = '<svg class="ikon-buku" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-      '<path class="ikon-buku-sampul" d="M5 6a1.5 1.5 0 0 1 1.5-1.5H19v12H6.5A1.5 1.5 0 0 0 5 18z"/>' +
-      '<path class="ikon-buku-sampul" d="M5 18a1.5 1.5 0 0 0 1.5 1.5H19v-3"/>' +
-      '<path class="ikon-buku-pembatas" d="M11 4.5h3v5.25l-1.5-1.1-1.5 1.1z"/></svg>';
     return {
       wadah: el('div', { class: 'login-merek' }, [
-        t.content.firstChild,
-        el('h1', { class: 'login-nama-aplikasi', text: 'InventoryKu' }),
+        el('span', { class: 'lencana-panggung' }, [el('span', { class: 'lencana-halo', 'aria-hidden': 'true' }), lencana('lencana-besar')]),
+        namaMerekHuruf(),
         outlet
       ]),
       outlet: outlet
@@ -1584,10 +1682,31 @@
   }
 
   /**
+   * Suasana di belakang Login (tampilan Bagian 5.1 dan 8, versi 1.8): rel dengan tiket yang
+   * berayun pelan, uap dapur yang naik, dan cahaya kedua. Hiasan saja (aria-hidden, tidak bisa
+   * disentuh), hanya transform dan opacity; diam (uap tidak tampil) saat "kurangi gerak".
+   */
+  function latarLogin() {
+    var tiket = [];
+    for (var i = 0; i < 5; i++) {
+      tiket.push(el('span', { class: 'latar-tiket', style: '--i:' + i }, [el('span', { class: 'latar-tiket-klip' })]));
+    }
+    var uap = [];
+    for (var j = 0; j < 7; j++) uap.push(el('span', { class: 'latar-uap', style: '--i:' + j }));
+    return el('div', { class: 'login-latar', 'aria-hidden': 'true' }, [
+      el('span', { class: 'latar-cahaya' }),
+      el('div', { class: 'latar-rel' }, [el('span', { class: 'latar-rel-garis' })].concat(tiket)),
+      el('div', { class: 'latar-uap-wadah' }, uap)
+    ]);
+  }
+
+  /**
    * Layar Login: pilih nama (tombol besar), lalu PIN di papan angka.
    * Setelah angka keenam, login langsung diproses. keterangan: satu baris di
    * atas pilihan nama setelah keluar otomatis; hilang setelah nama dipilih.
    */
+  var loginBukaSudah = false;
+
   function gambarLogin(info, pesanAwal, memuat, keterangan) {
     var wadah = $('#masuk');
     wadah.className = 'masuk';
@@ -1605,8 +1724,14 @@
       pulihkan,
       el('p', { class: 'login-versi', text: 'Versi ' + VERSI_APLIKASI })
     ]);
-    var kotakLogin = el('div', { class: 'login' }, [kiri, kanan, bawah]);
+    var kotakLogin = el('div', { class: 'login' + (loginBukaSudah ? '' : ' login-buka') }, [kiri, kanan, bawah]);
+    wadah.appendChild(latarLogin());
     wadah.appendChild(kotakLogin);
+    // Pembuka Login (tampilan Bagian 8): sekali setiap aplikasi dibuka, tidak diulang saat berganti langkah.
+    if (!loginBukaSudah) {
+      loginBukaSudah = true;
+      setTimeout(function () { kotakLogin.classList.remove('login-buka'); }, 1500);
+    }
 
     pulihkan.addEventListener('click', function () {
       if (keadaan.sibuk) return;
@@ -1653,12 +1778,15 @@
         kanan.appendChild(kerangka);
         return;
       }
-      var grid = el('div', { class: 'nama-grid' });
-      namaBisaMasuk().forEach(function (s) {
+      // Kembali dari langkah PIN: tombol nama masuk lagi bertahap (pembuka sudah lewat).
+      var grid = el('div', { class: 'nama-grid' + (keadaan.gerakNama ? ' langkah-masuk' : '') });
+      keadaan.gerakNama = false;
+      namaBisaMasuk().forEach(function (s, i) {
         var tunggu = Antrean.jumlah(s.nama);
         grid.appendChild(el('button', {
           type: 'button',
           class: 'tombol-nama',
+          style: '--i:' + Math.min(i, 7),
           'aria-label': s.nama + (tunggu ? ', ' + tunggu + ' isian menunggu kirim' : ''),
           onclick: function () {
             if (keadaan.sibuk) return;
@@ -1667,9 +1795,12 @@
             tampilPin(s.nama);
           }
         }, [
-          el('span', { text: s.nama }),
-          // Isian di antrean menunggu sampai pengisinya masuk lagi (Bagian 7.2).
-          tunggu ? el('span', { class: 'tombol-nama-ket', text: tunggu + ' isian menunggu kirim' }) : null
+          el('span', { class: 'tombol-nama-inisial', 'aria-hidden': 'true', text: s.nama.trim().charAt(0).toUpperCase() }),
+          el('span', { class: 'tombol-nama-teks' }, [
+            el('span', { class: 'tombol-nama-nama', text: s.nama }),
+            // Isian di antrean menunggu sampai pengisinya masuk lagi (Bagian 7.2).
+            tunggu ? el('span', { class: 'tombol-nama-ket', text: tunggu + ' isian menunggu kirim' }) : null
+          ])
         ]));
       });
       kanan.appendChild(grid);
@@ -1696,19 +1827,20 @@
           onclick: function () {
             if (keadaan.sibuk) return;
             tulisPesanLogin('');
+            keadaan.gerakNama = true;
             tampilNama();
           }
         })
       ]));
       titikGrup = el('div', { class: 'titik-grup', role: 'img', 'aria-label': 'PIN: 0 dari 6 angka' });
-      for (var i = 0; i < PANJANG_PIN; i++) titikGrup.appendChild(el('span', { class: 'titik' }));
+      for (var i = 0; i < PANJANG_PIN; i++) titikGrup.appendChild(el('span', { class: 'titik', style: '--i:' + i }));
       kiri.appendChild(titikGrup);
       kiri.appendChild(pesan);
 
       kosongkan(kanan);
       tombolAngka = [];
       var papan = el('div', { class: 'papan', role: 'group', 'aria-label': 'Papan angka PIN' });
-      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'hapus'].forEach(function (k) {
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'hapus'].forEach(function (k, ki) {
         var t;
         if (k === '') {
           t = el('span', { class: 'papan-kosong', 'aria-hidden': 'true' });
@@ -1721,6 +1853,7 @@
           t.addEventListener('click', function () { ketikAngka(k); });
           tombolAngka.push(t);
         }
+        t.style.setProperty('--i', ki); // tombol angka masuk bertahap (app.css)
         papan.appendChild(t);
       });
       kanan.appendChild(papan);
@@ -2058,6 +2191,7 @@
     // Tanggal dua baris (tampilan Bagian 5.2, versi 1.7): nama hari, lalu tanggal besar.
     var bagianTanggal = tanggalPanjang(new Date()).split(', ');
     var kepala = el('section', { class: 'beranda-kepala', 'aria-label': 'Hari ini' }, el('div', { class: 'beranda-kepala-isi' }, [
+      el('div', { class: 'beranda-merek', 'aria-hidden': 'true' }, [lencana(), namaMerek('beranda-merek-nama')]),
       el('p', { class: 'beranda-tanggal' }, [
         el('span', { class: 'beranda-hari', text: bagianTanggal[0] }),
         el('span', { class: 'sr', text: ', ' }),
@@ -2124,7 +2258,7 @@
         grid.appendChild(kotakKosong('Belum ada form yang tampil. Pengelola mengatur form di Pengaturan.'));
         return;
       }
-      var gerak = pembuka && !tiketSudahTampil;
+      var gerak = !tiketSudahTampil;
       form.forEach(function (f, i) {
         var st = STATUS_TIKET[f.status] || STATUS_TIKET.belum;
         var kataTiket = st.kata || f.detail || 'Belum diisi';
@@ -2200,6 +2334,9 @@
         kemajuanTeks.classList.remove('ganti');
         void kemajuanTeks.offsetWidth;
         kemajuanTeks.classList.add('ganti');
+        rel.classList.remove('kilau');
+        void rel.offsetWidth;
+        rel.classList.add('kilau'); // kilau sekali lewat di rel (versi 1.8)
       }
       selesaiSebelum = selesai;
     }
@@ -2285,6 +2422,7 @@
     if (namaOutlet) sesi.namaOutlet = namaOutlet;
     Sesi.tulis(sesi);
     if (berubah) gambarMenu();
+    else if (namaOutlet && $('#merek-outlet')) $('#merek-outlet').textContent = namaOutlet;
   }
 
   /* =======================================================================
@@ -7252,7 +7390,7 @@
   /** Elemen SVG (grafik). */
   function svgEl(tag, atribut, anak) {
     var e = document.createElementNS(SVG_NS, tag);
-    Object.keys(atribut || {}).forEach(function (k) { e.setAttribute(k, String(atribut[k])); });
+    Object.keys(atribut || {}).forEach(function (k) { if (atribut[k] != null) e.setAttribute(k, String(atribut[k])); });
     [].concat(anak || []).forEach(function (c) { if (c) e.appendChild(c); });
     return e;
   }
@@ -7325,7 +7463,7 @@
         : 'tidak ada waste') + '.';
     }
 
-    function gambarBatang(pilih) {
+    function gambarBatang(pilih, awal) {
       while (gambarSvg.firstChild) gambarSvg.removeChild(gambarSvg.firstChild);
       hari.forEach(function (x, i) {
         if (i === pilih) {
@@ -7333,7 +7471,8 @@
         }
         if (!(x.rp > 0) || !maks) return;
         var h = Math.max(3, Math.round(x.rp / maks.rp * (TINGGI - 8)));
-        gambarSvg.appendChild(svgEl('rect', { class: 'batang', x: i * LEBAR_KOLOM + 22, y: TINGGI - h, width: LEBAR_KOLOM - 44, height: h }));
+        gambarSvg.appendChild(svgEl('rect', { class: 'batang' + (awal ? ' tumbuh' : ''), style: awal ? '--i:' + i : null,
+          x: i * LEBAR_KOLOM + 22, y: TINGGI - h, width: LEBAR_KOLOM - 44, height: h }));
       });
       gambarSvg.appendChild(svgEl('line', { class: 'garis-dasar', x1: 0, y1: TINGGI - 0.5, x2: LEBAR_KOLOM * hari.length, y2: TINGGI - 0.5 }));
       tombolHari.forEach(function (t, i) { t.setAttribute('aria-pressed', i === pilih ? 'true' : 'false'); });
@@ -7349,7 +7488,7 @@
       kolom.appendChild(t);
       label.appendChild(el('span', { class: i === hari.length - 1 ? 'hari-ini' : null, text: HARI_SINGKAT[hariKe(x.tanggal)] }));
     });
-    gambarBatang(-1);
+    gambarBatang(-1, true);
     kartu.appendChild(el('div', { class: 'grafik-waste' }, [
       el('div', { class: 'grafik-waste-area' }, [gambarSvg, kolom]),
       label
@@ -7395,10 +7534,11 @@
           width: (posisi(s.normalAtas) - posisi(s.normalBawah)) * 100, height: 18 })
       ]);
       var titik = el('div', { class: 'suhu-titik' });
-      u.cek.forEach(function (c) {
+      u.cek.forEach(function (c, ci) {
         var f = posisi(c.suhu);
         var p = penandaSuhu(c.luar);
-        var bungkus = el('span', { class: 'suhu-titik-satu' + (f === 0 || f === 1 ? ' tepi' : ''), style: 'left:' + (f * 100).toFixed(2) + '%' });
+        var bungkus = el('span', { class: 'suhu-titik-satu' + (f === 0 || f === 1 ? ' tepi' : ''),
+          style: 'left:' + (f * 100).toFixed(2) + '%;--i:' + Math.min(ci, 7) });
         bungkus.appendChild(p);
         titik.appendChild(bungkus);
       });
@@ -8619,6 +8759,7 @@
           if (sesi && hasil.namaOutlet) {
             sesi.namaOutlet = hasil.namaOutlet;
             Sesi.tulis(sesi);
+            if ($('#merek-outlet')) $('#merek-outlet').textContent = hasil.namaOutlet;
           }
           gambar(hasil);
           toast(hasil.jadwalBerubah ? 'Tersimpan. Jalankan pasangTrigger supaya jadwal baru berlaku.' : 'Outlet dan jadwal tersimpan.',
@@ -11419,6 +11560,7 @@
   function mulai() {
     pitaSinyal = $('#pita-sinyal');
     pasangPapanKetik();
+    pasangUngkap();
     window.addEventListener('online', function () {
       aturSinyal();
       // Antrean dikirim saat sinyal kembali; layar diperbarui sesudahnya.

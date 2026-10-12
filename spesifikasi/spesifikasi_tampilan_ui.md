@@ -5,7 +5,15 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.7, 11 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.8, 12 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.7 (permintaan pemilik 12 Oktober 2026: bar, logo, dan nama yang
+> premium, dan tampilan penuh gerak supaya tidak monoton): bar navigasi bawah yang mengambang
+> dengan pil menu aktif, bar atas dengan pil dan nama outlet (Bagian 4.2 dan 4.3), logo berupa
+> lencana dan nama dua warna (Bagian 4.5), baris merek di kepala Beranda (Bagian 5.2), dan
+> gerak yang jauh lebih banyak: isi layar naik bertahap, bagian yang muncul saat digulir, angka
+> utama yang naik ke tempatnya, grafik yang tumbuh, dan cahaya pelan di permukaan navy (Bagian 8,
+> 10, dan 11). Aturan ringannya tetap: hanya CSS, hanya `transform` dan `opacity`, dan semuanya
+> mati saat perangkat diatur "kurangi gerak".
 > Perubahan sejak versi 1.6 (arah premium, dipilih pemilik dari pratinjau 11 Oktober 2026):
 > kepala navy berisi ringkasan di setiap layar (Bagian 4.2, 4.3, dan 4.7), bayangan lembut
 > menggantikan garis tepi kartu, tekstur garis halus di permukaan navy, angka utama yang
@@ -30,7 +38,7 @@
 
 ## 1. Arah Desain
 
-**Nama aplikasi:** InventoryKu. **Ikon:** buku (Bagian 4.5).
+**Nama aplikasi:** InventoryKu. **Ikon:** buku terbuka (Bagian 4.5).
 
 **Permintaan pemilik:** sederhana, modern, minimalis, sinematik, ada bar navigasi berwarna
 navy, tampilan bersih.
@@ -54,9 +62,10 @@ Dari dua hal itu, lima keputusan desain:
    atas permukaan navy. Navy dingin dengan satu titik hangat itulah yang memberi kesan sinematik.
 4. **HP dulu.** Setiap layar dirancang untuk HP, lalu dilebarkan untuk tablet, laptop,
    dan desktop (Bagian 4.6).
-5. **Gerak sebagai jawaban, bukan hiasan.** Layar bergerak hanya untuk memberi tahu bahwa
-   ketukan diterima, isian terkirim, atau layar berganti. Semua gerak singkat dan ringan
-   (Bagian 8).
+5. **Hidup, tetapi tidak pernah menghalangi.** Setiap layar masuk dengan gerak: kepala dan
+   isinya naik bertahap, bagian yang digulir muncul saat terlihat, angka utama dan grafik
+   naik ke tempatnya, dan permukaan navy punya cahaya yang bergeser pelan. Ketukan tetap
+   dijawab seketika, isian langsung bisa diketik, dan semua gerak ringan (Bagian 8).
 
 ---
 
@@ -101,8 +110,12 @@ bayangan lembut berlapis dan beda warna latar:
 - **Bayangan tiket** (tiket Beranda, kotak angka yang menggantung di kepala): `0 2px 4px` dan
   `0 14px 28px`, Navy Dalam 18% dan 16%, supaya terlihat tergantung.
 - **Tekstur kepala navy:** garis horizontal 1 px berwarna Garis Navy tiap 28 px, memudar ke
-  atas, seperti kertas bergaris di pass dapur. Ini satu-satunya pengecualian aturan gradasi
-  (pudarnya), hanya di permukaan navy, dan tidak pernah di belakang teks isian.
+  atas, seperti kertas bergaris di pass dapur. Ini pengecualian aturan gradasi (pudarnya),
+  hanya di permukaan navy, dan tidak pernah di belakang teks isian.
+- **Cahaya navy** (versi 1.8): satu bercak lingkaran Garis Navy yang memudar ke tepinya, bergeser
+  pelan di belakang isi kepala navy dan layar Login (Bagian 8). Pengecualian kedua, juga hanya
+  di permukaan navy. Kilau putih yang lewat sekali di rel saat momen selesai adalah gerak
+  sesaat, bukan warna latar.
 
 **Laporan PDF dan tab Harian di spreadsheet**
 
@@ -186,7 +199,12 @@ Bar navigasi navy di **bawah**, supaya terjangkau ibu jari. Kepala layar navy di
 └──────────────────────────────┘
 ```
 
-Menu aktif ditandai garis amber di atas ikonnya. Pengelola melihat 5 menu, staff 3.
+**Bar bawah mengambang** (versi 1.8): kapsul Navy Pass bersudut 20 px, berjarak 12 px dari tepi
+kiri dan kanan dan 8 px di atas jarak aman bawah (6 px di layar pendek), bertepi Garis Navy dan
+berbayangan tiket. Menu aktif ditandai **pil Navy Lapis** di belakang ikon dan katanya, ditambah
+garis amber pendek di tepi atas kapsul; saat pindah menu, pil dan garis itu bergeser ke menu
+yang baru dan ikonnya melonjak sedikit (Bagian 8). Isi layar diberi ruang di bawah supaya baris
+terakhir tidak tertutup kapsul. Pengelola melihat 5 menu, staff 3.
 
 | Lebar layar | Contoh perangkat | Susunan isi |
 |---|---|---|
@@ -209,7 +227,9 @@ aturan ini.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Di kiri bar: ikon buku dan nama aplikasi. Di kanan: nama pengguna. Klik nama itu untuk
+Di kiri bar: logo lencana, nama aplikasi dua warna, dan nama outlet kecil di bawahnya (Bagian
+4.5). Menu aktif ditandai pil Navy Lapis yang memudar di tempatnya dan garis amber di bawahnya;
+bar bertepi bawah Garis Navy. Di kanan: nama pengguna. Klik nama itu untuk
 membuka menu berisi satu pilihan, "Keluar". Karena bar ini ada di semua layar, tombol
 "Keluar" bisa dicapai dari layar mana pun.
 
@@ -251,8 +271,20 @@ di tengah selebar isi layar.
 
 - **Nama:** InventoryKu, ditulis menyambung dengan I dan K kapital. Nama ini tampil di
   bawah ikon setelah aplikasi di-install, di layar Login, dan di bar navigasi laptop/desktop.
-- **Ikon:** buku sederhana bergaya garis, warna Kertas, di atas latar Navy Pass. Pembatas
-  bukunya berwarna Lampu Pass (amber), satu-satunya aksen.
+- **Ikon: buku terbuka** (versi 1.8, dipilih pemilik dari pratinjau logo 12 Oktober 2026,
+  pilihan B). Dua halaman berbentuk bidang padat yang melengkung dari tengah: halaman kiri
+  Kertas dengan tiga garis tulisan Teks di Navy (seperti buku catatan dapur), halaman kanan Garis
+  Halus, dan pita pembatas Lampu Pass (amber) yang tergantung di halaman kanan, satu-satunya
+  aksen. Latar Navy Pass dengan cahaya lembut di kiri atas dan tekstur garis navy (Bagian 2).
+  Bidang padat dipilih supaya tetap terbaca di 16–24 px; ikon garis versi 1.7 terlalu tipis di
+  ukuran itu.
+- **Logo di dalam aplikasi** (versi 1.8): buku terbuka di dalam **lencana** Navy Lapis bertepi
+  Garis Navy dengan bayangan lembut. Ukuran: 72 px (sudut 20) di Login, 40 px (sudut 12) di bar
+  atas, 32 px (sudut 10) di kepala Beranda HP dan tablet. Favicon: buku terbuka tanpa garis
+  tulisan di atas Navy Pass. Saat pertama tampil, lencana membesar ke tempatnya, kedua halaman
+  membuka dari tengah, garis tulisan muncul, lalu pita amber turun (Bagian 8).
+- **Nama di dalam aplikasi** (versi 1.8): Barlow Condensed, "Inventory" berwarna Kertas dan "Ku"
+  berwarna Lampu Pass. Dua warna ini hanya dipakai di atas navy (Login, bar atas, kepala Beranda).
 - Bentuk dibuat sederhana supaya tetap terbaca pada ukuran kecil: tanpa tulisan di dalam ikon.
 - Ukuran yang disiapkan: 192 px dan 512 px untuk Android (termasuk versi *maskable* dengan
   gambar di dalam 80% bagian tengah), dan 180 px untuk iPhone.
@@ -361,7 +393,25 @@ Satu-satunya layar yang sepenuhnya navy.
   Angka menitnya mengikuti pengaturan. Keterangan hilang setelah sebuah nama dipilih.
   Tidak ada hitung mundur atau peringatan sebelum keluar.
 - Di tablet dan desktop, isi layar Login berada di tengah dengan lebar maksimal 420 px.
-  Latar navy tetap memenuhi layar.
+  Latar navy tetap memenuhi layar. Di laptop dan desktop (lebar 1.024 px ke atas, tinggi
+  700 px ke atas) isinya berada di **panel** Navy Lapis tembus 72%, bersudut 24 px, bertepi
+  Garis Navy, lebar maksimal 460 px, dengan bayangan dalam (versi 1.8).
+- **Suasana Login** (versi 1.8, permintaan pemilik 12 Oktober 2026 supaya Login tidak
+  sederhana dan monoton). Di belakang isi, hiasan yang tidak bisa disentuh dan tidak dibaca
+  pembaca layar:
+  - **Rel tiket** di tepi atas: garis Lampu Pass tipis yang berpendar, dengan lima tiket kecil
+    Navy Lapis (klip, dua garis tulisan, garis sobek putus-putus) yang berayun pelan, di kiri
+    dan kanan supaya tidak menutupi isi. Tidak tampil di layar setinggi di bawah 700 px.
+  - **Uap dapur:** tujuh bercak putih sangat tipis yang naik pelan dari bawah lalu hilang.
+  - **Cahaya:** cahaya navy (Bagian 2) dan cahaya hangat Lampu Pass yang sangat tipis di kanan
+    bawah, bergeser berlawanan arah.
+  - **Halo:** lingkar Lampu Pass tipis di sekitar lencana yang membesar dan memudar setiap
+    3,4 detik, seperti lampu pemanas di pass.
+- **Nama aplikasi** muncul huruf demi huruf saat pembuka. Pembaca layar membaca "InventoryKu"
+  utuh.
+- **Tombol nama** (versi 1.8): kotak Navy Lapis bersudut 14 px dengan inisial nama di lingkaran
+  Biru Malam (huruf Lampu Pass), lalu nama di kanannya. Tombol angka PIN: Navy Lapis bersudut
+  16 px, bertepi Garis Navy.
 
 ### 5.2 Beranda (rel tiket)
 
@@ -390,7 +440,9 @@ Satu-satunya layar yang sepenuhnya navy.
 └──────────────────────────────┘
 ```
 
-- Kepala navy mengisi kira-kira sepertiga atas layar. Tiket Kertas menumpuk sebagian di
+- Kepala navy mengisi kira-kira sepertiga atas layar. Di HP dan tablet kepala dibuka baris
+  merek: lencana 32 px dan nama dua warna 20 px (Bagian 4.5), di kiri atas; di laptop/desktop
+  merek sudah ada di bar atas, jadi baris ini tidak tampil. Tiket Kertas menumpuk sebagian di
   atasnya, sehingga terlihat tergantung di rel. Tanggal ditulis dalam dua baris: nama hari
   (16 px, Lampu Pass) lalu tanggal (44 px). Kemajuan ditulis dengan angkanya diperbesar:
   "**1** dari 4 form terisi".
@@ -882,23 +934,36 @@ permintaan maaf dan tidak ada kode teknis.
 
 ---
 
-## 8. Gerak
+## 8. Gerak (penuh gerak)
 
-Gerak punya satu tugas: memberi tahu bahwa sesuatu terjadi. Ketukan diterima, isian
-terkirim, layar berganti. Tidak ada gerak yang hanya hiasan. Di dapur, layar sering
-berminyak, jadi tanda "ketukan Anda masuk" lebih penting daripada keindahan.
+Versi 1.8 (permintaan pemilik 12 Oktober 2026): **penuh gerak** ("full animasi"). Aplikasi terasa
+hidup di setiap layar, bukan hanya saat mengetuk: setiap layar masuk dengan gerak, setiap bagian
+yang digulir muncul dengan gerak, angka dan grafik naik ke tempatnya, dan permukaan navy tidak
+pernah benar-benar diam. Bagian 8.1 mendaftar setiap gerak; Bagian 8.4 menunjukkan gerak apa yang
+terlihat di tiap layar. Gerak tetap tidak boleh memperlambat pekerjaan: ketukan dijawab seketika,
+isian langsung bisa diketik, dan data tidak menunggu gerak selesai. Semua gerak di bawah mati
+saat perangkat diatur "kurangi gerak".
 
 ### 8.1 Daftar gerak
 
 | Gerak | Kapan | Bentuk | Lama |
 |---|---|---|---|
-| Pembuka | Sekali setiap aplikasi dibuka | Tanggal di kepala Beranda muncul perlahan, lalu tiket turun ke rel satu per satu | Tanggal 400 ms; tiap tiket 150 ms dengan jeda 50 ms; paling banyak 8 tiket yang bergerak, sisanya langsung tampil |
+| Pembuka Login | Sekali setiap aplikasi dibuka | Rel tiket turun; lencana membesar ke tempatnya, dua halaman buku membuka dari tengah, garis tulisan muncul, pita amber turun; nama muncul huruf demi huruf; lalu outlet, pilihan nama, tombol nama, dan tautan bawah bertahap; di desktop panel naik | Rel 600 ms; lencana 480 ms; halaman 520 ms mulai 120 ms; pita 440 ms mulai 520 ms; huruf 520 ms, jeda 35 ms, mulai 200 ms; tombol nama 380 ms, jeda 50 ms, mulai 680 ms; tautan bawah mulai 1 detik; panel 600 ms |
+| Langkah Login | Pilih nama, atau "Ganti nama" | Isi langkah baru masuk dari kanan; titik PIN muncul satu per satu; tombol angka muncul bertahap | Langkah 360 ms; titik 300 ms, jeda 40 ms; tombol angka 320 ms, jeda 28 ms; tombol nama jeda 45 ms |
+| Suasana Login | Selama layar Login tampil | Tiket berayun ±3,5°; uap naik dan memudar; cahaya hangat bergeser; halo lencana membesar dan memudar | Ayun 4,6–7,4 detik bolak-balik; uap 10–18 detik; cahaya 20 detik; halo 3,4 detik |
+| Pembuka Beranda | Sekali setiap aplikasi dibuka | Lencana, halaman, dan pita seperti di Login, tanggal muncul perlahan, ruas rel terbentang dari kiri | Tanggal 400 ms; rel 520 ms mulai 200 ms |
+| Tiket turun | Setiap Beranda dibuka | Tiket turun ke rel satu per satu | Tiap tiket 360 ms, jeda 60 ms, paling banyak 8 tiket yang bergerak |
+| Ganti layar | Pindah layar | Isi kepala navy dan bagian isi layar naik 14 px sambil menjadi jelas, satu per satu; bingkai navy tetap diam. Hanya isi pertama layar; data yang tiba sesudahnya tampil tanpa gerak | 340 ms; jeda 40 ms; paling banyak 8 bagian |
+| Muncul saat digulir | Bagian yang berada di bawah layar saat layar dibuka masuk ke layar | Naik 18 px sambil menjadi jelas, sekali per bagian | 460 ms |
+| Angka utama | Nilai stock, angka ubin Dashboard, angka di kepala layar, jumlah form terisi | Naik ke tempatnya sambil menjadi jelas (tidak berhitung) | 520 ms |
+| Grafik | Grafik pertama kali tampil | Batang waste tumbuh dari garis dasar satu per satu; titik suhu muncul membesar; cincin Form terisi berputar ke tempatnya; grafik harga naik | Batang 560 ms, jeda 50 ms; titik 340 ms, jeda 70 ms; cincin 640 ms |
+| Cahaya navy | Selama kepala navy atau layar Login tampil | Satu bercak cahaya Garis Navy bergeser pelan di belakang isi | 16 detik, bolak-balik |
 | Tekan | Tombol, tiket, baris daftar, atau tombol papan PIN ditekan | Latar sedikit menggelap dan ukurannya turun ke 98% | 100 ms |
+| Arahan tetikus | Laptop/desktop, tetikus di atas tiket, ubin, atau kotak Nilai stock | Naik 3 px | 180 ms |
 | Cap terkirim | Tanda status berganti menjadi Terkirim, Nihil, atau Diperiksa | Tanda status muncul dari ukuran 115% ke 100% sambil menjadi jelas, seperti dicap | 150 ms |
 | Ruas rel menyala | Satu form menjadi lengkap | Ruas rel berganti dari Rel Padam ke Lampu Pass dengan memudar | 200 ms |
-| Momen selesai | Form terakhir hari itu lengkap | Ruas terakhir menyala dan tulisan kemajuan berganti dengan memudar | 300 ms, sekali |
-| Penanda menu | Pindah menu | Garis amber bergeser ke menu yang baru | 200 ms |
-| Ganti layar | Pindah layar | Isi layar baru memudar masuk; bingkai navy tetap diam | 120 ms |
+| Momen selesai | Form terakhir hari itu lengkap | Ruas terakhir menyala, tulisan kemajuan berganti dengan memudar, dan kilau putih lewat sekali di rel | 300 ms; kilau 900 ms, sekali |
+| Menu | Pindah menu | Bar bawah: pil Navy Lapis dan garis amber bergeser ke menu baru, ikonnya melonjak sedikit. Bar atas: pil memudar di menu baru, garis amber bergeser | Pil 320 ms; garis 200 ms; ikon 380 ms |
 | Lembar bawah dan dialog | Dibuka atau ditutup | Lembar naik dari bawah; dialog memudar | Buka 200 ms, tutup 150 ms |
 | Pesan singkat dan pita sinyal | Muncul atau hilang | Bergeser 8 px sambil memudar | 200 ms |
 | Titik PIN | Tiap angka PIN diketuk | Titik amber muncul dengan memudar | 100 ms |
@@ -908,31 +973,59 @@ berminyak, jadi tanda "ketukan Anda masuk" lebih penting daripada keindahan.
 
 ### 8.2 Aturan supaya tetap ringan
 
-1. **Hanya CSS.** Semua gerak dibuat dengan `transition` dan `@keyframes`. Tanpa library
-   animasi, dan tanpa animasi yang dihitung JavaScript tiap bingkai.
+1. **Hanya CSS.** Semua gerak dibuat dengan `transition` dan `@keyframes`. JavaScript hanya
+   memasang atau melepas kelas (misalnya saat bagian masuk layar, lewat
+   `IntersectionObserver`). Tanpa library animasi, dan tanpa animasi yang dihitung JavaScript
+   tiap bingkai.
 2. **Hanya dua sifat yang digerakkan:** `transform` (geser, skala, putar) dan `opacity`
    (jelas atau pudar). Keduanya paling ringan bagi HP. Yang tidak boleh digerakkan: lebar,
-   tinggi, jarak, posisi, bayangan, dan blur. Satu pengecualian: warna latar pada keadaan
-   tekan.
-3. **Singkat.** Gerak yang terlihat berkali-kali sehari paling lama 200 ms. Gerak lain
-   paling lama 300 ms. Hanya Pembuka yang boleh 400 ms. Kerangka memuat dan indikator
-   putar diatur butir 6.
-4. **Tanpa pantulan.** Gerak masuk melambat di akhir (`ease-out`), gerak keluar makin cepat
-   (`ease-in`). Tidak ada efek memantul atau melenting.
+   tinggi, jarak, posisi, warna, bayangan, dan blur. Satu pengecualian: warna latar pada
+   keadaan tekan.
+3. **Cukup singkat.** Gerak yang menjawab ketukan paling lama 200 ms. Gerak masuk (layar, bagian,
+   angka, grafik, pembuka) paling lama 640 ms termasuk jedanya tidak lebih dari 1 detik. Cahaya
+   navy, kerangka memuat, dan indikator putar diatur butir 6.
+4. **Ayunan.** Gerak masuk melambat di akhir (`ease-out` atau kurva yang setara), gerak keluar
+   makin cepat (`ease-in`). Benda kecil (lencana, pembatas, pil menu, ikon menu, tiket, titik
+   suhu) boleh sedikit melewati tempatnya lalu kembali; tidak ada pantulan berulang.
 5. **Tidak pernah menunda pekerjaan.** Kolom isian langsung bisa diketik, ketukan saat
-   gerak berjalan tetap diterima, dan data tidak menunggu gerak selesai.
-6. **Paling banyak satu gerak yang terus berjalan** di satu layar (kerangka memuat atau
-   indikator putar), dan gerak itu berhenti begitu data tiba atau proses selesai.
-7. **Grafik tampil langsung,** tanpa animasi.
-8. **Kurangi gerak.** Jika perangkat diatur "kurangi gerak" (`prefers-reduced-motion`),
-   semua gerak geser, skala, goyang, dan denyut dimatikan. Perubahan keadaan langsung
-   jadi, dan pesan teksnya tetap tampil. Indikator putar tetap ada, karena ia memberi
-   tahu bahwa proses masih berjalan.
+   gerak berjalan tetap diterima, dan data tidak menunggu gerak selesai. Isi yang digambar
+   ulang karena data baru tidak bergerak lagi (kecuali angka dan grafik yang nilainya berubah).
+6. **Gerak yang terus berjalan:** cahaya navy (sangat pelan, hanya `transform`), ditambah paling
+   banyak satu lagi (kerangka memuat atau indikator putar) yang berhenti begitu data tiba atau
+   proses selesai. Pengecualian: layar Login, yang tidak dipakai untuk bekerja, boleh punya
+   suasana yang terus bergerak (rel tiket berayun, uap, cahaya hangat, halo lencana; Bagian
+   5.1), semuanya pelan dan hanya `transform` dan `opacity`.
+7. **Kurangi gerak.** Jika perangkat diatur "kurangi gerak" (`prefers-reduced-motion`),
+   semua gerak masuk, geser, skala, goyang, denyut, cahaya, dan muncul saat digulir dimatikan.
+   Semua bagian langsung tampil, perubahan keadaan langsung jadi, dan pesan teksnya tetap
+   tampil. Indikator putar tetap ada, karena ia memberi tahu bahwa proses masih berjalan.
 
 ### 8.3 Yang tidak dipakai
 
-Animasi saat layar digulir, latar yang bergerak, angka yang berhitung naik, animasi masuk
-di tiap kartu setiap kali layar dibuka, dan gerak hiasan yang berulang tanpa henti.
+Angka yang berhitung naik (butuh JavaScript tiap bingkai), gerak yang menggerakkan ukuran,
+warna, atau bayangan, efek paralaks, dan gerak yang berulang cepat tanpa henti.
+
+### 8.4 Gerak per layar
+
+Semua layar memakai pola bersama: **ganti layar** (isi kepala navy dan bagian isi naik satu per
+satu), **muncul saat digulir** (bagian yang semula di bawah layar), **cahaya navy** di kepala, dan
+gerak **menu**, **tekan**, **lembar**, serta **pesan singkat** (Bagian 8.1). Tambahan per layar:
+
+| Layar | Gerak yang terlihat |
+|---|---|
+| Login | Pembuka Login sekali setiap aplikasi dibuka: rel tiket turun, lencana membesar dan bukunya membuka, nama muncul huruf demi huruf, lalu outlet, tombol nama, dan tautan bawah bertahap; di desktop panelnya naik sambil membesar dari 97%. Suasana yang terus bergerak (Bagian 5.1): tiket berayun, uap naik, dua cahaya bergeser, halo lencana. Pilih nama: langkah PIN masuk dari kanan, enam titik PIN muncul satu per satu, tombol angka muncul bertahap. "Ganti nama": tombol nama masuk lagi dari kanan. Titik PIN terisi; enam titik bergoyang saat PIN salah. Berganti langkah tidak mengulang pembuka. |
+| Beranda | Pembuka sekali setiap aplikasi dibuka (lencana dan pembatas di baris merek, tanggal muncul, ruas rel terbentang); tiket turun ke rel setiap Beranda dibuka; jumlah form terisi naik; cap pada tiket yang baru Terkirim atau Nihil; ruas rel menyala; momen selesai dengan kilau di rel; pemberitahuan di bawah tiket naik bertahap. |
+| Isi form (Stock, Suhu, Prep list, Waste, form kustom) | Kepala dan bagian layar naik bertahap; kartu item yang berada di bawah layar muncul saat digulir; bilah kirim di bawah tetap diam (tidak pernah tersembunyi); kartu Waste mengikuti jari saat digeser untuk dihapus. Kolom isian bisa diketik sejak layar tampil. |
+| Riwayat | Pilihan dan daftar kiriman naik bertahap; kiriman di bawah layar muncul saat digulir; cap pada tanda Diperiksa setelah Tandai diperiksa. |
+| Laporan | Kartu Laporan harian, Daftar belanja, dan Rekap bulanan naik bertahap. |
+| Dashboard | Nilai stock di kepala naik; ubin menggantung naik bertahap dengan angkanya; cincin Form terisi berputar ke tempatnya; daftar Perlu perhatian dan grafik muncul saat digulir; batang waste tumbuh satu per satu; titik suhu muncul satu per satu. |
+| Pengaturan | Daftar dan kartu naik bertahap; di layar item, Stock hari ini dan Harga sekarang di kepala naik dan grafik tangga harga naik. |
+| Lembar dan dialog | Lembar naik dari bawah, dialog memudar; isinya tidak bergerak lagi supaya bisa langsung diisi. |
+
+Isi yang digambar ulang karena data baru dari server tidak mengulang gerak masuk (Bagian 8.2
+butir 5); hanya angka dan grafik yang nilainya berubah yang naik lagi. Saat perangkat diatur
+"kurangi gerak", semua layar tampil langsung tanpa gerak apa pun dari tabel ini kecuali
+indikator putar.
 
 ---
 
@@ -957,9 +1050,9 @@ di tiap kartu setiap kali layar dibuka, dan gerak hiasan yang berulang tanpa hen
 |---|---|
 | Tema gelap di layar isi form | Sulit dibaca di bawah lampu dapur, silau di layar berminyak |
 | Foto atau video latar | Memperlambat aplikasi dan mengganggu keterbacaan angka |
-| Gradasi warna dan efek kaca | Tidak menambah informasi; membuat tampilan tidak bersih. Satu-satunya pengecualian: pudarnya tekstur garis di kepala navy (Bagian 2) |
+| Gradasi warna dan efek kaca | Tidak menambah informasi; membuat tampilan tidak bersih. Pengecualian: pudarnya tekstur garis dan cahaya pelan, keduanya hanya di permukaan navy (Bagian 2) |
 | Lebih dari satu warna aksen | Aksen akan berebut dengan warna makna status |
-| Animasi masuk di setiap kartu, animasi saat menggulir, latar bergerak, angka berhitung naik | Memperlambat pengisian dan menyita tenaga HP |
+| Angka berhitung naik, paralaks, gerak yang menggerakkan ukuran, warna, atau bayangan | Butuh hitungan tiap bingkai dan menyita tenaga HP (versi 1.8 memakai gerak masuk, muncul saat digulir, dan cahaya pelan dengan aturan Bagian 8.2) |
 | Library animasi dan library grafik | Menambah berat unduhan; CSS dan SVG sudah cukup |
 | Mengunci arah layar | Tablet sering dipakai mendatar |
 
@@ -974,11 +1067,11 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Gaya sinematik | Hanya di bingkai: Login, kepala Beranda, bar navigasi. Layar isi form tetap terang. |
 | Warna laporan PDF dan tab Harian | Navy, seragam dengan website (Bagian 2) |
 | Nama aplikasi | InventoryKu |
-| Ikon aplikasi | Buku (Bagian 4.5) |
+| Ikon aplikasi | Buku terbuka dengan pita amber (pilihan B dari pratinjau logo 12 Oktober 2026, Bagian 4.5) |
 | Bar navigasi di laptop/desktop | Di atas |
 | Bar navigasi di HP | Di bawah |
 | Bar navigasi di tablet | Di bawah sampai lebar 1.023 px; di atas mulai 1.024 px |
-| Gerak | Ditambah secukupnya, hanya sebagai jawaban atas tindakan, dengan aturan ringan (Bagian 8) |
+| Gerak | Versi 1.8 (12 Oktober 2026): penuh gerak ("full animasi") di setiap layar: masuk bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan. Tetap hanya CSS, hanya `transform` dan `opacity`, dan mati saat "kurangi gerak" (Bagian 8, daftar per layar di Bagian 8.4) |
 | Garis kemajuan hari ini | Digabung dengan rel tiket di kepala Beranda (Bagian 5.2) |
 | Momen selesai | Rel menyala penuh dan tulisan "Semua form hari ini sudah terisi" |
 | Grafik di Dashboard aplikasi | Dua grafik kecil: waste 7 hari terakhir dan suhu hari ini (Bagian 5.6) |
@@ -987,4 +1080,5 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
+| Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
