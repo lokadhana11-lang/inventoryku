@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.14 (memuat lebih cepat)
+// InventoryKu Code.gs v0.15 (pindah ke Supabase)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -59,9 +59,21 @@
  *                        bisa masuk; membuat Kode Pemasangan baru.
  * - ujiPemisahHalamanPdf : dijalankan dari editor; menguji apakah konversi PDF
  *                        mematuhi pemisah halaman (PDF stock per kategori).
+ * - 15 Oktober 2026    : pindah ke Supabase (supabase/PANDUAN.md). File ini juga
+ *                        dijalankan Supabase Edge Function (DI_SUPABASE_);
+ *                        sesudah file ini berubah, jalankan node supabase/rakit.mjs
+ *                        dan tempel ulang supabase/functions/api/index.ts.
+ * - pindahKeSupabase   : dijalankan sekali dari editor; memindahkan data.
+ * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.14';
+var VERSI_KODE = 'v0.15';
+
+/**
+ * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
+ * DI_SUPABASE diisi true oleh pembungkusnya. Di Apps Script variabel itu tidak ada.
+ */
+var DI_SUPABASE_ = typeof DI_SUPABASE !== 'undefined' && DI_SUPABASE === true;
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -212,6 +224,11 @@ function doPost(e) {
   lupakanMemoTab_();
   MEMO_TAB_AKTIF_ = false;
   DALAM_KUNCI_ = 0;
+  // Sesudah pindah ke Supabase: HP yang masih memakai alamat lama dialihkan ke alamat baru.
+  if (sudahPindah_()) {
+    return balasJson_({ ok: false, pesan: 'InventoryKu sudah pindah ke server baru. Tutup aplikasi, lalu buka lagi.',
+      pindahKe: alamatSupabase_() });
+  }
   try {
     var body = bacaBody_(e);
     nama = typeof body.action === 'string' ? body.action : '';
@@ -859,6 +876,10 @@ function hanguskanKodePemasangan_() {
  * salah ikut dibuka.
  */
 function buatKodePemasangan() {
+  if (sudahPindah_()) {
+    teruskanKeSupabase_('buatKodePemasangan');
+    return sinkronDariSupabase();
+  }
   var kode = buatKodeAcak_(8);
   tulisKonfigurasi_('kode_pemasangan', kode,
     'Kode Pemasangan sekali pakai, dibuat ' + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH:mm') +
@@ -1734,6 +1755,8 @@ function tambahBarisTabel_(tabel, daftarIsi) {
 
 /** Tanggal terbaru di atas, lalu kolom berikutnya (spesifikasi sistem Bagian 8.4). */
 function urutkanTabel_(tabel, urutan) {
+  // Di Supabase, Range.sort atas seluruh isi tab mencatat aturan urutan dan diterapkan setiap tab dimuat
+  // (supabase/src/sheet.js), jadi tidak ada baris yang ditulis ulang.
   var sheet = tabel.sheet;
   var n = sheet.getLastRow() - 1;
   if (n < 2) return;
@@ -2906,6 +2929,9 @@ function aksiKirimSuhu_(body, pengguna) {
  * jadi data lama ikut rapi pada kiriman Suhu berikutnya.
  */
 function urutkanSuhu_(tabel) {
+  // Di Supabase tidak diurutkan: layar Suhu, grafik, PDF, dan email mengurutkan sendiri, dan salinan ke
+  // Google Sheets mengurutkan tab ini (butir 151).
+  if (DI_SUPABASE_) return;
   var sheet = tabel.sheet;
   var n = sheet.getLastRow() - 1;
   var lebar = sheet.getLastColumn();
@@ -4213,6 +4239,14 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     if (jadwalBerubah) {
       tulisKonfigurasi_('pasang_trigger', 'Perlu dijalankan: jadwal diubah ' + waktuSekarangId_() + ' oleh ' + pengguna.nama + '.',
         KETERANGAN_PASANG_TRIGGER);
+      // Di Supabase jadwal langsung dipasang ulang (pg_cron), tanpa menjalankan pasangTrigger dari editor.
+      if (DI_SUPABASE_) {
+        try {
+          pasangTrigger();
+        } catch (err) {
+          console.error('Jadwal tidak bisa dipasang ulang: ' + err);
+        }
+      }
     }
     var hasil = dataOutletJadwal_();
     hasil.jadwalBerubah = jadwalBerubah;
@@ -6685,6 +6719,8 @@ var LAPORAN_PDF = {
 var PROP_PEMISAH_HALAMAN = 'PDF_PEMISAH_HALAMAN';
 
 function pemisahHalamanPdf_() {
+  // Di Supabase PDF dibuat supabase/src/pdf.js, yang selalu mematuhi pemisah halaman.
+  if (DI_SUPABASE_) return true;
   return String(PropertiesService.getScriptProperties().getProperty(PROP_PEMISAH_HALAMAN) || '')
     .trim().toLowerCase() === 'ya';
 }
@@ -7253,6 +7289,7 @@ function aksiSimpanPdfDrive_(body) {
  * Property itu sendiri (Project Settings → Script Properties).
  */
 function ujiPemisahHalamanPdf() {
+  if (sudahPindah_() || DI_SUPABASE_) return console.log('Di Supabase PDF selalu mematuhi pemisah halaman; uji ini tidak diperlukan.');
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
     'body{font-family:Arial,Helvetica,sans-serif}.halaman-baru{page-break-before:always;break-before:page}' +
     '</style></head><body>' +
@@ -7293,6 +7330,15 @@ function catatStatusSistem_(kunci, teks, keterangan) {
   } catch (err) {
     console.error('Status ' + kunci + ' tidak bisa dicatat: ' + err);
   }
+}
+
+/**
+ * Supabase: email yang gagal dikirim sesudah datanya tersimpan (Brevo, atau Gmail lewat salinan ke Sheets)
+ * dicatat seperti kegagalan email lain, sehingga tampil di Beranda Pengelola.
+ */
+function catatSurelGagal_(asal, pesan) {
+  var kunci = /Rekap/.test(String(asal)) ? 'rekap_terakhir' : 'laporan_terakhir';
+  catatStatusSistem_(kunci, 'Gagal ' + waktuSekarangId_() + ': email tidak terkirim (' + pesan + ').');
 }
 
 /** Untuk Beranda Pengelola: email laporan, cadangan, atau rekap bulanan terakhir yang gagal. */
@@ -7634,6 +7680,7 @@ function jalankanLaporanHarian_(opsi) {
  * sampai lewat tengah malam, laporan tetap untuk hari kemarin.
  */
 function kirimLaporanHarian() {
+  if (sudahPindah_()) return console.log('Sudah pindah ke Supabase: laporan harian dikirim dari sana.');
   SS_ = null;
   var jam = Number(Utilities.formatDate(new Date(), zonaWaktu_(), 'H'));
   var tanggal = jam < 6 ? geserTanggal_(hariIni_(), -1) : hariIni_();
@@ -7646,6 +7693,7 @@ function kirimLaporanHarian() {
  * Hasilnya tertulis di log eksekusi.
  */
 function kirimLaporanSekarang() {
+  if (sudahPindah_()) return teruskanKeSupabase_('kirimLaporanSekarang');
   var h = jalankanLaporanHarian_({ tanggal: null, uji: true });
   console.log(h.terkirim
     ? 'Email terkirim ke ' + h.penerima.join(', ') + ' dengan ' + h.pdf.length + ' PDF (' +
@@ -7662,6 +7710,7 @@ function kirimLaporanSekarang() {
  * kegagalan disebut di email harian berikutnya.
  */
 function buatCadangan() {
+  if (sudahPindah_()) return console.log('Sudah pindah ke Supabase: cadangan dibuat dari sana.');
   SS_ = null;
   var ket = 'Diisi otomatis oleh cadangan mingguan. Baris yang diawali "Gagal" disebut di email harian dan Beranda Pengelola.';
   try {
@@ -7670,7 +7719,12 @@ function buatCadangan() {
     var folder = cariAtauBuatFolder_(akar, FOLDER_CADANGAN);
     var awalan = 'Cadangan ' + ss.getName() + ' ';
     var nama = awalan + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmm');
-    DriveApp.getFileById(ss.getId()).makeCopy(nama, folder);
+    if (DI_SUPABASE_) {
+      // Di Supabase: isi semua tab sebagai satu berkas JSON (disalin ke Drive bersama berkas lain).
+      folder.createFile(Utilities.newBlob(isiCadanganJson_(ss), 'application/json', nama + '.json'));
+    } else {
+      DriveApp.getFileById(ss.getId()).makeCopy(nama, folder);
+    }
     var salinan = [];
     var it = folder.getFiles();
     while (it.hasNext()) {
@@ -7687,6 +7741,17 @@ function buatCadangan() {
     console.error('Cadangan gagal: ' + (err && err.stack ? err.stack : err));
     catatStatusSistem_('cadangan_terakhir', 'Gagal ' + waktuSekarangId_() + ': ' + (err && err.message ? err.message : err), ket);
   }
+}
+
+/** Cadangan di Supabase: { dibuat, tab: [{ nama, nilai: [[...]] }] }; tanggal ditulis ISO. */
+function isiCadanganJson_(ss) {
+  return JSON.stringify({
+    dibuat: new Date().toISOString(),
+    versiKode: VERSI_KODE,
+    tab: ss.getSheets().map(function (sheet) {
+      return { nama: sheet.getName(), nilai: sheet.getLastRow() ? sheet.getDataRange().getValues() : [] };
+    })
+  });
 }
 
 /* =========================================================================
@@ -8436,6 +8501,7 @@ function jalankanRekapBulanan_(opsi) {
 
 /** Dijalankan trigger bulanan tanggal 1 (dipasang pasangTrigger): rekap bulan sebelumnya. */
 function kirimRekapBulanan() {
+  if (sudahPindah_()) return console.log('Sudah pindah ke Supabase: rekap bulanan dikirim dari sana.');
   SS_ = null;
   resetMemoForm_();
   return jalankanRekapBulanan_({ bulan: bulanLalu_(hariIni_()) });
@@ -8450,6 +8516,7 @@ function kirimRekapBulanan() {
  * menggantikannya). Hasilnya tertulis di log eksekusi.
  */
 function kirimRekapSekarang() {
+  if (sudahPindah_()) return teruskanKeSupabase_('kirimRekapSekarang');
   SS_ = null;
   resetMemoForm_();
   var hari = hariIni_();
@@ -8482,6 +8549,10 @@ var JAM_CADANGAN = 3; // dini hari
  * zona waktu yang tersimpan.
  */
 function pasangTrigger() {
+  if (sudahPindah_()) {
+    pasangSinkron_();
+    return teruskanKeSupabase_('pasangTrigger');
+  }
   SS_ = null;
   var konf = bacaKonfigurasi_().nilai;
   var zona = zonaWaktu_();
@@ -8506,6 +8577,356 @@ function pasangTrigger() {
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');
   catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +
     jamTeks + ', cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.', KETERANGAN_PASANG_TRIGGER);
+}
+
+/* =========================================================================
+ * Pindah ke Supabase (Code.gs v0.15, spesifikasi sistem Bagian 4.3).
+ * Sesudah pindah, aplikasi memakai Supabase Edge Function (folder supabase/),
+ * yang menjalankan file ini juga (DI_SUPABASE_). Yang tinggal di Apps Script:
+ * - pindahKeSupabase    : dijalankan sekali dari editor; memindahkan semua isi
+ *                         Sheet dan Script Properties ke Supabase, lalu memasang
+ *                         trigger salinan tiap 5 menit.
+ * - sinkronDariSupabase : trigger tiap 5 menit; menyalin tab yang berubah ke
+ *                         Sheet ini (Sheet hanya untuk dicek: ketikan langsung
+ *                         di Sheet tertimpa), menyalin laporan PDF, foto, dan
+ *                         cadangan ke Drive, dan mengirim email dari Gmail jika
+ *                         Brevo tidak dipasang di Supabase.
+ * - fungsi editor lain (setupSpreadsheet, pasangTrigger, kirimLaporanSekarang,
+ *   kirimRekapSekarang, buatKodePemasangan) diteruskan ke Supabase.
+ * Alamat dan rahasia diisi pemilik di Project Settings → Script Properties
+ * (SUPABASE_API, RAHASIA_SINKRON), tidak pernah ditulis di repo.
+ * ========================================================================= */
+
+var PROP_SUPABASE_API = 'SUPABASE_API';
+var PROP_RAHASIA_SINKRON = 'RAHASIA_SINKRON';
+var PROP_SUDAH_PINDAH = 'SUDAH_PINDAH';
+var PROP_SINKRON_VERSI = 'SINKRON_VERSI';
+var PROP_TIMPA_SUPABASE = 'TIMPA_SUPABASE';
+var PROP_SINKRON_PENUH = 'SINKRON_PENUH'; // tanggal salinan penuh terakhir
+var JAM_SINKRON_PENUH = 2; // sekali sehari sesudah jam ini semua tab disalin penuh (memperbaiki ketikan langsung di Sheet)
+var BARIS_PER_KIRIMAN_IMPOR = 2000;
+var MENIT_SINKRON = 5;
+// Property yang tidak ikut pindah: milik Apps Script saja.
+var PROP_TIDAK_DIPINDAH = [PROP_SUPABASE_API, PROP_RAHASIA_SINKRON, PROP_SUDAH_PINDAH, PROP_SINKRON_VERSI,
+  PROP_TIMPA_SUPABASE, PROP_SINKRON_PENUH, 'SPREADSHEET_ID'];
+
+/** true di Apps Script setelah pindahKeSupabase berhasil. */
+function sudahPindah_() {
+  if (DI_SUPABASE_) return false;
+  return !!PropertiesService.getScriptProperties().getProperty(PROP_SUDAH_PINDAH);
+}
+
+function alamatSupabase_() {
+  return String(PropertiesService.getScriptProperties().getProperty(PROP_SUPABASE_API) || '').trim();
+}
+
+/** Memanggil Edge Function sebagai pemilik (rahasia sinkron). Mengembalikan data jawaban atau melempar galat. */
+function panggilSupabase_(aksi, isi) {
+  var props = PropertiesService.getScriptProperties();
+  var url = alamatSupabase_();
+  var rahasia = String(props.getProperty(PROP_RAHASIA_SINKRON) || '').trim();
+  if (!/^https?:\/\//.test(url) || !rahasia) {
+    throw new Error('Isi dulu Script Properties SUPABASE_API (alamat Edge Function, diawali https://) dan RAHASIA_SINKRON ' +
+      '(sama dengan secret RAHASIA_SINKRON di Supabase): Project Settings → Script Properties.');
+  }
+  var body = { action: aksi, rahasia: rahasia };
+  Object.keys(isi || {}).forEach(function (k) { body[k] = isi[k]; });
+  var r = UrlFetchApp.fetch(url, {
+    method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify(body), muteHttpExceptions: true
+  });
+  var teks = r.getContentText();
+  var j;
+  try {
+    j = JSON.parse(teks);
+  } catch (err) {
+    throw new Error('Supabase menjawab ' + r.getResponseCode() + ' yang bukan JSON: ' + teks.slice(0, 300));
+  }
+  if (!j || !j.ok) throw new Error('Supabase: ' + (j && j.pesan ? j.pesan : 'jawaban ' + r.getResponseCode()));
+  return j.data;
+}
+
+/** Menjalankan fungsi Code.gs di Supabase dan menulis catatannya ke log editor ini. */
+function teruskanKeSupabase_(nama, argumen) {
+  console.log('Dijalankan di Supabase: ' + nama + '.');
+  var h = panggilSupabase_('__fungsi', { nama: nama, argumen: argumen || [] });
+  (h.catatan || []).forEach(function (c) { console.log(c); });
+  return h.keluaran;
+}
+
+function nilaiKeSupabase_(v) {
+  return v instanceof Date ? { $d: v.getTime() } : v;
+}
+
+function nilaiDariSupabase_(v) {
+  return v && typeof v === 'object' && v.$d != null ? new Date(v.$d) : v;
+}
+
+/**
+ * Jalankan SEKALI dari editor Apps Script setelah Supabase disiapkan (lihat supabase/PANDUAN.md). Selama berjalan
+ * aplikasi menolak isian baru ("sudah pindah ke server baru"), supaya tidak ada isian yang tertinggal di Sheet.
+ * Sesudahnya config.js diarahkan ke Supabase; HP yang masih memakai alamat lama dialihkan otomatis.
+ */
+function pindahKeSupabase() {
+  if (DI_SUPABASE_) throw new Error('pindahKeSupabase dijalankan dari editor Apps Script, bukan di Supabase.');
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(PROP_SUDAH_PINDAH)) {
+    throw new Error('Sudah pindah ke Supabase pada ' + props.getProperty(PROP_SUDAH_PINDAH) + '. Menjalankan ulang akan ' +
+      'menimpa data di Supabase dengan isi Sheet ini. Jika memang itu yang diinginkan: hapus Script Property SUDAH_PINDAH, ' +
+      'isi TIMPA_SUPABASE dengan ya, lalu jalankan lagi.');
+  }
+  panggilSupabase_('ping', {});
+  var ss = SpreadsheetApp.getActiveSpreadsheet() || bukaSpreadsheet_();
+  var kunci = LockService.getScriptLock();
+  kunci.waitLock(30000);
+  props.setProperty(PROP_SUDAH_PINDAH, Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd HH:mm'));
+  try {
+    var semua = props.getProperties();
+    var properti = {};
+    Object.keys(semua).forEach(function (k) { if (PROP_TIDAK_DIPINDAH.indexOf(k) < 0) properti[k] = semua[k]; });
+    var sheets = ss.getSheets();
+    panggilSupabase_('__impor', {
+      langkah: 'mulai',
+      timpa: String(props.getProperty(PROP_TIMPA_SUPABASE) || '').trim().toLowerCase() === 'ya',
+      tab: sheets.map(function (sh, i) {
+        return { nama: sh.getName(), urutan: i + 1,
+          meta: { id: sh.getSheetId(), maksBaris: sh.getMaxRows(), maksKolom: sh.getMaxColumns(), beku: sh.getFrozenRows() } };
+      }),
+      properti: properti,
+      info: { namaSpreadsheet: ss.getName(), alamatSheet: ss.getUrl(), zona: ss.getSpreadsheetTimeZone(),
+        emailPemilik: Session.getEffectiveUser().getEmail() }
+    });
+    var jumlah = 0;
+    sheets.forEach(function (sh) {
+      var nama = sh.getName();
+      if (/^Harian_/.test(nama) || nama === 'Dashboard' || !sh.getLastRow()) return;
+      var nilai = sh.getDataRange().getValues();
+      for (var dari = 0; dari < nilai.length; dari += BARIS_PER_KIRIMAN_IMPOR) {
+        var potong = nilai.slice(dari, dari + BARIS_PER_KIRIMAN_IMPOR).map(function (b) { return b.map(nilaiKeSupabase_); });
+        panggilSupabase_('__impor', { langkah: 'baris', nama: nama, dari: dari + 1, nilai: potong });
+      }
+      jumlah += nilai.length;
+      console.log('Dipindah: ' + nama + ' (' + nilai.length + ' baris).');
+    });
+    var hasil = panggilSupabase_('__impor', { langkah: 'selesai' });
+    props.setProperty(PROP_SINKRON_VERSI, JSON.stringify(hasil.versi || {}));
+    props.deleteProperty(PROP_TIMPA_SUPABASE);
+    console.log('Data pindah: ' + sheets.length + ' tab, ' + jumlah + ' baris.');
+  } catch (err) {
+    props.deleteProperty(PROP_SUDAH_PINDAH);
+    throw err;
+  } finally {
+    kunci.releaseLock();
+  }
+  pasangSinkron_();
+  teruskanKeSupabase_('pasangTrigger');
+  sinkronDariSupabase();
+  console.log('Selesai. Ubah config.js ke alamat Supabase, lalu buka aplikasi dari HP. Sheet ini kini salinan yang ' +
+    'diperbarui tiap ' + MENIT_SINKRON + ' menit; perubahan yang diketik langsung di Sheet akan tertimpa.');
+}
+
+/** Menghapus semua trigger Apps Script (laporan, cadangan, rekap kini di Supabase) dan memasang salinan tiap 5 menit. */
+function pasangSinkron_() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('sinkronDariSupabase').timeBased().everyMinutes(MENIT_SINKRON).create();
+  console.log('Trigger salinan dari Supabase terpasang: tiap ' + MENIT_SINKRON + ' menit.');
+}
+
+/** Trigger tiap 5 menit (dipasang pindahKeSupabase atau pasangTrigger sesudah pindah). */
+function sinkronDariSupabase() {
+  if (!sudahPindah_()) return;
+  var kunci = LockService.getScriptLock();
+  if (!kunci.tryLock(5000)) return;
+  var galat = [];
+  var langkah = [
+    ['berkas', salinBerkasKeDrive_],
+    ['tab', salinTabKeSheet_],
+    ['email', kirimSurelLewatGmail_]
+  ];
+  try {
+    langkah.forEach(function (l) {
+      try {
+        l[1]();
+      } catch (err) {
+        console.error('Salinan ' + l[0] + ' gagal: ' + (err && err.stack ? err.stack : err));
+        galat.push(l[0] + ': ' + (err && err.message ? err.message : err));
+      }
+    });
+  } finally {
+    kunci.releaseLock();
+  }
+  if (galat.length) throw new Error('Salinan dari Supabase belum lengkap. ' + galat.join(' | '));
+}
+
+/** Folder Drive dari jalur "Laporan Kitchen/Outlet/2026/10 Oktober". */
+function folderDariJalur_(jalur) {
+  var folder = DriveApp.getRootFolder();
+  String(jalur || '').split('/').filter(function (x) { return x; }).forEach(function (n) {
+    folder = cariAtauBuatFolder_(folder, n);
+  });
+  return folder;
+}
+
+function salinBerkasKeDrive_() {
+  var mulai = Date.now();
+  for (var putaran = 0; putaran < 10 && Date.now() - mulai < 90 * 1000; putaran++) {
+    var d = panggilSupabase_('__berkas', {});
+    var salin = [];
+    d.salin.forEach(function (b) {
+      try {
+        var blob = UrlFetchApp.fetch(b.url).getBlob().setName(b.nama);
+        if (b.mime) blob.setContentType(b.mime);
+        var f = folderDariJalur_(b.jalur).createFile(blob);
+        salin.push({ id: b.id, driveId: f.getId(), url: f.getUrl() });
+      } catch (err) {
+        console.error('Berkas ' + b.jalur + '/' + b.nama + ' gagal disalin ke Drive: ' + err);
+      }
+    });
+    var buang = [];
+    d.buang.forEach(function (b) {
+      try {
+        DriveApp.getFileById(b.driveId).setTrashed(true);
+      } catch (err) {
+        console.error('Salinan berkas di Drive tidak bisa dibuang: ' + err);
+      }
+      buang.push(b.id);
+    });
+    if (salin.length || buang.length) panggilSupabase_('__berkasTersalin', { salin: salin, buang: buang });
+    if (!salin.length && !buang.length) break;
+    if (salin.length < d.salin.length) break; // ada yang gagal: dicoba lagi 5 menit kemudian
+  }
+}
+
+/** Tab master dulu (dropdown di tab lain merujuknya), lalu tab lain menurut urutan di Supabase. */
+function urutanSalinTab_(daftar) {
+  var awal = ['M_Kategori', 'M_Satuan', 'M_Item', 'M_Unit', 'M_Form', 'M_FormKolom'];
+  return daftar.slice().sort(function (a, b) {
+    var ia = awal.indexOf(a.nama);
+    var ib = awal.indexOf(b.nama);
+    var ma = ia >= 0 ? ia : (/^M_/.test(a.nama) ? awal.length : awal.length + 1);
+    var mb = ib >= 0 ? ib : (/^M_/.test(b.nama) ? awal.length : awal.length + 1);
+    return ma - mb || (a.urutan || 0) - (b.urutan || 0);
+  });
+}
+
+function salinTabKeSheet_() {
+  var props = PropertiesService.getScriptProperties();
+  var versi = JSON.parse(props.getProperty(PROP_SINKRON_VERSI) || '{}');
+  var mulai = Date.now();
+  var ss = SpreadsheetApp.getActiveSpreadsheet() || bukaSpreadsheet_();
+  // Sekali sehari semua tab disalin penuh, supaya ketikan langsung di Sheet tertimpa dan salinan pasti sama.
+  var zona = ss.getSpreadsheetTimeZone();
+  var hari = Utilities.formatDate(new Date(), zona, 'yyyy-MM-dd');
+  var penuh = props.getProperty(PROP_SINKRON_PENUH) !== hari && Number(Utilities.formatDate(new Date(), zona, 'H')) >= JAM_SINKRON_PENUH;
+  if (penuh) versi = {};
+  for (var putaran = 0; putaran < 20; putaran++) {
+    var d = panggilSupabase_('__sinkron', { versi: versi });
+    var ditulis = {};
+    urutanSalinTab_(d.tab).forEach(function (t) {
+      var sheet = ss.getSheetByName(t.nama) || buatTabSalinan_(ss, t.nama);
+      if (!t.penuh && barisKunciTerakhir_(sheet, 1) !== t.barisLama) {
+        // Isi Sheet tidak seperti yang dikira Supabase (baris diketik atau dihapus langsung): tab ini disalin penuh.
+        console.log('Tab ' + t.nama + ' berbeda dari salinan terakhir; disalin penuh.');
+        delete versi[t.nama];
+        return;
+      }
+      if (t.penuh) tulisTabPenuh_(sheet, t.nilai, t.lebar);
+      else jalankanLangkahSalin_(sheet, t.langkah, t.lebar);
+      versi[t.nama] = t.versi;
+      ditulis[t.nama] = t.versi;
+      props.setProperty(PROP_SINKRON_VERSI, JSON.stringify(versi));
+    });
+    var ulangi = d.tab.some(function (t) { return !Object.prototype.hasOwnProperty.call(versi, t.nama); });
+    if (Object.keys(ditulis).length) {
+      SpreadsheetApp.flush();
+      panggilSupabase_('__sinkronSelesai', { versi: ditulis });
+      console.log('Disalin dari Supabase: ' + d.tab.filter(function (t) { return ditulis[t.nama]; }).map(function (t) {
+        return t.nama + (t.penuh ? ' (penuh, ' + t.nilai.length + ' baris)' : ' (' + t.langkah.length + ' langkah)');
+      }).join(', ') + '.');
+    }
+    if (d.selesai && !ulangi) {
+      if (penuh) props.setProperty(PROP_SINKRON_PENUH, hari);
+      break;
+    }
+    if (Date.now() - mulai > 4 * 60 * 1000) break;
+  }
+}
+
+/** Tab yang belum ada di Sheet: tab form kustom dibuat lengkap dengan format; tab lain kosong. */
+function buatTabSalinan_(ss, nama) {
+  if (nama.indexOf(AWALAN_TAB_KUSTOM) === 0) {
+    SS_ = null;
+    resetMemoForm_();
+    var id = nama.slice(AWALAN_TAB_KUSTOM.length);
+    var f = cariForm_(id, true);
+    if (f) {
+      try {
+        return siapkanTabKustom_(ss, f, kolomForm_(id), {});
+      } catch (err) {
+        console.error('Tab ' + nama + ' dibuat tanpa format: ' + err);
+      }
+    }
+  }
+  return ss.getSheetByName(nama) || ss.insertSheet(nama);
+}
+
+function barisSalin_(b, lebar) {
+  var a = [];
+  for (var i = 0; i < lebar; i++) a.push(i < b.length ? nilaiDariSupabase_(b[i]) : '');
+  return a;
+}
+
+function tulisTabPenuh_(sheet, nilai, lebar) {
+  var n = nilai.length;
+  if (lebar < 1) lebar = 1;
+  pastikanJumlahKolom_(sheet, lebar);
+  if (sheet.getMaxRows() < n + 1) sheet.insertRowsAfter(sheet.getMaxRows(), n + 1 - sheet.getMaxRows());
+  if (n) sheet.getRange(1, 1, n, lebar).setValues(nilai.map(function (b) { return barisSalin_(b, lebar); }));
+  var akhir = sheet.getLastRow();
+  if (akhir > n) sheet.getRange(n + 1, 1, akhir - n, sheet.getMaxColumns()).clearContent();
+  var kanan = sheet.getLastColumn();
+  if (n && kanan > lebar) sheet.getRange(1, lebar + 1, n, kanan - lebar).clearContent();
+}
+
+/** Langkah dari Supabase dijalankan berurutan: { hapus, jumlah } | { sisip, nilai } | { ubah, nilai } (nomor baris Sheet). */
+function jalankanLangkahSalin_(sheet, langkah, lebar) {
+  if (lebar < 1) lebar = 1;
+  pastikanJumlahKolom_(sheet, lebar);
+  langkah.forEach(function (l) {
+    if (l.hapus != null) {
+      sheet.deleteRows(l.hapus, l.jumlah);
+      return;
+    }
+    var nilai = l.nilai.map(function (b) { return barisSalin_(b, lebar); });
+    var baris = l.sisip != null ? l.sisip : l.ubah;
+    if (l.sisip != null && baris <= sheet.getLastRow()) {
+      sheet.insertRowsBefore(baris, nilai.length);
+    } else if (baris + nilai.length - 1 > sheet.getMaxRows()) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), baris + nilai.length - 1 - sheet.getMaxRows());
+    }
+    sheet.getRange(baris, 1, nilai.length, lebar).setValues(nilai);
+  });
+}
+
+function kirimSurelLewatGmail_() {
+  var daftar = panggilSupabase_('__surel', {});
+  if (!daftar.length) return;
+  var hasil = daftar.map(function (s) {
+    try {
+      var opsi = {
+        to: s.to, subject: s.subject, body: s.body || '', name: s.name || 'InventoryKu',
+        attachments: (s.attachments || []).map(function (a) {
+          return Utilities.newBlob(Utilities.base64Decode(a.data), a.mime, a.nama);
+        })
+      };
+      if (s.htmlBody) opsi.htmlBody = s.htmlBody;
+      MailApp.sendEmail(opsi);
+      return { id: s.id };
+    } catch (err) {
+      return { id: s.id, galat: String(err && err.message ? err.message : err) };
+    }
+  });
+  panggilSupabase_('__surelTerkirim', { hasil: hasil });
+  console.log('Email dikirim dari Gmail: ' + hasil.filter(function (h) { return !h.galat; }).length + ' dari ' + hasil.length + '.');
 }
 
 /* =========================================================================
@@ -8885,6 +9306,10 @@ function konfigurasiAwal_() {
  * menghapus atau menimpa data.
  */
 function setupSpreadsheet() {
+  // Sesudah pindah ke Supabase: susunan data disiapkan di Supabase dulu, lalu Sheet ini (format, rumus, grafik), lalu
+  // Sheet disalin penuh dari Supabase supaya sama persis.
+  var pindah = sudahPindah_();
+  if (pindah) teruskanKeSupabase_('setupSpreadsheet');
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     throw new Error('Jalankan setupSpreadsheet dari editor Apps Script yang menempel pada Google Sheet (Extensions → Apps Script).');
@@ -8908,7 +9333,8 @@ function setupSpreadsheet() {
     });
 
     // Cara menulis rumus yang diterima file ini (lokalitas berdesimal koma memakai titik koma).
-    GAYA_RUMUS_ = deteksiGayaRumus_(ss, catatan);
+    // Di Supabase rumus tidak pernah dihitung (tab Harian dan Dashboard hanya ada di Google Sheets).
+    GAYA_RUMUS_ = DI_SUPABASE_ ? GAYA_RUMUS_ : deteksiGayaRumus_(ss, catatan);
 
     // 2. Susun tiap tab.
     siapkanDashboard_(ss, ss.getSheetByName('Dashboard'), catatan);
@@ -8965,6 +9391,12 @@ function setupSpreadsheet() {
       siapkanTabKustom_(ss, f, kolomForm_(f.id), { catatan: catatan });
     });
 
+    if (DI_SUPABASE_) {
+      aturUrutanTab_(ss);
+      console.log('InventoryKu ' + VERSI_KODE + ' setupSpreadsheet di Supabase:\n- ' +
+        (catatan.length ? catatan.join('\n- ') : 'tidak ada yang berubah'));
+      return;
+    }
 
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
     pasangRumusHarianStock_(ss, catatan);
@@ -9001,6 +9433,11 @@ function setupSpreadsheet() {
   catatan.push('Selesai. ID spreadsheet tersimpan di Script Properties.');
   catatan.push('Kode Pemasangan ada di tab M_Konfigurasi (baris kode_pemasangan).');
   console.log('InventoryKu ' + VERSI_KODE + ' setupSpreadsheet:\n- ' + catatan.join('\n- '));
+  if (pindah) {
+    PropertiesService.getScriptProperties().deleteProperty(PROP_SINKRON_VERSI);
+    console.log('Sheet disalin penuh dari Supabase (tab besar bisa berlanjut di salinan 5 menit berikutnya).');
+    sinkronDariSupabase();
+  }
 }
 
 /* ---------- Rumus sesuai lokalitas spreadsheet ---------- */

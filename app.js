@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.15.1';
+  var VERSI_APLIKASI = '0.16.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -243,7 +243,11 @@
    * API
    * ===================================================================== */
 
-  function alamatApi() {
+  // Server pindah (Apps Script → Supabase): server lama menjawab pindahKe; alamat baru dipakai selama config.js
+  // di HP ini masih berisi alamat lama (config.js baru datang di latar, butir 196).
+  var KUNCI_PINDAH_API = 'inventoryku:pindahApi';
+
+  function alamatConfig() {
     if (typeof API_URL === 'undefined') {
       throw new Error(PESAN.configTidakTermuat);
     }
@@ -257,10 +261,18 @@
     return alamat;
   }
 
+  function alamatApi() {
+    var alamat = alamatConfig();
+    var pindah = Simpan.baca(KUNCI_PINDAH_API);
+    if (pindah && pindah.dari === alamat && typeof pindah.ke === 'string' && pindah.ke.indexOf('https://') === 0) return pindah.ke;
+    if (pindah) Simpan.hapus(KUNCI_PINDAH_API);
+    return alamat;
+  }
+
   /**
    * Memanggil satu aksi API. Body berupa JSON.stringify dengan satu-satunya
    * header Content-Type: text/plain;charset=utf-8, supaya browser tidak
-   * mengirim preflight CORS (Apps Script tidak melayaninya). Token sesi ikut
+   * mengirim preflight CORS (Apps Script tidak melayaninya; Supabase tidak membutuhkannya). Token sesi ikut
    * di dalam body.
    * Berhasil: mengembalikan isi field "data". Gagal: melempar Error berisi
    * pesan berbahasa Indonesia yang siap ditampilkan; err.sesiBerakhir = true
@@ -310,6 +322,11 @@
         }
         if (!json || typeof json !== 'object' || typeof json.ok !== 'boolean') {
           throw galatJaringan(PESAN.jawabanTidakDikenal);
+        }
+        if (!json.ok && typeof json.pindahKe === 'string' && json.pindahKe.indexOf('https://') === 0 &&
+            json.pindahKe !== alamat && !(opsi && opsi.dialihkan)) {
+          Simpan.tulis(KUNCI_PINDAH_API, { dari: alamatConfig(), ke: json.pindahKe });
+          return panggilApi(aksi, isi, Object.assign({}, opsi || {}, { dialihkan: true }));
         }
         if (!json.ok) {
           var galat = new Error(typeof json.pesan === 'string' && json.pesan ? json.pesan : PESAN.gagalUmum);
@@ -7388,8 +7405,8 @@
         aturTombolProses(tombolDrive, true, 'Menyimpan…');
         jagaProses(panggilApi('simpanPdfDrive', { formId: pilih.formId, tanggal: pilih.tanggal })).then(function (h) {
           aturTombolProses(tombolDrive, false);
-          tulisPesan(pesanDrive, 'Tersimpan di Drive: ' + h.lokasi + '/' + h.namaFile, 'baik');
-          toast('PDF tersimpan di Drive.');
+          tulisPesan(pesanDrive, 'Tersimpan: ' + h.lokasi + '/' + h.namaFile + '. Salinannya muncul di Google Drive paling lambat 5 menit lagi.', 'baik');
+          toast('PDF tersimpan.');
         }).catch(function (err) {
           aturTombolProses(tombolDrive, false);
           if (tanganiSesiBerakhir(err)) return;

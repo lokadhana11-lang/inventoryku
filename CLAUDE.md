@@ -10,6 +10,9 @@ ditambah form kustom buatan Pengelola. Skala: 1 outlet, 4 staff, dua role (Staff
 Pengelola). Frontend statis ditayangkan dari GitHub Pages; backend berupa Apps Script yang
 menempel pada Google Sheet dan dideploy sebagai Web App (API `doPost`). Data tersimpan di
 Google Sheets, laporan PDF di Google Drive, laporan harian dikirim lewat Gmail.
+Sejak 15 Oktober 2026 (keputusan pemilik, butir 203) backend yang sama berjalan di **Supabase**:
+Edge Function `api` menjalankan Code.gs di atas Postgres, Storage, Brevo, dan pg_cron; Google
+Sheets menjadi salinan yang diperbarui Apps Script tiap 5 menit dan hanya untuk dicek.
 Sumber kebenaran ada di folder `spesifikasi/`. Jika kedua file berbeda soal fungsi, file
 sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan catat di bagian
 "Keputusan tambahan" di bawah. Jangan menambah fitur di luar spesifikasi.
@@ -23,12 +26,20 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 ├── app.js             seluruh frontend: API, penyimpanan per pengguna, komponen, router, layar
 ├── sw.js              service worker (cache halaman aplikasi; versi = VERSI_APLIKASI di app.js)
 ├── manifest.webmanifest
-├── config.js          satu baris: alamat API (URL Web App)
+├── config.js          satu baris: alamat API (Edge Function Supabase; dulu URL Web App)
 ├── .nojekyll          kosong; mencegah GitHub Pages memproses repo dengan Jekyll
 ├── icons/             ikon PWA: ikon-192/512 (any), ikon-maskable-192/512, ikon-180 (iPhone), ikon.svg (sumber)
 ├── fonts/             Barlow 400/500/600 dan Barlow Condensed 600 (woff2, subset latin) + lisensi OFL
 ├── apps-script/
-│   └── Code.gs        SELURUH kode backend (ditempel tangan ke editor Apps Script)
+│   └── Code.gs        SELURUH logika backend (ditempel tangan ke editor Apps Script; dijalankan juga oleh Supabase)
+├── supabase/
+│   ├── skema.sql      tabel Postgres (skema inventoryku), bucket arsip, pg_cron/pg_net; ditempel di SQL Editor
+│   ├── src/           runtime Edge Function: sheet.js (tiruan SpreadsheetApp), layanan.js (Drive, Mail, Properties,
+│   │                  Utilities, ScriptApp), penyimpanan.js, runtime.js, pdf.js (HTML laporan → PDF), sinkron.js
+│   │                  (impor, salinan ke Sheets, berkas, email), adaptor.js (Storage, Brevo, pg_cron), server.js (HTTP)
+│   ├── rakit.mjs      node supabase/rakit.mjs → functions/api/index.ts (src + Code.gs dalam satu file)
+│   ├── functions/api/index.ts   HASIL RAKITAN, ditempel tangan ke editor Edge Function; jangan diubah langsung
+│   └── PANDUAN.md     langkah pemilik untuk pindah
 ├── spesifikasi/
 │   ├── spesifikasi_web_inventory_harian_v2.md   sistem: data, role, alur, arsitektur
 │   └── spesifikasi_tampilan_ui.md               tampilan: warna, huruf, tata letak, layar, teks
@@ -174,6 +185,14 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `riwayat`/`detailKiriman`/jawaban pemeriksaan: baris Waste membawa `foto: true|false` untuk semua role dan `fotoUrl` (tautan
   Drive) hanya untuk Pengelola.
 - Arah premium (aplikasi 0.14.0) dan bar, logo, serta gerak versi 1.8 (aplikasi 0.15.0) tidak mengubah API.
+- Pindah ke Supabase (Code.gs v0.15, aplikasi 0.16.0): aksi aplikasi tidak berubah. Apps Script yang sudah pindah menjawab
+  setiap aksi `{ ok: false, pesan, pindahKe: alamat }`; `panggilApi` lalu memakai alamat itu selama `config.js` di HP masih
+  berisi alamat lama (`inventoryku:pindahApi`). Aksi pemilik di Edge Function (diawali `__`, butuh `rahasia` = secret
+  `RAHASIA_SINKRON`): `__impor {langkah: mulai|baris|selesai, ...}`, `__sinkron {versi}` → `{ tab: [{ nama, versi, urutan,
+  lebar, penuh, nilai } | { ..., langkah, barisLama }], selesai }`, `__sinkronSelesai {versi}`, `__berkas` → `{ salin, buang }`,
+  `__berkasTersalin {salin, buang}`, `__surel`, `__surelTerkirim {hasil}`, `__fungsi {nama, argumen}` → `{ keluaran, catatan }`;
+  `__jadwal {nama, syarat, rahasia}` dari pg_cron memakai rahasia jadwal di tabel `info`. Nilai sel di semua aksi pemilik:
+  tanggal `{ "$d": ms }`. Fungsi editor baru: `pindahKeSupabase`, `sinkronDariSupabase` (trigger 5 menit).
 - Riwayat harga item (11 Oktober 2026): `gantiHarga {nama, harga, berlakuMulai: 'yyyy-mm-dd'}` (khusus Pengelola; hari ini atau
   tanggal lewat) → jawaban `daftarItem` ditambah `hargaDisimpan: { nama, harga, berlakuMulai, mengganti }`. `daftarItem` ditambah
   `riwayatHargaSiap` dan per item `hargaSejak` ('' = sejak awal, null = belum punya riwayat), `riwayatHarga: [{ berlakuMulai, harga,
@@ -206,6 +225,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 11++ | Arah premium, spesifikasi tampilan 1.7 (dipilih pemilik dari pratinjau 11 Oktober 2026): kepala navy berisi ringkasan di setiap layar, bayangan lembut, tekstur navy, angka utama besar, tiket berikon dengan sobek, Nilai stock di kepala Dashboard dan ubin menggantung, grafik tangga harga, grafik kosong bersumbu | Kode selesai (aplikasi 0.14.0; Code.gs tidak berubah), diuji di Chromium (13 uji alur, sapuan semua rute Pengelola dan Staff pada delapan ukuran dan "kurangi gerak": 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11+++ | Bar, logo, nama, dan gerak, spesifikasi tampilan 1.8 (permintaan pemilik 12 Oktober 2026): bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna, baris merek di kepala Beranda, isi layar naik bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan | Kode selesai (aplikasi 0.15.0; Code.gs tidak berubah), diuji di Chromium (11 uji gerak baru, 13 uji alur lama, sapuan 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11++++ | Memuat lebih cepat (keluhan pemilik 12 Oktober 2026): login membawa Beranda, tiap tab dibaca sekali per permintaan, jawaban Beranda disimpan 2 menit di server, lama aksi di log, `config.js` dari salinan di HP | Kode selesai (Code.gs v0.14, aplikasi 0.15.1), diuji dengan API tiruan (11 uji server baru, jawaban 12 aksi sama dengan sebelum, 26 uji harga dan 32 pemeriksaan regresi) dan Chromium (4 uji baru, uji lama, sapuan delapan ukuran). Waktu di Google asli belum bisa diukur di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu) |
+| 12 | Pindah ke Supabase (keputusan pemilik 15 Oktober 2026): Edge Function menjalankan Code.gs di atas Postgres, PDF jsPDF, Storage, email Brevo atau Gmail, jadwal pg_cron, cadangan JSON, salinan ke Sheets tiap 5 menit per baris, berkas ke Drive, `pindahKeSupabase`, pengalihan HP | Kode selesai (Code.gs v0.15, aplikasi 0.16.0, skema.sql v0.2), diuji dengan Postgres 16 lokal dan Deno (Edge Function rakitan), uji ujung-ke-ujung Sheet tiruan → Supabase → Sheet (35 pemeriksaan), Brevo tiruan, pembanding 91 langkah dengan tiruan Apps Script, beban satu tahun, Chromium pengalihan. Supabase dan Google asli belum bisa diuji di sini. Menunggu pemilik: langkah di `supabase/PANDUAN.md` |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1486,3 +1506,66 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     membuka Beranda lagi memanggil server, server lama tanpa `beranda`, `config.js` yang ditunda 6 detik tidak menahan pembukaan
     kedua (service worker 0.15.0: 4.041 ms, 0.15.1: di bawah 2 detik), pembukaan pertama tetap dari jaringan), ditambah uji lama.
 
+### Pindah ke Supabase (Code.gs v0.15, aplikasi 0.16.0, 15 Oktober 2026)
+
+203. **Asal dan keputusan pemilik.** Sesudah "memuat lebih cepat" (butir 194) pemilik memilih pindah ke Supabase. Jawaban atas
+    pertanyaan: PDF, email harian, rekap bulanan, dan cadangan **pindah semua ke Supabase**; salinan ke Google Sheets **tiap 5
+    menit** oleh Apps Script; **Sheets hanya untuk dicek** (satu arah, ketikan langsung tertimpa). Spesifikasi sistem Bagian 4.5,
+    9.4, dan 10. Spesifikasi tampilan tidak berubah.
+204. **Satu sumber logika.** Code.gs tidak ditulis ulang. `supabase/src/bungkus.js` membungkus Code.gs menjadi fungsi pembuat
+    (`new Function('G', …)`) sehingga setiap permintaan mendapat variabel global baru seperti satu eksekusi Apps Script, dengan
+    `DI_SUPABASE = true`. Di Code.gs, `DI_SUPABASE_` hanya dipakai untuk: urutan `Data_Suhu` tidak ditulis (salinan ke Sheets
+    mengurutkannya, butir 151), PDF selalu dengan pemisah halaman, cadangan berupa JSON, jadwal dipasang ulang otomatis saat
+    Pengaturan → Outlet dan jadwal berubah, dan `setupSpreadsheet` melewati rumus, grafik, dan pemeriksaan rumus.
+205. **Tiruan Sheet di Postgres** (`sheet.js`, `penyimpanan.js`, `skema.sql`): `tab_meta` (nama, urutan, meta, versi) dan
+    `tab_baris` (pos, nilai jsonb, rumus, `diubah` dari sequence `urut_ubah`). Teks berawalan kutip disimpan tanpa kutip. Hanya
+    baris yang berubah yang ditulis; posisi ditulis ulang hanya jika struktur berubah. `Range.sort` atas seluruh data menyimpan
+    aturan di `meta.urutan` dan diterapkan setiap tab dimuat. Script Properties di tabel `properti`; zona, nama, alamat Sheet,
+    jadwal di `info`. Runtime: tab master selalu dimuat, tab lain dipelajari per aksi (`aksi_tab`); tab yang belum dimuat
+    menghentikan Code.gs, dimuat, lalu aksi diulang dari awal (paling banyak 40 kali). Aksi tulis memakai
+    `pg_advisory_xact_lock(4207)`, aksi `bacaSaja` transaksi `repeatable read`. Isi tab disimpan di memori isolate per versi.
+    `Utilities.formatDate` menyimpan hasilnya (tanggal yang sama diformat berulang).
+206. **Layanan pengganti** (`layanan.js`, `adaptor.js`): Drive = tabel `folder`/`berkas` + Storage bucket `arsip` (nama objek = id;
+    `getUrl` = `https://berkas.inventoryku/<id>`, diganti tautan bertanda tangan 6 jam di jawaban API, jadi `fotoUrl` tetap hanya
+    untuk Pengelola); MailApp = antrean `surel_keluar` yang ditulis dalam transaksi yang sama, dikirim lewat Brevo sesudah tersimpan
+    (jika `BREVO_API_KEY` dan `SUREL_PENGIRIM`), atau oleh Apps Script dari Gmail; kegagalan dicatat lewat `catatSurelGagal_`
+    (laporan_terakhir atau rekap_terakhir). ScriptApp = daftar trigger di `info.jadwal`, dipasang sebagai pg_cron
+    `inventoryku-<fungsi>` (UTC dari zona tersimpan; mingguan/bulanan dijalankan harian dengan `syarat` hari/tanggal yang diperiksa
+    Edge Function). LockService dan CacheService tanpa efek.
+207. **PDF** (`pdf.js`): pengurai kecil untuk HTML `htmlLaporan_` (kelas kepala, info, data, bawah, kategori, total, cek-ulang,
+    angka, akhir, tengah, masalah, kecil, catatan, kaki, halaman-baru), jsPDF 2.5.2, A4 tegak, margin 36 pt, Helvetica dengan huruf
+    WinAnsi (− menjadi -, → menjadi ->), judul kolom tabel diulang di halaman baru, judul kolom yang sempit diperkecil sampai 6 pt.
+208. **Salinan ke Sheets** (`sinkron.js`, `sinkronDariSupabase`): urutan berkas → tab → email. Tab Harian_* dan Dashboard tidak
+    disalin. Keadaan per tab di tabel `sinkron` (id baris menurut urutan Sheet, nomor `diubah` terakhir, kiriman "tertunda" sampai
+    Apps Script memastikan lewat `__sinkronSelesai`). Langkah: hapus, sisip, ubah per rentang baris; urutan baris lama berubah atau
+    perubahan > separuh tab → salin penuh. Apps Script memeriksa `barisKunciTerakhir_(sheet, 1)` = `barisLama`; jika tidak cocok
+    (ketikan langsung) tab disalin penuh; sekali sehari sesudah 02.00 semua tab penuh (`SINKRON_PENUH`). Master dulu (dropdown
+    `setAllowInvalid(false)` merujuknya). Tab `Data_K_` baru dibuat dengan `siapkanTabKustom_`. Teks berawalan `= + - @` diberi
+    kutip; tautan berkas diganti tautan Drive (baris yang memuatnya ditandai berubah saat berkasnya tersalin).
+209. **Impor** (`pindahKeSupabase`): Script Property `SUDAH_PINDAH` diisi lebih dulu (aplikasi ditolak) di dalam kunci, semua tab
+    (Harian/Dashboard hanya nama dan meta, termasuk gid untuk tautan Dashboard) dan Script Properties kecuali milik Apps Script
+    (`SUPABASE_API`, `RAHASIA_SINKRON`, `SUDAH_PINDAH`, `SINKRON_VERSI`, `SINKRON_PENUH`, `TIMPA_SUPABASE`, `SPREADSHEET_ID`)
+    dikirim per 2.000 baris; gagal → `SUDAH_PINDAH` dihapus lagi. Supabase menolak impor jika sudah berisi data, kecuali
+    `TIMPA_SUPABASE` = ya. Sesudahnya trigger Apps Script diganti salinan 5 menit, `pasangTrigger` dijalankan di Supabase, dan
+    satu salinan langsung.
+210. **Rakit** (`node supabase/rakit.mjs`): tiap modul `src` dibungkus IIFE, impor antarmodul menjadi destrukturisasi, Code.gs
+    disisipkan sebagai string, impor `npm:postgres@3.4.5`, `npm:jspdf@2.5.2`, `node:buffer`, `node:crypto`; `// @ts-nocheck`.
+    Jalankan setiap kali Code.gs atau `supabase/src` berubah, dan commit hasilnya. Secret otomatis Supabase yang dipakai:
+    `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`; dari pemilik: `RAHASIA_SINKRON`, `BREVO_API_KEY`,
+    `SUREL_PENGIRIM` (opsional), `ALAMAT_API` (opsional, jika nama function bukan `api`). Koneksi Postgres `prepare: false`
+    (pooler transaksi).
+211. **Uji** (di luar repo): Postgres 16 lokal dan Node 22; Edge Function rakitan dijalankan dengan Deno 2 (ping, setup lewat
+    `__fungsi`, pasang, kirim, unduh PDF). `uji_pindah.js` (35 pemeriksaan): data dibuat di tiruan Apps Script lama, `pindahKeSupabase`
+    lewat curl ke server uji (Edge Function di Node + Storage tiruan + tabel cron tiruan), isi Sheet sama dengan Supabase sesudah impor
+    dan sesudah tiap putaran (kiriman lima form, koreksi, resep ditulis ulang, staff dihapus, form kustom dan tab barunya, harga,
+    foto, PDF, email Gmail, kode pemasangan, cadangan, ketikan langsung di Sheet, `setupSpreadsheet` sesudah pindah), hanya baris
+    yang berubah dikirim, sesi dan PIN lama berlaku, jadwal pg_cron 15.15 UTC, rahasia salah ditolak. `uji_brevo.mjs`: email lewat
+    Brevo tiruan dan kegagalannya di `laporan_terakhir`. `banding.mjs`: 91 langkah, jawaban sama dengan tiruan Apps Script kecuali
+    yang memang berubah (teks `=1+1` tetap teks, PDF stock per kategori berhalaman, jadwal otomatis, properti milik Apps Script).
+    Beban satu tahun (18.250 baris Stock_Harian dan Data_Stock): beranda 90–120 ms, kirimStock ~400 ms, dashboard ~200 ms;
+    CPU laporan harian 0,5–1,1 detik, rekap 0,25–0,7, cadangan 0,3–0,7. `uji_pindah_chromium.js`: alamat lama dipanggil sekali,
+    sesudah itu langsung ke alamat baru, juga setelah dimuat ulang.
+212. **Belum bisa diuji di sini:** Supabase asli (Edge Function di dashboard, `new Function` di edge-runtime, batas CPU 2 detik,
+    pooler, Storage, pg_cron/pg_net), Brevo asli, Google asli (UrlFetchApp, kuota trigger, validasi dropdown saat menyalin), dan
+    tampilan PDF jsPDF di HP. Jika laporan harian kelak melewati batas CPU karena data bertahun-tahun, arsip tahunan (Tahap 11)
+    menjadi jalan keluarnya.

@@ -22,6 +22,9 @@
 > Diperbarui 12 Oktober 2026: memuat lebih cepat (Bagian 4.2 "Waktu tanggap" dan Bagian 11).
 > Login membawa data Beranda, server membaca tiap tab sekali per permintaan dan menyimpan
 > jawaban Beranda sebentar, dan alamat API diambil dari salinan di HP.
+> Diperbarui 15 Oktober 2026: pindah ke Supabase (Bagian 4.5). Aplikasi memakai Supabase Edge
+> Function dan database Postgres; Google Sheets menjadi salinan yang diperbarui tiap 5 menit dan
+> hanya untuk dicek. PDF, email, rekap bulanan, dan cadangan dibuat di Supabase.
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -133,6 +136,11 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 ---
 
 ## 4. Arsitektur
+
+> **Sejak 15 Oktober 2026 backend berjalan di Supabase (Bagian 4.5).** Bagian 4.2–4.4 di bawah
+> menjelaskan susunan awal dengan Apps Script; aturan isinya (satu pintu `doPost`, POST
+> `text/plain` tanpa preflight, token di body, kunci tulis, token wajib) tetap berlaku, karena
+> kode yang sama (`Code.gs`) kini dijalankan Supabase.
 
 Karena PWA diperlukan, sistem dibangun sebagai **frontend statis + Apps Script sebagai API**.
 Apps Script HTML Service murni tidak bisa dipakai: halamannya berjalan di dalam iframe
@@ -263,6 +271,71 @@ di bawah batas.
   kelak pindah ke sini: Gmail tidak bisa dikirim lewat Service Account untuk akun
   @gmail.com biasa (butuh Workspace dengan domain-wide delegation, OAuth atas nama user,
   atau SMTP), dan file yang diunggah Service Account menjadi milik akun tersebut.
+
+### 4.5 Supabase (sejak 15 Oktober 2026)
+
+Pemilik mengeluh membuka aplikasi lama, juga sesudah perbaikan 12 Oktober (Bagian 4.2). Waktu
+satu panggilan Apps Script sebagian besar adalah waktu Google membuka script dan Sheet, yang
+tidak bisa dipercepat dari kode. Keputusan pemilik: pindah ke Supabase; PDF, email, rekap
+bulanan, dan cadangan juga dibuat di Supabase; data tetap tersalin ke Google Sheets tiap 5 menit;
+Sheets hanya untuk dicek.
+
+```
+PWA (GitHub Pages, sama seperti sebelumnya)
+   │  fetch POST ke Supabase Edge Function "api" (text/plain, token di body)
+   ▼
+Supabase Edge Function "api" (Deno)
+   ├─▶ menjalankan Code.gs yang sama di atas tiruan SpreadsheetApp/Drive/Mail
+   ├─▶ Postgres (skema inventoryku): satu baris tab Sheet = satu baris tabel
+   ├─▶ Storage (bucket arsip): laporan PDF, foto bukti waste, cadangan
+   ├─▶ Brevo: email laporan harian dan rekap bulanan (jika dipasang)
+   └─▶ pg_cron + pg_net: laporan harian, cadangan mingguan, rekap bulanan
+
+Apps Script (menempel di Google Sheet yang sama)
+   └─▶ tiap 5 menit: salin tab yang berubah ke Sheet, salin berkas ke Drive,
+       kirim email dari Gmail jika Brevo tidak dipasang
+```
+
+- **Satu sumber logika.** Seluruh aturan (role, validasi, hitung ulang stock, PDF, email) tetap di
+  `apps-script/Code.gs`. Edge Function membungkus Code.gs dan menyediakan pengganti layanan Google
+  (`supabase/src/`): tab Sheet disimpan sebagai baris JSON di Postgres, Drive sebagai tabel berkas
+  dan Storage, MailApp sebagai antrean email, trigger sebagai jadwal pg_cron. Karena itu jawaban API
+  sama dengan sebelumnya dan frontend hanya perlu alamat baru di `config.js`.
+- **Kunci tulis.** Aksi yang menulis memakai `pg_advisory_xact_lock` (pengganti LockService), jadi
+  penulisan berurutan; aksi baca berjalan bersamaan dalam transaksi `repeatable read`.
+- **Memuat tab seperlunya.** Tiap aksi memuat tab master dan tab yang biasa dibutuhkannya (dipelajari
+  otomatis); isi tab disimpan di memori Edge Function selama versinya sama.
+- **PDF** dibuat dari HTML laporan yang sama (Bagian 9) dengan jsPDF, huruf Helvetica, A4. Pemisah
+  halaman PDF stock per kategori selalu dipatuhi.
+- **Email** lewat Brevo jika `BREVO_API_KEY` dan `SUREL_PENGIRIM` dipasang; jika tidak, email menunggu
+  di antrean dan Apps Script mengirimnya dari Gmail pemilik paling lambat 5 menit. Email yang gagal
+  dicatat seperti sebelumnya (Beranda Pengelola, `laporan_terakhir`/`rekap_terakhir`).
+- **Jadwal** dipasang ulang otomatis begitu Pengelola mengubah jam closing, jeda, hari cadangan, atau
+  zona waktu; tidak perlu menjalankan `pasangTrigger` lagi. pg_cron memakai UTC; jam lokal diubah
+  dengan zona waktu tersimpan.
+- **Salinan ke Google Sheets tiap 5 menit** (`sinkronDariSupabase`). Hanya tab yang berubah; untuk
+  tab yang sudah disalin, hanya baris yang dihapus, disisipkan, atau diubah, supaya kuota waktu Apps
+  Script (90 menit per hari) cukup. Tab Harian dan Dashboard tidak disalin: rumusnya menghitung dari
+  tab yang disalin, jadi tetap jalan. Sheets hanya untuk dicek: ketikan langsung di Sheet tertimpa;
+  jika jumlah baris Sheet tidak cocok, tab itu disalin penuh, dan sekali sehari (sesudah pukul 02.00)
+  semua tab disalin penuh.
+- **Berkas di Drive.** Laporan PDF, foto bukti waste, dan cadangan disalin ke folder Drive yang sama
+  seperti sebelumnya (`Laporan Kitchen/...`); kolom Foto Bukti di Sheet berisi tautan Drive. Di
+  aplikasi, Pengelola membuka foto lewat tautan sementara dari Storage.
+- **Cadangan mingguan** berupa satu berkas JSON berisi semua tab (`Cadangan … .json`), empat terakhir
+  disimpan, dan ikut tersalin ke Drive. Google Sheets sendiri juga menjadi salinan.
+- **Pindah sekali** (`pindahKeSupabase`, dari editor Apps Script): isi semua tab dan Script Properties
+  (termasuk rahasia PIN dan sesi, jadi PIN dan login yang sedang berjalan tetap berlaku) dikirim ke
+  Supabase, trigger lama dihapus, dan salinan 5 menit dipasang. Sesudah itu Apps Script menolak aksi
+  aplikasi dan menjawab alamat baru (`pindahKe`); HP yang masih memakai alamat lama langsung beralih.
+  Fungsi editor (`setupSpreadsheet`, `pasangTrigger`, `kirimLaporanSekarang`, `kirimRekapSekarang`,
+  `buatKodePemasangan`) diteruskan ke Supabase.
+- **Rahasia** (`RAHASIA_SINKRON`, kunci Brevo, kunci Supabase) hanya di Supabase Secrets dan Script
+  Properties, tidak pernah di repo. Skema `inventoryku` tidak dibuka ke API publik Supabase; hanya
+  Edge Function yang membacanya.
+- **Batas.** Edge Function dibatasi sekitar 2 detik waktu CPU per permintaan. Dengan data satu tahun
+  (diuji), aksi aplikasi memakai 0,1–0,8 detik dan laporan harian sekitar 0,6–1,1 detik. Arsip
+  tahunan (Tahap 11, opsional) menjaga angka ini tetap rendah.
 
 ---
 
@@ -1095,7 +1168,8 @@ untuk tanggal di bulan itu.
 ### 9.4 Cadangan otomatis mingguan
 
 - Seminggu sekali, pada dini hari, server menyalin seluruh spreadsheet ke folder
-  `Laporan Kitchen/Cadangan/` dengan nama yang memuat tanggalnya.
+  `Laporan Kitchen/Cadangan/` dengan nama yang memuat tanggalnya. Sejak pindah ke Supabase
+  (Bagian 4.5) salinannya berupa satu berkas JSON berisi semua tab.
 - Empat salinan terakhir disimpan; yang lebih lama dibuang ke tempat sampah Drive.
 - Salinan hanya bisa dibuka pemilik dan akun yang punya akses ke folder itu.
 - Memulihkan data dari cadangan dilakukan pemilik Sheet dengan tangan; aplikasi tidak
@@ -1128,6 +1202,8 @@ email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
   Satu email harian ke 2 atau 3 penerima hanya memakai 2 atau 3 dari batas itu.
 - Jika email gagal terkirim, data tetap aman di Sheet dan kegagalannya dicatat agar
   terlihat oleh Pengelola.
+- Sejak pindah ke Supabase (Bagian 4.5) email dikirim lewat Brevo, atau dari Gmail pemilik
+  lewat Apps Script jika Brevo tidak dipasang.
 
 ---
 
