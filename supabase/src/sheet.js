@@ -38,7 +38,7 @@ function kosong(v) {
 }
 
 /** Mengurutkan baris[dari..] di tempat menurut daftar { column, ascending }, stabil (urutan lama untuk nilai sama). */
-function urutkanBaris(baris, daftar, dari) {
+export function urutkanBaris(baris, daftar, dari) {
   const bagian = baris.slice(dari).map((b, i) => ({ b, i }));
   const nilaiDi = (b, kol) => { const v = b.v[kol - 1]; return v === undefined ? '' : v; };
   bagian.sort((x, y) => {

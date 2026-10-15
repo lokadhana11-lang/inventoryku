@@ -12,7 +12,7 @@ export const PENANDA_BERKAS = 'https://berkas.inventoryku/';
 // Code.gs memformat tanggal untuk setiap baris tab (Utilities.formatDate di Apps Script cepat).
 const pemformat = new Map();
 const selisihJam = new Map();
-function selisihMenit(ms, zona) {
+export function selisihMenit(ms, zona) {
   const kunci = zona + '|' + Math.floor(ms / 3600000);
   let m = selisihJam.get(kunci);
   if (m === undefined) {
@@ -47,9 +47,23 @@ function bagianZona(d, zona) {
 
 const NAMA_HARI_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Code.gs memformat tanggal yang sama berulang kali (setiap baris tab): hasilnya disimpan.
+const simpananFormat = new Map();
+
 /** Utilities.formatDate untuk pola yang dipakai Code.gs (yyyy MM dd HH mm ss, 'teks', E, u). */
 export function formatTanggal(d, zona, pola) {
   if (!(d instanceof Date) || isNaN(d.getTime())) throw new Error('formatDate: bukan tanggal');
+  const kunci = pola + '|' + zona + '|' + d.getTime();
+  let h = simpananFormat.get(kunci);
+  if (h === undefined) {
+    if (simpananFormat.size > 100000) simpananFormat.clear();
+    h = formatTanggalBaru(d, zona, pola);
+    simpananFormat.set(kunci, h);
+  }
+  return h;
+}
+
+function formatTanggalBaru(d, zona, pola) {
   const o = bagianZona(d, zona || 'Asia/Jakarta');
   let hasil = '';
   for (let i = 0; i < pola.length;) {

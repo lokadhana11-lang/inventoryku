@@ -124,7 +124,6 @@ export function buatPenyimpanan() {
           else if (b.kotor) ubah.push(Object.assign({ id: b.id, pos: b.pos }, data));
         });
       }
-      if (globalThis.__CATAT_TULIS) globalThis.__CATAT_TULIS(sh.nama, { ubah: ubah.length, tambah: tambah.length, hapus: hapus.length, nomorUlang });
       // Posisi akhir tiap baris, untuk memperbarui salinan tab di memori sesudah ditulis.
       const posAkhir = new Map();
       if (nomorUlang) isi.forEach((b, i) => posAkhir.set(b, i + 1));
@@ -133,7 +132,8 @@ export function buatPenyimpanan() {
         tambah.forEach((t, i) => posAkhir.set(isi.filter((b) => b.id == null)[i], t.pos));
       }
       if (ubah.length) {
-        await tx`update inventoryku.tab_baris t set pos = x.pos, nilai = x.nilai, rumus = x.rumus
+        await tx`update inventoryku.tab_baris t set pos = x.pos, nilai = x.nilai, rumus = x.rumus,
+            diubah = case when t.nilai is distinct from x.nilai then nextval('inventoryku.urut_ubah') else t.diubah end
           from jsonb_to_recordset(${tx.json(ubah)}) as x(id bigint, pos float8, nilai jsonb, rumus jsonb)
           where t.id = x.id`;
       }

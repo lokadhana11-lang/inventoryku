@@ -14,8 +14,16 @@ import { buatPenyimpanan, uraiNilai } from './penyimpanan.js';
 const KUNCI_TULIS = 4207;
 const BATAS_ULANG = 40;
 
-function salinData(baris) {
-  return baris;
+// Email dari MailApp tiruan menjadi data yang bisa disimpan (lampiran base64).
+function dataSurel(o, Buffer) {
+  const lampiran = (o.attachments || []).map((b) => {
+    const bytes = b.bytesAsli ? b.bytesAsli() : Buffer.from((b.getBytes() || []).map((x) => x & 0xff));
+    return { nama: b.getName() || 'lampiran', mime: b.getContentType() || 'application/octet-stream', data: bytes.toString('base64') };
+  });
+  return {
+    to: String(o.to || ''), subject: String(o.subject || ''), body: String(o.body || ''),
+    htmlBody: o.htmlBody ? String(o.htmlBody) : '', name: o.name ? String(o.name) : 'InventoryKu', attachments: lampiran
+  };
 }
 
 /**
@@ -24,7 +32,8 @@ function salinData(baris) {
  *   buatKodeGs(G) → objek fungsi Code.gs,
  *   crypto, Buffer, htmlKePdf(html) → Uint8Array,
  *   unggah(berkas) → Promise (isi berkas ke Storage), alamatBerkas([id]) → Promise<{ id: url }>,
- *   kirimSurel(opsi) → Promise, pasangJadwal(daftar, info) → Promise,
+ *   hapusBerkas([id]) → Promise, kirimSurel(isi) → Promise (Brevo; tanpa ini email menunggu Apps Script),
+ *   pasangJadwal(daftar, info) → Promise,
  *   Date (opsional, untuk uji), log (opsional)
  * }
  */
@@ -69,7 +78,8 @@ export function buatRuntime(dep) {
       const info = await simpan.muatInfo(tx);
       const perlu = new Set(await simpan.tabAksi(tx, namaKunci));
       // Tab master selalu dimuat; fungsi terjadwal dan dari pemilik (setupSpreadsheet, laporan, rekap) memuat semua tab.
-      metas.forEach((m) => { if (/^M_/.test(m.nama) || kerja.jenis === 'fungsi') perlu.add(m.nama); });
+      const semua = kerja.jenis === 'fungsi' && kerja.muat !== 'master';
+      metas.forEach((m) => { if (/^M_/.test(m.nama) || semua) perlu.add(m.nama); });
       const dataTab = {};
       let drive = null;
       const dipelajari = [];
@@ -137,7 +147,16 @@ export function buatRuntime(dep) {
           delete k.props.SPREADSHEET_ID;
         }
         const tabBerubah = await simpan.tulis(tx, k, dep.unggah || (async () => {}));
-        return { keluaran, surel: k.surel, jadwal: k.jadwal, tabBerubah, info };
+        // Email disimpan bersama data (antrean surel_keluar); dikirim sesudah tersimpan.
+        const surel = [];
+        for (const o of k.surel) {
+          const isi = dataSurel(o, dep.Buffer);
+          const r = await tx`insert into inventoryku.surel_keluar (asal, isi) values (${namaKunci}, ${tx.json(isi)}) returning id`;
+          surel.push({ id: Number(r[0].id), isi });
+        }
+        const dibuang = k.drive ? k.drive.berkas.filter((b) => b.kotor && b.dibuang).map((b) => b.id) : [];
+        const teksLog = catatan.map(([j, a]) => (j === 'error' ? 'GALAT: ' : '') + a.map((x) => (typeof x === 'string' ? x : String(x))).join(' '));
+        return { keluaran, surel, jadwal: k.jadwal, tabBerubah, info, dibuang, namaKunci, catatan: teksLog };
       }
       throw new Error('Aksi ' + namaKunci + ' membutuhkan terlalu banyak tab.');
     };
@@ -156,17 +175,45 @@ export function buatRuntime(dep) {
       }
     }
 
-    // Sesudah tersimpan: email dan jadwal (kegagalannya dicatat, data tetap tersimpan).
-    for (const s of hasil.surel) {
-      try {
-        await dep.kirimSurel(s);
-      } catch (err) {
-        log.error('Email gagal dikirim: ' + (err && err.message ? err.message : err));
-        if (dep.surelGagal) await dep.surelGagal(s, err);
+    // Sesudah tersimpan: email (jika Brevo dipasang; jika tidak, Apps Script mengirimnya dari Gmail), jadwal, dan
+    // isi berkas yang dibuang. Kegagalannya dicatat; data tetap tersimpan.
+    if (dep.kirimSurel) {
+      for (const s of hasil.surel) {
+        try {
+          await dep.kirimSurel(s.isi);
+          await dep.sql`update inventoryku.surel_keluar set terkirim = now(), lewat = 'brevo' where id = ${s.id}`;
+        } catch (err) {
+          const pesan = err && err.message ? err.message : String(err);
+          log.error('Email gagal dikirim: ' + pesan);
+          await dep.sql`update inventoryku.surel_keluar set galat = ${pesan}, lewat = 'brevo' where id = ${s.id}`;
+          await catatSurelGagal(hasil.namaKunci, pesan);
+        }
       }
     }
-    if (hasil.jadwal.berubah && dep.pasangJadwal) await dep.pasangJadwal(hasil.jadwal.daftar, hasil.info);
+    if (hasil.jadwal.berubah && dep.pasangJadwal) {
+      try {
+        await dep.pasangJadwal(hasil.jadwal.daftar, hasil.info);
+      } catch (err) {
+        log.error('Jadwal gagal dipasang: ' + (err && err.stack ? err.stack : err));
+      }
+    }
+    if (hasil.dibuang.length && dep.hapusBerkas) {
+      try {
+        await dep.hapusBerkas(hasil.dibuang);
+      } catch (err) {
+        log.error('Berkas lama gagal dihapus dari Storage: ' + err);
+      }
+    }
     return hasil;
+  }
+
+  /** Email yang gagal sesudah data tersimpan dicatat di M_Konfigurasi (laporan_terakhir atau rekap_terakhir). */
+  async function catatSurelGagal(asal, pesan) {
+    try {
+      await jalankan({ jenis: 'fungsi', nama: 'catatSurelGagal_', argumen: [String(asal || ''), String(pesan).slice(0, 300)], muat: 'master' });
+    } catch (err) {
+      log.error('Kegagalan email tidak bisa dicatat: ' + err);
+    }
   }
 
   /** Mengganti penanda https://berkas.inventoryku/<id> di jawaban dengan tautan sementara yang ditandatangani. */
@@ -178,5 +225,5 @@ export function buatRuntime(dep) {
     return teks.replace(pola, (m, x) => (peta[x] || ''));
   }
 
-  return { jalankan, gantiTautanBerkas, simpan, infoAksi, uraiNilai, salinData };
+  return { jalankan, gantiTautanBerkas, catatSurelGagal, simpan, infoAksi, uraiNilai };
 }

@@ -1,4 +1,4 @@
--- InventoryKu skema.sql v0.1 (pindah ke Supabase)
+-- InventoryKu skema.sql v0.2 (pindah ke Supabase)
 -- Tempel seluruh isi file ini di Supabase → SQL Editor, lalu Run. Aman dijalankan ulang.
 -- Semua tabel berada di skema "inventoryku", yang TIDAK dibuka ke API publik Supabase:
 -- hanya Edge Function "api" (lewat koneksi database langsung) yang membacanya.
@@ -23,6 +23,21 @@ create table if not exists inventoryku.tab_baris (
   rumus  jsonb                                    -- { "nomor kolom": "=RUMUS" } (hanya tab Harian/Dashboard)
 );
 create index if not exists tab_baris_tab_pos on inventoryku.tab_baris (tab, pos);
+-- Nomor perubahan tiap baris (naik setiap baris ditulis), supaya salinan ke Sheets hanya mengirim baris yang berubah.
+create sequence if not exists inventoryku.urut_ubah;
+alter table inventoryku.tab_baris add column if not exists diubah bigint not null default nextval('inventoryku.urut_ubah');
+
+-- Keadaan salinan di Google Sheets per tab: baris (urut) yang sudah ada di Sheets dan nomor perubahan terakhirnya.
+-- "tertunda" = kiriman terakhir yang belum dipastikan Apps Script sudah ditulis.
+create table if not exists inventoryku.sinkron (
+  tab             text primary key,
+  versi           bigint,
+  ids             bigint[],
+  tanda           bigint,
+  tertunda_versi  bigint,
+  tertunda_ids    bigint[],
+  tertunda_tanda  bigint
+);
 
 -- Pengganti Script Properties (sesi, hash rahasia PIN, hitungan salah PIN, dan lain-lain).
 create table if not exists inventoryku.properti (
@@ -58,6 +73,22 @@ create table if not exists inventoryku.berkas (
   dibuang  boolean not null default false
 );
 create index if not exists berkas_jalur on inventoryku.berkas (jalur, nama);
+-- Salinan berkas di Google Drive (dibuat Apps Script saat menyalin ke Sheets).
+alter table inventoryku.berkas add column if not exists drive_id text;
+alter table inventoryku.berkas add column if not exists drive_url text;
+alter table inventoryku.berkas add column if not exists drive_dibuang boolean not null default false;
+
+-- Email keluar. Dikirim lewat Brevo jika BREVO_API_KEY dipasang; jika tidak, Apps Script mengirimnya dari Gmail
+-- pemilik saat menyalin ke Sheets (paling lambat 5 menit).
+create table if not exists inventoryku.surel_keluar (
+  id        bigserial primary key,
+  dibuat    timestamptz not null default now(),
+  asal      text,
+  isi       jsonb not null,           -- { to, subject, body, htmlBody, name, attachments: [{ nama, mime, data (base64) }] }
+  terkirim  timestamptz,
+  lewat     text,                     -- brevo | gmail
+  galat     text
+);
 
 revoke all on all tables in schema inventoryku from public, anon, authenticated;
 revoke all on all sequences in schema inventoryku from public, anon, authenticated;
