@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.14 (memuat lebih cepat)
+// InventoryKu Code.gs v0.15 (pindah ke Supabase)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -61,7 +61,13 @@
  *                        mematuhi pemisah halaman (PDF stock per kategori).
  */
 
-var VERSI_KODE = 'v0.14';
+var VERSI_KODE = 'v0.15';
+
+/**
+ * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
+ * DI_SUPABASE diisi true oleh pembungkusnya. Di Apps Script variabel itu tidak ada.
+ */
+var DI_SUPABASE_ = typeof DI_SUPABASE !== 'undefined' && DI_SUPABASE === true;
 
 /** Nama Script Property tempat ID spreadsheet disimpan oleh setupSpreadsheet. */
 var PROP_ID_SPREADSHEET = 'SPREADSHEET_ID';
@@ -1734,6 +1740,8 @@ function tambahBarisTabel_(tabel, daftarIsi) {
 
 /** Tanggal terbaru di atas, lalu kolom berikutnya (spesifikasi sistem Bagian 8.4). */
 function urutkanTabel_(tabel, urutan) {
+  // Di Supabase, Range.sort atas seluruh isi tab mencatat aturan urutan dan diterapkan setiap tab dimuat
+  // (supabase/src/sheet.js), jadi tidak ada baris yang ditulis ulang.
   var sheet = tabel.sheet;
   var n = sheet.getLastRow() - 1;
   if (n < 2) return;
@@ -2906,6 +2914,9 @@ function aksiKirimSuhu_(body, pengguna) {
  * jadi data lama ikut rapi pada kiriman Suhu berikutnya.
  */
 function urutkanSuhu_(tabel) {
+  // Di Supabase tidak diurutkan: layar Suhu, grafik, PDF, dan email mengurutkan sendiri, dan salinan ke
+  // Google Sheets mengurutkan tab ini (butir 151).
+  if (DI_SUPABASE_) return;
   var sheet = tabel.sheet;
   var n = sheet.getLastRow() - 1;
   var lebar = sheet.getLastColumn();
