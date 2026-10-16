@@ -17,7 +17,8 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
 2. **Buat tabel.** Menu **SQL Editor** → New query → tempel seluruh isi `supabase/skema.sql` dari repo
    ini → **Run**. Harus selesai tanpa galat. Aman dijalankan ulang.
 3. **Buat Edge Function.** Menu **Edge Functions** → **Deploy a new function** → **Via Editor**.
-   - Nama function: `api` (harus persis).
+   - Nama function: `api`. Jika Supabase memberi nama lain (misalnya `rapid-action`), boleh dipakai: tambahkan secret
+     `ALAMAT_API` berisi alamat function itu (langkah 4) dan pakai alamat itu di langkah 5, 7, dan 9.
    - Hapus contoh kodenya, lalu tempel seluruh isi `supabase/functions/api/index.ts` dari repo ini
      (buka file itu di GitHub → tombol **Raw** → pilih semua → salin).
    - **Deploy**.
