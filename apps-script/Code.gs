@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.16.1 (hapus item yang belum punya catatan)
+// InventoryKu Code.gs v0.17 (kunci PIN bertingkat dan PIN yang mudah ditebak)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -71,7 +71,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.16.1';
+var VERSI_KODE = 'v0.17';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -544,6 +544,10 @@ var ROLE_SEMUA = ['Staff', 'Head Kitchen', 'Manager'];
 var ROLE_PENGELOLA = ['Head Kitchen', 'Manager'];
 var BATAS_SALAH = 5;
 var LAMA_KUNCI_MS = 15 * 60 * 1000;
+// Kunci bertingkat (Code.gs v0.17): kunci ketiga dalam 24 jam berlangsung 24 jam, atau sampai PIN direset.
+var JENDELA_KUNCI_MS = 24 * 60 * 60 * 1000;
+var KUNCI_KE_PANJANG = 3;
+var LAMA_KUNCI_PANJANG_MS = 24 * 60 * 60 * 1000;
 var LAMA_SESI_MS = 12 * 60 * 60 * 1000;
 var PANJANG_NAMA_MAKS = 40;
 var PANJANG_OUTLET_MAKS = 60;
@@ -658,6 +662,39 @@ function periksaFormatPin_(pin) {
   return pin;
 }
 
+/**
+ * PIN baru (pemasangan, pemulihan, tambah staff, reset PIN): 6 angka dan tidak mudah ditebak.
+ * Login tidak memakai ini, supaya PIN lama yang sudah terlanjur mudah tetap bisa masuk.
+ */
+function periksaPinBaru_(pin) {
+  periksaFormatPin_(pin);
+  if (pinLemah_(pin)) {
+    throw galatPengguna_('PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain.');
+  }
+  return pin;
+}
+
+/** PIN yang sering dipakai orang. Pola berulang dan berurutan dikenali pinLemah_. */
+var PIN_LEMAH_LAIN = ['112233', '111222', '123321', '147258', '258369', '159753', '147852', '102030'];
+
+/**
+ * PIN yang mudah ditebak: berulang tiap 1, 2, atau 3 angka (000000, 121212, 123123), berurutan naik
+ * atau turun (123456, 654321, 890123), atau ada di PIN_LEMAH_LAIN. Aturan yang sama ada di app.js (pinLemah).
+ */
+function pinLemah_(pin) {
+  for (var p = 1; p <= 3; p++) {
+    if (pin.slice(p) === pin.slice(0, pin.length - p)) return true;
+  }
+  var naik = true;
+  var turun = true;
+  for (var i = 1; i < pin.length; i++) {
+    var beda = pin.charCodeAt(i) - pin.charCodeAt(i - 1);
+    if (beda !== 1 && beda !== -9) naik = false;
+    if (beda !== -1 && beda !== 9) turun = false;
+  }
+  return naik || turun || PIN_LEMAH_LAIN.indexOf(pin) >= 0;
+}
+
 /* ---------- PIN: hash bergaram ---------- */
 
 /**
@@ -747,9 +784,10 @@ function bersihkanCatatanLama_(props) {
   Object.keys(semua).forEach(function (kunci) {
     if (kunci.indexOf(AWALAN_SESI) !== 0 && kunci.indexOf(AWALAN_GAGAL_PIN) !== 0) return;
     var isi = bacaJson_(semua[kunci]);
+    // Hitungan PIN yang kuncinya sudah habis tetap disimpan selama masih ada kunci dalam 24 jam terakhir.
     var habis = !isi ||
       (kunci.indexOf(AWALAN_SESI) === 0 && !(kini < isi.s)) ||
-      (kunci.indexOf(AWALAN_GAGAL_PIN) === 0 && isi.s && kini >= isi.s);
+      (kunci.indexOf(AWALAN_GAGAL_PIN) === 0 && isi.s && kini >= isi.s && !keadaanGagal_(isi, kini).k.length);
     if (habis) props.deleteProperty(kunci);
   });
 }
@@ -760,25 +798,70 @@ function kunciGagalPin_(nama) {
   return AWALAN_GAGAL_PIN + sha256Heks_(rapikanTeks_(nama).toLowerCase()).slice(0, 24);
 }
 
-/** { j: jumlah salah berturut-turut, s: terkunci sampai (ms, 0 = tidak) }. */
+/**
+ * Keadaan hitungan salah, tanpa menulis apa pun: { j: jumlah salah berturut-turut, s: terkunci sampai
+ * (ms, 0 = tidak), k: waktu mulai tiap kunci dalam 24 jam terakhir (hanya PIN), p: kunci 24 jam }.
+ */
+function keadaanGagal_(g, kini) {
+  g = g || {};
+  var k = (Array.isArray(g.k) ? g.k : []).filter(function (t) {
+    return typeof t === 'number' && kini - t < JENDELA_KUNCI_MS;
+  });
+  if (g.s && kini >= g.s) return { j: 0, s: 0, k: k, p: false };
+  return { j: Number(g.j) || 0, s: Number(g.s) || 0, k: k, p: !!(g.s && g.p) };
+}
+
 function bacaGagal_(props, kunci) {
-  var g = bacaJson_(props.getProperty(kunci)) || { j: 0, s: 0 };
-  if (g.s && Date.now() >= g.s) {
-    props.deleteProperty(kunci);
-    g = { j: 0, s: 0 };
-  }
+  var asli = bacaJson_(props.getProperty(kunci));
+  var g = keadaanGagal_(asli, Date.now());
+  if (asli && !g.j && !g.s && !g.k.length) props.deleteProperty(kunci);
   return g;
 }
 
-function catatGagal_(props, kunci, g) {
+/**
+ * Mencatat satu kali salah. Lima kali berturut-turut mengunci 15 menit. bertingkat (PIN): kunci yang
+ * ketiga dalam 24 jam berlangsung 24 jam, supaya PIN tidak bisa ditebak terus-menerus 5 kali tiap 15 menit.
+ */
+function catatGagal_(props, kunci, g, bertingkat) {
   g.j += 1;
-  if (g.j >= BATAS_SALAH) g.s = Date.now() + LAMA_KUNCI_MS;
+  if (g.j >= BATAS_SALAH) {
+    var kini = Date.now();
+    if (bertingkat) {
+      g.k = (g.k || []).concat([kini]);
+      g.p = g.k.length >= KUNCI_KE_PANJANG;
+    }
+    g.s = kini + (g.p ? LAMA_KUNCI_PANJANG_MS : LAMA_KUNCI_MS);
+  }
   props.setProperty(kunci, JSON.stringify(g));
   return g;
 }
 
 function sisaMenit_(sampai) {
   return Math.max(1, Math.ceil((sampai - Date.now()) / 60000));
+}
+
+/** "12 menit" atau, untuk kunci 24 jam, "23 jam". */
+function sisaWaktu_(sampai) {
+  var menit = sisaMenit_(sampai);
+  return menit <= 60 ? menit + ' menit' : Math.ceil(menit / 60) + ' jam';
+}
+
+/**
+ * Akun aktif yang terkunci karena PIN salah (Code.gs v0.17), tanpa menulis apa pun:
+ * [{ nama, sampai (ISO, null jika sudah terbuka), panjang, kali (jumlah kunci dalam 24 jam terakhir) }],
+ * urut abjad. Beranda dan Dashboard memakai yang masih terkunci; email harian semuanya.
+ */
+function akunTerkunci_() {
+  var semua = PropertiesService.getScriptProperties().getProperties();
+  var kini = Date.now();
+  var hasil = [];
+  bacaStaff_().daftar.forEach(function (s) {
+    if (!s.aktif || !s.hash) return;
+    var g = keadaanGagal_(bacaJson_(semua[kunciGagalPin_(s.nama)]), kini);
+    if (!g.s && !g.k.length) return;
+    hasil.push({ nama: s.nama, sampai: g.s ? new Date(g.s).toISOString() : null, panjang: g.p, kali: g.k.length });
+  });
+  return hasil.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
 }
 
 /* ---------- Konfigurasi dan outlet ---------- */
@@ -1023,6 +1106,7 @@ function ringkasStaff_(daftar) {
   return daftar.slice().sort(function (a, b) {
     return (b.aktif ? 1 : 0) - (a.aktif ? 1 : 0) || a.nama.localeCompare(b.nama, 'id');
   }).map(function (s) {
+    var g = bacaGagal_(props, kunciGagalPin_(s.nama));
     return {
       nama: s.nama,
       role: s.role,
@@ -1030,7 +1114,9 @@ function ringkasStaff_(daftar) {
       aktif: s.aktif,
       punyaPin: !!s.hash,
       permintaanReset: s.reset ? s.reset.toISOString() : null,
-      terkunci: !!bacaGagal_(props, kunciGagalPin_(s.nama)).s
+      terkunci: !!g.s,
+      terkunciSampai: g.s ? new Date(g.s).toISOString() : null,
+      kunciPanjang: g.p
     };
   });
 }
@@ -1066,16 +1152,25 @@ function aksiLogin_(body) {
     var kunci = kunciGagalPin_(staff.nama);
     var g = bacaGagal_(props, kunci);
     if (g.s) {
-      throw galatPengguna_('Terkunci. Coba lagi dalam ' + sisaMenit_(g.s) +
-        ' menit, atau minta Head Kitchen atau Manager mereset PIN.');
+      throw galatPengguna_('Terkunci. Coba lagi dalam ' + sisaWaktu_(g.s) +
+        ', atau minta Head Kitchen atau Manager mereset PIN.');
     }
     if (cocokPin_(pin, staff.hash)) {
       props.deleteProperty(kunci);
       return buatSesi_(staff);
     }
-    g = catatGagal_(props, kunci, g);
-    if (g.s) throw galatPengguna_('Terkunci 15 menit. Minta Head Kitchen atau Manager mereset PIN.');
-    throw galatPengguna_('PIN salah. Sisa ' + (BATAS_SALAH - g.j) + ' percobaan.');
+    g = catatGagal_(props, kunci, g, true);
+    if (g.s) {
+      // Pemberitahuan "terkunci" di Beranda Pengelola langsung tampil (simpanan Beranda tidak dipakai lagi).
+      tandaiDataBerubah_();
+      if (g.p) {
+        throw galatPengguna_('PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN.');
+      }
+      throw galatPengguna_('Terkunci 15 menit. Minta Head Kitchen atau Manager mereset PIN.');
+    }
+    var sisa = BATAS_SALAH - g.j;
+    throw galatPengguna_('PIN salah. Sisa ' + sisa + ' percobaan.' +
+      (sisa === 1 && g.k.length >= KUNCI_KE_PANJANG - 1 ? ' Jika salah lagi, akun terkunci 24 jam.' : ''));
   }, true);
   return lampirkanBeranda_(sesi, body);
 }
@@ -1119,7 +1214,7 @@ function aksiPasang_(body) {
   var namaOutlet = periksaNama_(body.namaOutlet, 'Nama outlet', PANJANG_OUTLET_MAKS);
   var nama = periksaNama_(body.nama, 'Nama', PANJANG_NAMA_MAKS);
   if (ROLE_PENGELOLA.indexOf(body.role) < 0) throw galatPengguna_('Pilih role: Head Kitchen atau Manager.');
-  var pin = periksaFormatPin_(body.pin);
+  var pin = periksaPinBaru_(body.pin);
   if (!rapikanKode_(body.kode)) throw galatPengguna_('Isi Kode Pemasangan.');
   var zona = zonaSah_(body.zonaWaktu) ? body.zonaWaktu : '';
 
@@ -1165,7 +1260,7 @@ function aksiPasang_(body) {
 function aksiPulihkan_(body) {
   var nama = rapikanTeks_(body.nama);
   if (!nama) throw galatPengguna_('Pilih nama Head Kitchen atau Manager.');
-  var pin = periksaFormatPin_(body.pin);
+  var pin = periksaPinBaru_(body.pin);
   if (!rapikanKode_(body.kode)) throw galatPengguna_('Isi Kode Pemasangan.');
 
   var sesi = denganKunci_(function () {
@@ -1267,6 +1362,10 @@ function berandaBaru_(tanggal, body, pengguna) {
       return a.reset.getTime() - b.reset.getTime();
     }).map(function (s) {
       return { nama: s.nama, waktu: s.reset.toISOString() };
+    });
+    // Akun yang sedang terkunci karena PIN salah (Code.gs v0.17).
+    hasil.terkunci = akunTerkunci_().filter(function (a) { return a.sampai; }).map(function (a) {
+      return { nama: a.nama, sampai: a.sampai, panjang: a.panjang };
     });
     hasil.pemeriksaan = ringkasPemeriksaan_();
     hasil.peringatanSistem = peringatanSistem_();
@@ -1510,7 +1609,7 @@ function aksiDaftarStaff_() {
 function aksiTambahStaff_(body) {
   var nama = periksaNama_(body.nama, 'Nama', PANJANG_NAMA_MAKS);
   var role = periksaRole_(body.role);
-  var pin = periksaFormatPin_(body.pin);
+  var pin = periksaPinBaru_(body.pin);
   return denganKunci_(function () {
     var info = bacaStaff_();
     var ada = cariStaff_(info.daftar, nama);
@@ -1580,10 +1679,11 @@ function aksiHapusStaff_(body, pengguna) {
 
 /**
  * Buat atau reset PIN. PIN lama langsung tidak berlaku, sesi lama staff itu
- * gugur, kunci 15 menit dibuka, dan permintaan reset ditandai selesai.
+ * gugur, kunci karena PIN salah (15 menit atau 24 jam) dibuka beserta hitungannya, dan permintaan reset
+ * ditandai selesai.
  */
 function aksiAturPin_(body, pengguna) {
-  var pin = periksaFormatPin_(body.pin);
+  var pin = periksaPinBaru_(body.pin);
   return denganKunci_(function () {
     var info = bacaStaff_();
     var staff = cariStaff_(info.daftar, body.nama);
@@ -4567,6 +4667,11 @@ function perhatianDashboard_(d) {
   d.reset.forEach(function (s) {
     tambah('resetPin', 'tinjau', s.nama + ' meminta reset PIN', 'Buat PIN baru di Pengaturan → Staff dan PIN.', { nama: s.nama });
   });
+  (d.terkunci || []).forEach(function (a) {
+    tambah('terkunci', 'tinjau', a.nama + ' terkunci karena PIN salah',
+      (a.panjang ? 'Salah berulang kali dalam 24 jam. ' : '') + 'Terbuka sendiri ' + waktuPendekId_(new Date(a.sampai)) +
+      ', atau buat PIN baru di Pengaturan → Staff dan PIN.', { nama: a.nama });
+  });
   if (d.stock.belanja.length) {
     tambah('bawahMinimum', 'tinjau', d.stock.belanja.length + ' item di bawah stok minimum',
       daftarNamaSingkat_(d.stock.belanja.map(function (x) { return x.m.nama; })) + '.',
@@ -4643,6 +4748,7 @@ function aksiDashboard_(body) {
     reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).sort(function (a, b) {
       return a.reset.getTime() - b.reset.getTime();
     }),
+    terkunci: akunTerkunci_().filter(function (a) { return a.sampai; }),
     peringatan: peringatanSistem_(),
     opname: statusOpname_(),
     hpp: ringkasHppDashboard_(tanggal)
@@ -8374,6 +8480,12 @@ function htmlEmailHarian_(d) {
   if (d.pemeriksaan.belumDiperiksa) periksa.push(d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa (31 hari terakhir)');
   if (d.pemeriksaan.dilaporkan) periksa.push(d.pemeriksaan.dilaporkan + ' baris dilaporkan keliru');
   d.reset.forEach(function (n) { periksa.push(escHtml_(n) + ' meminta reset PIN'); });
+  // Akun yang terkunci karena PIN salah dalam 24 jam terakhir (Code.gs v0.17).
+  (d.terkunci || []).forEach(function (a) {
+    periksa.push(escHtml_(a.nama) + ' terkunci karena PIN salah' + (a.kali > 1 ? ' (' + a.kali + ' kali dalam 24 jam terakhir)' : '') +
+      (a.sampai ? ', masih terkunci sampai ' + escHtml_(waktuPendekId_(new Date(a.sampai))) : '') + '.' +
+      (a.kali > 1 ? ' Jika ' + escHtml_(a.nama) + ' tidak lupa PIN, mungkin ada yang mencoba menebaknya; buat PIN baru dari Pengaturan.' : ''));
+  });
   // Pengingat stock opname jika sudah lewat jadwal (Bagian 5.7 dan 10).
   if (d.opname && d.opname.lewat) {
     periksa.push('<b>' + escHtml_(teksPengingatOpname_(d.opname)) + '</b> Jadwal ' + escHtml_(d.opname.jadwal) +
@@ -8449,6 +8561,7 @@ function jalankanLaporanHarian_(opsi) {
       masaSimpan: masaSimpan_(tanggal),
       pemeriksaan: ringkasPemeriksaan_(),
       reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).map(function (s) { return s.nama; }),
+      terkunci: akunTerkunci_(),
       opname: statusOpname_(),
       pdf: hasil.pdf,
       masalah: masalah,

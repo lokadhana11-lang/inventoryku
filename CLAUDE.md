@@ -216,6 +216,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Waste tanpa kolom berjenis `rupiah`.
 - Hapus item (Code.gs v0.16.1, 17 Oktober 2026; khusus Pengelola): `hapusItem {nama}` → jawaban `daftarItem` ditambah `dihapus: nama`.
   `daftarItem.item[]` ditambah `sebabTidakBisaHapus` ('' = bisa dihapus setelah nonaktif; selain itu kalimat sebabnya).
+- Keamanan login (Code.gs v0.17, 17 Oktober 2026): `beranda` (Pengelola) ditambah `terkunci: [{ nama, sampai, panjang }]` (akun aktif
+  yang sedang terkunci karena PIN salah); `daftarStaff.staff[]` (dan jawaban aksi staff lain) ditambah `terkunciSampai` dan
+  `kunciPanjang`; `dashboard.perhatian[]` boleh berjenis `terkunci` (`data.nama`). `pasang`, `pulihkan`, `tambahStaff`, dan `aturPin`
+  menolak PIN yang terlalu mudah ditebak; `login` tidak.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -248,6 +252,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++ | Hapus item yang belum punya catatan (permintaan pemilik 17 Oktober 2026): tombol Hapus di layar ubah item untuk item nonaktif tanpa catatan stock, resep, menu, atau isian form kustom; baris `M_Item` dan riwayat harganya dihapus | Kode selesai (Code.gs v0.16.1, aplikasi 0.17.1), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 8 uji server) dan Chromium (alur nonaktifkan → Batal → Hapus, sebab tidak bisa dihapus, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12+++++ | Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (dipilih pemilik dari pratinjau 17 Oktober 2026, pola C): cahaya dan butiran menggantikan tekstur garis di kepala Beranda, kepala layar, Login, pita rel, dan bar atas; bar bawah kaca buram; kartu bergaris rambut | Kode selesai (aplikasi 0.17.2; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (sapuan 10 rute pada delapan ukuran dan "kurangi gerak", kontras kata menu di atas kaca). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12++++++ | Perpindahan layar yang mulus dan angka berhitung naik, spesifikasi tampilan 1.12 (dipilih pemilik dari pratinjau 17 Oktober 2026); ATURAN TETAP gerak dicabut | Kode selesai (aplikasi 0.18.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan (buka, tutup, maju, mundur, desktop, tanpa View Transitions, "kurangi gerak", angka tengah dan akhir, sapuan delapan ukuran). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
+| 12+++++++ | Keamanan login (permintaan pemilik 17 Oktober 2026, dari telaah keamanan): kunci PIN bertingkat (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci di Beranda, Dashboard, Staff dan PIN, dan email harian Pengelola, PIN baru yang terlalu mudah ditebak ditolak | Kode selesai (Code.gs v0.17, aplikasi 0.18.1), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (15 uji server, 15 jawaban aksi sama dengan v0.16.1 selain kolom baru) dan Chromium (pemberitahuan, lembar PIN, Dashboard, Staff dan PIN, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1807,3 +1812,41 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tanpa galat konsol; sapuan 10 rute pada delapan ukuran dan "kurangi gerak". Belum diuji di HP asli (rasa geraknya dan Safari
     iPhone).
 
+### Keamanan login: kunci bertingkat dan PIN yang mudah ditebak (Code.gs v0.17, aplikasi 0.18.1, 17 Oktober 2026)
+
+247. **Asal:** pemilik meminta telaah aplikasi (fitur, keamanan login, saran lain), lalu memilih dua saran keamanan login: kunci
+    bertingkat dan PIN yang terlalu mudah ditebak. Alasan: kunci 15 menit yang berulang tanpa batas membolehkan 480 tebakan per hari
+    per nama, sedangkan alamat aplikasi dan API publik dan `infoLogin` memberi daftar nama tanpa login (dengan 4 nama, sekitar 50%
+    peluang menebak salah satu PIN dalam setahun). Sesudahnya 15 tebakan per nama per sekitar 25 jam. Spesifikasi sistem Bagian 7.2
+    dan 10, tampilan Bagian 5.1, 5.2, 5.7, dan 7.
+248. **Kunci bertingkat** (`keadaanGagal_`, `bacaGagal_`, `catatGagal_(…, bertingkat)`, Script Property `GAGAL_PIN_<hash nama>`):
+    isinya kini `{ j, s, k: [waktu mulai tiap kunci], p: kunci 24 jam }`; `k` hanya menyimpan kunci dalam 24 jam terakhir
+    (`JENDELA_KUNCI_MS`). Kunci ke-3 (`KUNCI_KE_PANJANG`) dalam 24 jam berlangsung 24 jam (`LAMA_KUNCI_PANJANG_MS`); setelah itu
+    semua kunci lama sudah lewat 24 jam, jadi kunci berikutnya kembali 15 menit. `keadaanGagal_` murni (tidak menulis), `bacaGagal_`
+    hanya menghapus catatan yang sudah kosong, dan `bersihkanCatatanLama_` tidak menghapus catatan yang kuncinya habis tetapi masih
+    punya kunci dalam 24 jam. Catatan versi lama (tanpa `k`) tetap terbaca. Login benar, reset PIN, pemulihan, dan hapus staff
+    menghapus catatannya seperti dulu. Kode Pemasangan tetap 15 menit tanpa tingkat (8 huruf dari 31, tidak mungkin ditebak).
+    Pesan: "PIN salah. Sisa 1 percobaan. Jika salah lagi, akun terkunci 24 jam.", "PIN salah 5 kali lagi. Akun terkunci 24 jam,
+    atau sampai Head Kitchen atau Manager mereset PIN.", dan sisa waktu dalam jam jika lebih dari 60 menit (`sisaWaktu_`). Kunci
+    baru mengganti versi data (`tandaiDataBerubah_`), supaya simpanan Beranda 2 menit di Apps Script tidak menyembunyikannya.
+249. **Akun terkunci untuk Pengelola** (`akunTerkunci_`: satu `getProperties`, staff aktif yang punya PIN, urut abjad, tanpa menulis):
+    Beranda `terkunci` (yang masih terkunci) tampil di bawah permintaan reset PIN, tanda Perlu ditinjau "Rina terkunci karena PIN
+    salah", ketuk membuka lembar reset PIN (`hrefStaff(nama, true)`); setelah PIN direset, `hapusPermintaanDiBeranda` membuang
+    keduanya dari Beranda tersimpan. Dashboard: butir `terkunci` tingkat Perlu ditinjau sesudah `resetPin`, ikon kunci, dengan
+    "Terbuka sendiri 18 Okt 12.54". Email harian (bagian "Untuk Head Kitchen dan Manager"): akun yang terkunci dalam 24 jam terakhir,
+    berapa kali, sampai kapan, dan untuk lebih dari sekali "mungkin ada yang mencoba menebaknya". Staff dan PIN: tanda di kartu PIN
+    menyebut lama kunci dan jam terbukanya.
+250. **PIN yang terlalu mudah ditebak** (`pinLemah_` di Code.gs, `pinLemah` di app.js dengan aturan yang sama): berulang tiap 1, 2,
+    atau 3 angka, berurutan naik atau turun (dengan putaran 9→0, misalnya 890123), atau di `PIN_LEMAH_LAIN` (112233, 111222, 123321,
+    147258, 258369, 159753, 147852, 102030): 1.118 dari 1.000.000 PIN. Diperiksa `periksaPinBaru_` di `pasang`, `pulihkan`,
+    `tambahStaff`, dan `aturPin`, dan di HP oleh `periksaPinGanda` (dipakai keempat layar itu) sebelum server dipanggil. `login`
+    tetap memakai `periksaFormatPin_`, jadi PIN lama yang lemah tetap bisa masuk sampai direset.
+251. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js` dengan jam tiruan: 15 uji server
+    (PIN lemah ditolak di keempat aksi tanpa memakai Kode Pemasangan, PIN lama lemah tetap login, kunci 15 menit lalu 15 menit lalu
+    24 jam dengan pesan peringatan, sisa "23 jam", Beranda/Dashboard/Staff dan PIN, Staff tanpa `terkunci`, email harian, login orang
+    lain tidak menghapus kunci, kunci 24 jam terbuka lalu kembali 15 menit, reset PIN membuka kunci, catatan versi lama, Kode
+    Pemasangan tetap 15 menit), 15 jawaban aksi dibanding Code.gs v0.16.1 (hanya kolom baru yang berbeda; pesan PIN salah,
+    Dashboard, dan email lain sama), dan Chromium dengan API tiruan yang memanggil `doPost` asli (pemberitahuan di Beranda, ketuk
+    membuka lembar PIN, PIN 123456 ditolak di HP, reset membuka kunci dan pemberitahuan hilang, tanda kunci 24 jam di Staff dan PIN,
+    butir Dashboard membuka lembar PIN, delapan ukuran tanpa gulir samping dan pemberitahuan ≥ 44 px, tanpa galat konsol). Hasil
+    rakitan lolos pemeriksaan sintaks. Belum diuji di Supabase asli dan di HP.

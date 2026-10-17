@@ -31,6 +31,9 @@
 > (Bagian 5.4).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik): item nonaktif yang belum punya catatan apa pun,
 > misalnya item yang salah dibuat, bisa dihapus (Bagian 5.1).
+> Diperbarui 17 Oktober 2026 (permintaan pemilik, dari telaah keamanan): kunci PIN bertingkat
+> (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci terlihat oleh Pengelola, dan PIN
+> baru yang terlalu mudah ditebak ditolak (Bagian 7.2 dan 10).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -996,9 +999,22 @@ Role diperiksa di **server** pada setiap permintaan, bukan hanya disembunyikan d
 
 - PIN terdiri dari 6 angka, dibuat dan direset oleh Manager/Head Kitchen dari halaman
   Pengaturan → Staff.
+- **PIN yang terlalu mudah ditebak ditolak** saat PIN dibuat atau direset (termasuk pemasangan
+  pertama dan pemulihan): enam angka sama (000000), berurutan naik atau turun (123456, 654321,
+  890123), berulang tiap 2 atau 3 angka (121212, 123123), dan beberapa pola umum (112233,
+  147258, 159753). PIN lama yang sudah terlanjur seperti itu tetap bisa dipakai login sampai
+  direset.
 - Staff memilih nama, memasukkan PIN, lalu server mengembalikan token sesi beserta role.
 - PIN disimpan sebagai hash, bukan angka aslinya.
 - Lima kali salah PIN berturut-turut mengunci akun staff tersebut selama 15 menit.
+- **Kunci bertingkat.** Kunci yang ketiga dalam 24 jam berlangsung 24 jam, supaya PIN tidak bisa
+  ditebak terus-menerus 5 kali tiap 15 menit. Setelah PIN salah sekali lagi akan mengunci 24 jam,
+  layar Login memperingatkannya. Login yang benar menghapus hitungan. Reset PIN oleh Pengelola
+  (atau "Pulihkan akses Pengelola") selalu langsung membuka kunci.
+- **Akun terkunci terlihat oleh Pengelola**: sebagai pemberitahuan di Beranda dan butir Perlu
+  perhatian di Dashboard selama masih terkunci (ketuk untuk membuat PIN baru), dan di email
+  harian untuk akun yang terkunci dalam 24 jam terakhir. Akun yang terkunci berulang kali bisa
+  berarti ada yang mencoba menebak PIN-nya.
 - Token sesi berlaku paling lama 12 jam; setelah habis, staff login ulang.
 - **Tombol "Keluar".** Tombol ini mengeluarkan pengguna saat ini dan kembali ke layar
   Login: token dihapus dari perangkat. Tombol tersedia untuk semua role di semua ukuran
@@ -1309,6 +1325,7 @@ email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
   - Item dengan Stock Akhir minus
   - Barang jadi yang lewat masa simpan atau habis besok
   - Jumlah data yang belum diperiksa, baris yang dilaporkan keliru, dan permintaan reset PIN
+  - Akun yang terkunci karena PIN salah dalam 24 jam terakhir
   - Pengingat stock opname jika sudah lewat jadwal
   - Tautan untuk membuka aplikasi
   - Lampiran: PDF laporan harian tiap form yang sudah diisi

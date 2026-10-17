@@ -16,6 +16,9 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
+> Tambahan 17 Oktober 2026 (permintaan pemilik, keamanan login): pesan kunci 24 jam di Login,
+> pemberitahuan akun terkunci di Beranda dan Dashboard Pengelola, tanda kunci di Staff dan PIN, dan
+> pesan PIN yang terlalu mudah ditebak (Bagian 5.1, 5.2, 5.7, dan 7).
 > Perubahan sejak versi 1.9 (dipilih pemilik dari pratinjau "Rancangan HPP InventoryKu", 17 Oktober
 > 2026): layar HPP dan food cost yang dibuka dari Dashboard (Bagian 5.6 dan 5.10), Pengaturan →
 > Menu dan dua isian HPP di Outlet dan jadwal (Bagian 5.7), ringkasan kepala untuk keduanya (Bagian
@@ -432,6 +435,10 @@ Satu-satunya layar yang sepenuhnya navy.
   satu per satu; setelah angka keenam, login langsung diproses tanpa tombol tambahan.
 - PIN salah: enam titik PIN bergoyang sekali (Bagian 8), tulisan "PIN salah. Sisa 4 percobaan."
 - Terkunci: "Terkunci 15 menit. Minta Head Kitchen atau Manager mereset PIN."
+- Sebelum kunci 24 jam (spesifikasi sistem Bagian 7.2): "PIN salah. Sisa 1 percobaan. Jika salah
+  lagi, akun terkunci 24 jam." Lalu: "PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai
+  Head Kitchen atau Manager mereset PIN." Saat masih terkunci: "Terkunci. Coba lagi dalam 23 jam,
+  atau minta Head Kitchen atau Manager mereset PIN." (menit jika kurang dari satu jam).
 - **Lupa PIN?** Tautan kecil di bawah papan angka, di langkah PIN. Ketuk,
   lalu konfirmasi: "Kirim permintaan reset PIN untuk Rina?" Setelah terkirim:
   "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager."
@@ -536,6 +543,10 @@ Satu-satunya layar yang sepenuhnya navy.
   "1 baris dilaporkan keliru", masing-masing membuka Riwayat dengan filter yang sesuai.
 - **Permintaan reset PIN** tampil paling atas untuk Pengelola, dengan tanda Perlu
   ditinjau: "Rina meminta reset PIN". Ketuk untuk langsung membuka layar reset PIN staff itu.
+- **Akun terkunci** tampil di bawahnya untuk Pengelola, juga bertanda Perlu ditinjau: "Rina
+  terkunci karena PIN salah", keterangan "Terbuka sendiri pukul 12.54. Ketuk untuk membuat PIN
+  baru." (kunci 24 jam diawali "Salah berulang kali dalam 24 jam."). Dashboard menampilkan butir
+  Perlu perhatian yang sama dengan ikon kunci.
 - **Pengingat stock opname** untuk Pengelola jika sudah lewat jadwal: "Stock opname
   terakhir 9 hari lalu." Ketuk untuk membuka layar Stock opname.
 
@@ -785,6 +796,11 @@ Satu-satunya layar yang sepenuhnya navy.
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
 - Staff yang meminta reset PIN diberi tanda Perlu ditinjau di daftar Staff.
+- Staff yang terkunci diberi tanda Masalah "Terkunci" di daftar, dan di kartu PIN layar ubah
+  staff "Terkunci karena PIN salah 5 kali, terbuka sendiri pukul 12.37" (kunci 24 jam: "Terkunci
+  24 jam karena PIN salah berulang kali, …").
+- PIN baru yang terlalu mudah ditebak ditolak di kolom PIN: "PIN ini terlalu mudah ditebak (angka
+  sama, berurutan, atau berulang). Pilih 6 angka lain." (juga di pemasangan pertama dan pemulihan).
 
 **Pengaturan → Staff dan PIN:**
 
@@ -1041,6 +1057,9 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui." |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
+| Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
+| PIN terlalu mudah | "PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain." |
+| Kunci 24 jam | "PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN." |
 | Form kustom tersimpan | "Form tersimpan dan sudah tampil di Beranda." |
 | Sudah ada isian yang sama | "Suhu Opening Chiller 1 sudah diisi Rina pukul 07.10." |
 | Tandai nihil | Tombol "Tidak ada hari ini", lalu "Waste ditandai nihil untuk hari ini." |
