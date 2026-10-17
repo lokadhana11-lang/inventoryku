@@ -5,7 +5,11 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.11, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.12, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.11 (dipilih pemilik dari pratinjau "Pratinjau Gerak InventoryKu", 17 Oktober
+> 2026): perpindahan layar yang mulus (View Transitions) dengan nama tiket yang terbang ke judul
+> layar form, dan angka utama yang berhitung naik dalam 0,9 detik (Bagian 8.1, 8.2, 8.3, 8.5, 10,
+> dan 11). Pemilik juga mencabut larangan library animasi dan library grafik.
 > Perubahan sejak versi 1.10 (dipilih pemilik dari pratinjau "Pilihan Pola InventoryKu", 17 Oktober
 > 2026, pola C): permukaan navy tanpa garis, berupa cahaya lembut dan butiran halus, menggantikan
 > tekstur garis; bar navigasi bawah dari kaca buram; kartu bertepi garis rambut dengan bayangan yang
@@ -1096,9 +1100,9 @@ saat perangkat diatur "kurangi gerak".
 | Suasana Login | Selama layar Login tampil | Tiket berayun ±3,5°; uap naik dan memudar; cahaya hangat bergeser; halo lencana membesar dan memudar | Ayun 4,6–7,4 detik bolak-balik; uap 10–18 detik; cahaya 20 detik; halo 3,4 detik |
 | Pembuka Beranda | Sekali setiap aplikasi dibuka | Lencana, halaman, dan pita seperti di Login, tanggal muncul perlahan, ruas rel terbentang dari kiri | Tanggal 400 ms; rel 520 ms mulai 200 ms |
 | Tiket turun | Setiap Beranda dibuka | Tiket turun ke rel satu per satu | Tiap tiket 360 ms, jeda 60 ms, paling banyak 8 tiket yang bergerak |
-| Ganti layar | Pindah layar | Isi kepala navy dan bagian isi layar naik 14 px sambil menjadi jelas, satu per satu; bingkai navy tetap diam. Hanya isi pertama layar; data yang tiba sesudahnya tampil tanpa gerak | 340 ms; jeda 40 ms; paling banyak 8 bagian |
+| Ganti layar | Pindah layar | Versi 1.12: perpindahan mulus (Bagian 8.5). Layar lama memudar, layar baru bergeser masuk searah menu, membesar masuk saat form dibuka dari tiket, atau memudar masuk; bar navigasi diam. Browser tanpa View Transitions: isi kepala navy dan bagian isi layar naik 14 px sambil menjadi jelas, satu per satu. Hanya isi pertama layar; data yang tiba sesudahnya tampil tanpa gerak | Lama 120–150 ms, baru 200–300 ms sesudahnya; tanpa View Transitions 340 ms, jeda 40 ms, paling banyak 8 bagian |
 | Muncul saat digulir | Bagian yang berada di bawah layar saat layar dibuka masuk ke layar | Naik 18 px sambil menjadi jelas, sekali per bagian | 460 ms |
-| Angka utama | Nilai stock, angka ubin Dashboard, angka di kepala layar, jumlah form terisi | Naik ke tempatnya sambil menjadi jelas (tidak berhitung) | 520 ms |
+| Angka utama | Nilai stock, angka ubin Dashboard, angka di kepala layar, jumlah form terisi | Versi 1.12: berhitung dari 0 ke angkanya, melambat di akhir; angka sejajar supaya lebarnya tidak bergoyang. Hanya angka pertama ("2" pada "2 dari 4") | 900 ms |
 | Grafik | Grafik pertama kali tampil | Batang waste tumbuh dari garis dasar satu per satu; titik suhu muncul membesar; cincin Form terisi berputar ke tempatnya; grafik harga naik | Batang 560 ms, jeda 50 ms; titik 340 ms, jeda 70 ms; cincin 640 ms |
 | Cahaya navy | Selama kepala navy atau layar Login tampil | Satu bercak cahaya Garis Navy bergeser pelan di belakang isi | 16 detik, bolak-balik |
 | Tekan | Tombol, tiket, baris daftar, atau tombol papan PIN ditekan | Latar sedikit menggelap dan ukurannya turun ke 98% | 100 ms |
@@ -1116,10 +1120,11 @@ saat perangkat diatur "kurangi gerak".
 
 ### 8.2 Aturan supaya tetap ringan
 
-1. **Hanya CSS.** Semua gerak dibuat dengan `transition` dan `@keyframes`. JavaScript hanya
-   memasang atau melepas kelas (misalnya saat bagian masuk layar, lewat
-   `IntersectionObserver`). Tanpa library animasi, dan tanpa animasi yang dihitung JavaScript
-   tiap bingkai.
+1. **CSS lebih dulu.** Gerak dibuat dengan `transition`, `@keyframes`, dan View Transitions;
+   JavaScript memasang kelas dan nama transisi. Versi 1.12: angka utama berhitung lewat
+   JavaScript (`requestAnimationFrame`, satu teks per angka). Sejak 17 Oktober 2026 library
+   animasi dan library grafik boleh dipakai bila memberi gerak yang tidak bisa dibuat dengan CSS;
+   berkasnya disimpan di repo seperti huruf, supaya aplikasi tetap jalan tanpa sinyal.
 2. **Hanya dua sifat yang digerakkan:** `transform` (geser, skala, putar) dan `opacity`
    (jelas atau pudar). Keduanya paling ringan bagi HP. Yang tidak boleh digerakkan: lebar,
    tinggi, jarak, posisi, warna, bayangan, dan blur. Satu pengecualian: warna latar pada
@@ -1145,8 +1150,8 @@ saat perangkat diatur "kurangi gerak".
 
 ### 8.3 Yang tidak dipakai
 
-Angka yang berhitung naik (butuh JavaScript tiap bingkai), gerak yang menggerakkan ukuran,
-warna, atau bayangan, efek paralaks, dan gerak yang berulang cepat tanpa henti.
+Gerak yang menggerakkan ukuran, warna, atau bayangan, efek paralaks, dan gerak yang berulang
+cepat tanpa henti. (Angka yang berhitung naik dipakai sejak versi 1.12, Bagian 8.5.)
 
 ### 8.4 Gerak per layar
 
@@ -1169,6 +1174,26 @@ Isi yang digambar ulang karena data baru dari server tidak mengulang gerak masuk
 butir 5); hanya angka dan grafik yang nilainya berubah yang naik lagi. Saat perangkat diatur
 "kurangi gerak", semua layar tampil langsung tanpa gerak apa pun dari tabel ini kecuali
 indikator putar.
+
+### 8.5 Perpindahan layar dan angka berhitung (versi 1.12)
+
+- **Perpindahan layar** memakai View Transitions bawaan browser (Chrome Android, Safari iPhone iOS
+  18 ke atas). Jenisnya ditentukan dari layar lama dan baru:
+  - **Buka** (tiket Beranda → layar form): nama form di tiket terbang ke judul layar form; layar form
+    membesar dari 97% sambil menjadi jelas.
+  - **Tutup** (layar form → Beranda): judul terbang kembali ke tiketnya; Beranda memudar masuk. Tiket
+    tidak turun lagi selama perpindahan ini.
+  - **Maju / mundur:** menu di kanan / kiri menu lama, atau layar yang lebih dalam / dangkal di menu
+    yang sama: layar bergeser 24 px searah itu sambil memudar.
+  - **Ganti:** selain itu (misalnya Dashboard → Stock opname pada kedalaman sama): memudar.
+  - Bar navigasi (bawah di HP dan tablet, atas di desktop) tidak ikut bergerak; pil menu tetap
+    bergeser seperti Bagian 8.1.
+  - Tidak ada perpindahan mulus untuk layar pertama sesudah login, layar yang digambar ulang di alamat
+    yang sama, browser tanpa View Transitions (memakai gerak "ganti layar" lama), dan "kurangi gerak".
+- **Angka berhitung:** angka utama yang muncul bersama isi pertama layar (0,9 detik pertama) berhitung
+  dari 0 dalam 900 ms dengan kurva yang melambat di akhir. Format angka sama dengan angka akhirnya
+  (pemisah ribuan titik, desimal koma, "Rp", "%"). Angka yang tiba sesudahnya, atau berubah saat
+  mengetik, langsung tampil. Selama berhitung, pembaca layar membaca angka akhirnya.
 
 ---
 
@@ -1195,8 +1220,7 @@ indikator putar.
 | Foto atau video latar | Memperlambat aplikasi dan mengganggu keterbacaan angka |
 | Gradasi warna dan efek kaca di layar isi | Tidak menambah informasi; membuat tampilan tidak bersih. Pengecualian (versi 1.11): cahaya, gradasi, dan butiran di permukaan navy, dan kaca buram bar navigasi bawah (Bagian 2 dan 4.2) |
 | Lebih dari satu warna aksen | Aksen akan berebut dengan warna makna status |
-| Angka berhitung naik, paralaks, gerak yang menggerakkan ukuran, warna, atau bayangan | Butuh hitungan tiap bingkai dan menyita tenaga HP (versi 1.8 memakai gerak masuk, muncul saat digulir, dan cahaya pelan dengan aturan Bagian 8.2) |
-| Library animasi dan library grafik | Menambah berat unduhan; CSS dan SVG sudah cukup |
+| Paralaks, gerak yang menggerakkan ukuran, warna, atau bayangan | Butuh hitungan tiap bingkai dan menyita tenaga HP (versi 1.8 memakai gerak masuk, muncul saat digulir, dan cahaya pelan dengan aturan Bagian 8.2; versi 1.12 menambah angka berhitung, Bagian 8.5) |
 | Mengunci arah layar | Tablet sering dipakai mendatar |
 
 ---
@@ -1227,5 +1251,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
+| Perpindahan layar dan angka berhitung (17 Oktober 2026) | Keduanya dipakai; angka berhitung dengan kecepatan sedang (0,9 detik). Larangan library animasi dan library grafik dicabut (Bagian 8.2 dan 8.5). |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
