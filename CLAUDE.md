@@ -227,6 +227,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 11++++ | Memuat lebih cepat (keluhan pemilik 12 Oktober 2026): login membawa Beranda, tiap tab dibaca sekali per permintaan, jawaban Beranda disimpan 2 menit di server, lama aksi di log, `config.js` dari salinan di HP | Kode selesai (Code.gs v0.14, aplikasi 0.15.1), diuji dengan API tiruan (11 uji server baru, jawaban 12 aksi sama dengan sebelum, 26 uji harga dan 32 pemeriksaan regresi) dan Chromium (4 uji baru, uji lama, sapuan delapan ukuran). Waktu di Google asli belum bisa diukur di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12 | Pindah ke Supabase (keputusan pemilik 15 Oktober 2026): Edge Function menjalankan Code.gs di atas Postgres, PDF jsPDF, Storage, email Brevo atau Gmail, jadwal pg_cron, cadangan JSON, salinan ke Sheets tiap 5 menit per baris, berkas ke Drive, `pindahKeSupabase`, pengalihan HP | Kode selesai (Code.gs v0.15, aplikasi 0.16.0, skema.sql v0.2), diuji dengan Postgres 16 lokal dan Deno (Edge Function rakitan), uji ujung-ke-ujung Sheet tiruan → Supabase → Sheet (35 pemeriksaan), Brevo tiruan, pembanding 91 langkah dengan tiruan Apps Script, beban satu tahun, Chromium pengalihan. Dipasang pemilik 16 Oktober 2026 (butir 213): aplikasi, salinan ke Sheet, email lewat Gmail, dan tiga jadwal pg_cron berjalan |
 | 12+ | Login lebih bersih, spesifikasi tampilan 1.9 (dipilih pemilik dari pratinjau 17 Oktober 2026, cara 3): HP mengingat pengguna terakhir dan Login langsung menyapanya dengan papan PIN, daftar nama berupa lingkaran inisial lewat "Ganti nama" | Kode selesai (aplikasi 0.16.1; Code.gs tidak berubah), diuji di Chromium dengan API tiruan (delapan ukuran untuk sapaan dan daftar nama, alur pilih nama/PIN salah/login/ingat, nama yang tidak bisa masuk lagi, keterangan keluar otomatis, nama panjang, "kurangi gerak"). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs) |
+| 12++ | Perbaikan jadwal Supabase (laporan harian 16 Oktober 2026 tidak terkirim): pg_cron memanggil Edge Function dengan `Content-Type: application/json`; peringatan di Beranda/Dashboard Pengelola jika laporan harian tidak berjalan | Kode selesai (Code.gs v0.15.1; aplikasi tetap 0.16.1), diuji dengan Postgres 16 lokal (tiruan `net.http_post` dengan pemeriksaan Supabase: versi lama gagal dengan pesan yang sama, versi baru lolos untuk tiga jadwal), pelayan Edge Function dengan body JSON, dan 13 skenario waktu peringatan. Menunggu pemilik: tempel `index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1600,3 +1601,29 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     muat di layar), HP tanpa ingatan → daftar → pilih → PIN salah → login → nama tersimpan → Login berikutnya menyapa orang itu,
     nama yang sudah tidak bisa masuk → daftar, keterangan keluar otomatis di atas sapaan lalu hilang setelah Ganti nama, nama
     panjang di 320 × 568, "kurangi gerak" tanpa animasi berjalan, tanpa galat konsol. Belum diuji di HP asli.
+
+### Perbaikan jadwal Supabase (Code.gs v0.15.1, 17 Oktober 2026)
+
+218. **Asal:** laporan harian Jumat, 16 Oktober 2026 (malam pertama dengan jadwal Supabase) tidak terkirim. Hasil query pemilik:
+    ketiga jadwal `inventoryku-...` di `cron.job_run_details` berstatus `failed` dengan `Content-Type header must be
+    "application/json"` dari `net.http_post`. pg_net mengirim body `jsonb` dan menolak header lain; `pasangJadwal` (adaptor.js)
+    memakai `text/plain;charset=utf-8` meniru panggilan aplikasi. Uji butir 211 memakai tabel cron tiruan yang tidak menjalankan
+    perintahnya, jadi tidak menangkap ini; email "[Uji]" (langkah 11 PANDUAN) lewat jalur lain (`__fungsi` dari Apps Script).
+219. **Perbaikan:** jadwal memakai `Content-Type: application/json`. Edge Function membaca body sebagai teks apa pun headernya,
+    jadi tidak ada perubahan lain. Jadwal yang sudah tersimpan di `cron.job` baru berubah setelah `pasangTrigger` dijalankan lagi
+    (dari editor Apps Script, diteruskan ke Supabase) dengan Edge Function versi baru; sebelum itu bisa dibetulkan langsung dengan
+    `cron.alter_job` di SQL Editor.
+220. **Peringatan laporan yang tidak berjalan** (`laporanTerlambat_`, dipakai `peringatanSistem_`, jadi tampil di Beranda Pengelola
+    dan butir `sistem` Perlu perhatian di Dashboard): laporan untuk tanggal D dijadwalkan D + jam closing + jeda (boleh lewat tengah
+    malam) dan dianggap terlambat 60 menit sesudahnya. Jika `laporan_terakhir` belum mencakup tanggal terbaru yang sudah lewat
+    batasnya, tampil "Laporan harian: laporan untuk Jumat, 16 Oktober 2026 belum terkirim. Jadwal otomatis mungkin berhenti. Pemilik
+    Sheet perlu menjalankan pasangTrigger di editor Apps Script." Kiriman yang tercatat lebih dari 30 menit sebelum jadwal (uji
+    `kirimLaporanSekarang` pagi hari) tidak mencakup tanggal itu. Tidak tampil jika `laporan_terakhir` kosong (belum pernah ada
+    laporan) atau sudah diawali "Gagal" (peringatan lama sudah tampil). Berlaku juga untuk Apps Script yang belum pindah.
+    Hanya laporan harian: cadangan mingguan dan rekap bulanan jarang berjalan, jadi tidak diberi pemeriksaan serupa.
+221. **Uji** (di luar repo): Postgres 16 lokal dengan `cron.job` dan `net.http_post` tiruan yang meniru pemeriksaan header Supabase;
+    `pasangJadwal` dari adaptor.js lama: tiga jadwal gagal dengan pesan yang sama dengan milik pemilik; versi baru: tiga jadwal lolos,
+    body berisi `action`, `nama`, `syarat`, dan `rahasia`. Pelayan Edge Function menerima `__jadwal` ber-`application/json`. Code.gs
+    dimuat di Node: 13 skenario `laporanTerlambat_` (uji pagi, sebelum dan sesudah batas, nearMinute lebih awal, dua malam terlewat,
+    jam laporan lewat tengah malam, nilai bawaan, belum pernah, Gagal) dan `peringatanSistem_` tanpa peringatan ganda. Hasil rakitan
+    lolos pemeriksaan sintaks. Belum bisa diuji di sini: pg_cron dan pg_net asli.

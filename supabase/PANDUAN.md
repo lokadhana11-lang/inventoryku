@@ -63,6 +63,11 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
     `Laporan Kitchen/...` dalam 5 menit.
 12. Di Supabase: **Database → Cron Jobs** (atau SQL: `select * from cron.job;`) berisi tiga jadwal
     `inventoryku-...`.
+    Sesudah jam laporan pertama (sekitar 22.15 WIB), pastikan jadwal itu benar-benar berjalan:
+    `select j.jobname, d.status, d.return_message, d.start_time from cron.job_run_details d join cron.job j
+    using (jobid) where j.jobname like 'inventoryku-%' order by d.start_time desc limit 5;` harus berstatus
+    `succeeded`. Jika laporan tidak terkirim, Beranda Pengelola juga menulis "Laporan harian: laporan untuk …
+    belum terkirim" (Code.gs v0.15.1).
 
 ## Sesudah pindah
 

@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.15 (pindah ke Supabase)
+// InventoryKu Code.gs v0.15.1 (pindah ke Supabase; peringatan laporan harian yang tidak berjalan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -67,7 +67,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.15';
+var VERSI_KODE = 'v0.15.1';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -7341,7 +7341,31 @@ function catatSurelGagal_(asal, pesan) {
   catatStatusSistem_(kunci, 'Gagal ' + waktuSekarangId_() + ': email tidak terkirim (' + pesan + ').');
 }
 
-/** Untuk Beranda Pengelola: email laporan, cadangan, atau rekap bulanan terakhir yang gagal. */
+/**
+ * Tanggal laporan harian terbaru yang seharusnya sudah terkirim, jika laporan_terakhir belum mencakupnya; '' jika tidak
+ * terlambat. Menangkap jadwal yang tidak berjalan sama sekali dan karena itu tidak sempat menulis "Gagal" (misalnya pg_cron
+ * yang gagal memanggil Supabase). Laporan untuk tanggal D dijadwalkan pada D + jam closing + jeda (boleh lewat tengah malam);
+ * dianggap terlambat 60 menit sesudahnya. Kiriman yang tercatat lebih dari 30 menit sebelum jadwal (misalnya uji
+ * kirimLaporanSekarang pagi hari) tidak mencakup tanggal itu. laporan_terakhir yang kosong (belum pernah ada laporan) tidak
+ * dianggap terlambat.
+ */
+function laporanTerlambat_(nilai, lap) {
+  var m = String(lap).match(/^(?:Terkirim|Gagal) (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/);
+  if (!m) return '';
+  var jam = jamSah_(nilai.jam_closing) || '21:30';
+  var jeda = jedaSah_(nilai.jeda_laporan_menit);
+  if (jeda === null) jeda = 45;
+  var jadwal = Number(jam.slice(0, 2)) * 60 + Number(jam.slice(3)) + jeda;
+  var kini = waktuSekarangId_().match(/^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/);
+  var menitKini = Number(kini[2]) * 60 + Number(kini[3]);
+  var mundur = 0;
+  while (menitKini + mundur * 1440 < jadwal + 60) mundur++;
+  var harus = geserTanggal_(kini[1], -mundur);
+  var menitKirim = Math.round((Date.parse(m[1]) - Date.parse(harus)) / 864e5) * 1440 + Number(m[2]) * 60 + Number(m[3]);
+  return menitKirim >= jadwal - 30 ? '' : harus;
+}
+
+/** Untuk Beranda Pengelola: email laporan, cadangan, atau rekap bulanan terakhir yang gagal atau tidak berjalan. */
 function peringatanSistem_() {
   var nilai = bacaKonfigurasi_().nilai;
   var hasil = [];
@@ -7349,6 +7373,11 @@ function peringatanSistem_() {
   var cad = String(nilai.cadangan_terakhir || '');
   var rek = String(nilai.rekap_terakhir || '');
   if (/^Gagal/.test(lap)) hasil.push('Laporan harian: ' + lap);
+  var telat = /^Gagal/.test(lap) ? '' : laporanTerlambat_(nilai, lap);
+  if (telat) {
+    hasil.push('Laporan harian: laporan untuk ' + tanggalPanjangId_(telat) + ' belum terkirim. Jadwal otomatis mungkin ' +
+      'berhenti. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script.');
+  }
   if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
   if (/^Gagal/.test(rek)) hasil.push('Rekap bulanan: ' + rek);
   // Jadwal diubah dari Pengaturan → Outlet dan jadwal, trigger belum dipasang ulang (Tahap 7).
