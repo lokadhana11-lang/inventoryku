@@ -200,6 +200,20 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   menulis harga untuk item yang belum punya harga (harga berbeda untuk item berharga ditolak). `formWaste.item[].harga` dan
   `formOpname.item[].harga` = harga yang berlaku pada `tanggal`. `dashboard.nilaiStock` ditambah `selisihHarga: { dari, sampai, total,
   item: [{ nama, kategori, satuan, selisih, perubahan: [{ tanggal, dari, ke, stock, selisih }] }] }` (bulan berjalan).
+- HPP dan food cost (Code.gs v0.16, 17 Oktober 2026; semua khusus Pengelola): `hpp {bulan: 'yyyy-mm'}` → `{ bulan, nama, dari,
+  sampai, berjalan, hariIni, target, bahanKecilPersen, pemakaian: { terpakai, waste, selisihStock, total, wasteBarangJadi, stokPembuka },
+  cekSilang: { awal, masuk, stokPembuka, akhir, selisihHarga, tanggalAwal, tanggalAkhir, beda, cocok }, penjualan: { total, hari,
+  jumlahHari, kurang: [tanggal], terakhir: [{ tanggal, nilai, catatan, oleh }], pernah }, foodCost, perKategori: [{ kategori, nilai }],
+  bahanTerbesar: [{ nama, satuan, qty, nilai }], tanpaHarga: [nama], grafik: [{ bulan, foodCost, pemakaian, penjualan, lengkap }],
+  menu: [menu HPP], siap: { menu, penjualan } }`; `daftarMenu` → `{ siap, hariIni, menu: [{ nama, hargaJual, aktif, bahan: [{ item, qty,
+  hasilBersih, satuan, harga, hargaDariResep, beli, biaya }], biayaBahan, bahanKecil, hpp, foodCost, margin, hargaTarget, diAtasTarget,
+  lengkap, tanpaHarga, masalah }], item, target, bahanKecilPersen }`; `simpanMenu {baru, namaLama, nama, hargaJual, bahan: [{ item, qty,
+  hasilBersih }]}` (+ `disimpan`) dan `aturMenuAktif {nama, aktif}` (+ `diubah`) → jawaban `daftarMenu`; `simpanPenjualan {tanggal,
+  penjualan, catatan, submissionId, bulan?}` → `{ tanggal, penjualan, catatan, mengganti, hpp? }`. `bacaOutletJadwal`/`simpanOutletJadwal`
+  ditambah `targetFoodCost` dan `bahanKecilPersen`; `dashboard` ditambah `hpp: { bulan, nama, foodCost, target }` dan `perhatian[]` berjenis
+  `menu` dan `penjualan` (`data.tanggal`); `daftarItem.item[]` ditambah `dipakaiMenu`. Nominal rupiah waste untuk Staff: `formWaste` (dan
+  `kirimWaste.form`) tanpa `item[].harga`, `kiriman.totalRp`, `baris[].estimasi`, ditambah `tanpaRupiah: true`; `riwayat`/`detailKiriman`
+  Waste tanpa kolom berjenis `rupiah`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -228,6 +242,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12 | Pindah ke Supabase (keputusan pemilik 15 Oktober 2026): Edge Function menjalankan Code.gs di atas Postgres, PDF jsPDF, Storage, email Brevo atau Gmail, jadwal pg_cron, cadangan JSON, salinan ke Sheets tiap 5 menit per baris, berkas ke Drive, `pindahKeSupabase`, pengalihan HP | Kode selesai (Code.gs v0.15, aplikasi 0.16.0, skema.sql v0.2), diuji dengan Postgres 16 lokal dan Deno (Edge Function rakitan), uji ujung-ke-ujung Sheet tiruan → Supabase → Sheet (35 pemeriksaan), Brevo tiruan, pembanding 91 langkah dengan tiruan Apps Script, beban satu tahun, Chromium pengalihan. Dipasang pemilik 16 Oktober 2026 (butir 213): aplikasi, salinan ke Sheet, email lewat Gmail, dan tiga jadwal pg_cron berjalan |
 | 12+ | Login lebih bersih, spesifikasi tampilan 1.9 (dipilih pemilik dari pratinjau 17 Oktober 2026, cara 3): HP mengingat pengguna terakhir dan Login langsung menyapanya dengan papan PIN, daftar nama berupa lingkaran inisial lewat "Ganti nama" | Kode selesai (aplikasi 0.16.1; Code.gs tidak berubah), diuji di Chromium dengan API tiruan (delapan ukuran untuk sapaan dan daftar nama, alur pilih nama/PIN salah/login/ingat, nama yang tidak bisa masuk lagi, keterangan keluar otomatis, nama panjang, "kurangi gerak"). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12++ | Perbaikan jadwal Supabase (laporan harian 16 Oktober 2026 tidak terkirim): pg_cron memanggil Edge Function dengan `Content-Type: application/json`; peringatan di Beranda/Dashboard Pengelola jika laporan harian tidak berjalan | Kode selesai (Code.gs v0.15.1; aplikasi tetap 0.16.1), diuji dengan Postgres 16 lokal (tiruan `net.http_post` dengan pemeriksaan Supabase: versi lama gagal dengan pesan yang sama, versi baru lolos untuk tiga jadwal), pelayan Edge Function dengan body JSON, dan 13 skenario waktu peringatan. Dipasang dan diuji pemilik 17 Oktober 2026 (butir 222): Edge Function dan Code.gs ditempel, `pasangTrigger` dijalankan, jadwal cadangan yang dijalankan manual dijawab 200 `dilewati` |
+| 12+++ | HPP dan food cost (dipilih pemilik dari pratinjau 17 Oktober 2026): Pengaturan → Menu (takaran bersih, hasil bersih, bahan kecil, Salin menu), layar HPP dan food cost dari Dashboard (pemakaian bahan, cek silang, per kategori, grafik 6 bulan, Per menu), penjualan harian, bagian HPP di rekap bulanan, nominal rupiah waste hanya untuk Pengelola | Kode selesai (Code.gs v0.16, aplikasi 0.17.0), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 18 uji server dengan angka dihitung tangan, 34 jawaban aksi lama sama dengan v0.15.1) dan Chromium (13 uji alur, delapan ukuran, "kurangi gerak", 28 layar lama sama piksel per piksel dengan versi sebelumnya). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Menu`, `M_MenuBahan`, `Data_Penjualan`, dua baris konfigurasi), uji dari HP |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1633,3 +1648,60 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `net._http_response` mencatat status 200 dengan `{"ok":true,"data":{"dilewati":true}}` (jalur pg_cron → pg_net → Edge
     Function → rahasia jadwal → syarat hari). Laporan harian dari jadwal belum teramati saat butir ini ditulis; jalurnya sama,
     dan pembuatan laporan serta email lewat Gmail sudah terbukti dengan uji "[Uji]" 16 Oktober.
+
+### HPP dan food cost (Code.gs v0.16, aplikasi 0.17.0, 17 Oktober 2026)
+
+223. **Asal dan keputusan pemilik.** Pemilik bertanya fitur apa yang perlu ditambah, termasuk HPP untuk Head Kitchen dan Manager.
+    Rancangan dan pratinjau (artifact "Rancangan HPP InventoryKu") lalu dipilih dengan jawaban: penjualan dicatat per hari, harga
+    jual dan penjualan tanpa pajak dan service, bahan kecil 3%, target food cost 35%, nominal Rp waste tidak terlihat Staff, kasir
+    buatan sendiri (penjualan per menu belum dibangun). Susut bahan (hasil bersih) per baris bahan menu dan "Salin menu" untuk versi
+    bungkus juga dipilih; biaya operasional tidak masuk HPP per porsi. Spesifikasi sistem Bagian 5.9 (baru), 5.1, 5.4, 7.1, 8.2, 9.3,
+    10, 12, 13; spesifikasi tampilan versi 1.10 (Bagian 4.7, 5.3, 5.6, 5.7, 5.10 baru, 7, 11).
+224. **Data.** `M_Menu` (Nama Menu, Harga Jual (Rp), Aktif) dan `M_MenuBahan` (Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih
+    (%)) masuk `TAB_MASTER` dan `KUNCI_MASTER` (kunci Nama Menu); `Data_Penjualan` (Tanggal, Penjualan (Rp), Catatan + kolom sistem)
+    masuk `TAB_DATA`, satu baris per tanggal, urut tanggal terbaru. `M_Konfigurasi`: `target_food_cost` 35 dan `bahan_kecil_persen` 3
+    (nilai kosong atau di luar 1–100 / 0–15 dibaca nilai awal; ditulis dengan koma). Sebelum `setupSpreadsheet` dijalankan ulang,
+    `daftarMenu.siap` false, `hpp` dan `dashboard` tetap jalan, `simpanMenu` dan `simpanPenjualan` menolak dengan petunjuk.
+225. **Menu** (`bacaMenu_`, `hppMenu_`, `dataMenu_`): bahan aktif, tidak ganda, takaran bersih > 0 (3 angka di belakang koma), hasil
+    bersih di atas 0 sampai 100 dengan satu desimal (kosong = 100). HPP = Σ(takaran ÷ hasil × harga yang berlaku pada tanggal) ×
+    (1 + bahan kecil %), barang jadi tanpa harga dari resepnya (`lengkapiHargaResep_`); satu bahan tanpa harga → `lengkap: false`.
+    Food cost dibulatkan satu desimal, harga untuk target dibulatkan ke atas ke Rp 100. Nama boleh diganti (bahan ditulis ulang
+    seperti `tulisBahanResep_`); perubahan nama dan harga jual dicatat di `Log_Perubahan` (Tab `M_Menu`, row_id nama baru).
+    Mengaktifkan lagi ditolak jika ada bahan nonaktif. Item yang masih bahan menu aktif tidak bisa dinonaktifkan (`aturItemAktif`) dan
+    namanya tidak bisa diganti jika dipakai menu mana pun (`simpanItem`, `bisaGantiNama`).
+226. **Pemakaian bahan** (`pemakaianBahan_`): dari rekap `Stock_Harian`, hanya item tanpa resep aktif, per hari × `hargaPada_`. Terpakai =
+    Keluar + Dipakai Prep − Hasil Prep; waste bahan; selisih stock = −(Penyesuaian − stok pembuka). **Stok pembuka** (`stokPembuka_`,
+    `Data_Penyesuaian` beralasan "Stok pembuka") tidak dihitung sebagai selisih, karena barangnya sudah ada sebelum dicatat; tanpa ini
+    food cost bulan pertama pemakaian aplikasi akan terlihat jauh terlalu rendah. Waste barang jadi diambil dari estimasi yang
+    tercatat di `Data_Waste` (`nilaiWasteTercatat_`). Cek silang = nilai stock bahan sehari sebelum periode + masuk + stok pembuka −
+    nilai stock bahan akhir + selisih harga item bahan (`selisihHarga_`); `cocok` jika beda ≤ 1 rupiah per item berganti harga
+    (pembulatan per item). Bulan berjalan dinilai sampai kemarin; pada tanggal 1, periode kosong.
+227. **Food cost** (`foodCostBulan_`, `dataHpp_`): pemakaian ÷ penjualan, hanya jika setiap hari periode punya catatan (`kurang` kosong)
+    dan penjualan > 0. Grafik 6 bulan sampai bulan yang dipilih. HPP menu di layar memakai harga hari ini untuk bulan berjalan dan
+    harga hari terakhir untuk bulan lalu. `simpanPenjualan` dengan `bulan` menjawab `hpp` bulan itu, jadi layar tidak memanggil
+    server dua kali.
+228. **Dashboard** (`ringkasHppDashboard_`): `hpp` food cost bulan ini; Perlu perhatian `menu` (Perlu ditinjau, menu aktif di atas
+    target) dan `penjualan` (Menunggu, hari bulan ini sampai kemarin yang belum dicatat, mulai penjualan pertama yang pernah dicatat;
+    "Penjualan kemarin belum dicatat" jika hanya kemarin). Rekap bulanan: `hasil.hpp`, bagian "HPP dan food cost" di PDF
+    (`isiPdfRekapHpp_`, setelah Kepatuhan) dan email.
+229. **Nominal Rp waste untuk Staff** (`rupiahWasteTerlihat_` = tanpa pengguna atau Pengelola): `dataFormWaste_` tanpa harga dan
+    estimasi (+ `tanpaRupiah`), `defRiwayat_('WASTE')` tanpa kolom `rupiah` (Riwayat, detail, jawaban laporkan), `isiPdfWaste_` tanpa
+    kolom dan total rupiah. Trigger, email, Drive tetap lengkap. Di HP, layar Waste memakai role sesi (`rupiah = pengelola`), jadi
+    data lama di HP Staff pun tidak menampilkan rupiah.
+230. **Aplikasi (0.17.0):** rute `#/hpp` dan `#/hpp/menu` (menu Dashboard), `#/pengaturan/menu`, `-baru`, `/<nama>`. Dashboard:
+    `.dashboard-pintas` berisi Stock opname dan HPP dan food cost (dua kolom di desktop). Layar HPP: pilihan bulan (`cache:hpp-pilihan`),
+    `grupPilihan` Bulan/Per menu (alamat ikut berganti), jawaban per bulan di `cache:hpp:<bulan>`; grafik food cost SVG dengan batang
+    `tumbuh`; batang kategori lewat `transform: scaleX` (kelas `kat-*`; `bar-isi` sudah dipakai bar navigasi). Lembar
+    `bukaCatatPenjualan` (juga dari Perlu perhatian). Pengaturan → Menu: draft `draft:menu:<nama>`/`+baru`, `cache:menu`, perkiraan
+    dihitung di HP dengan rumus yang sama, "Salin menu" mengisi layar menu baru lewat `salinanMenu`. Outlet dan jadwal: kartu "HPP dan
+    food cost". Item: keterangan dan "Buka menu" jika dipakai menu.
+231. **Uji** (di luar repo; tiruan kini memakai `supabase/src/sheet.js` dan `layanan.js` di memori, jadi tidak perlu tiruan Apps Script
+    sendiri): `uji_hpp.mjs` 18 uji server dengan data September–Oktober (harga Ayam berganti 10 Okt, stok pembuka, opname, prep beresep,
+    waste barang jadi, bahan tanpa harga; pemakaian Rp 541.000 dan food cost 33,8% dihitung tangan), `banding.mjs` 34 jawaban aksi lama
+    sama dengan Code.gs v0.15.1 selain `dipakaiMenu`, `uji_chromium.mjs` 13 uji (Dashboard, HPP Bulan/Per menu, catat penjualan,
+    penjualan belum lengkap, menu ubah dan perkiraan, Salin menu, sakelar, Outlet, item dipakai menu, Waste Staff HP dan desktop,
+    delapan ukuran Bagian 4.6 untuk 9 rute dan lembar penjualan, "kurangi gerak"), dan `banding_layar.mjs`: 14 layar lama × 2 ukuran
+    sama piksel per piksel dengan versi sebelumnya (uji ini menangkap bentrok kelas `bar-isi` yang merusak bar atas desktop).
+232. **Belum diuji di sini:** Supabase dan Google asli (tab baru tersalin ke Sheets, `setupSpreadsheet` di Sheet), tampilan di HP asli,
+    dan PDF rekap jsPDF dengan bagian baru.
+

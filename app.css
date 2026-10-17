@@ -6291,3 +6291,363 @@ textarea.isian-catatan {
 @media (prefers-reduced-motion: reduce) {
   .tombol-nama:hover { transform: none !important; }
 }
+
+
+/* =========================================================================
+ * HPP dan food cost (spesifikasi tampilan Bagian 5.10, 17 Oktober 2026):
+ * layar HPP, Pengaturan → Menu, dan tombol di Dashboard
+ * ========================================================================= */
+
+/* Dashboard: Stock opname dan HPP berdampingan di laptop dan desktop */
+.dashboard-pintas {
+  display: grid;
+  gap: 0 32px;
+  margin: 16px 0 24px;
+}
+
+.dashboard-pintas .dashboard-opname {
+  margin: 0 0 8px;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-pintas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Kotak angka di kepala yang tidak bisa diketuk */
+.kepala-nilai.kepala-nilai-diam {
+  padding-right: 16px;
+  cursor: default;
+}
+
+.kepala-nilai-angka small {
+  font-family: var(--huruf);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--teks-di-navy);
+  margin-left: 6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kepala-nilai.kepala-nilai-diam:hover {
+    transform: none;
+    background: var(--navy-lapis);
+  }
+}
+
+.kepala-hpp {
+  display: grid;
+  gap: 12px;
+}
+
+/* Pilihan bulan dan bagian (Bulan / Per menu) */
+.hpp-pilih {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hpp-pilih .kolom {
+  margin: 0;
+}
+
+@media (min-width: 600px) {
+  .hpp-pilih {
+    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+    align-items: end;
+  }
+}
+
+.hpp-bagian .pilihan-grup {
+  margin: 0;
+}
+
+/* Dua kolom di laptop dan desktop: rincian di kiri, grafik dan penjualan di kanan */
+.hpp-kolom,
+.hpp-kolom-isi {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.hpp-kolom-isi .kartu + .kartu {
+  margin-top: 0;
+}
+
+.hpp > .kartu + .hpp-kolom {
+  margin-top: 16px;
+}
+
+@media (min-width: 1024px) {
+  .hpp-kolom {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+.kartu-menunggu {
+  background: var(--menunggu-latar);
+  box-shadow: none;
+}
+
+/* Baris label dan nilai rupiah */
+.daftar-nilai {
+  display: grid;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.baris-nilai {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.baris-nilai > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.baris-nilai > strong {
+  flex: none;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.baris-nilai.total {
+  margin-top: 2px;
+  border-top: 1px solid var(--garis-halus);
+  padding-top: 8px;
+  font-weight: 600;
+}
+
+.baris-nilai.total > strong {
+  font-weight: 600;
+}
+
+/* Pemakaian per kategori: batang mendatar (lebar lewat transform) */
+.kat-daftar {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kat-baris {
+  display: grid;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.kat-atas {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kat-atas > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kat-nilai {
+  flex: none;
+  color: var(--tinta-redup);
+  font-variant-numeric: tabular-nums;
+}
+
+.kat-jalur {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--garis-halus);
+  overflow: hidden;
+}
+
+.kat-isi {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--biru-malam);
+  transform-origin: 0 50%;
+}
+
+.hpp-rinci {
+  margin-top: 12px;
+  border-top: 1px solid var(--garis-halus);
+  padding-top: 4px;
+}
+
+.hpp-rinci summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--biru-malam);
+  cursor: pointer;
+}
+
+.hpp-rinci ol {
+  margin: 0;
+}
+
+/* Food cost 6 bulan */
+.grafik-fc-nilai {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.grafik-fc-nilai .di-atas {
+  color: var(--tinjau-teks);
+}
+
+.grafik-fc-svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+
+.grafik-fc-svg .batang {
+  fill: var(--biru-malam);
+}
+
+.grafik-fc-svg .batang.di-atas {
+  fill: var(--tinjau-teks);
+}
+
+.grafik-fc-svg .garis-target {
+  stroke: var(--tinta);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.grafik-fc-svg .garis-dasar {
+  stroke: var(--garis-isian);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.grafik-fc-bulan {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.grafik-fc-svg .batang.tumbuh {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: batang-tumbuh 560ms var(--ayun-masuk) backwards;
+  animation-delay: calc(var(--i, 0) * 50ms + 120ms);
+}
+
+.ungkap:not(.ungkap-tampil) .grafik-fc-svg .batang.tumbuh {
+  animation: none;
+}
+
+/* Per menu (HP dan tablet) */
+.daftar-baris.menu-hpp {
+  align-items: center;
+}
+
+.menu-hpp-persen {
+  flex: none;
+  font-family: var(--huruf-sempit);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabel-menu-hpp .kolom-bantuan {
+  margin-top: 2px;
+}
+
+/* Pengaturan → Menu: bahan per porsi */
+.daftar-bahan-menu {
+  display: grid;
+  margin: 8px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.baris-bahan-menu {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--garis-halus);
+}
+
+.baris-bahan-menu-kepala {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.baris-bahan-menu-kepala .daftar-baris-judul {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.baris-bahan-menu-kepala .tombol-ikon {
+  flex: none;
+}
+
+.baris-bahan-menu-isian {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.baris-bahan-menu-isian .kolom {
+  margin: 0;
+}
+
+.baris-bahan-menu-isian .kolom-label {
+  font-size: 14px;
+}
+
+.baris-bahan-menu-isian .isian {
+  min-width: 0;
+}
+
+.menu-hasil-tetap {
+  align-self: end;
+  padding-bottom: 12px;
+}
+
+.baris-bahan-menu-ket {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.baris-bahan-menu-ket > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.menu-biaya {
+  flex: none;
+  color: var(--tinta);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+hr.pemisah {
+  border: 0;
+  border-top: 1px solid var(--garis-halus);
+  margin: 12px 0;
+}

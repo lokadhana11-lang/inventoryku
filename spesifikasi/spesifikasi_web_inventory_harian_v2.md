@@ -25,6 +25,10 @@
 > Diperbarui 15 Oktober 2026: pindah ke Supabase (Bagian 4.5). Aplikasi memakai Supabase Edge
 > Function dan database Postgres; Google Sheets menjadi salinan yang diperbarui tiap 5 menit dan
 > hanya untuk dicek. PDF, email, rekap bulanan, dan cadangan dibuat di Supabase.
+> Diperbarui 17 Oktober 2026 (dipilih pemilik dari pratinjau "Rancangan HPP InventoryKu"): HPP dan
+> food cost (Bagian 5.9): menu dengan takaran per porsi, HPP per porsi, penjualan harian, dan food
+> cost per bulan, khusus Pengelola. Nominal rupiah waste kini hanya terlihat oleh Pengelola
+> (Bagian 5.4).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -349,7 +353,8 @@ Apps Script (menempel di Google Sheet yang sama)
 - **Satu sheet data per form:** `Data_Suhu`, `Data_Prep`, `Data_Waste`, `Data_Stock`,
   dan satu sheet untuk tiap form kustom (Bagian 5.6).
 - **Sheet pendukung:** `Data_PrepBahan` (bahan yang terpakai tiap prep), `Stock_Harian`
-  (rekap stock per tanggal dan item), `Data_Penyesuaian`, `Data_Opname`, dan `Data_Nihil`.
+  (rekap stock per tanggal dan item), `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, dan
+  `Data_Penjualan` (penjualan harian, Bagian 5.9).
 - **Outlet terisi otomatis.** Karena hanya ada satu outlet, staff tidak memilihnya. Nama
   outlet tetap tampil di form dan laporan, dan tetap disimpan di setiap baris data.
 - **Semua pilihan memakai dropdown dari master data.** Teks bebas membuat "Ayam Fillet" dan
@@ -386,11 +391,13 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
 | `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
+| `M_Menu` | Nama Menu, Harga Jual (Rp), Aktif | Menu yang dijual dan harganya, untuk HPP (Bagian 5.9) |
+| `M_MenuBahan` | Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih (%) | Takaran bahan satu porsi dan susutnya |
 | `M_Kategori` | Nama Kategori, Urutan, Aktif | Dropdown kategori di Stock Inventory; urutan kelompok di tab Harian dan PDF |
 | `M_Form` | ID Form, Nama, Jenis (bawaan / kustom), Keterangan, Jadwal (harian / hari tertentu / sewaktu-waktu), Urutan, Aktif | Daftar form yang tampil di Beranda, Riwayat, dan Laporan |
 | `M_FormKolom` | ID Form, Urutan, Label, Jenis Kolom, Pilihan, Wajib, Bagian (kepala / baris), Aktif | Susunan kolom tiap form kustom |
 | `M_Satuan` | Satuan, Jenis (Berat / Isi / Hitungan / Kemasan), Aktif | Daftar satuan yang sah |
-| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis |
+| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit), target food cost (35%), bahan kecil (3%) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis, HPP |
 
 **Riwayat harga item (`M_HargaItem`):**
 
@@ -436,7 +443,8 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 
 - Master tidak pernah dihapus, hanya dinonaktifkan, supaya riwayat tetap terbaca.
   Satu-satunya yang punya tombol "Hapus" adalah staff, dengan aturan di bawah.
-- Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif.
+- Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif, atau
+  bahan menu yang aktif (Bagian 5.9).
 - Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan.
 - Satuan dasar sebuah item tidak bisa diganti setelah item itu punya catatan stock.
 
@@ -570,6 +578,12 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
 
 Waste tidak memicu email. Totalnya dimuat di laporan harian dan dashboard. Waste yang
 dikirim **langsung mengurangi stock** item itu dan tampil di kolom Waste pada Stock Inventory.
+
+**Nominal rupiah hanya untuk Pengelola** (keputusan pemilik 17 Oktober 2026). Staff tidak
+melihat harga satuan dan estimasi kerugian: layar Waste, Riwayat Waste, dan PDF Waste yang
+diunduh Staff tidak memuat kolom rupiah, dan server tidak mengirim angkanya ke Staff.
+`Data_Waste` tetap menyimpan keduanya untuk kiriman Staff; email harian, PDF di Drive, Sheets,
+Dashboard, dan rekap bulanan tetap lengkap.
 
 ### 5.5 Form Stock Inventory Harian
 
@@ -758,6 +772,88 @@ tiket di Beranda, email harian, blok Kepatuhan di dashboard, dan rekap bulanan.
   form kustom yang tampil dan dijadwalkan untuk hari itu. Form kustom berjadwal
   "Sewaktu-waktu", form di luar jadwalnya, dan form yang disembunyikan tidak dihitung.
 
+### 5.9 Menu, HPP, dan Food Cost (Pengelola)
+
+Keputusan pemilik 17 Oktober 2026. Pengelola melihat dua hal: berapa persen penjualan yang
+habis untuk bahan (**food cost**), dan berapa biaya bahan tiap menu (**HPP per porsi**).
+Semuanya khusus Pengelola dan diperiksa di server.
+
+**Master dan data:**
+
+| Sheet | Kolom | Keterangan |
+|---|---|---|
+| `M_Menu` | Nama Menu, Harga Jual (Rp), Aktif | Harga jual tanpa pajak dan service |
+| `M_MenuBahan` | Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih (%) | Takaran bersih per porsi; Hasil Bersih kosong = 100% |
+| `Data_Penjualan` | Tanggal, Penjualan (Rp), Catatan, ditambah kolom sistem Bagian 5.0 | Satu baris per tanggal |
+| `M_Konfigurasi` | `target_food_cost` (persen, awal 35), `bahan_kecil_persen` (persen, awal 3) | Diubah dari Pengaturan → Outlet dan jadwal |
+
+**Aturan menu:**
+
+- Menu bukan item stock: tidak punya stock, tidak tampil di form mana pun, dan tidak
+  menggerakkan stock. Stock tetap berkurang lewat Stock Keluar dan Prep List.
+- Bahan menu boleh bahan mentah atau barang jadi. Barang jadi yang harganya kosong memakai
+  harga dari resepnya (Bagian 5.3).
+- **Takaran bersih** = yang masuk ke piring, dalam satuan dasar bahan, tanpa konversi (0,18 kg,
+  bukan 180 gr).
+- **Hasil bersih (%)** per baris bahan: bagian yang tersisa setelah dikupas, dibuang tulang,
+  atau dibersihkan; di atas 0 sampai 100, satu angka di belakang koma, kosong berarti 100.
+  Diisi per baris menu, bukan per item, karena bahan yang sama bisa disiapkan berbeda. Barang
+  jadi tidak punya isian ini: susutnya sudah tercakup di "Hasil per 1 resep".
+- **Bahan kecil:** bumbu, minyak, dan garnish yang sulit ditakar per porsi ditambahkan sebagai
+  satu persen untuk semua menu (0 sampai 15%). Bahan yang memang ditakar boleh tetap ditulis
+  sebagai bahan biasa.
+- **Kemasan bungkus:** item biasa. Versi bungkus dibuat dengan "Salin menu", misalnya
+  "Chicken steak (bungkus)", dengan harga jualnya sendiri.
+- Harga jual tidak punya riwayat; perubahan harga jual dan nama menu tercatat di `Log_Perubahan`.
+- Nama menu unik dan boleh diganti. Menu tidak dihapus, hanya dinonaktifkan; mengaktifkan
+  lagi ditolak jika ada bahan yang nonaktif.
+- Biaya operasional (gas, listrik, sewa, gaji) **tidak** masuk HPP per porsi: biaya itu tetap per
+  bulan, jadi bagiannya per porsi berubah setiap kali jumlah porsi terjual berubah.
+
+**Rumus HPP per porsi** (harga bahan yang berlaku pada tanggal yang dinilai, Bagian 5.1):
+
+- Biaya bahan = jumlah (takaran bersih ÷ hasil bersih × harga bahan)
+- HPP per porsi = biaya bahan × (1 + bahan kecil %)
+- Food cost menu = HPP per porsi ÷ harga jual × 100%
+- Margin kotor = harga jual − HPP per porsi
+- Harga jual untuk target = HPP per porsi ÷ target, dibulatkan ke atas ke Rp 100
+- Jika satu bahan belum punya harga, HPP menu itu "belum lengkap" dan tidak dihitung.
+- Menu di atas target ditandai Perlu ditinjau.
+
+**Food cost per bulan:**
+
+- Periode satu bulan kalender. Bulan berjalan dihitung sampai kemarin (hari ini belum closing).
+- **Pemakaian bahan** = jumlah per hari, untuk item yang bukan hasil resep aktif:
+  (Stock Keluar + Dipakai Prep − Hasil Prep) + Waste − Penyesuaian, × harga yang berlaku hari
+  itu. Dirinci menjadi terpakai (keluar dan prep), waste bahan, dan selisih stock (opname dan
+  penyesuaian; stock yang hilang menambah pemakaian, stock yang ternyata lebih menguranginya).
+- Penyesuaian beralasan **Stok pembuka** tidak dihitung sebagai selisih stock: barang itu sudah
+  ada sebelum dicatat.
+- Barang jadi tidak dihitung lagi, karena biayanya terhitung saat bahannya dipakai prep. Waste
+  barang jadi (estimasi yang tercatat) hanya ditampilkan sebagai keterangan. Akibatnya barang jadi
+  yang masih tersisa di akhir bulan sudah dihitung sebagai pemakaian bulan itu.
+- **Cek silang:** nilai stock bahan awal + nilai barang masuk + stok pembuka − nilai stock bahan
+  akhir + selisih karena perubahan harga (Bagian 8.5) = pemakaian bahan. Jika berbeda (bahan tanpa
+  harga pada sebagian hari), selisihnya disebut.
+- Bahan tanpa harga pada suatu hari tidak dihitung untuk hari itu dan namanya disebut.
+- **Food cost %** = pemakaian bahan ÷ penjualan × 100%. Dihitung hanya jika setiap hari dalam
+  periode punya catatan penjualan (Rp 0 untuk hari tutup). Jika ada yang kosong, food cost tidak
+  ditampilkan dan tanggalnya disebut.
+- Rincian: per kategori item, 10 bahan dengan pemakaian terbesar, dan food cost 6 bulan sampai
+  bulan yang dipilih.
+
+**Penjualan:**
+
+- Dicatat Pengelola: satu angka per tanggal, total penjualan sebelum pajak dan service dari
+  kasir. Hari ini atau tanggal yang sudah lewat; masa depan ditolak. Butuh sinyal.
+- Menyimpan tanggal yang sudah punya catatan menimpa angkanya; perubahannya tercatat di
+  `Log_Perubahan`.
+- Pengingat di Dashboard ("Perlu perhatian", Menunggu): hari bulan ini yang belum punya catatan
+  penjualan, dihitung mulai penjualan pertama yang pernah dicatat, supaya tidak ada pengingat
+  sebelum fitur ini dipakai.
+- Kasir outlet buatan sendiri. Penjualan per menu dan perbandingan pemakaian teoritis dan aktual
+  belum dibangun; kelak bisa memakai data dari kasir itu.
+
 ---
 
 ## 6. Riwayat, Pemeriksaan, dan Koreksi Data
@@ -876,6 +972,8 @@ misalnya "2 dari 3 isian diperiksa".
 | Mengelola staff dan PIN, termasuk menonaktifkan dan menghapus staff | Tidak | Ya |
 | Mengatur penerima email | Tidak | Ya |
 | Mengelola master data (item, resep, unit, kategori, satuan) dan konfigurasi | Tidak | Ya |
+| Melihat HPP, food cost, dan harga jual menu; mengelola menu; mencatat penjualan | Tidak | Ya |
+| Melihat nominal rupiah waste (harga satuan, estimasi kerugian) | Tidak | Ya |
 
 Role diperiksa di **server** pada setiap permintaan, bukan hanya disembunyikan di tampilan.
 
@@ -968,8 +1066,8 @@ ke file ini (Bagian 7.3).
 | 1 | `Dashboard` | Ringkasan dan grafik | Rumus |
 | 2 | `Harian_Stock`, `Harian_Suhu`, `Harian_Prep`, `Harian_Waste` | Tampilan satu hari, tata letaknya sama dengan form | Rumus |
 | 3 | `Stock_Harian` | Rekap stock, satu baris per tanggal dan item | Aplikasi (dihitung server) |
-| 3 | `Data_Stock`, `Data_Suhu`, `Data_Prep`, `Data_PrepBahan`, `Data_Waste`, `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, dan `Data_K_...` untuk tiap form kustom | Data lengkap, satu baris per item | Aplikasi |
-| 4 | `M_Outlet`, `M_Unit`, `M_Staff`, `M_Item`, `M_Resep`, `M_ResepBahan`, `M_Kategori`, `M_Satuan`, `M_Form`, `M_FormKolom`, `M_Konfigurasi` | Master data dan definisi form | Aplikasi (Pengaturan) |
+| 3 | `Data_Stock`, `Data_Suhu`, `Data_Prep`, `Data_PrepBahan`, `Data_Waste`, `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, `Data_Penjualan`, dan `Data_K_...` untuk tiap form kustom | Data lengkap, satu baris per item | Aplikasi |
+| 4 | `M_Outlet`, `M_Unit`, `M_Staff`, `M_Item`, `M_HargaItem`, `M_Resep`, `M_ResepBahan`, `M_Menu`, `M_MenuBahan`, `M_Kategori`, `M_Satuan`, `M_Form`, `M_FormKolom`, `M_Konfigurasi` | Master data dan definisi form | Aplikasi (Pengaturan) |
 | 5 | `Log_Perubahan` | Jejak koreksi | Aplikasi |
 
 Tiap kelompok tab punya warna tab sendiri, supaya mudah dibedakan.
@@ -1164,6 +1262,7 @@ untuk tanggal di bulan itu.
 | Prep | Total resep dan hasil per item |
 | Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat |
 | Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan |
+| HPP dan food cost | Pemakaian bahan dan rinciannya, penjualan, food cost dan target, pemakaian per kategori, menu di atas target (HPP dengan harga hari terakhir bulan itu); Bagian 5.9 |
 
 ### 9.4 Cadangan otomatis mingguan
 
@@ -1202,6 +1301,7 @@ email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
   Satu email harian ke 2 atau 3 penerima hanya memakai 2 atau 3 dari batas itu.
 - Jika email gagal terkirim, data tetap aman di Sheet dan kegagalannya dicatat agar
   terlihat oleh Pengelola.
+- Email rekap bulanan memuat juga satu bagian HPP dan food cost (Bagian 5.9).
 - Sejak pindah ke Supabase (Bagian 4.5) email dikirim lewat Brevo, atau dari Gmail pemilik
   lewat Apps Script jika Brevo tidak dipasang.
 
@@ -1271,8 +1371,11 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
       di spreadsheet, dan pemulihannya hanya bisa dilakukan pemilik Sheet.
 - [ ] **Hanya Pengelola** yang melihat nilai rupiah stock, daftar belanja, rekap bulanan,
       dan yang melakukan stock opname.
-- [ ] **Nominal waste (Rp) terlihat oleh staff** di form waste. Jika harga sebaiknya hanya
-      terlihat Pengelola, nominal disembunyikan dari staff.
+- [x] **Nominal waste (Rp) hanya terlihat Pengelola** (keputusan pemilik 17 Oktober 2026):
+      disembunyikan dari Staff di form, Riwayat, dan PDF Waste (Bagian 5.4).
+- [x] **HPP dan food cost** (keputusan pemilik 17 Oktober 2026, Bagian 5.9): penjualan dicatat
+      per hari, harga jual dan penjualan tanpa pajak dan service, target food cost 35%, bahan
+      kecil 3%, hasil bersih per baris bahan menu, biaya operasional tidak masuk HPP per porsi.
 - [ ] **Pemberitahuan Lupa PIN** baru terlihat saat Pengelola membuka aplikasi; tidak ada
       notifikasi ke HP yang aplikasinya tertutup.
 
@@ -1332,6 +1435,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
 10. **Tahap 10 — Rekap bulanan:** PDF rekap bulanan, trigger tanggal 1, email, dan unduhan
     dari menu Laporan
 11. **Tahap 11 (opsional):** foto bukti waste, arsip data tahunan, penambahan outlet
+12. **HPP dan food cost** (17 Oktober 2026): Pengaturan → Menu, layar HPP dan food cost dari
+    Dashboard, penjualan harian, bagian HPP di rekap bulanan
 
 ---
 

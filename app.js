@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.16.1';
+  var VERSI_APLIKASI = '0.17.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1306,6 +1306,7 @@
     { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
     { pola: /^\/dashboard$/, menu: 'dashboard', pengelola: true, layar: layarDashboard },
     { pola: /^\/opname$/, menu: 'dashboard', pengelola: true, layar: layarOpname },
+    { pola: /^\/hpp(\/menu)?$/, menu: 'dashboard', pengelola: true, layar: layarHpp },
     { pola: /^\/pengaturan$/, menu: 'pengaturan', pengelola: true, layar: layarPengaturan },
     { pola: /^\/pengaturan\/staff$/, menu: 'pengaturan', pengelola: true, layar: layarStaff },
     { pola: /^\/pengaturan\/staff\/([^/]+)(\/pin)?$/, menu: 'pengaturan', pengelola: true, layar: layarStaffDetail },
@@ -1321,7 +1322,10 @@
     { pola: /^\/pengaturan\/kategori$/, menu: 'pengaturan', pengelola: true, layar: layarKategoriSatuan },
     { pola: /^\/pengaturan\/resep$/, menu: 'pengaturan', pengelola: true, layar: layarResep },
     { pola: /^\/pengaturan\/resep-baru$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah },
-    { pola: /^\/pengaturan\/resep\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah }
+    { pola: /^\/pengaturan\/resep\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah },
+    { pola: /^\/pengaturan\/menu$/, menu: 'pengaturan', pengelola: true, layar: layarMenu },
+    { pola: /^\/pengaturan\/menu-baru$/, menu: 'pengaturan', pengelola: true, layar: layarMenuUbah },
+    { pola: /^\/pengaturan\/menu\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarMenuUbah }
   ];
 
   function jalankanRute() {
@@ -3525,6 +3529,8 @@
   function layarWaste(k) {
     aturJudul('Waste');
     var pengelola = !!k.sesi.pengguna.pengelola;
+    // Nominal rupiah waste hanya untuk Head Kitchen dan Manager (keputusan pemilik 17 Oktober 2026).
+    var rupiah = pengelola;
     var draft = bacaDraftWaste();
     var tanggal = tanggalDraft(draft.tanggal, pengelola);
     var data = null;
@@ -3784,7 +3790,7 @@
       var h = periksa(b);
       var bagian = [b.kategori || 'Kategori belum dipilih'];
       if (h.qty > 0) bagian.push(formatAngka(h.qty) + (it.satuan ? ' ' + it.satuan : ''));
-      if (h.qty > 0 && it.harga != null) bagian.push(formatRupiah(h.qty * it.harga));
+      if (rupiah && h.qty > 0 && it.harga != null) bagian.push(formatRupiah(h.qty * it.harga));
       if (b.foto) bagian.push('ada foto');
       var kartu = el('div', { class: 'kartu-item waste-ringkas' }, [
         el('button', { type: 'button', class: 'waste-ringkas-tombol', 'aria-expanded': 'false',
@@ -3816,7 +3822,7 @@
         ]),
         x.kAlasan.wadah,
         x.foto,
-        el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Estimasi kerugian' }), x.estimasi]),
+        rupiah ? el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Estimasi kerugian' }), x.estimasi]) : null,
         draft.baris.length > 1 ? tombol('Selesai', 'tautan', { onclick: function () { bukaBaris(''); } }) : null
       ]);
       pasangGeserHapus(kartu, function () { hapusBaris(b); });
@@ -3835,7 +3841,7 @@
         el('td', {}, [el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]), x.galatQty]),
         el('td', { class: 'sel-alasan' }, x.kAlasan.wadah),
         el('td', { class: 'sel-foto' }, x.foto),
-        el('td', { class: 'angka otomatis' }, x.estimasi),
+        rupiah ? el('td', { class: 'angka otomatis' }, x.estimasi) : null,
         el('td', {}, x.hapus)
       ]);
     }
@@ -3852,8 +3858,9 @@
         var badan = el('tbody');
         draft.baris.forEach(function (b, i) { badan.appendChild(barisTabel(b, i + 1)); });
         wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-waste' }, [
-          el('thead', {}, el('tr', {}, ['No', 'Item / Produk', 'Kategori waste', 'Qty', 'Alasan / keterangan', 'Foto bukti', 'Estimasi kerugian', '']
-            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 || i === 6 ? 'angka' : null, text: j }); }))),
+          el('thead', {}, el('tr', {}, ['No', 'Item / Produk', 'Kategori waste', 'Qty', 'Alasan / keterangan', 'Foto bukti', rupiah ? 'Estimasi kerugian' : null, '']
+            .filter(function (j) { return j !== null; })
+            .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 || (rupiah && i === 6) ? 'angka' : null, text: j }); }))),
           badan
         ])));
       } else {
@@ -3885,7 +3892,8 @@
             onclick: function () { tambahBaris(it.nama); lembar.tutup(); } }, [
             el('span', { class: 'daftar-baris-isi' }, [
               el('span', { class: 'daftar-baris-judul', text: it.nama }),
-              el('span', { class: 'daftar-baris-ket', text: [it.kategori, it.satuan, it.harga != null ? formatRupiah(it.harga) + ' per ' + it.satuan : 'tanpa harga']
+              el('span', { class: 'daftar-baris-ket', text: [it.kategori, it.satuan,
+                rupiah ? (it.harga != null ? formatRupiah(it.harga) + ' per ' + it.satuan : 'tanpa harga') : '']
                 .filter(Boolean).join(' · ') })
             ]),
             ikon('tambah')
@@ -3921,7 +3929,7 @@
         var t = kr.terakhir;
         statusForm.appendChild(el('p', {}, [tandaStatus('baik', 'Terkirim'),
           el('span', { class: 'kolom-bantuan', text: ' ' + kr.jumlah + ' kiriman' + (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') +
-            '. Estimasi kerugian ' + formatRupiah(kr.totalRp) + '.' })]));
+            (rupiah && kr.totalRp != null ? '. Estimasi kerugian ' + formatRupiah(kr.totalRp) : '') + '.' })]));
         statusForm.appendChild(el('p', { class: 'kolom-bantuan lebar-penuh', text: 'Tercatat: ' + kr.baris.map(function (b) {
           return b.item + ' ' + formatAngka(b.qty) + (b.satuan ? ' ' + b.satuan : '') + ' (' + b.kategori.toLowerCase() + ')';
         }).join(', ') + '.' }));
@@ -7807,6 +7815,10 @@
       case 'jadwal': return { href: '#/pengaturan/outlet' };
       case 'opname': return { href: '#/opname' };
       case 'tanpaHarga': return { klik: function () { bukaNilaiStock(d.nilaiStock); } };
+      case 'menu': return { href: '#/hpp/menu' };
+      case 'penjualan': return { klik: function () {
+        bukaCatatPenjualan({ tanggal: data.tanggal, selesai: function () { if (segarkanLayar) segarkanLayar(); } });
+      } };
       default: return null;
     }
   }
@@ -7815,7 +7827,7 @@
   var IKON_PERHATIAN = {
     suhu: 'termometer', minus: 'kotak', bawahMinimum: 'kotak', lewatMasaSimpan: 'jam', habisBesok: 'jam', sistem: 'segitiga',
     dilaporkan: 'bendera', resetPin: 'kunci', jadwal: 'jam', opname: 'opname', formBelum: 'tiket', belumDiperiksa: 'centang',
-    tanpaHarga: 'label'
+    tanpaHarga: 'label', menu: 'resep', penjualan: 'label'
   };
   var KATA_TINGKAT = { masalah: 'Masalah', tinjau: 'Perlu ditinjau', menunggu: 'Menunggu' };
 
@@ -7920,11 +7932,20 @@
         wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'Data ' + tanggalJudul(d.tanggal) + '.' }));
       }
       // Tombol Stock opname dengan tanggal opname terakhir di sampingnya (Tahap 8).
-      wadah.appendChild(el('div', { class: 'dashboard-opname' }, [
-        el('a', { class: 'tombol tombol-kedua', href: '#/opname' }, el('span', { class: 'tombol-teks', text: 'Stock opname' })),
-        d.opname && d.opname.lewat
-          ? tandaStatus('tinjau', teksOpnameTerakhir(d.opname))
-          : el('span', { class: 'kolom-bantuan', text: teksOpnameTerakhir(d.opname) })
+      wadah.appendChild(el('div', { class: 'dashboard-pintas' }, [
+        el('div', { class: 'dashboard-opname' }, [
+          el('a', { class: 'tombol tombol-kedua', href: '#/opname' }, el('span', { class: 'tombol-teks', text: 'Stock opname' })),
+          d.opname && d.opname.lewat
+            ? tandaStatus('tinjau', teksOpnameTerakhir(d.opname))
+            : el('span', { class: 'kolom-bantuan', text: teksOpnameTerakhir(d.opname) })
+        ]),
+        // HPP dan food cost (tampilan Bagian 5.6 dan 5.10), dengan food cost bulan ini di sampingnya.
+        el('div', { class: 'dashboard-opname' }, [
+          el('a', { class: 'tombol tombol-kedua', href: '#/hpp' }, el('span', { class: 'tombol-teks', text: 'HPP dan food cost' })),
+          d.hpp && d.hpp.foodCost != null && d.hpp.foodCost > d.hpp.target
+            ? tandaStatus('tinjau', teksFoodCostDashboard(d.hpp))
+            : el('span', { class: 'kolom-bantuan', text: teksFoodCostDashboard(d.hpp) })
+        ])
       ]));
       wadah.appendChild(el('div', { class: 'dashboard-isi' }, [
         el('section', { class: 'dashboard-perhatian', 'aria-labelledby': 'judul-perhatian' }, [
@@ -7976,6 +7997,13 @@
   function teksPengingatOpname(s) {
     if (!s || !s.terakhir) return 'Belum ada stock opname.';
     return 'Stock opname terakhir ' + (s.hariLalu === 0 ? 'hari ini' : s.hariLalu + ' hari lalu') + '.';
+  }
+
+  /** "Oktober 34,0% · target 35%", di samping tombol HPP dan food cost di Dashboard. */
+  function teksFoodCostDashboard(h) {
+    if (!h) return 'Food cost bulan ini';
+    var bulan = NAMA_BULAN[Number(h.bulan.slice(5, 7)) - 1];
+    return h.foodCost == null ? bulan + ': penjualan belum lengkap' : bulan + ' ' + formatPersen(h.foodCost) + ' · target ' + formatPersen(h.target);
   }
 
   /** "Terakhir 3 Okt (3 hari lalu)", di samping tombol Stock opname di Dashboard. */
@@ -8663,6 +8691,14 @@
           ]),
           ikon('kanan')
         ]),
+        el('a', { class: 'daftar-baris', href: '#/pengaturan/menu' }, [
+          ikon('label'),
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: 'Menu' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Harga jual dan takaran bahan per porsi untuk menghitung HPP.' })
+          ]),
+          ikon('kanan')
+        ]),
         el('a', { class: 'daftar-baris', href: '#/pengaturan/unit' }, [
           ikon('termometer'),
           el('span', { class: 'daftar-baris-isi' }, [
@@ -8683,7 +8719,7 @@
           ikon('jam'),
           el('span', { class: 'daftar-baris-isi' }, [
             el('span', { class: 'daftar-baris-judul', text: 'Outlet dan jadwal' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis.' })
+            el('span', { class: 'daftar-baris-ket', text: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis, target food cost.' })
           ]),
           ikon('kanan')
         ])
@@ -8757,7 +8793,9 @@
       return {
         namaOutlet: d.namaOutlet || '', zonaWaktu: d.zonaWaktu || '', jamClosing: d.jamClosing || '21:30',
         jedaLaporanMenit: String(d.jedaLaporanMenit == null ? 45 : d.jedaLaporanMenit), jadwalOpname: d.jadwalOpname || 'mingguan',
-        hariCadangan: d.hariCadangan || 'Minggu', keluarOtomatisMenit: Number(d.keluarOtomatisMenit) || KELUAR_OTOMATIS_AWAL
+        hariCadangan: d.hariCadangan || 'Minggu', keluarOtomatisMenit: Number(d.keluarOtomatisMenit) || KELUAR_OTOMATIS_AWAL,
+        targetFoodCost: String(d.targetFoodCost == null ? 35 : d.targetFoodCost).replace('.', ','),
+        bahanKecilPersen: String(d.bahanKecilPersen == null ? 3 : d.bahanKecilPersen).replace('.', ',')
       };
     }
 
@@ -8819,10 +8857,23 @@
         i.addEventListener('change', function () { isi.keluarOtomatisMenit = parseInt(gKeluar.nilai(), 10); perbarui(); });
       });
 
+      var kTarget = kolomIsian({ label: 'Target food cost (%)', inputmode: 'decimal', kelas: 'isian-angka', maxlength: 5,
+        nilai: isi.targetFoodCost, bantuan: 'Menu dan bulan di atas angka ini ditandai di HPP dan food cost.' });
+      kTarget.input.addEventListener('input', function () { isi.targetFoodCost = kTarget.input.value.trim(); perbarui(); });
+      var kKecil = kolomIsian({ label: 'Bahan kecil (%)', inputmode: 'decimal', kelas: 'isian-angka', maxlength: 4,
+        nilai: isi.bahanKecilPersen, bantuan: 'Ditambahkan ke HPP semua menu untuk bumbu, minyak, dan garnish yang sulit ditakar per porsi.' });
+      kKecil.input.addEventListener('input', function () { isi.bahanKecilPersen = kKecil.input.value.trim(); perbarui(); });
+      function persenSah(teks, min, maks) {
+        var n = bacaAngka(teks);
+        return n !== null && !isNaN(n) && n >= min && n <= maks;
+      }
+
       simpan.addEventListener('click', function () {
         if (simpan.disabled) return;
         tulisPesan(pesan, '');
         var ok = [
+          kTarget.galat(persenSah(isi.targetFoodCost, 1, 100) ? '' : 'Isi persen 1 sampai 100, misalnya 35.'),
+          kKecil.galat(persenSah(isi.bahanKecilPersen, 0, 15) ? '' : 'Isi persen 0 sampai 15, misalnya 3.'),
           kNama.galat(isi.namaOutlet.trim() ? '' : 'Isi nama outlet.'),
           kJam.galat(/^\d{1,2}:\d{2}$/.test(isi.jamClosing) ? '' : 'Isi jam closing, misalnya 21:30.'),
           kJeda.galat(/^\d{1,3}$/.test(isi.jedaLaporanMenit) && Number(isi.jedaLaporanMenit) <= 240 ? '' : 'Isi menit bulat, 0 sampai 240.')
@@ -8870,6 +8921,10 @@
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
         gKeluar.wadah,
         el('p', { class: 'kolom-bantuan', text: 'Berlaku untuk semua pengguna di semua perangkat.' })
+      ]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+        el('h2', { class: 'kartu-judul', text: 'HPP dan food cost' }),
+        kTarget.wadah, kKecil.wadah
       ]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
     }
@@ -9273,7 +9328,13 @@
           keadaan.push(el('p', { class: 'kartu-teks', text: 'Aktif. ' + it.nama + ' tampil di form.' }));
           var alasan = it.resepAktif ? 'Tidak bisa dinonaktifkan selama resep ' + it.nama + ' aktif.'
             : (it.dipakaiResep.length ? 'Tidak bisa dinonaktifkan: masih dipakai resep ' + it.dipakaiResep.join(', ') + '.' : '');
-          if (alasan) {
+          var dipakaiMenu = it.dipakaiMenu || [];
+          if (!alasan && dipakaiMenu.length) {
+            keadaan.push(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+              text: 'Tidak bisa dinonaktifkan: masih dipakai menu ' + dipakaiMenu.join(', ') + '. Ubah atau nonaktifkan menunya dulu.' })]));
+            keadaan.push(el('a', { class: 'tombol tombol-kedua', href: hrefMenu(dipakaiMenu[0]) },
+              el('span', { class: 'tombol-teks', text: 'Buka menu' })));
+          } else if (alasan) {
             keadaan.push(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', { text: alasan + ' Ubah atau nonaktifkan resepnya dulu.' })]));
             keadaan.push(el('a', { class: 'tombol tombol-kedua', href: it.resepAktif ? hrefResep(it.nama) : hrefResep(it.dipakaiResep[0]) },
               el('span', { class: 'tombol-teks', text: 'Buka resep' })));
@@ -10378,6 +10439,922 @@
       galat: function (pesan, cobaLagi) {
         kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
       },
+      penanda: penanda
+    });
+  }
+
+  /* =======================================================================
+   * HPP dan food cost (khusus Pengelola; spesifikasi tampilan Bagian 5.10,
+   * sistem Bagian 5.9): layar HPP dari Dashboard, Pengaturan → Menu, dan
+   * lembar Catat penjualan
+   * ===================================================================== */
+
+  /** "35%" / "37,2%" */
+  function formatPersen(n) {
+    return n == null ? '–' : formatAngka(Math.round(n * 10) / 10) + '%';
+  }
+
+  function namaBulanIso(b) {
+    return NAMA_BULAN[Number(b.slice(5, 7)) - 1] + ' ' + b.slice(0, 4);
+  }
+
+  /** "1–16 Oktober" dari dari dan sampai satu bulan. */
+  function teksRentangBulan(dari, sampai) {
+    var nama = NAMA_BULAN[Number(dari.slice(5, 7)) - 1];
+    return Number(dari.slice(8, 10)) + '–' + Number(sampai.slice(8, 10)) + ' ' + nama;
+  }
+
+  /** "9 dan 14 Okt" / "3, 7, dan 12 Okt" */
+  function teksTanggalBulan(daftar) {
+    if (!daftar.length) return '';
+    var n = daftar.map(function (t) { return String(Number(t.slice(8, 10))); });
+    var bulan = tanggalPendek(daftar[daftar.length - 1]).replace(/^\d+\s*/, '');
+    var gabung = n.length === 1 ? n[0] : (n.length === 2 ? n[0] + ' dan ' + n[1] : n.slice(0, -1).join(', ') + ', dan ' + n[n.length - 1]);
+    return gabung + ' ' + bulan;
+  }
+
+  /** Tanda food cost menu: Di atas target (Perlu ditinjau), Sesuai target (Baik), atau Belum lengkap (Menunggu). */
+  function tandaFoodCost(m) {
+    if (!m.lengkap) return tandaStatus('menunggu', 'Belum lengkap');
+    return m.diAtasTarget ? tandaStatus('tinjau', 'Di atas target') : tandaStatus('baik', 'Sesuai target');
+  }
+
+  function hrefMenu(nama) {
+    return '#/pengaturan/menu/' + encodeURIComponent(nama);
+  }
+
+  /**
+   * Lembar Catat penjualan (tampilan Bagian 5.10): tanggal (Kemarin atau tanggal lain), penjualan
+   * dalam rupiah, dan catatan. Butuh sinyal. selesai(hasil) dipanggil setelah tersimpan.
+   */
+  function bukaCatatPenjualan(opsi) {
+    var hari = tanggalIso(new Date());
+    var kemarin = tanggalIso(new Date(Date.now() - 86400000));
+    var tanggal = opsi.tanggal || kemarin;
+    var gTanggal = grupPilihan('Tanggal', ['Kemarin, ' + tanggalPendek(kemarin), 'Tanggal lain'],
+      tanggal === kemarin ? 'Kemarin, ' + tanggalPendek(kemarin) : 'Tanggal lain');
+    var kTanggal = kolomIsian({ label: 'Pilih tanggal', type: 'date', nilai: tanggal, atribut: { max: hari } });
+    kTanggal.wadah.hidden = tanggal === kemarin;
+    var sudah = el('p', { class: 'kolom-bantuan', 'aria-live': 'polite' });
+    var kJual = kolomIsian({ label: 'Penjualan (Rp)', inputmode: 'numeric', kelas: 'isian-angka',
+      bantuan: 'Total penjualan makanan dan minuman dari kasir, sebelum pajak dan service. Hari tutup: isi 0.' });
+    var kCatatan = kolomIsian({ label: 'Catatan (tidak wajib)', maxlength: 200 });
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+
+    function tanggalTerpilih() {
+      return gTanggal.nilai() === 'Tanggal lain' ? kTanggal.input.value : kemarin;
+    }
+    function isiLama() {
+      var t = tanggalTerpilih();
+      var ada = (opsi.terakhir || []).filter(function (x) { return x.tanggal === t; })[0];
+      sudah.textContent = ada ? 'Sudah tercatat ' + formatRupiah(ada.nilai) + '. Menyimpan akan menggantinya.' : '';
+    }
+    gTanggal.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        kTanggal.wadah.hidden = gTanggal.nilai() !== 'Tanggal lain';
+        isiLama();
+      });
+    });
+    kTanggal.input.addEventListener('change', isiLama);
+    isiLama();
+
+    bukaLembar({
+      judul: 'Catat penjualan',
+      isi: [gTanggal.wadah, kTanggal.wadah, kJual.wadah, sudah, kCatatan.wadah, pesan],
+      aksi: [
+        { teks: 'Batal', jenis: 'kedua' },
+        { teks: 'Simpan penjualan', jenis: 'utama', klik: function (t, lembar) {
+          tulisPesan(pesan, '');
+          var t1 = tanggalTerpilih();
+          var okTanggal = kTanggal.galat(!t1 ? 'Pilih tanggal.' : (t1 > hari ? 'Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat.' : ''));
+          var teks = kJual.input.value.trim().replace(/^rp\s*/i, '').replace(/\./g, '');
+          var nilai = bacaAngka(teks);
+          var okJual = kJual.galat(nilai === null ? 'Isi penjualan. Hari tutup diisi 0.' : (isNaN(nilai) || nilai < 0 ? 'Isi angka 0 atau lebih, misalnya 3450000.' : ''));
+          if (!okTanggal || !okJual) return;
+          aturTombolProses(t, true, 'Menyimpan…');
+          jagaProses(panggilApi('simpanPenjualan', { tanggal: t1, penjualan: nilai, catatan: kCatatan.input.value.trim(), bulan: opsi.bulan,
+            submissionId: buatId() })).then(function (hasil) {
+            lembar.tutup();
+            toast('Penjualan ' + tanggalPendek(t1) + ' tersimpan.');
+            if (opsi.selesai) opsi.selesai(hasil);
+          }).catch(function (err) {
+            aturTombolProses(t, false);
+            if (tanganiSesiBerakhir(err)) return;
+            tulisPesan(pesan, pesanGalat(err), 'masalah');
+          });
+        } }
+      ]
+    });
+    if (!apakahSentuh()) kJual.input.focus();
+  }
+
+  /** Grafik food cost 6 bulan (SVG; batang di atas target berwarna Perlu ditinjau dan angkanya tertulis). */
+  function grafikFoodCost(h) {
+    var g = h.grafik || [];
+    var idJudul = 'judul-grafik-fc';
+    var kartu = el('section', { class: 'kartu grafik-kartu', 'aria-labelledby': idJudul }, [
+      el('h2', { class: 'kartu-judul', id: idJudul, text: 'Food cost 6 bulan' })
+    ]);
+    var ada = g.filter(function (x) { return x.foodCost != null; });
+    var tertinggi = null;
+    ada.forEach(function (x) { if (!tertinggi || x.foodCost > tertinggi.foodCost) tertinggi = x; });
+    kartu.appendChild(el('p', { class: 'grafik-ringkas', text: tertinggi
+      ? 'Tertinggi ' + namaBulanIso(tertinggi.bulan).split(' ')[0] + ' ' + formatPersen(tertinggi.foodCost) + '. Garis putus-putus: target ' + formatPersen(h.target) + '.'
+      : 'Belum ada bulan dengan penjualan lengkap. Garis putus-putus: target ' + formatPersen(h.target) + '.' }));
+    var maks = Math.max(h.target * 1.3, ada.reduce(function (m, x) { return Math.max(m, x.foodCost); }, 0) * 1.1, 10);
+    var TINGGI = 120;
+    var LEBAR = 100;
+    var svg = svgEl('svg', { class: 'grafik-fc-svg', viewBox: '0 0 ' + (LEBAR * g.length) + ' ' + TINGGI, preserveAspectRatio: 'none',
+      'aria-hidden': 'true', focusable: 'false' });
+    g.forEach(function (x, i) {
+      if (x.foodCost == null) return;
+      var tinggi = Math.max(3, Math.round(Math.min(x.foodCost, maks) / maks * TINGGI));
+      svg.appendChild(svgEl('rect', { class: 'batang' + (x.foodCost > h.target ? ' di-atas' : '') + ' tumbuh', style: '--i:' + i,
+        x: i * LEBAR + 24, y: TINGGI - tinggi, width: LEBAR - 48, height: tinggi }));
+    });
+    var yTarget = TINGGI - h.target / maks * TINGGI;
+    svg.appendChild(svgEl('line', { class: 'garis-target', x1: 0, y1: yTarget, x2: LEBAR * g.length, y2: yTarget }));
+    svg.appendChild(svgEl('line', { class: 'garis-dasar', x1: 0, y1: TINGGI - 0.5, x2: LEBAR * g.length, y2: TINGGI - 0.5 }));
+    var uraian = g.map(function (x) {
+      return namaBulanIso(x.bulan) + ' ' + (x.foodCost == null ? 'belum dihitung' : formatPersen(x.foodCost));
+    }).join(', ');
+    kartu.appendChild(el('div', { class: 'grafik-fc', role: 'img', 'aria-label': 'Food cost per bulan: ' + uraian + '. Target ' + formatPersen(h.target) + '.' }, [
+      el('div', { class: 'grafik-fc-nilai', 'aria-hidden': 'true' }, g.map(function (x) {
+        return el('span', { class: x.foodCost != null && x.foodCost > h.target ? 'di-atas' : null, text: x.foodCost == null ? '–' : formatAngka(x.foodCost) });
+      })),
+      svg,
+      el('div', { class: 'grafik-waste-hari grafik-fc-bulan', 'aria-hidden': 'true' }, g.map(function (x, i) {
+        return el('span', { class: i === g.length - 1 ? 'hari-ini' : null, text: NAMA_BULAN[Number(x.bulan.slice(5, 7)) - 1].slice(0, 3) });
+      }))
+    ]));
+    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap.' }));
+    return kartu;
+  }
+
+  function barisNilai(label, nilai, kelas) {
+    return el('div', { class: 'baris-nilai' + (kelas ? ' ' + kelas : '') }, [el('span', { text: label }), el('strong', { text: nilai })]);
+  }
+
+  /**
+   * Layar HPP dan food cost (tampilan Bagian 5.10): pilihan bulan, kepala navy berisi food cost,
+   * pemakaian bahan, dan penjualan; bagian Bulan (rincian, cek silang, per kategori, grafik,
+   * penjualan) dan Per menu (HPP per porsi menu aktif).
+   */
+  function layarHpp(k) {
+    aturJudul('HPP dan food cost');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var ringkasKepala = el('div', { class: 'kepala-hpp' });
+    var wadah = el('div', { class: 'hpp' });
+    var kini = tanggalIso(new Date()).slice(0, 7);
+    var daftarBulan = [];
+    var th = Number(kini.slice(0, 4));
+    var bl = Number(kini.slice(5, 7));
+    for (var i = 0; i < BULAN_REKAP; i++) {
+      daftarBulan.push(th + '-' + duaAngka(bl));
+      bl--;
+      if (!bl) { bl = 12; th--; }
+    }
+    var pilihan = (Cache.baca('hpp-pilihan') || {}).data || {};
+    var bulan = daftarBulan.indexOf(pilihan.bulan) >= 0 ? pilihan.bulan : kini;
+    var bagian = k.cocok[1] ? 'menu' : 'bulan';
+    var data = null;
+    var mediaDesktop = window.matchMedia(DESKTOP);
+
+    var pilihBulan = el('select', { class: 'isian', id: 'hpp-bulan' }, daftarBulan.map(function (b, n) {
+      return el('option', { value: b, text: namaBulanIso(b) + (n === 0 ? ' (bulan berjalan)' : '') });
+    }));
+    pilihBulan.value = bulan;
+    var gBagian = grupPilihan('Tampilkan', ['Bulan', 'Per menu'], bagian === 'menu' ? 'Per menu' : 'Bulan');
+    gBagian.wadah.classList.add('hpp-bagian');
+    gBagian.wadah.querySelector('legend').classList.add('sr');
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi' }, [
+      tautanKembali('Dashboard', '#/dashboard'),
+      el('h1', { class: 'judul-layar', text: 'HPP dan food cost' }),
+      el('div', { class: 'kepala-ringkas' }, [ringkasKepala, penanda]),
+      el('div', { class: 'hpp-pilih' }, [
+        el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'hpp-bulan', text: 'Bulan' }), pilihBulan]),
+        gBagian.wadah
+      ]),
+      wadah
+    ]));
+
+    function simpanPilihan() {
+      Cache.tulis('hpp-pilihan', { bulan: bulan });
+    }
+    pilihBulan.addEventListener('change', function () {
+      bulan = pilihBulan.value;
+      simpanPilihan();
+      muat();
+    });
+    gBagian.input.forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        bagian = gBagian.nilai() === 'Per menu' ? 'menu' : 'bulan';
+        simpanPilihan();
+        gantiAlamat(bagian === 'menu' ? '#/hpp/menu' : '#/hpp');
+        if (data) gambar(data);
+      });
+    });
+
+    function gambarKepala(h) {
+      kosongkan(ringkasKepala);
+      var p = h.pemakaian;
+      var jual = h.penjualan;
+      var periode = h.sampai < h.dari ? namaBulanIso(h.bulan) : teksRentangBulan(h.dari, h.sampai);
+      if (bagian === 'menu') {
+        var diAtas = h.menu.filter(function (m) { return m.diAtasTarget; }).length;
+        var belum = h.menu.filter(function (m) { return !m.lengkap; }).length;
+        ringkasKepala.appendChild(el('div', { class: 'kepala-nilai kepala-nilai-diam' }, [
+          el('span', { class: 'kepala-nilai-label', text: 'Menu di atas target ' + formatPersen(h.target) }),
+          el('span', { class: 'kepala-nilai-angka' }, [String(diAtas), el('small', { text: ' dari ' + h.menu.length + ' menu' })]),
+          el('span', { class: 'kepala-nilai-ket', text: (belum ? belum + ' menu belum lengkap · ' : '') +
+            'harga bahan ' + (h.berjalan ? 'hari ini' : tanggalPendek(h.sampai)) })
+        ]));
+        return;
+      }
+      ringkasKepala.appendChild(el('div', { class: 'kepala-nilai kepala-nilai-diam' }, [
+        el('span', { class: 'kepala-nilai-label', text: 'Food cost ' + periode }),
+        el('span', { class: 'kepala-nilai-angka' }, [formatPersen(h.foodCost), el('small', { text: ' target ' + formatPersen(h.target) })]),
+        h.foodCost != null && h.foodCost > h.target ? el('span', { class: 'kepala-nilai-selisih', text: 'Di atas target' }) : null
+      ]));
+      ringkasKepala.appendChild(el('div', { class: 'kepala-angka' }, [
+        el('div', {}, [
+          el('span', { class: 'kepala-angka-label', text: 'Pemakaian bahan' }),
+          el('span', { class: 'kepala-angka-nilai', text: formatRupiah(p.total) })
+        ]),
+        el('div', {}, [
+          el('span', { class: 'kepala-angka-label', text: 'Penjualan' + (jual.kurang.length && jual.hari ? ', ' + jual.hari + ' hari' : '') }),
+          el('span', { class: 'kepala-angka-nilai', text: jual.hari ? formatRupiah(jual.total) : '–' })
+        ])
+      ]));
+    }
+
+    function kartuPemakaian(h) {
+      var p = h.pemakaian;
+      return el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Pemakaian bahan' }),
+        el('p', { class: 'kartu-teks', text: 'Bahan mentah, dinilai dengan harga yang berlaku tiap hari.' }),
+        el('div', { class: 'daftar-nilai' }, [
+          barisNilai('Terpakai (keluar dan prep)', formatRupiah(p.terpakai)),
+          barisNilai('Waste bahan', formatRupiah(p.waste)),
+          barisNilai('Selisih stock (opname dan penyesuaian)', formatRupiah(p.selisihStock)),
+          barisNilai('Pemakaian bahan', formatRupiah(p.total), 'total')
+        ]),
+        p.wasteBarangJadi ? el('p', { class: 'kolom-bantuan', text: 'Waste barang jadi ' + formatRupiah(p.wasteBarangJadi) +
+          ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.' }) : null,
+        p.stokPembuka ? el('p', { class: 'kolom-bantuan', text: 'Stok pembuka ' + formatRupiah(p.stokPembuka) +
+          ' tidak dihitung sebagai selisih stock.' }) : null
+      ]);
+    }
+
+    function kartuCekSilang(h) {
+      var c = h.cekSilang;
+      return el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Cocok dengan nilai stock' }),
+        el('div', { class: 'daftar-nilai' }, [
+          barisNilai('Stock bahan ' + tanggalPendek(c.tanggalAwal), formatRupiah(c.awal)),
+          barisNilai('+ Barang masuk', formatRupiah(c.masuk)),
+          c.stokPembuka ? barisNilai('+ Stok pembuka', formatRupiah(c.stokPembuka)) : null,
+          barisNilai('− Stock bahan ' + tanggalPendek(c.tanggalAkhir), formatRupiah(c.akhir)),
+          barisNilai((c.selisihHarga < 0 ? '− ' : '+ ') + 'Selisih karena harga ' + (c.selisihHarga < 0 ? 'turun' : 'naik'),
+            formatRupiah(Math.abs(c.selisihHarga))),
+          barisNilai('= Pemakaian bahan', formatRupiah(c.awal + c.masuk + (c.stokPembuka || 0) - c.akhir + c.selisihHarga), 'total')
+        ]),
+        c.cocok ? el('p', {}, tandaStatus('baik', 'Sama dengan rincian di atas'))
+          : el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', { text: 'Beda ' + formatRupiah(Math.abs(c.beda)) +
+            ' dengan rincian di atas, karena ada bahan yang belum punya harga pada sebagian hari.' })])
+      ]);
+    }
+
+    function kartuKategori(h) {
+      var daftar = h.perKategori || [];
+      var total = h.pemakaian.total;
+      var maks = daftar.reduce(function (m, x) { return Math.max(m, x.nilai); }, 0);
+      return el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Per kategori' }),
+        daftar.length ? el('ul', { class: 'kat-daftar' }, daftar.map(function (x) {
+          return el('li', { class: 'kat-baris' }, [
+            el('span', { class: 'kat-atas' }, [el('span', { text: x.kategori }),
+              el('span', { class: 'kat-nilai', text: formatRupiah(x.nilai) + (total > 0 ? ' · ' + Math.round(x.nilai / total * 100) + '%' : '') })]),
+            el('span', { class: 'kat-jalur', 'aria-hidden': 'true' }, el('span', { class: 'kat-isi',
+              style: 'transform:scaleX(' + (maks > 0 ? Math.max(0, x.nilai) / maks : 0).toFixed(3) + ')' }))
+          ]);
+        })) : el('p', { class: 'kartu-teks', text: 'Belum ada bahan terpakai pada bulan ini.' }),
+        (h.bahanTerbesar || []).length ? el('details', { class: 'hpp-rinci' }, [
+          el('summary', { text: 'Bahan dengan pemakaian terbesar' }),
+          el('ol', { class: 'daftar-nilai' }, h.bahanTerbesar.map(function (x) {
+            return el('li', {}, barisNilai(x.nama + ' · ' + formatAngka(x.qty) + ' ' + x.satuan, formatRupiah(x.nilai)));
+          }))
+        ]) : null,
+        (h.tanpaHarga || []).length ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+          text: h.tanpaHarga.join(', ') + ' dipakai bulan ini tetapi belum punya harga, jadi tidak ikut dihitung.' })]) : null
+      ]);
+    }
+
+    function kartuPenjualan(h) {
+      var j = h.penjualan;
+      var catat = tombol('Catat penjualan', 'kedua', { 'aria-haspopup': 'dialog' });
+      catat.addEventListener('click', function () {
+        bukaCatatPenjualan({ bulan: h.bulan, terakhir: j.terakhir, selesai: function (hasil) { if (hasil.hpp) terima(hasil.hpp); } });
+      });
+      return el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Penjualan' }),
+        el('p', { class: 'kartu-teks', text: j.jumlahHari ? j.hari + ' dari ' + j.jumlahHari + ' hari tercatat' : 'Belum ada hari yang selesai bulan ini.' }),
+        j.terakhir.length ? el('div', { class: 'daftar-nilai' }, j.terakhir.map(function (x) {
+          return barisNilai(tanggalJudul(x.tanggal) + (x.catatan ? ' · ' + x.catatan : ''), formatRupiah(x.nilai));
+        })) : null,
+        el('div', {}, catat)
+      ]);
+    }
+
+    function kartuKurang(h) {
+      var j = h.penjualan;
+      if (!j.kurang.length || h.foodCost != null) return null;
+      var catat = tombol('Catat penjualan ' + tanggalPendek(j.kurang[0]), 'utama', { 'aria-haspopup': 'dialog' });
+      catat.addEventListener('click', function () {
+        bukaCatatPenjualan({ tanggal: j.kurang[0], bulan: h.bulan, terakhir: j.terakhir, selesai: function (hasil) { if (hasil.hpp) terima(hasil.hpp); } });
+      });
+      var daftar = j.kurang.length > 6 ? teksTanggalBulan(j.kurang.slice(0, 5)) + ', dan ' + (j.kurang.length - 5) + ' hari lain' : teksTanggalBulan(j.kurang);
+      return el('section', { class: 'kartu kartu-menunggu' }, [
+        el('p', {}, tandaStatus('menunggu', 'Menunggu')),
+        el('p', { class: 'kartu-teks', text: 'Penjualan belum dicatat untuk ' + j.kurang.length + ' hari: ' + daftar +
+          '. Food cost dihitung setelah semua hari tercatat.' }),
+        el('div', {}, catat)
+      ]);
+    }
+
+    function gambarBulan(h) {
+      if (h.sampai < h.dari) {
+        wadah.appendChild(kotakKosong('Belum ada hari yang selesai di ' + namaBulanIso(h.bulan) + '. Food cost bulan ini terlihat mulai besok.'));
+        wadah.appendChild(kartuPenjualan(h));
+        return;
+      }
+      var kurang = kartuKurang(h);
+      if (kurang) wadah.appendChild(kurang);
+      wadah.appendChild(el('div', { class: 'hpp-kolom' }, [
+        el('div', { class: 'hpp-kolom-isi' }, [kartuPemakaian(h), kartuCekSilang(h), kartuKategori(h)]),
+        el('div', { class: 'hpp-kolom-isi' }, [grafikFoodCost(h), kartuPenjualan(h)])
+      ]));
+    }
+
+    function gambarMenu(h) {
+      var menu = h.menu || [];
+      if (!h.siap.menu) {
+        wadah.appendChild(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'),
+          el('span', { text: 'Tab M_Menu belum ada. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet.' })]));
+        return;
+      }
+      if (!menu.length) {
+        wadah.appendChild(kotakKosong('Belum ada menu. Tambah menu di Pengaturan → Menu.', 'resep'));
+      } else if (mediaDesktop.matches) {
+        wadah.appendChild(el('div', { class: 'tabel-bingkai' }, el('table', { class: 'tabel tabel-menu-hpp' }, [
+          el('thead', {}, el('tr', {}, ['Menu', 'Harga jual', 'HPP per porsi', 'Food cost', 'Margin kotor', 'Harga untuk ' + formatPersen(h.target), 'Keadaan']
+            .map(function (j, i) { return el('th', { class: i && i < 6 ? 'angka' : null, scope: 'col', text: j }); }))),
+          el('tbody', {}, menu.map(function (m) {
+            return el('tr', {}, [
+              el('th', { scope: 'row', class: 'nama-item' }, el('a', { class: 'tabel-tombol', href: hrefMenu(m.nama), text: m.nama })),
+              el('td', { class: 'angka', text: formatRupiah(m.hargaJual) }),
+              el('td', { class: 'angka', text: m.hpp == null ? '–' : formatRupiah(m.hpp) }),
+              el('td', { class: 'angka', text: formatPersen(m.foodCost) }),
+              el('td', { class: 'angka', text: m.margin == null ? '–' : formatRupiah(m.margin) }),
+              el('td', { class: 'angka', text: m.hargaTarget == null ? '–' : formatRupiah(m.hargaTarget) }),
+              el('td', {}, [tandaFoodCost(m), m.lengkap ? null : el('span', { class: 'kolom-bantuan blok', text: m.tanpaHarga.join(', ') + ' belum punya harga' })])
+            ]);
+          }))
+        ])));
+      } else {
+        wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'Urut dari food cost tertinggi. Ketuk menu untuk melihat bahannya.' }));
+        wadah.appendChild(el('nav', { class: 'daftar', 'aria-label': 'HPP per menu' }, menu.map(function (m) {
+          return el('a', { class: 'daftar-baris menu-hpp', href: hrefMenu(m.nama) }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: m.nama }),
+              el('span', { class: 'daftar-baris-ket', text: m.lengkap ? 'Harga jual ' + formatRupiah(m.hargaJual) + ' · HPP ' + formatRupiah(m.hpp)
+                : m.tanpaHarga.join(', ') + ' belum punya harga' }),
+              el('span', { class: 'tanda-deret' }, tandaFoodCost(m))
+            ]),
+            el('strong', { class: 'menu-hpp-persen', text: formatPersen(m.foodCost) })
+          ]);
+        })));
+      }
+      wadah.appendChild(el('div', { class: 'deret-tombol' }, el('a', { class: 'tombol tombol-kedua', href: '#/pengaturan/menu' },
+        el('span', { class: 'tombol-teks', text: 'Atur menu di Pengaturan' }))));
+      wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'HPP per porsi = bahan (takaran bersih ÷ hasil bersih × harga) + bahan kecil ' +
+        formatPersen(h.bahanKecilPersen) + '. Harga jual tanpa pajak dan service.' }));
+    }
+
+    function gambar(h) {
+      data = h;
+      gambarKepala(h);
+      kosongkan(wadah);
+      if (bagian === 'menu') gambarMenu(h);
+      else gambarBulan(h);
+    }
+
+    function terima(h) {
+      Cache.tulis('hpp:' + h.bulan, h);
+      if (h.bulan === bulan) gambar(h);
+    }
+
+    function muat() {
+      return muatData({
+        kunciCache: 'hpp:' + bulan,
+        ambil: function () { return panggilApi('hpp', { bulan: bulan }); },
+        gambar: gambar,
+        kerangka: function () {
+          kosongkan(ringkasKepala);
+          kosongkan(wadah).appendChild(kerangkaBaris(4));
+        },
+        galat: function (pesan, cobaLagi) {
+          kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
+        },
+        penanda: penanda
+      });
+    }
+    function gantiSusunan() {
+      if (data && bagian === 'menu') gambar(data);
+    }
+    if (mediaDesktop.addEventListener) mediaDesktop.addEventListener('change', gantiSusunan);
+    else if (mediaDesktop.addListener) mediaDesktop.addListener(gantiSusunan);
+    pembersihLayar.push(function () {
+      if (mediaDesktop.removeEventListener) mediaDesktop.removeEventListener('change', gantiSusunan);
+      else if (mediaDesktop.removeListener) mediaDesktop.removeListener(gantiSusunan);
+    });
+
+    muat();
+    segarkanLayar = muat;
+  }
+
+  /* ---------- Pengaturan → Menu (tampilan Bagian 5.7, sistem Bagian 5.9) ---------- */
+
+  function layarMenu(k) {
+    aturJudul('Menu');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var tambah = el('a', { class: 'tombol tombol-utama', href: '#/pengaturan/menu-baru' }, el('span', { class: 'tombol-teks', text: 'Tambah' }));
+    var kCari = kolomIsian({ label: 'Cari menu', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Pengaturan', '#/pengaturan'),
+      el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Menu' }), tambah]),
+      el('p', { class: 'kartu-teks', text: 'Menu yang dijual, harga jualnya, dan takaran bahan per porsi untuk menghitung HPP. Menu tidak mengurangi stock.' }),
+      kCari.wadah,
+      penanda,
+      wadah
+    ]));
+    var data = null;
+
+    function saring() {
+      kosongkan(wadah);
+      if (!data.siap) {
+        wadah.appendChild(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'),
+          el('span', { text: 'Tab M_Menu dan M_MenuBahan belum ada. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet.' })]));
+        return;
+      }
+      var semua = data.menu || [];
+      if (!semua.length) {
+        wadah.appendChild(kotakKosong('Belum ada menu. Ketuk Tambah untuk membuat menu pertama.', 'resep'));
+        return;
+      }
+      var q = kCari.input.value.trim().toLowerCase();
+      var menu = semua.filter(function (m) { return !q || m.nama.toLowerCase().indexOf(q) >= 0; });
+      if (!menu.length) {
+        wadah.appendChild(kotakKosong('Tidak ada menu dengan nama itu.'));
+        return;
+      }
+      wadah.appendChild(el('nav', { class: 'daftar', 'aria-label': 'Daftar menu' }, menu.map(function (m) {
+        var ket = [formatRupiah(m.hargaJual), m.hpp == null ? 'HPP belum lengkap' : 'HPP ' + formatRupiah(m.hpp)];
+        if (m.foodCost != null) ket.push('food cost ' + formatPersen(m.foodCost));
+        var tanda = [];
+        if (!m.aktif) tanda.push(tandaStatus('menunggu', 'Nonaktif'));
+        else tanda.push(tandaFoodCost(m));
+        if (m.masalah.length) tanda.push(tandaStatus('tinjau', m.masalah[0]));
+        return el('a', { class: 'daftar-baris' + (m.aktif ? '' : ' nonaktif'), href: hrefMenu(m.nama) }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: m.nama }),
+            el('span', { class: 'daftar-baris-ket', text: ket.join(' · ') }),
+            el('span', { class: 'tanda-deret bungkus' }, tanda)
+          ]),
+          ikon('kanan')
+        ]);
+      })));
+    }
+    kCari.input.addEventListener('input', function () { if (data) saring(); });
+
+    muatData({
+      kunciCache: 'menu',
+      ambil: function () { return panggilApi('daftarMenu'); },
+      gambar: function (d) { data = d; saring(); },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(4)); },
+      galat: function (pesan, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi)); },
+      penanda: penanda
+    });
+  }
+
+  var salinanMenu = null; // isi menu yang disalin ("Salin menu"), dipakai layar menu baru sekali
+
+  /**
+   * Buat dan ubah menu (tampilan Bagian 5.7): nama, harga jual, bahan per porsi (takaran bersih
+   * dan hasil bersih), perkiraan HPP yang berubah saat diketik, Salin menu, dan sakelar Aktif.
+   * Isian tersimpan sebagai draft.
+   */
+  function layarMenuUbah(k) {
+    var baru = !k.cocok[1];
+    var namaAwal = '';
+    if (!baru) {
+      try {
+        namaAwal = decodeURIComponent(k.cocok[1]);
+      } catch (err) {
+        namaAwal = k.cocok[1];
+      }
+    }
+    aturJudul(baru ? 'Menu baru' : namaAwal);
+    var kunciDraft = 'menu:' + (baru ? '+baru' : namaAwal.toLowerCase());
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
+    var ringkasKepala = el('div', { class: 'kepala-ringkas', hidden: true });
+    var judul = el('h1', { class: 'judul-layar', text: baru ? 'Menu baru' : namaAwal });
+    var wadah = el('div');
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Menu', '#/pengaturan/menu'),
+      judul,
+      ringkasKepala,
+      catatanDraft,
+      penanda,
+      wadah
+    ]));
+
+    var data = null;
+    var isi = null; // { nama, hargaJual, bahan: [{ id, item, qty, hasil }] }
+    var menuKini = null;
+    var d = Draft.baca(kunciDraft);
+    if (d && d.data) {
+      isi = d.data;
+      catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(d.waktu).toISOString());
+    } else if (baru && salinanMenu) {
+      isi = salinanMenu;
+    }
+    salinanMenu = null;
+
+    function simpanDraft() {
+      var waktu = Draft.simpan(kunciDraft, isi);
+      if (waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(waktu).toISOString());
+    }
+
+    function infoItem(nama) {
+      var daftar = data && data.item || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return { nama: nama, satuan: '', harga: null, aktif: true };
+    }
+
+    function cariMenu(nama) {
+      var daftar = data && data.menu || [];
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama.toLowerCase() === String(nama).toLowerCase()) return daftar[i];
+      return null;
+    }
+
+    function dariMenu(m) {
+      return {
+        nama: m.nama,
+        hargaJual: m.hargaJual == null ? '' : String(m.hargaJual).replace('.', ','),
+        bahan: m.bahan.map(function (b) {
+          return { id: buatId(), item: b.item, qty: String(b.qty).replace('.', ','),
+            hasil: b.hasilBersih === 100 ? '' : String(b.hasilBersih).replace('.', ',') };
+        })
+      };
+    }
+
+    /** Perkiraan dari isian (sama dengan hitungan server): { bahan: [{ beli, biaya }], biayaBahan, kecil, hpp, foodCost, ... }. */
+    function hitung() {
+      var target = data ? data.target : 35;
+      var persenKecil = data ? data.bahanKecilPersen : 3;
+      var hasil = { bahan: [], biayaBahan: 0, lengkap: isi.bahan.length > 0, tanpaHarga: [], salah: false };
+      isi.bahan.forEach(function (b) {
+        var it = infoItem(b.item);
+        var q = bacaAngka(b.qty);
+        var h = b.hasil === '' || b.hasil == null ? 100 : bacaAngka(b.hasil);
+        var x = { beli: null, biaya: null, harga: it.harga };
+        if (q === null || isNaN(q) || !(q > 0) || h === null || isNaN(h) || !(h > 0) || h > 100) {
+          hasil.salah = true;
+          hasil.lengkap = false;
+        } else {
+          x.beli = q / (h / 100);
+          if (it.harga == null) {
+            hasil.lengkap = false;
+            hasil.tanpaHarga.push(b.item);
+          } else {
+            x.biaya = x.beli * it.harga;
+            hasil.biayaBahan += x.biaya;
+          }
+        }
+        hasil.bahan.push(x);
+      });
+      var jual = bacaAngka(String(isi.hargaJual || '').replace(/\./g, ''));
+      hasil.jual = jual > 0 ? jual : null;
+      hasil.target = target;
+      hasil.persenKecil = persenKecil;
+      if (hasil.lengkap) {
+        hasil.kecil = hasil.biayaBahan * persenKecil / 100;
+        hasil.hpp = hasil.biayaBahan + hasil.kecil;
+        hasil.foodCost = hasil.jual ? Math.round(hasil.hpp / hasil.jual * 1000) / 10 : null;
+        hasil.margin = hasil.jual ? hasil.jual - hasil.hpp : null;
+        hasil.hargaTarget = Math.ceil(hasil.hpp / (target / 100) / 100) * 100;
+      }
+      return hasil;
+    }
+
+    function perbaruiRingkas(x) {
+      kosongkan(ringkasKepala);
+      ringkasKepala.hidden = !isi;
+      if (!isi) return;
+      var chip = [el('span', { class: 'chip-navy', text: isi.bahan.length + ' bahan' })];
+      if (menuKini) chip.push(el('span', { class: 'chip-navy', text: menuKini.aktif ? 'Aktif' : 'Nonaktif' }));
+      if (x.foodCost != null) chip.push(el('span', { class: 'chip-navy', text: x.foodCost > x.target ? 'Di atas target' : 'Sesuai target' }));
+      ringkasKepala.appendChild(el('div', { class: 'kepala-chip' }, chip));
+      ringkasKepala.appendChild(el('div', { class: 'kepala-angka' }, [
+        el('div', {}, [
+          el('span', { class: 'kepala-angka-label', text: 'HPP per porsi' }),
+          el('span', { class: 'kepala-angka-nilai', text: x.hpp == null ? '–' : formatRupiah(x.hpp) })
+        ]),
+        el('div', {}, [
+          el('span', { class: 'kepala-angka-label', text: 'Food cost' }),
+          el('span', { class: 'kepala-angka-nilai', text: formatPersen(x.foodCost) }),
+          el('span', { class: 'kepala-angka-sub', text: 'target ' + formatPersen(x.target) })
+        ])
+      ]));
+    }
+
+    function gambar(hasil, dariHp) {
+      data = hasil;
+      menuKini = baru ? null : cariMenu(namaAwal);
+      kosongkan(wadah);
+      if (!data.siap) {
+        wadah.appendChild(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'),
+          el('span', { text: 'Tab M_Menu dan M_MenuBahan belum ada. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet.' })]));
+        return;
+      }
+      if (!baru && !menuKini) {
+        if (!dariHp) wadah.appendChild(kotakKosong('Menu ' + namaAwal + ' tidak ditemukan. Kembali ke daftar menu.', 'resep'));
+        return;
+      }
+      if (!isi) isi = baru ? { nama: '', hargaJual: '', bahan: [] } : dariMenu(menuKini);
+      gambarIsian();
+    }
+
+    function gambarIsian() {
+      kosongkan(wadah);
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+      var kNama = kolomIsian({ label: 'Nama menu', maxlength: 60, nilai: isi.nama });
+      kNama.input.addEventListener('input', function () { isi.nama = kNama.input.value; simpanDraft(); });
+      var kJual = kolomIsian({ label: 'Harga jual (Rp)', inputmode: 'numeric', kelas: 'isian-angka', nilai: isi.hargaJual,
+        bantuan: 'Harga di daftar menu, tanpa pajak dan service.' });
+      kJual.input.addEventListener('input', function () { isi.hargaJual = kJual.input.value; simpanDraft(); perbaruiPerkiraan(); });
+
+      var daftarBahan = el('ul', { class: 'daftar daftar-bahan-menu', 'aria-label': 'Bahan per porsi' });
+      var kolomBahan = [];
+      isi.bahan.forEach(function (b, i) {
+        var it = infoItem(b.item);
+        var idQty = 'menu-qty-' + (++nomorKolom);
+        var idHasil = 'menu-hasil-' + (++nomorKolom);
+        var inQty = el('input', { class: 'isian isian-angka', id: idQty, type: 'text', inputmode: 'decimal', autocomplete: 'off' });
+        inQty.value = b.qty || '';
+        var inHasil = el('input', { class: 'isian isian-angka', id: idHasil, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+          placeholder: '100' });
+        inHasil.value = b.hasil == null ? '' : b.hasil;
+        var beli = el('span', { class: 'menu-beli' });
+        var biaya = el('strong', { class: 'menu-biaya' });
+        var galat = el('p', { class: 'kolom-galat' });
+        [[inQty, 'qty'], [inHasil, 'hasil']].forEach(function (p) {
+          p[0].addEventListener('input', function () {
+            b[p[1]] = p[0].value;
+            p[0].setAttribute('aria-invalid', 'false');
+            kosongkan(galat);
+            simpanDraft();
+            perbaruiPerkiraan();
+          });
+        });
+        kolomBahan.push({ b: b, inQty: inQty, inHasil: inHasil, beli: beli, biaya: biaya, galat: galat, it: it });
+        daftarBahan.appendChild(el('li', { class: 'baris-bahan-menu' }, [
+          el('div', { class: 'baris-bahan-menu-kepala' }, [
+            el('span', { class: 'daftar-baris-judul', text: b.item }),
+            it.aktif === false ? tandaStatus('tinjau', 'Nonaktif') : null,
+            el('button', { type: 'button', class: 'tombol-ikon', 'aria-label': 'Hapus ' + b.item + ' dari bahan',
+              onclick: function () {
+                isi.bahan = isi.bahan.filter(function (x) { return x !== b; });
+                simpanDraft();
+                gambarIsian();
+              } }, ikon('sampah'))
+          ]),
+          el('div', { class: 'baris-bahan-menu-isian' }, [
+            el('div', { class: 'kolom' }, [
+              el('label', { class: 'kolom-label', for: idQty }, ['Takaran bersih', el('span', { class: 'sr', text: ' ' + b.item })]),
+              el('div', { class: 'baris-angka' }, [inQty, el('span', { class: 'satuan-tetap', text: it.satuan })])
+            ]),
+            it.hargaDariResep
+              ? el('p', { class: 'kolom-bantuan menu-hasil-tetap', text: 'Hasil bersih: sudah di resep' })
+              : el('div', { class: 'kolom' }, [
+                el('label', { class: 'kolom-label', for: idHasil }, ['Hasil bersih', el('span', { class: 'sr', text: ' ' + b.item })]),
+                el('div', { class: 'baris-angka' }, [inHasil, el('span', { class: 'satuan-tetap', text: '%' })])
+              ])
+          ]),
+          el('div', { class: 'baris-bahan-menu-ket' }, [beli, biaya]),
+          galat
+        ]));
+        if (it.hargaDariResep) b.hasil = '';
+      });
+      var tambahBahan = tombol('Tambah bahan', 'kedua', { 'aria-haspopup': 'dialog' });
+      tambahBahan.insertBefore(ikon('tambah'), tambahBahan.lastChild);
+      tambahBahan.addEventListener('click', function () {
+        var sudah = {};
+        isi.bahan.forEach(function (b) { sudah[b.item.toLowerCase()] = true; });
+        bukaPilihItem({
+          judul: 'Tambah bahan',
+          daftar: (data.item || []).filter(function (it) { return it.aktif && !sudah[it.nama.toLowerCase()]; }),
+          kosong: 'Semua item aktif sudah menjadi bahan menu ini.',
+          ket: function (it) {
+            return [it.kategori, it.satuan, it.harga != null ? formatRupiah(it.harga) + ' per ' + it.satuan + (it.hargaDariResep ? ' (dari resep)' : '') : 'tanpa harga']
+              .filter(Boolean).join(' · ');
+          },
+          pilih: function (it) {
+            isi.bahan.push({ id: buatId(), item: it.nama, qty: '', hasil: '' });
+            simpanDraft();
+            gambarIsian();
+            var input = wadah.querySelectorAll('.daftar-bahan-menu input');
+            if (input.length && !apakahSentuh()) input[it.hargaDariResep ? input.length - 1 : input.length - 2].focus();
+          }
+        });
+      });
+
+      var perkiraan = el('div', { class: 'daftar-nilai', 'aria-live': 'polite' });
+      var tandaPerkiraan = el('p');
+      function perbaruiPerkiraan() {
+        var x = hitung();
+        kolomBahan.forEach(function (kb, i) {
+          var hb = x.bahan[i];
+          kb.beli.textContent = kb.it.harga == null ? 'Belum punya harga'
+            : (hb && hb.beli != null && Math.abs(hb.beli - bacaAngka(kb.b.qty)) > 1e-9
+              ? 'Dibeli ' + formatAngka(Math.round(hb.beli * 1000) / 1000) + ' ' + kb.it.satuan + ' × ' : '') +
+              formatRupiah(kb.it.harga) + ' per ' + kb.it.satuan + (kb.it.hargaDariResep ? ', harga dari resep' : '');
+          kb.biaya.textContent = hb && hb.biaya != null ? formatRupiah(hb.biaya) : '';
+        });
+        kosongkan(perkiraan);
+        if (!isi.bahan.length) {
+          perkiraan.appendChild(el('p', { class: 'kartu-teks', text: 'Perkiraan HPP muncul setelah bahan ditambahkan.' }));
+        } else if (!x.lengkap) {
+          perkiraan.appendChild(el('p', { class: 'kartu-teks', text: x.tanpaHarga.length
+            ? x.tanpaHarga.join(', ') + ' belum punya harga, jadi HPP belum lengkap.'
+            : 'Isi takaran bersih dan hasil bersih semua bahan.' }));
+        } else {
+          perkiraan.appendChild(barisNilai('Bahan di atas', formatRupiah(x.biayaBahan)));
+          perkiraan.appendChild(barisNilai('Bahan kecil (bumbu, minyak, garnish) ' + formatPersen(x.persenKecil), formatRupiah(x.kecil)));
+          perkiraan.appendChild(barisNilai('HPP per porsi', formatRupiah(x.hpp), 'total'));
+          perkiraan.appendChild(barisNilai('Food cost', formatPersen(x.foodCost)));
+          perkiraan.appendChild(barisNilai('Margin kotor per porsi', x.margin == null ? '–' : formatRupiah(x.margin)));
+          perkiraan.appendChild(barisNilai('Harga jual untuk food cost ' + formatPersen(x.target), formatRupiah(x.hargaTarget), 'total'));
+        }
+        kosongkan(tandaPerkiraan);
+        if (x.foodCost != null) {
+          tandaPerkiraan.appendChild(x.foodCost > x.target ? tandaStatus('tinjau', 'Di atas target') : tandaStatus('baik', 'Sesuai target'));
+        }
+        perbaruiRingkas(x);
+      }
+
+      var simpan = tombol('Simpan menu', 'utama');
+      simpan.addEventListener('click', function () {
+        if (simpan.disabled) return;
+        tulisPesan(pesan, '');
+        var ok = true;
+        if (!kNama.galat(isi.nama.trim() ? '' : 'Isi nama menu.')) ok = false;
+        var jual = bacaAngka(String(isi.hargaJual || '').replace(/\./g, ''));
+        if (!kJual.galat(jual === null ? 'Isi harga jual.' : (isNaN(jual) || !(jual > 0) ? 'Isi angka lebih dari 0, misalnya 58000.' : ''))) ok = false;
+        kolomBahan.forEach(function (x) {
+          var q = bacaAngka(x.b.qty);
+          var h = x.b.hasil === '' || x.b.hasil == null ? 100 : bacaAngka(x.b.hasil);
+          var salahQty = q === null || isNaN(q) || !(q > 0);
+          var salahHasil = h === null || isNaN(h) || !(h > 0) || h > 100;
+          x.inQty.setAttribute('aria-invalid', salahQty ? 'true' : 'false');
+          x.inHasil.setAttribute('aria-invalid', salahHasil ? 'true' : 'false');
+          kosongkan(x.galat);
+          if (salahQty || salahHasil) {
+            ok = false;
+            x.galat.appendChild(ikonStatus('masalah'));
+            x.galat.appendChild(el('span', { text: salahQty ? 'Isi takaran ' + x.b.item + ' per porsi, lebih dari 0.'
+              : 'Hasil bersih ' + x.b.item + ' diisi persen di atas 0 sampai 100, misalnya 85.' }));
+          }
+        });
+        if (!isi.bahan.length) {
+          tulisPesan(pesan, 'Tambah minimal satu bahan.', 'masalah');
+          return;
+        }
+        if (!ok) {
+          var salahPertama = wadah.querySelector('[aria-invalid="true"]');
+          if (salahPertama) salahPertama.focus();
+          return;
+        }
+        aturTombolProses(simpan, true, 'Menyimpan…');
+        panggilApi('simpanMenu', {
+          baru: baru,
+          namaLama: baru ? '' : menuKini.nama,
+          nama: isi.nama.trim().replace(/\s+/g, ' '),
+          hargaJual: jual,
+          bahan: isi.bahan.map(function (b) {
+            return { item: b.item, qty: bacaAngka(b.qty), hasilBersih: b.hasil === '' || b.hasil == null ? '' : bacaAngka(b.hasil) };
+          })
+        }).then(function (hasil) {
+          Draft.hapus(kunciDraft);
+          Cache.tulis('menu', hasil);
+          toast('Menu tersimpan.');
+          location.hash = '#/pengaturan/menu';
+        }).catch(function (err) {
+          aturTombolProses(simpan, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesan, pesanGalat(err), 'masalah');
+        });
+      });
+
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [kNama.wadah, kJual.wadah]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+        el('h2', { class: 'kartu-judul', text: 'Bahan per porsi' }),
+        el('p', { class: 'kolom-bantuan', text: 'Takaran bersih = yang masuk ke piring, dalam satuan dasar bahan. Hasil bersih = sisa setelah ' +
+          'dikupas, dibuang tulang, atau dibersihkan; kosongkan jika 100%.' }),
+        isi.bahan.length ? daftarBahan : kotakKosong('Belum ada bahan. Ketuk Tambah bahan.'),
+        el('div', {}, tambahBahan)
+      ]));
+      wadah.appendChild(el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Perkiraan' }),
+        perkiraan,
+        tandaPerkiraan,
+        el('p', { class: 'kolom-bantuan', text: 'Persen bahan kecil berlaku untuk semua menu dan diatur di Pengaturan → Outlet dan jadwal. ' +
+          'Menu tidak mengurangi stock; stock tetap berkurang lewat Stock keluar dan Prep list.' })
+      ]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
+      if (!baru && menuKini) wadah.appendChild(kartuKeadaan());
+      perbaruiPerkiraan();
+    }
+
+    function kartuKeadaan() {
+      var m = menuKini;
+      var s = sakelarTampil({ nilai: m.aktif, kataYa: 'Aktif', kataTidak: 'Nonaktif', labelSr: 'Menu ' + m.nama });
+      var ket = el('p', { class: 'kartu-teks', text: m.aktif ? 'Aktif. Menu ini ikut dihitung di HPP dan food cost.'
+        : 'Nonaktif. Menu ini tidak tampil di HPP per menu.' });
+      s.input.addEventListener('change', function () {
+        var aktif = s.input.checked;
+        if (!aktif) {
+          konfirmasi({
+            judul: 'Nonaktifkan menu ' + m.nama + '?',
+            teks: 'Menu ini tidak tampil di HPP per menu sampai diaktifkan lagi. Takaran bahannya tetap tersimpan.',
+            teksYa: 'Nonaktifkan',
+            bahaya: true,
+            jalankan: function () { return panggilApi('aturMenuAktif', { nama: m.nama, aktif: false }); }
+          }).then(function (hasil) {
+            if (!hasil) { s.atur(true); return; }
+            Cache.tulis('menu', hasil);
+            gambar(hasil);
+            toast('Menu ' + m.nama + ' dinonaktifkan.');
+          });
+          return;
+        }
+        s.input.disabled = true;
+        panggilApi('aturMenuAktif', { nama: m.nama, aktif: true }).then(function (hasil) {
+          Cache.tulis('menu', hasil);
+          gambar(hasil);
+          toast('Menu ' + m.nama + ' aktif lagi.');
+        }).catch(function (err) {
+          if (tanganiSesiBerakhir(err)) return;
+          gambar(data);
+          toast(pesanGalat(err), 'masalah');
+        });
+      });
+      var salin = tombol('Salin menu', 'kedua');
+      salin.addEventListener('click', function () {
+        var x = dariMenu(m);
+        x.nama = m.nama + ' (bungkus)';
+        salinanMenu = x;
+        Draft.hapus('menu:+baru');
+        location.hash = '#/pengaturan/menu-baru';
+      });
+      return el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Keadaan menu' }),
+        s.wadah,
+        ket,
+        el('hr', { class: 'pemisah' }),
+        el('div', {}, salin),
+        el('p', { class: 'kolom-bantuan', text: 'Untuk versi bungkus dengan kemasan, misalnya "' + m.nama + ' (bungkus)", dengan harga jualnya sendiri.' })
+      ]);
+    }
+
+    muatData({
+      kunciCache: 'menu',
+      ambil: function () { return panggilApi('daftarMenu'); },
+      gambar: function (hasil, dariHp) {
+        // Isian yang sedang diketik tidak digambar ulang; hanya data pendukungnya diperbarui.
+        if (isi && data && data.siap) {
+          data = hasil;
+          menuKini = baru ? null : cariMenu(namaAwal);
+          return;
+        }
+        gambar(hasil, dariHp);
+      },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(4)); },
+      galat: function (pesan, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi)); },
       penanda: penanda
     });
   }
