@@ -6,6 +6,8 @@
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
 > Versi 1.10, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
+> nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
 > Perubahan sejak versi 1.9 (dipilih pemilik dari pratinjau "Rancangan HPP InventoryKu", 17 Oktober
 > 2026): layar HPP dan food cost yang dibuka dari Dashboard (Bagian 5.6 dan 5.10), Pengaturan →
 > Menu dan dua isian HPP di Outlet dan jadwal (Bagian 5.7), ringkasan kepala untuk keduanya (Bagian
@@ -824,6 +826,17 @@ Satu-satunya layar yang sepenuhnya navy.
   Sesuaikan stock dengan alasan Stok pembuka.
 - Sakelar "Datang dalam kemasan besar". Jika dinyalakan, muncul dua isian: satuan besar
   dan isinya, ditulis sebagai kalimat: "1 [dus] berisi [12] botol".
+- **Hapus** (spesifikasi sistem Bagian 5.1): bagian paling bawah layar ubah item, terpisah
+  dengan garis, sama seperti hapus staff. Item nonaktif yang belum punya catatan: tombol
+  "Hapus" berwarna Masalah. Item aktif yang belum punya catatan: "Item ini belum punya
+  catatan. Nonaktifkan dulu untuk bisa menghapus." Item nonaktif yang tidak bisa dihapus:
+  sebabnya, misalnya "Tidak bisa dihapus karena Tomat sudah punya catatan stock. Riwayatnya
+  tetap tersimpan selama item nonaktif." Item aktif yang sudah punya catatan: bagian ini tidak
+  tampil.
+- Hapus meminta konfirmasi: "Hapus Tomat dari daftar item? Tomat belum punya catatan, jadi
+  tidak ada riwayat yang hilang. Riwayat harganya ikut terhapus. Tindakan ini tidak bisa
+  dibatalkan dari aplikasi." Tombolnya "Hapus" dan "Batal". Setelah dihapus, layar kembali ke
+  daftar item dengan pesan "Tomat dihapus dari daftar item."
 
 **Pengaturan → Resep:**
 
@@ -1018,6 +1031,9 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Hapus staff | "Hapus Rina dari daftar staff? Namanya tetap tampil di riwayat. Tindakan ini tidak bisa dibatalkan dari aplikasi." |
 | Staff dihapus | "Rina dihapus dari daftar staff." |
 | Staff masih aktif | "Nonaktifkan dulu untuk bisa menghapus." |
+| Hapus item | "Hapus Tomat dari daftar item? Tomat belum punya catatan, jadi tidak ada riwayat yang hilang. Riwayat harganya ikut terhapus. Tindakan ini tidak bisa dibatalkan dari aplikasi." |
+| Item dihapus | "Tomat dihapus dari daftar item." |
+| Item belum punya catatan dan masih aktif | "Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus." |
 | Pilihan kategori di Laporan | Label "Kategori", nilai awal "Semua kategori" |
 | Tanggal ditolak | "Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini." |
 | Opname tersimpan | "Opname tersimpan. 3 item diluruskan." |
@@ -1191,6 +1207,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
 | Login (17 Oktober 2026) | HP mengingat orang yang terakhir masuk: Login langsung menyapanya dengan papan angka PIN; daftar nama berupa lingkaran inisial hanya lewat "Ganti nama" atau saat HP belum mengingat siapa pun (Bagian 5.1). Login dengan PIN saja dan mengetik nama tidak dipilih. |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
+| Hapus item (17 Oktober 2026) | Hanya untuk item nonaktif yang belum punya catatan, dengan konfirmasi, di bagian paling bawah layar ubah item (Bagian 5.7) |
 | HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
