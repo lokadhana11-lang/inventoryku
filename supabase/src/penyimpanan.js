@@ -22,36 +22,73 @@ export function buatPenyimpanan() {
   // Simpanan isi tab di isolate Edge Function, dipakai lagi selama versinya sama.
   const cacheTab = new Map();
 
-  async function muatMeta(tx) {
-    return tx`select nama, urutan, meta, versi from inventoryku.tab_meta order by urutan, nama`;
+  // Tab yang biasa dibutuhkan tiap aksi (tabel aksi_tab, kecil dan hanya bertambah), dibaca sekali per isolate. Isolate lain
+  // yang mempelajari tab baru tidak terlihat di sini; akibatnya hanya satu percobaan ulang yang mempelajarinya lagi.
+  let tabAksi = null;
+
+  /**
+   * Bacaan awal setiap permintaan dalam SATU kali bolak-balik ke database: daftar tab, Script Properties, info, dan (sekali
+   * per isolate) aksi_tab. Dengan kunciTulis (bilangan), kunci pg_advisory_xact_lock diambil lebih dulu di kiriman yang sama:
+   * Postgres menjalankan kedua perintah berurutan dan, pada read committed, bacaan memakai keadaan sesudah kunci didapat.
+   * Tanpa parameter, karena dengan prepare: false query berparameter butuh dua kali bolak-balik dan postgres.js tidak
+   * mengirim query beruntun di dalam transaksi.
+   * → { metas: [{ nama, urutan, meta, versi }], props: { kunci: nilai }, info: { kunci: nilai }, tabAksi: [nama] }
+   */
+  async function muatAwal(tx, aksi, kunciTulis) {
+    if (kunciTulis != null && !Number.isInteger(kunciTulis)) throw new Error('Kunci tulis harus bilangan bulat.');
+    const kunci = kunciTulis != null ? 'select pg_advisory_xact_lock(' + kunciTulis + ');\n' : '';
+    const hasil = await tx.unsafe(kunci + `select
+      coalesce((select json_agg(json_build_object('nama', nama, 'urutan', urutan, 'meta', meta, 'versi', versi) order by urutan, nama)
+        from inventoryku.tab_meta), '[]') as metas,
+      coalesce((select json_object_agg(kunci, nilai) from inventoryku.properti), '{}') as props,
+      coalesce((select json_object_agg(kunci, nilai) from inventoryku.info), '{}') as info` + (tabAksi ? '' : `,
+      coalesce((select json_object_agg(aksi, tab) from (select aksi, json_agg(tab) as tab from inventoryku.aksi_tab group by aksi) a),
+        '{}') as tab_aksi`));
+    const r = kunci ? hasil[1] : hasil;
+    if (!tabAksi) tabAksi = r[0].tab_aksi;
+    const tab = Object.prototype.hasOwnProperty.call(tabAksi, aksi) ? tabAksi[aksi].slice() : [];
+    return { metas: r[0].metas, props: r[0].props, info: r[0].info, tabAksi: tab };
+  }
+
+  function barisTab(r) {
+    return { id: Number(r.id), pos: r.pos, v: (r.nilai || []).map(uraiNilai), f: r.rumus || null };
   }
 
   async function muatTab(tx, nama, versi) {
     const c = cacheTab.get(nama);
     if (c && c.versi === versi) return c.baris;
     const rows = await tx`select id, pos, nilai, rumus from inventoryku.tab_baris where tab = ${nama} order by pos, id`;
-    const baris = rows.map((r) => ({ id: Number(r.id), pos: r.pos, v: (r.nilai || []).map(uraiNilai), f: r.rumus || null }));
+    const baris = rows.map(barisTab);
     cacheTab.set(nama, { versi, baris });
     return baris;
   }
 
-  async function muatProperti(tx) {
-    const rows = await tx`select kunci, nilai from inventoryku.properti`;
-    const o = {};
-    rows.forEach((r) => { o[r.kunci] = r.nilai; });
-    return o;
-  }
-
-  async function muatInfo(tx) {
-    const rows = await tx`select kunci, nilai from inventoryku.info`;
-    const o = {};
-    rows.forEach((r) => { o[r.kunci] = r.nilai; });
-    return o;
+  /** Beberapa tab sekaligus ([{ nama, versi }] → { nama: baris }); yang belum ada di simpanan dibaca dalam satu query. */
+  async function muatTabBanyak(tx, daftar) {
+    const hasil = {};
+    const baca = [];
+    for (const { nama, versi } of daftar) {
+      const c = cacheTab.get(nama);
+      if (c && c.versi === versi) hasil[nama] = c.baris;
+      else baca.push({ nama, versi });
+    }
+    if (!baca.length) return hasil;
+    const rows = await tx`select tab, id, pos, nilai, rumus from inventoryku.tab_baris
+      where tab = any(${baca.map((t) => t.nama)}) order by tab, pos, id`;
+    const perTab = {};
+    rows.forEach((r) => { (perTab[r.tab] || (perTab[r.tab] = [])).push(barisTab(r)); });
+    for (const { nama, versi } of baca) {
+      const baris = perTab[nama] || [];
+      cacheTab.set(nama, { versi, baris });
+      hasil[nama] = baris;
+    }
+    return hasil;
   }
 
   async function muatDrive(tx) {
-    const folder = await tx`select jalur from inventoryku.folder`;
-    const berkas = await tx`select id, jalur, nama, mime, ukuran, dibuat, dibuang from inventoryku.berkas`;
+    // Dua perintah dalam satu kiriman (satu kali bolak-balik).
+    const [folder, berkas] = await tx.unsafe(`select jalur from inventoryku.folder;
+      select id, jalur, nama, mime, ukuran, dibuat, dibuang from inventoryku.berkas`);
     return {
       folder: new Set(folder.map((f) => f.jalur)),
       folderBaru: new Set(),
@@ -60,14 +97,13 @@ export function buatPenyimpanan() {
     };
   }
 
-  async function tabAksi(tx, aksi) {
-    const rows = await tx`select tab from inventoryku.aksi_tab where aksi = ${aksi}`;
-    return rows.map((r) => r.tab);
-  }
-
   async function catatTabAksi(tx, aksi, tabs) {
     for (const t of tabs) {
       await tx`insert into inventoryku.aksi_tab (aksi, tab) values (${aksi}, ${t}) on conflict do nothing`;
+    }
+    if (tabAksi) {
+      const ada = Object.prototype.hasOwnProperty.call(tabAksi, aksi) ? tabAksi[aksi] : (tabAksi[aksi] = []);
+      tabs.forEach((t) => { if (ada.indexOf(t) < 0) ada.push(t); });
     }
   }
 
@@ -198,5 +234,5 @@ export function buatPenyimpanan() {
     return berubah;
   }
 
-  return { muatMeta, muatTab, muatProperti, muatInfo, muatDrive, tabAksi, catatTabAksi, tulis, cacheTab };
+  return { muatAwal, muatTab, muatTabBanyak, muatDrive, catatTabAksi, tulis, cacheTab };
 }
