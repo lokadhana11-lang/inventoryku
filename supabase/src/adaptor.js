@@ -94,7 +94,9 @@ export function buatAdaptor(o) {
         const syarat = {};
         if (t.hariMinggu) syarat.hari = t.hariMinggu;
         if (t.tanggalBulan) syarat.tanggal = Number(t.tanggalBulan);
-        const cronTeks = (t.setiapMenit ? '*/' + t.setiapMenit + ' * * * *' : (utc % 60) + ' ' + Math.floor(utc / 60) + ' * * *');
+        // setiapJam (arsip tahunan): tiap N jam pada menit yang tetap.
+        const cronTeks = t.setiapMenit ? '*/' + t.setiapMenit + ' * * * *'
+          : (t.setiapJam ? (Number(t.menit) || 7) + ' */' + t.setiapJam + ' * * *' : (utc % 60) + ' ' + Math.floor(utc / 60) + ' * * *');
         // pg_net mengirim body jsonb dan menolak Content-Type selain application/json ("Content-Type header must be
         // \"application/json\""), jadi jadwal tidak memakai text/plain seperti aplikasi. Edge Function membaca body sebagai teks.
         const perintah = "select net.http_post(url := (select nilai #>> '{}' from inventoryku.info where kunci = 'alamatApi'), " +

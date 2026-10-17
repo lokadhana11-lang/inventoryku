@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.19 (notifikasi ke HP)
+// InventoryKu Code.gs v0.20 (arsip tahunan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -57,6 +57,8 @@
  * - 17 Oktober 2026    : notifikasi ke HP (Web Push, hanya di Supabase): aksi
  *                        infoNotifikasi, aturNotifikasi, ujiNotifikasi;
  *                        pengingatSuhuOpening/Middle/Closing (trigger harian).
+ * - 17 Oktober 2026    : arsip tahunan (arsipTahunan, trigger tiap jam): data
+ *                        sebelum tahun lalu dipindah ke berkas arsip di Drive.
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -77,7 +79,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.19';
+var VERSI_KODE = 'v0.20';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -1807,6 +1809,7 @@ function periksaTanggalIsian_(tanggal, pengguna) {
   if (!pengguna.pengelola && tanggal < geserTanggal_(hari, -1)) {
     throw galatPengguna_('Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini.');
   }
+  periksaBelumDiarsip_(tanggal);
   return tanggal;
 }
 
@@ -5361,6 +5364,7 @@ function aksiSimpanPenjualan_(body, pengguna) {
   if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
   var tanggal = body.tanggal;
   if (tanggal > hariIni_()) throw galatPengguna_('Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat.');
+  periksaBelumDiarsip_(tanggal);
   if (body.penjualan === '' || body.penjualan == null) throw galatPengguna_('Isi penjualan. Hari tutup diisi 0.');
   var nilai = angkaOpsional_(body.penjualan, 'Penjualan', 2);
   var catatan = teksAman_(rapikanTeks_(body.catatan).slice(0, 200));
@@ -5845,6 +5849,7 @@ function dataHpp_(bulan) {
   var ctx = konteksHpp_();
   if (!bulanSah_(bulan)) bulan = ctx.hari.slice(0, 7);
   if (bulan + '-01' > ctx.hari) throw galatPengguna_('Bulan ' + namaBulanId_(bulan) + ' belum dimulai. Pilih bulan lain.');
+  periksaBelumDiarsip_(bulan + '-01');
   var n = bacaKonfigurasi_().nilai;
   var target = targetFoodCost_(n);
   var x = foodCostBulan_(ctx, bulan);
@@ -7309,6 +7314,7 @@ function rentangRiwayat_(body) {
   if (geserTanggal_(dari, BATAS_RIWAYAT_HARI - 1) < sampai) {
     throw galatPengguna_('Riwayat paling banyak ' + BATAS_RIWAYAT_HARI + ' hari sekali ambil. Persempit rentang tanggalnya.');
   }
+  periksaBelumDiarsip_(dari);
   return { dari: dari, sampai: sampai };
 }
 
@@ -8673,6 +8679,7 @@ function aksiInfoLaporan_() {
  * menambah file di Drive. kategori (opsional, Stock): satu kategori saja.
  */
 function aksiUnduhPdf_(body) {
+  if (tanggalSah_(body.tanggal)) periksaBelumDiarsip_(body.tanggal);
   var pdf = buatPdf_(body.formId, String(body.tanggal || ''), { kategori: body.kategori });
   return {
     namaFile: pdf.namaFile,
@@ -8684,6 +8691,7 @@ function aksiUnduhPdf_(body) {
 /** Simpan ulang ke Drive (khusus Pengelola), misalnya setelah ada koreksi. Selalu semua kategori, seperti PDF harian. */
 function aksiSimpanPdfDrive_(body) {
   var tanggal = String(body.tanggal || '');
+  if (tanggalSah_(tanggal)) periksaBelumDiarsip_(tanggal);
   var pdf = buatPdf_(body.formId, tanggal);
   return simpanPdfKeDrive_(pdf, tanggal);
 }
@@ -8789,6 +8797,7 @@ function peringatanSistem_() {
   }
   if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
   if (/^Gagal/.test(rek)) hasil.push('Rekap bulanan: ' + rek);
+  if (/^Gagal/.test(String(nilai.arsip_terakhir || ''))) hasil.push('Arsip tahunan: ' + nilai.arsip_terakhir);
   // Jadwal diubah dari Pengaturan → Outlet dan jadwal, trigger belum dipasang ulang (Tahap 7).
   if (/^Perlu/.test(String(nilai.pasang_trigger || ''))) {
     hasil.push('Jadwal: jam closing, jeda laporan, hari cadangan, atau zona waktu sudah diubah. ' +
@@ -9938,6 +9947,7 @@ function simpanRekapKeDrive_(pdf, bulan) {
 function aksiUnduhPdfRekap_(body, pengguna) {
   var bulan = String(body.bulan || '');
   if (!bulanSah_(bulan)) throw galatPengguna_('Bulan tidak terbaca. Pilih bulan lagi.');
+  periksaBelumDiarsip_(bulan + '-01');
   var pdf = buatPdfRekap_(dataRekapBulan_(bulan), pengguna.nama + ', ' + waktuPendekId_(new Date()));
   return { namaFile: pdf.namaFile, mime: 'application/pdf', data: Utilities.base64Encode(pdf.blob.getBytes()) };
 }
@@ -10143,13 +10153,223 @@ function pasangTrigger() {
       pengingat.push(p.waktu + ' ' + jam);
     });
   }
+  // Arsip tahunan (Code.gs v0.20): tiap jam, tanpa kerja kecuali ada data yang perlu dipindah.
+  ScriptApp.newTrigger('arsipTahunan').timeBased().everyHours(1).create();
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
   var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00' +
-    (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '');
+    (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '') + ', arsip tahunan tiap jam';
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');
   catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +
     jamTeks + ', cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.', KETERANGAN_PASANG_TRIGGER);
+}
+
+/* =========================================================================
+ * Arsip tahunan (Code.gs v0.20; spesifikasi sistem Bagian 8.6). Tahun berjalan
+ * dan tahun lalu tetap di tab; baris yang lebih tua dipindah ke berkas arsip
+ * Laporan Kitchen/{Outlet}/Arsip/{Tahun}/Arsip_{Tahun}_{Tab}_{batas}.json,
+ * yang di Google Drive juga ditulis ke Google Sheets "Arsip InventoryKu
+ * {Tahun}" (satu tab per tab data). Supaya stock tetap benar, rekap terakhir
+ * tiap item sebelum batas tetap di Stock_Harian (Stock Awal sesudahnya
+ * berasal darinya). arsipTahunan dijalankan trigger tiap jam: di Supabase satu
+ * tab per jalan (batas CPU Edge Function), di Apps Script sebanyak mungkin
+ * dalam 4 menit. Jalan yang tidak punya pekerjaan hanya membaca M_Konfigurasi.
+ * ========================================================================= */
+
+var ARSIP_TAHUN_DISIMPAN = 2; // tahun berjalan dan tahun lalu
+var FOLDER_ARSIP = 'Arsip';
+var PROP_ARSIP_PROSES = 'ARSIP_PROSES';
+var NAMA_SHEETS_ARSIP = 'Arsip InventoryKu ';
+// Di Supabase paling banyak sekian baris per jalan (yang tertua dulu), supaya tetap di bawah batas CPU Edge Function.
+var BARIS_ARSIP_PER_JALAN = 20000;
+var KETERANGAN_ARSIP = 'Diisi otomatis oleh arsip tahunan. arsip_sampai: data sebelum tanggal ini sudah dipindah ke arsip ' +
+  '(Laporan Kitchen/<Outlet>/Arsip). Baris arsip_terakhir yang diawali "Gagal" tampil di Beranda Pengelola.';
+
+/** Batas arsip hari ini: 1 Januari tahun lalu (baris sebelum tanggal ini dipindah). */
+function batasArsip_() {
+  return (Number(hariIni_().slice(0, 4)) - (ARSIP_TAHUN_DISIMPAN - 1)) + '-01-01';
+}
+
+/** Tanggal yang sudah selesai diarsipkan ('' jika belum pernah): data sebelum tanggal ini tidak ada lagi di tab. */
+function arsipSampai_() {
+  var t = String(bacaKonfigurasi_().nilai.arsip_sampai || '').trim();
+  return tanggalSah_(t) ? t : '';
+}
+
+/** Menolak tanggal yang datanya sudah dipindah ke arsip (Riwayat, PDF, isian, HPP). */
+function periksaBelumDiarsip_(tanggal) {
+  var sampai = arsipSampai_();
+  if (sampai && tanggal < sampai) {
+    throw galatPengguna_('Data sebelum ' + tanggalPanjangId_(sampai).replace(/^[^,]+, /, '') + ' sudah dipindah ke arsip tahunan ' +
+      '(Google Drive: ' + FOLDER_LAPORAN + '/' + (namaOutlet_() || 'Outlet') + '/' + FOLDER_ARSIP + '). Pilih tanggal yang lebih baru.');
+  }
+}
+
+/** Tab yang diarsipkan, urut nama: semua tab Data_* (termasuk form kustom), Stock_Harian, dan Log_Perubahan. */
+function tabArsip_() {
+  return ss_().getSheets().map(function (sh) { return sh.getName(); }).filter(function (n) {
+    return n.indexOf('Data_') === 0 || n === 'Stock_Harian' || n === TAB_LOG.nama;
+  }).sort();
+}
+
+/** Nilai sel untuk berkas arsip: tanggal menjadi teks "yyyy-mm-dd hh:mm:ss" (atau "yyyy-mm-dd" jika jamnya 00.00). */
+function nilaiArsip_(v, zona) {
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    var t = Utilities.formatDate(v, zona, 'yyyy-MM-dd HH:mm:ss');
+    return t.slice(11) === '00:00:00' ? t.slice(0, 10) : t;
+  }
+  return v;
+}
+
+/**
+ * Memindahkan baris satu tab yang tanggalnya (kolom Tanggal, atau Waktu di Log_Perubahan) sebelum
+ * batas ke berkas arsip per tahun, lalu menghapusnya dari tab. Stock_Harian: rekap terakhir tiap item
+ * sebelum batas tidak dipindah. Paling banyak maks baris (yang tertua dulu); sisanya pada jalan
+ * berikutnya, dengan nomor bagian di nama berkas. Mengembalikan { jumlah, selesai }. Di dalam kunci.
+ */
+function arsipkanTab_(nama, batas, maks, bagian) {
+  var kosong = { jumlah: 0, selesai: true };
+  var sheet = ss_().getSheetByName(nama);
+  if (!sheet) return kosong;
+  var isi = nilaiTab_(sheet);
+  if (isi.length < 2) return kosong;
+  var judul = isi[0].map(function (j) { return String(j).trim(); });
+  var kol = judul.indexOf('Tanggal');
+  if (kol < 0) kol = judul.indexOf('Waktu');
+  if (kol < 0) return kosong;
+  var zona = zonaSheet_();
+  var tanggal = isi.map(function (b, i) { return i ? teksTanggal_(b[kol], zona) : ''; });
+  // Stock_Harian: rekap terakhir sebelum batas per item tetap di tab (titik awal stock sesudahnya).
+  var tetap = {};
+  if (nama === 'Stock_Harian') {
+    var kItem = judul.indexOf('Nama Item');
+    var terakhir = {};
+    isi.forEach(function (b, i) {
+      if (!i || !tanggalSah_(tanggal[i]) || tanggal[i] >= batas) return;
+      var k = rapikanTeks_(b[kItem]).toLowerCase();
+      if (!terakhir[k] || tanggal[i] > tanggal[terakhir[k]]) terakhir[k] = i;
+    });
+    Object.keys(terakhir).forEach(function (k) { tetap[terakhir[k]] = true; });
+  }
+  var calon = [];
+  isi.forEach(function (b, i) {
+    if (i && tanggalSah_(tanggal[i]) && tanggal[i] < batas && !tetap[i]) calon.push(i);
+  });
+  if (!calon.length) return kosong;
+  var selesai = !(maks && calon.length > maks);
+  if (!selesai) {
+    calon.sort(function (a, b) { return tanggal[a] < tanggal[b] ? -1 : (tanggal[a] > tanggal[b] ? 1 : a - b); });
+    calon = calon.slice(0, maks);
+  }
+  var pindah = calon.sort(function (a, b) { return a - b; });
+  var perTahun = {};
+  pindah.forEach(function (i) {
+    var th = tanggal[i].slice(0, 4);
+    (perTahun[th] = perTahun[th] || []).push(isi[i].map(function (v) { return nilaiArsip_(v, zona); }));
+  });
+  Object.keys(perTahun).sort().forEach(function (th) {
+    var folder = cariAtauBuatFolder_(cariAtauBuatFolder_(folderOutlet_(), FOLDER_ARSIP), th);
+    var namaBerkas = 'Arsip_' + th + '_' + nama + '_' + batas + (bagian > 1 ? '_' + bagian : '') + '.json';
+    var ada = folder.getFilesByName(namaBerkas);
+    while (ada.hasNext()) ada.next().setTrashed(true); // jalan ulang sesudah gagal: berkas lama diganti
+    var teks = JSON.stringify({ jenis: 'arsip-inventoryku', tahun: th, tab: nama, batas: batas, dibuat: new Date().toISOString(),
+      outlet: namaOutlet_(), judul: judul, baris: perTahun[th] });
+    folder.createFile(Utilities.newBlob(teks, 'application/json', namaBerkas));
+    // Di Apps Script (belum pindah) langsung ditulis ke Google Sheets arsip; di Supabase oleh salinan ke Drive.
+    if (!DI_SUPABASE_) arsipJsonKeSheets_(teks, namaBerkas, folder);
+  });
+  // Hapus per rentang baris yang berurutan, dari bawah supaya nomor baris di atasnya tetap.
+  var rentang = [];
+  pindah.forEach(function (i) {
+    var r = rentang[rentang.length - 1];
+    if (r && r.akhir === i - 1) r.akhir = i;
+    else rentang.push({ awal: i, akhir: i });
+  });
+  rentang.reverse().forEach(function (r) { sheet.deleteRows(r.awal + 1, r.akhir - r.awal + 1); });
+  lupakanMemoTab_();
+  return { jumlah: pindah.length, selesai: selesai };
+}
+
+/**
+ * Trigger tiap jam. Jika batas arsip (1 Januari tahun lalu) belum diselesaikan, tab berikutnya
+ * dipindah (Supabase: satu tab per jalan; Apps Script: sampai 4 menit). Kemajuan di Script Property
+ * ARSIP_PROSES; sesudah semua tab, M_Konfigurasi arsip_sampai diisi batasnya dan arsip_terakhir hasilnya.
+ */
+function arsipTahunan() {
+  if (sudahPindah_()) return console.log('Sudah pindah ke Supabase: arsip tahunan berjalan di sana.');
+  SS_ = null;
+  var batas = batasArsip_();
+  if (arsipSampai_() >= batas) return console.log('Arsip sudah sampai ' + arsipSampai_() + '; tidak ada yang perlu dipindah.');
+  var props = PropertiesService.getScriptProperties();
+  var proses = bacaJson_(props.getProperty(PROP_ARSIP_PROSES)) || {};
+  if (proses.batas !== batas) proses = { batas: batas, selesai: [], baris: 0, bagian: {} };
+  proses.bagian = proses.bagian || {};
+  var mulai = Date.now();
+  try {
+    var sisa = tabArsip_().filter(function (n) { return proses.selesai.indexOf(n) < 0; });
+    for (var i = 0; i < sisa.length; i++) {
+      var bagian = (proses.bagian[sisa[i]] || 0) + 1;
+      var h = denganKunci_(function () { return arsipkanTab_(sisa[i], batas, DI_SUPABASE_ ? BARIS_ARSIP_PER_JALAN : 0, bagian); });
+      if (h.selesai) proses.selesai.push(sisa[i]);
+      else proses.bagian[sisa[i]] = bagian;
+      proses.baris += h.jumlah;
+      props.setProperty(PROP_ARSIP_PROSES, JSON.stringify(proses));
+      console.log('Arsip ' + sisa[i] + ': ' + h.jumlah + ' baris dipindah' + (h.selesai ? '.' : ', sisanya pada jalan berikutnya.'));
+      if (DI_SUPABASE_ || Date.now() - mulai > 4 * 60 * 1000) break;
+    }
+    if (tabArsip_().every(function (n) { return proses.selesai.indexOf(n) >= 0; })) {
+      denganKunci_(function () {
+        tulisKonfigurasi_('arsip_sampai', batas, KETERANGAN_ARSIP);
+        catatStatusSistem_('arsip_terakhir', 'Berhasil ' + waktuSekarangId_() + ': data sebelum ' + batas + ' (' + proses.baris +
+          ' baris) dipindah ke ' + FOLDER_LAPORAN + '/' + (namaOutlet_() || 'Outlet') + '/' + FOLDER_ARSIP + '.', KETERANGAN_ARSIP);
+      });
+      props.deleteProperty(PROP_ARSIP_PROSES);
+    }
+  } catch (err) {
+    console.error('Arsip tahunan gagal: ' + (err && err.stack ? err.stack : err));
+    catatStatusSistem_('arsip_terakhir', 'Gagal ' + waktuSekarangId_() + ': ' + (err && err.message ? err.message : err) +
+      '. Dicoba lagi satu jam kemudian.', KETERANGAN_ARSIP);
+  }
+}
+
+/**
+ * Menulis isi berkas arsip ke Google Sheets "Arsip InventoryKu {Tahun}" di folder yang sama: satu tab
+ * per tab data, baris ditambahkan di bawah. Tab "Keterangan" mencatat berkas yang sudah ditulis,
+ * supaya berkas yang sama tidak ditulis dua kali. Hanya di Google (Apps Script).
+ */
+function arsipJsonKeSheets_(teks, namaBerkas, folder) {
+  var d = JSON.parse(teks);
+  if (!d || d.jenis !== 'arsip-inventoryku') return;
+  var namaSs = NAMA_SHEETS_ARSIP + d.tahun;
+  var ada = folder.getFilesByName(namaSs);
+  var ss;
+  if (ada.hasNext()) {
+    ss = SpreadsheetApp.openById(ada.next().getId());
+  } else {
+    ss = SpreadsheetApp.create(namaSs);
+    DriveApp.getFileById(ss.getId()).moveTo(folder);
+    ss.getSheets()[0].setName('Keterangan').getRange(1, 1, 1, 3).setValues([['Berkas arsip', 'Ditulis', 'Baris']]);
+  }
+  var ket = ss.getSheetByName('Keterangan') || ss.insertSheet('Keterangan');
+  var sudah = ket.getLastRow() > 1 ? ket.getRange(2, 1, ket.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]); }) : [];
+  if (sudah.indexOf(namaBerkas) >= 0) return;
+  var sheet = ss.getSheetByName(d.tab);
+  if (!sheet) {
+    sheet = ss.insertSheet(d.tab);
+    sheet.getRange(1, 1, 1, d.judul.length).setValues([d.judul]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  var lebar = d.judul.length;
+  for (var i = 0; i < d.baris.length; i += 5000) {
+    var potong = d.baris.slice(i, i + 5000).map(function (b) {
+      var r = b.slice(0, lebar);
+      while (r.length < lebar) r.push('');
+      return r;
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, potong.length, lebar).setValues(potong);
+  }
+  ket.getRange(ket.getLastRow() + 1, 1, 1, 3).setValues([[namaBerkas, new Date(), d.baris.length]]);
 }
 
 /* =========================================================================
@@ -10348,7 +10568,16 @@ function salinBerkasKeDrive_() {
       try {
         var blob = UrlFetchApp.fetch(b.url).getBlob().setName(b.nama);
         if (b.mime) blob.setContentType(b.mime);
-        var f = folderDariJalur_(b.jalur).createFile(blob);
+        var folder = folderDariJalur_(b.jalur);
+        var f = folder.createFile(blob);
+        // Berkas arsip tahunan (Code.gs v0.20) juga ditulis ke Google Sheets "Arsip InventoryKu {Tahun}".
+        if (/^Arsip_\d{4}_.+\.json$/.test(b.nama)) {
+          try {
+            arsipJsonKeSheets_(blob.getDataAsString(), b.nama, folder);
+          } catch (err) {
+            console.error('Arsip ' + b.nama + ' tidak bisa ditulis ke Google Sheets: ' + err);
+          }
+        }
         salin.push({ id: b.id, driveId: f.getId(), url: f.getUrl() });
       } catch (err) {
         console.error('Berkas ' + b.jalur + '/' + b.nama + ' gagal disalin ke Drive: ' + err);
