@@ -5,7 +5,11 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.8, 12 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.9, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.8 (dipilih pemilik dari pratinjau Login 17 Oktober 2026, supaya Login
+> lebih bersih): HP mengingat orang yang terakhir masuk, jadi Login langsung menyapanya ("Halo,
+> Rina") dengan papan angka PIN; daftar nama berupa lingkaran inisial dan hanya tampil saat HP
+> belum mengingat siapa pun atau "Ganti nama" diketuk (Bagian 5.1, 8.4, dan 11).
 > Perubahan sejak versi 1.7 (permintaan pemilik 12 Oktober 2026: bar, logo, dan nama yang
 > premium, dan tampilan penuh gerak supaya tidak monoton): bar navigasi bawah yang mengambang
 > dengan pil menu aktif, bar atas dengan pil dan nama outlet (Bagian 4.2 dan 4.3), logo berupa
@@ -376,21 +380,38 @@ Satu-satunya layar yang sepenuhnya navy.
 
 - Ikon buku dan nama "InventoryKu" dengan huruf Barlow Condensed besar, rata kiri, di
   sepertiga atas. Nama outlet di bawahnya dengan warna Teks di Navy.
-- **Pilih nama:** nama staff tampil sebagai tombol besar (hanya ada beberapa orang, jadi
-  tidak perlu dropdown atau mengetik).
+- **HP mengingat pengguna terakhir** (versi 1.9). Setiap login yang berhasil di HP itu
+  (termasuk pemasangan pertama dan pemulihan) menyimpan nama orangnya di HP. Login berikutnya
+  langsung membuka langkah PIN untuk orang itu, tanpa daftar nama. Daftar nama tampil jika HP
+  belum mengingat siapa pun, orang itu tidak bisa masuk lagi (nonaktif, dihapus, atau belum
+  punya PIN), atau "Ganti nama" diketuk. Tombol "Keluar" dan keluar otomatis tidak menghapus
+  ingatan ini.
+- **Langkah PIN** (versi 1.9): merek diringkas menjadi satu baris (lencana 40 px, nama 26 px,
+  outlet di bawahnya), lalu sapaan di tengah: inisial di lingkaran Biru Malam 64 px (huruf Lampu
+  Pass, tepi Garis Navy, cincin amber tipis), "Halo, Rina" (26 px, tebal), dan "Masukkan PIN untuk
+  masuk" (Teks di Navy); jika orang itu punya isian di HP: "2 isian menunggu kirim". Lalu enam
+  titik PIN dan papan angka. Di bawah papan angka, dalam satu baris: "Bukan Rina? Ganti nama"
+  (nama depan saja) di kiri dan "Lupa PIN?" di kanan. Pada layar setinggi di bawah 620 px dan
+  pada layar mendatar yang pendek, lingkaran inisial tidak tampil supaya papan angka tetap muat.
+- **Pilih nama** (versi 1.9): judul "Siapa yang masuk?" (20 px, Kertas), lalu nama staff sebagai
+  lingkaran inisial 64 px (Navy Lapis, huruf Lampu Pass) dengan nama di bawahnya, tiga per baris
+  (hanya ada beberapa orang, jadi tidak perlu dropdown atau mengetik). Orang yang terakhir masuk
+  di HP itu bertepi Lampu Pass dengan keterangan kecil "Terakhir masuk"; isian yang menunggu
+  ditulis "2 isian menunggu kirim". Seluruh lingkaran dan nama adalah satu tombol.
 - **PIN:** papan angka besar di layar, 3 kolom, tombol 64 px. Enam titik PIN terisi amber
   satu per satu; setelah angka keenam, login langsung diproses tanpa tombol tambahan.
 - PIN salah: enam titik PIN bergoyang sekali (Bagian 8), tulisan "PIN salah. Sisa 4 percobaan."
 - Terkunci: "Terkunci 15 menit. Minta Head Kitchen atau Manager mereset PIN."
-- **Lupa PIN?** Tautan kecil di bawah papan angka, muncul setelah nama dipilih. Ketuk,
+- **Lupa PIN?** Tautan kecil di bawah papan angka, di langkah PIN. Ketuk,
   lalu konfirmasi: "Kirim permintaan reset PIN untuk Rina?" Setelah terkirim:
   "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager."
 - Jika permintaan untuk nama itu sudah ada: "Permintaan sudah dikirim pukul 08.10."
 - **Pulihkan akses Pengelola:** tautan kecil di bagian paling bawah layar, hanya untuk
   keadaan darurat saat tidak ada Pengelola yang bisa masuk. Meminta Kode Pemasangan baru.
-- **Setelah keluar otomatis:** di atas pilihan nama tampil satu baris keterangan: "Keluar
-  otomatis karena 5 menit tidak dipakai. Isian yang belum dikirim tetap tersimpan."
-  Angka menitnya mengikuti pengaturan. Keterangan hilang setelah sebuah nama dipilih.
+- **Setelah keluar otomatis:** di atas sapaan (atau di atas pilihan nama jika HP belum
+  mengingat siapa pun) tampil satu baris keterangan: "Keluar otomatis karena 5 menit tidak
+  dipakai. Isian yang belum dikirim tetap tersimpan." Angka menitnya mengikuti pengaturan.
+  Keterangan hilang setelah "Ganti nama" diketuk atau sebuah nama dipilih.
   Tidak ada hitung mundur atau peringatan sebelum keluar.
 - Di tablet dan desktop, isi layar Login berada di tengah dengan lebar maksimal 420 px.
   Latar navy tetap memenuhi layar. Di laptop dan desktop (lebar 1.024 px ke atas, tinggi
@@ -409,8 +430,8 @@ Satu-satunya layar yang sepenuhnya navy.
     3,4 detik, seperti lampu pemanas di pass.
 - **Nama aplikasi** muncul huruf demi huruf saat pembuka. Pembaca layar membaca "InventoryKu"
   utuh.
-- **Tombol nama** (versi 1.8): kotak Navy Lapis bersudut 14 px dengan inisial nama di lingkaran
-  Biru Malam (huruf Lampu Pass), lalu nama di kanannya. Tombol angka PIN: Navy Lapis bersudut
+- **Tombol nama** (versi 1.9): lingkaran inisial dengan nama di bawahnya (lihat Pilih nama di
+  atas); versi 1.8 berupa kotak Navy Lapis dengan inisial di kiri dan nama di kanan. Tombol angka PIN: Navy Lapis bersudut
   16 px, bertepi Garis Navy.
 
 ### 5.2 Beranda (rel tiket)
@@ -1013,7 +1034,7 @@ gerak **menu**, **tekan**, **lembar**, serta **pesan singkat** (Bagian 8.1). Tam
 
 | Layar | Gerak yang terlihat |
 |---|---|
-| Login | Pembuka Login sekali setiap aplikasi dibuka: rel tiket turun, lencana membesar dan bukunya membuka, nama muncul huruf demi huruf, lalu outlet, tombol nama, dan tautan bawah bertahap; di desktop panelnya naik sambil membesar dari 97%. Suasana yang terus bergerak (Bagian 5.1): tiket berayun, uap naik, dua cahaya bergeser, halo lencana. Pilih nama: langkah PIN masuk dari kanan, enam titik PIN muncul satu per satu, tombol angka muncul bertahap. "Ganti nama": tombol nama masuk lagi dari kanan. Titik PIN terisi; enam titik bergoyang saat PIN salah. Berganti langkah tidak mengulang pembuka. |
+| Login | Pembuka Login sekali setiap aplikasi dibuka: rel tiket turun, lencana membesar dan bukunya membuka, nama muncul huruf demi huruf, lalu outlet, tombol nama, dan tautan bawah bertahap; di desktop panelnya naik sambil membesar dari 97%. Suasana yang terus bergerak (Bagian 5.1): tiket berayun, uap naik, dua cahaya bergeser, halo lencana. Pilih nama (atau Login yang langsung menyapa pengguna terakhir): sapaan masuk dari kanan, enam titik PIN muncul satu per satu, tombol angka muncul bertahap. "Ganti nama": tombol nama masuk lagi dari kanan. Titik PIN terisi; enam titik bergoyang saat PIN salah. Berganti langkah tidak mengulang pembuka. |
 | Beranda | Pembuka sekali setiap aplikasi dibuka (lencana dan pembatas di baris merek, tanggal muncul, ruas rel terbentang); tiket turun ke rel setiap Beranda dibuka; jumlah form terisi naik; cap pada tiket yang baru Terkirim atau Nihil; ruas rel menyala; momen selesai dengan kilau di rel; pemberitahuan di bawah tiket naik bertahap. |
 | Isi form (Stock, Suhu, Prep list, Waste, form kustom) | Kepala dan bagian layar naik bertahap; kartu item yang berada di bawah layar muncul saat digulir; bilah kirim di bawah tetap diam (tidak pernah tersembunyi); kartu Waste mengikuti jari saat digeser untuk dihapus. Kolom isian bisa diketik sejak layar tampil. |
 | Riwayat | Pilihan dan daftar kiriman naik bertahap; kiriman di bawah layar muncul saat digulir; cap pada tanda Diperiksa setelah Tandai diperiksa. |
@@ -1078,6 +1099,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Unduh PDF di iPhone dan iPad | Dua langkah: "Unduh PDF", lalu "Simpan PDF" lewat lembar bagikan (Bagian 5.5) |
 | Tombol keluar | Bernama "Keluar", di menu nama pengguna: kepala Beranda di HP dan tablet, bar atas di desktop |
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
+| Login (17 Oktober 2026) | HP mengingat orang yang terakhir masuk: Login langsung menyapanya dengan papan angka PIN; daftar nama berupa lingkaran inisial hanya lewat "Ganti nama" atau saat HP belum mengingat siapa pun (Bagian 5.1). Login dengan PIN saja dan mengetik nama tidak dipilih. |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |

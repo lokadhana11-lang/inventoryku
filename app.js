@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.16.0';
+  var VERSI_APLIKASI = '0.16.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1416,6 +1416,8 @@
       namaOutlet: data.namaOutlet
     });
     simpanMenitKeluarOtomatis(data.keluarOtomatisMenit);
+    // Login berikutnya di HP ini langsung menyapa orang ini (tampilan Bagian 5.1, versi 1.9).
+    if (data.pengguna && data.pengguna.nama) Simpan.tulis(AWALAN + 'penggunaTerakhir', data.pengguna.nama);
     catatDipakai(true);
     berandaDariLogin = 0;
     if (data.beranda) {
@@ -1746,9 +1748,11 @@
   }
 
   /**
-   * Layar Login: pilih nama (tombol besar), lalu PIN di papan angka.
-   * Setelah angka keenam, login langsung diproses. keterangan: satu baris di
-   * atas pilihan nama setelah keluar otomatis; hilang setelah nama dipilih.
+   * Layar Login (tampilan Bagian 5.1, versi 1.9): HP mengingat orang yang terakhir masuk,
+   * jadi Login langsung menyapanya ("Halo, Rina") dengan papan angka PIN. Daftar nama
+   * (lingkaran inisial) hanya tampil jika HP belum mengingat siapa pun, orang itu tidak bisa
+   * masuk lagi, atau "Ganti nama" diketuk. Setelah angka keenam, login langsung diproses.
+   * keterangan: satu baris setelah keluar otomatis; hilang setelah "Ganti nama" atau nama dipilih.
    */
   var loginBukaSudah = false;
 
@@ -1758,7 +1762,8 @@
     kosongkan(wadah);
     aturJudulDokumen('Masuk');
 
-    var keadaan = { info: info, nama: '', pin: '', sibuk: false, keterangan: keterangan || '' };
+    // ingat: langkah pertama menyapa pengguna terakhir; mati setelah "Ganti nama" diketuk.
+    var keadaan = { info: info, nama: '', pin: '', sibuk: false, keterangan: keterangan || '', ingat: true };
     var merek = merekLogin(info ? info.namaOutlet : '');
     var kiri = el('div', { class: 'login-kiri' }, merek.wadah);
     var kanan = el('div', { class: 'login-kanan' });
@@ -1795,10 +1800,29 @@
       return (keadaan.info && keadaan.info.staff || []).filter(function (s) { return s.punyaPin; });
     }
 
-    /** "Keluar otomatis karena 5 menit tidak dipakai. …" di atas pilihan nama. */
-    function tambahKeterangan() {
+    /** Orang yang terakhir masuk di HP ini, jika masih bisa masuk (aktif dan punya PIN). */
+    function penggunaTerakhir() {
+      var nama = Simpan.baca(AWALAN + 'penggunaTerakhir');
+      if (typeof nama !== 'string' || !nama) return null;
+      var kecil = nama.toLowerCase();
+      return namaBisaMasuk().filter(function (s) { return s.nama.toLowerCase() === kecil; })[0] || null;
+    }
+
+    /** Langkah pertama: sapa pengguna terakhir, atau daftar nama. */
+    function mulaiLangkah() {
+      var terakhir = keadaan.ingat && keadaan.info ? penggunaTerakhir() : null;
+      if (terakhir) tampilPin(terakhir.nama);
+      else tampilNama();
+    }
+
+    function inisial(nama) {
+      return String(nama).trim().charAt(0).toUpperCase();
+    }
+
+    /** "Keluar otomatis karena 5 menit tidak dipakai. …" di atas pilihan nama atau sapaan. */
+    function tambahKeterangan(tempat) {
       if (!keadaan.keterangan) return;
-      kanan.appendChild(el('p', { class: 'pesan-login keterangan-login', role: 'status' }, [
+      (tempat || kanan).appendChild(el('p', { class: 'pesan-login keterangan-login', role: 'status' }, [
         ikon('info'),
         el('span', { text: keadaan.keterangan })
       ]));
@@ -1814,25 +1838,27 @@
       kosongkan(kanan);
       tambahKeterangan();
       kanan.appendChild(el('div', { class: 'deret-tombol' }, [
-        el('p', { class: 'login-label', text: 'Pilih nama' }),
+        el('p', { class: 'login-tanya', text: 'Siapa yang masuk?' }),
         penanda
       ]));
       if (!keadaan.info) {
         var kerangka = el('div', { class: 'nama-grid', 'aria-hidden': 'true' });
-        for (var i = 0; i < 4; i++) kerangka.appendChild(el('span', { class: 'kerangka', style: 'height:56px' }));
+        for (var i = 0; i < 3; i++) kerangka.appendChild(el('span', { class: 'kerangka', style: 'height:96px' }));
         kanan.appendChild(kerangka);
         return;
       }
       // Kembali dari langkah PIN: tombol nama masuk lagi bertahap (pembuka sudah lewat).
       var grid = el('div', { class: 'nama-grid' + (keadaan.gerakNama ? ' langkah-masuk' : '') });
       keadaan.gerakNama = false;
+      var namaTerakhir = String(Simpan.baca(AWALAN + 'penggunaTerakhir') || '').toLowerCase();
       namaBisaMasuk().forEach(function (s, i) {
         var tunggu = Antrean.jumlah(s.nama);
+        var terakhir = s.nama.toLowerCase() === namaTerakhir;
         grid.appendChild(el('button', {
           type: 'button',
-          class: 'tombol-nama',
+          class: 'tombol-nama' + (terakhir ? ' terakhir' : ''),
           style: '--i:' + Math.min(i, 7),
-          'aria-label': s.nama + (tunggu ? ', ' + tunggu + ' isian menunggu kirim' : ''),
+          'aria-label': s.nama + (terakhir ? ', terakhir masuk' : '') + (tunggu ? ', ' + tunggu + ' isian menunggu kirim' : ''),
           onclick: function () {
             if (keadaan.sibuk) return;
             tulisPesanLogin('');
@@ -1840,9 +1866,10 @@
             tampilPin(s.nama);
           }
         }, [
-          el('span', { class: 'tombol-nama-inisial', 'aria-hidden': 'true', text: s.nama.trim().charAt(0).toUpperCase() }),
-          el('span', { class: 'tombol-nama-teks' }, [
+          el('span', { class: 'tombol-nama-inisial', 'aria-hidden': 'true', text: inisial(s.nama) }),
+          el('span', { class: 'tombol-nama-teks', 'aria-hidden': 'true' }, [
             el('span', { class: 'tombol-nama-nama', text: s.nama }),
+            terakhir ? el('span', { class: 'tombol-nama-ket', text: 'Terakhir masuk' }) : null,
             // Isian di antrean menunggu sampai pengisinya masuk lagi (Bagian 7.2).
             tunggu ? el('span', { class: 'tombol-nama-ket', text: tunggu + ' isian menunggu kirim' }) : null
           ])
@@ -1860,22 +1887,14 @@
       keadaan.pin = '';
       kotakLogin.classList.add('langkah-pin');
       kosongkan(kiri).appendChild(merek.wadah);
-      kiri.appendChild(el('div', { class: 'login-siapa' }, [
-        el('div', {}, [
-          el('p', { class: 'login-label', text: 'Masuk sebagai' }),
-          el('p', { class: 'login-siapa-nama', text: nama })
-        ]),
-        el('button', {
-          type: 'button',
-          class: 'login-tautan',
-          text: 'Ganti nama',
-          onclick: function () {
-            if (keadaan.sibuk) return;
-            tulisPesanLogin('');
-            keadaan.gerakNama = true;
-            tampilNama();
-          }
-        })
+      tambahKeterangan(kiri);
+      var tunggu = Antrean.jumlah(nama);
+      kiri.appendChild(el('div', { class: 'login-sapa' }, [
+        el('span', { class: 'login-sapa-inisial', 'aria-hidden': 'true', text: inisial(nama) }),
+        el('h2', { class: 'login-sapa-nama', text: 'Halo, ' + nama }),
+        el('p', { class: 'login-sapa-ket', text: 'Masukkan PIN untuk masuk' }),
+        // Isian di antrean menunggu sampai pengisinya masuk lagi (Bagian 7.2).
+        tunggu ? el('p', { class: 'login-sapa-ket', text: tunggu + ' isian menunggu kirim' }) : null
       ]));
       titikGrup = el('div', { class: 'titik-grup', role: 'img', 'aria-label': 'PIN: 0 dari 6 angka' });
       for (var i = 0; i < PANJANG_PIN; i++) titikGrup.appendChild(el('span', { class: 'titik', style: '--i:' + i }));
@@ -1902,12 +1921,28 @@
         papan.appendChild(t);
       });
       kanan.appendChild(papan);
-      kanan.appendChild(el('div', {}, el('button', {
-        type: 'button',
-        class: 'login-tautan',
-        text: 'Lupa PIN?',
-        onclick: mintaResetPin
-      })));
+      kanan.appendChild(el('div', { class: 'login-pilihan' }, [
+        el('button', {
+          type: 'button',
+          class: 'login-tautan',
+          // Nama depan saja, supaya nama panjang tidak membuat tautan dua baris.
+          text: 'Bukan ' + String(nama).trim().split(/\s+/)[0] + '? Ganti nama',
+          onclick: function () {
+            if (keadaan.sibuk) return;
+            tulisPesanLogin('');
+            keadaan.ingat = false;
+            keadaan.keterangan = '';
+            keadaan.gerakNama = true;
+            tampilNama();
+          }
+        }),
+        el('button', {
+          type: 'button',
+          class: 'login-tautan',
+          text: 'Lupa PIN?',
+          onclick: mintaResetPin
+        })
+      ]));
       gambarTitik();
     }
 
@@ -1998,7 +2033,7 @@
         merek.outlet.textContent = infoBaru.namaOutlet || '';
         penanda.textContent = '';
         if (!keadaan.nama) {
-          tampilNama();
+          mulaiLangkah();
           return;
         }
         var masihAda = namaBisaMasuk().some(function (s) { return s.nama === keadaan.nama; });
@@ -2015,7 +2050,7 @@
         }
         kosongkan(kanan);
         tambahKeterangan();
-        kanan.appendChild(el('div', { class: 'deret-tombol' }, el('p', { class: 'login-label', text: 'Pilih nama' })));
+        kanan.appendChild(el('div', { class: 'deret-tombol' }, el('p', { class: 'login-tanya', text: 'Siapa yang masuk?' })));
         tulisPesanLogin(teks, 'masalah');
         kanan.appendChild(tombol('Coba lagi', 'kedua', {
           onclick: function () {
@@ -2028,7 +2063,7 @@
     };
     login = kendali;
 
-    tampilNama();
+    mulaiLangkah();
     if (memuat && info) penanda.textContent = PESAN.memperbarui;
     if (pesanAwal) tulisPesanLogin(pesanAwal, 'masalah');
   }
