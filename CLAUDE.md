@@ -226,6 +226,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 11+++ | Bar, logo, nama, dan gerak, spesifikasi tampilan 1.8 (permintaan pemilik 12 Oktober 2026): bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna, baris merek di kepala Beranda, isi layar naik bertahap, muncul saat digulir, angka dan grafik naik, cahaya navy pelan | Kode selesai (aplikasi 0.15.0; Code.gs tidak berubah), diuji di Chromium (11 uji gerak baru, 13 uji alur lama, sapuan 292 pemeriksaan). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11++++ | Memuat lebih cepat (keluhan pemilik 12 Oktober 2026): login membawa Beranda, tiap tab dibaca sekali per permintaan, jawaban Beranda disimpan 2 menit di server, lama aksi di log, `config.js` dari salinan di HP | Kode selesai (Code.gs v0.14, aplikasi 0.15.1), diuji dengan API tiruan (11 uji server baru, jawaban 12 aksi sama dengan sebelum, 26 uji harga dan 32 pemeriksaan regresi) dan Chromium (4 uji baru, uji lama, sapuan delapan ukuran). Waktu di Google asli belum bisa diukur di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12 | Pindah ke Supabase (keputusan pemilik 15 Oktober 2026): Edge Function menjalankan Code.gs di atas Postgres, PDF jsPDF, Storage, email Brevo atau Gmail, jadwal pg_cron, cadangan JSON, salinan ke Sheets tiap 5 menit per baris, berkas ke Drive, `pindahKeSupabase`, pengalihan HP | Kode selesai (Code.gs v0.15, aplikasi 0.16.0, skema.sql v0.2), diuji dengan Postgres 16 lokal dan Deno (Edge Function rakitan), uji ujung-ke-ujung Sheet tiruan → Supabase → Sheet (35 pemeriksaan), Brevo tiruan, pembanding 91 langkah dengan tiruan Apps Script, beban satu tahun, Chromium pengalihan. Dipasang pemilik 16 Oktober 2026 (butir 213): aplikasi, salinan ke Sheet, email lewat Gmail, dan tiga jadwal pg_cron berjalan |
+| 12+ | Login lebih bersih, spesifikasi tampilan 1.9 (dipilih pemilik dari pratinjau 17 Oktober 2026, cara 3): HP mengingat pengguna terakhir dan Login langsung menyapanya dengan papan PIN, daftar nama berupa lingkaran inisial lewat "Ganti nama" | Kode selesai (aplikasi 0.16.1; Code.gs tidak berubah), diuji di Chromium dengan API tiruan (delapan ukuran untuk sapaan dan daftar nama, alur pilih nama/PIN salah/login/ingat, nama yang tidak bisa masuk lagi, keterangan keluar otomatis, nama panjang, "kurangi gerak"). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1574,3 +1575,28 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `config.js` menunjuk ke `.../functions/v1/rapid-action`. Langkah 10–12 PANDUAN berhasil: isian dari HP tersalin ke Sheet,
     email "[Uji]" dan PDF ke Drive sampai, tiga jadwal `inventoryku-...` ada di `cron.job` dengan `alamatApi` yang benar.
     Setiap rilis Code.gs berikutnya: tempel `supabase/functions/api/index.ts` ke function `rapid-action`.
+
+### Login lebih bersih, spesifikasi tampilan 1.9 (aplikasi 0.16.1, 17 Oktober 2026)
+
+214. **Asal:** pemilik bertanya apakah Login bisa tanpa daftar nama, atau dengan nama dan PIN, supaya lebih bersih. Tiga cara
+    dibandingkan di pratinjau (artifact "Pilihan Login InventoryKu"): PIN saja (PIN harus unik dan kuncian 5 kali salah tidak
+    bisa per orang lagi), ketik nama + PIN (lambat dan rawan salah ketik di dapur), dan HP mengingat pengguna terakhir. Pemilik
+    memilih cara 3. Spesifikasi tampilan naik ke 1.9 (Bagian 5.1, 8.4, 11). Code.gs dan aksi API tidak berubah.
+215. **Ingatan di HP:** `simpanSesiBaru` menulis `inventoryku:penggunaTerakhir` (nama, per perangkat, bukan per pengguna) setiap
+    login, pemasangan pertama, dan pemulihan berhasil. `keluar()` dan keluar otomatis tidak menghapusnya. `gambarLogin` memulai
+    dengan `mulaiLangkah()`: jika `infoLogin` sudah ada (dari HP atau server) dan nama itu ada di daftar staff yang bisa masuk
+    (huruf besar/kecil tidak dibedakan), langsung `tampilPin`; selain itu daftar nama. `keadaan.ingat` mati setelah "Ganti nama",
+    jadi `infoLogin` yang datang sesudahnya tidak melompat kembali ke langkah PIN. Jika nama itu tidak bisa masuk lagi saat
+    langkah PIN tampil, aturan lama berlaku (kembali ke daftar dengan pesan).
+216. **Tampilan:** langkah PIN memakai merek ringkas satu baris (`.login.langkah-pin .login-merek`, lencana 40 px), sapaan
+    `.login-sapa` (inisial 64 px, "Halo, Rina", "Masukkan PIN untuk masuk", jumlah isian di HP jika ada), titik PIN, papan
+    angka, lalu `.login-pilihan`: "Bukan Rina? Ganti nama" (nama depan saja, supaya nama panjang tidak membuat dua baris) dan
+    "Lupa PIN?". Lingkaran inisial disembunyikan pada tinggi 500–619 px dan pada layar mendatar pendek (≤ 499 px). Daftar nama
+    "Siapa yang masuk?": `.tombol-nama` berupa lingkaran inisial 64 px dengan nama di bawahnya, tiga kolom; `.terakhir` bertepi
+    Lampu Pass dan berketerangan "Terakhir masuk". Keterangan keluar otomatis tampil di atas sapaan (atau di atas daftar nama)
+    dan hilang setelah "Ganti nama" atau nama dipilih. Gerak tetap sama (sapaan masuk dari kanan seperti `login-siapa` dulu).
+217. **Uji** (di luar repo, `uji_login.js`): Chromium dengan API tiruan (`context.route`), delapan ukuran Bagian 4.6 untuk sapaan
+    dan daftar nama (tanpa gulir ke samping, elemen keluar layar, teks terpotong, sasaran di bawah 44 px, dan papan angka selalu
+    muat di layar), HP tanpa ingatan → daftar → pilih → PIN salah → login → nama tersimpan → Login berikutnya menyapa orang itu,
+    nama yang sudah tidak bisa masuk → daftar, keterangan keluar otomatis di atas sapaan lalu hilang setelah Ganti nama, nama
+    panjang di 320 × 568, "kurangi gerak" tanpa animasi berjalan, tanpa galat konsol. Belum diuji di HP asli.

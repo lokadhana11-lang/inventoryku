@@ -1535,36 +1535,23 @@ body.papan-ketik .lembar-aksi {
   overflow-wrap: anywhere;
 }
 
-.login-label {
-  color: var(--teks-di-navy);
-  font-size: 14px;
+.login-tanya {
+  color: var(--kertas);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
+/* Daftar nama (versi 1.9): lingkaran inisial, tiga per baris */
 .nama-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.tombol-nama {
-  min-height: 56px;
-  padding: 8px 12px;
-  border: 1px solid var(--rel-padam);
-  border-radius: 10px;
-  background: var(--biru-malam);
-  color: var(--kertas);
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.25;
-  text-align: center;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-  transition: transform 100ms ease-out, background-color 100ms ease-out;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 8px;
 }
 
 .tombol-nama:active:not(:disabled) {
   transform: scale(0.98);
-  background: var(--navy-pass);
+  background: var(--navy-lapis);
 }
 
 .tombol-nama:focus-visible,
@@ -1574,20 +1561,52 @@ body.papan-ketik .lembar-aksi {
   outline-offset: 2px;
 }
 
-.login-siapa {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
+/* Sapaan di langkah PIN (versi 1.9): inisial, "Halo, Rina", ajakan memasukkan PIN */
+.login-sapa {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
 }
 
-.login-siapa-nama {
-  font-size: 24px;
+.login-sapa-inisial {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border: 2px solid var(--garis-navy);
+  border-radius: 50%;
+  background: var(--biru-malam);
+  box-shadow: 0 0 0 6px rgba(242, 169, 59, 0.12);
+  color: var(--lampu-pass);
+  font-family: var(--huruf-sempit);
+  font-size: 32px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1;
+}
+
+.login-sapa-nama {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
   overflow-wrap: anywhere;
   min-width: 0;
+}
+
+.login-sapa-ket {
+  color: var(--teks-di-navy);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/* "Bukan Rina? Ganti nama" dan "Lupa PIN?" di bawah papan angka */
+.login-pilihan {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 16px;
 }
 
 .login-tautan {
@@ -1767,7 +1786,10 @@ body.papan-ketik .lembar-aksi {
   .login-merek .lencana .ikon-buku { width: 28px; height: 28px; }
   .login-nama-aplikasi { font-size: 32px; }
   .tombol-angka { min-height: 48px; font-size: 24px; }
-  .tombol-nama { min-height: 48px; }
+  .tombol-nama-inisial { width: 48px; height: 48px; font-size: 24px; }
+  .nama-grid { gap: 8px; }
+  .login-sapa-inisial { display: none; }
+  .login-sapa-nama { font-size: 22px; }
 }
 
 /* HP kecil: pada langkah PIN, papan angka harus muat tanpa digulir */
@@ -1789,6 +1811,11 @@ body.papan-ketik .lembar-aksi {
   .login.langkah-pin .titik-grup {
     padding: 0;
   }
+}
+
+/* HP sangat pendek: sapaan tanpa lingkaran inisial supaya papan angka tetap terlihat utuh */
+@media (min-height: 500px) and (max-height: 619px) {
+  .login-sapa-inisial { display: none; }
 }
 
 /* Layar terang tanpa sesi (Pemasangan pertama, Pulihkan akses) */
@@ -2315,20 +2342,6 @@ body.papan-ketik .lembar-aksi {
 /* =========================================================================
  * Layar isi form (spesifikasi tampilan Bagian 5.3): pola umum semua form
  * ========================================================================= */
-
-/* Tombol nama di Login: pengingat isian di antrean */
-.tombol-nama {
-  display: grid;
-  gap: 2px;
-  justify-items: center;
-  align-content: center;
-}
-
-.tombol-nama-ket {
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--teks-di-navy);
-}
 
 .layar-form .catatan-draft {
   margin-bottom: 8px;
@@ -6067,18 +6080,22 @@ textarea.isian-catatan {
   animation: muncul 400ms ease-out 1000ms backwards;
 }
 
-/* ---------- Tombol nama berinisial ---------- */
+/* ---------- Tombol nama: lingkaran inisial dengan nama di bawahnya (versi 1.9) ---------- */
 .tombol-nama {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 10px 12px;
-  border-color: var(--garis-navy);
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 4px 10px;
+  border: 0;
   border-radius: 14px;
-  background: var(--navy-lapis);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 6px 18px rgba(7, 21, 40, 0.35);
-  text-align: left;
+  background: transparent;
+  color: var(--kertas);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
   transition: transform 160ms var(--ayun-masuk), background-color 100ms ease-out;
 }
 
@@ -6086,22 +6103,42 @@ textarea.isian-catatan {
   flex: none;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--garis-navy);
+  width: 64px;
+  height: 64px;
+  border: 2px solid var(--garis-navy);
   border-radius: 50%;
-  background: var(--biru-malam);
+  background: var(--navy-lapis);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 6px 18px rgba(7, 21, 40, 0.35);
   color: var(--lampu-pass);
   font-family: var(--huruf-sempit);
-  font-size: 20px;
+  font-size: 30px;
   font-weight: 600;
   line-height: 1;
+}
+
+/* Orang yang terakhir masuk di HP ini */
+.tombol-nama.terakhir .tombol-nama-inisial {
+  border-color: var(--lampu-pass);
 }
 
 .tombol-nama-teks {
   display: grid;
   gap: 2px;
   min-width: 0;
+  max-width: 100%;
+}
+
+.tombol-nama-nama {
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.tombol-nama-ket {
+  color: var(--teks-di-navy);
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .login-buka .tombol-nama,
@@ -6120,8 +6157,47 @@ textarea.isian-catatan {
 }
 
 /* ---------- Langkah PIN: masuk dari kanan, titik dan tombol angka bertahap ---------- */
-.login.langkah-pin .login-siapa {
+.login.langkah-pin .login-sapa {
   animation: langkah-masuk 360ms var(--ayun-masuk) backwards;
+}
+
+/* ---------- Langkah PIN: merek ringkas dalam satu baris (versi 1.9) ---------- */
+.login.langkah-pin .login-merek {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 0;
+}
+
+.login.langkah-pin .login-merek .lencana-panggung {
+  grid-row: span 2;
+  margin-bottom: 0;
+}
+
+.login.langkah-pin .login-merek .lencana {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.login.langkah-pin .login-merek .lencana .ikon-buku {
+  width: 28px;
+  height: 28px;
+}
+
+.login.langkah-pin .lencana-halo {
+  inset: -6px;
+  border-radius: 18px;
+}
+
+.login.langkah-pin .login-nama-aplikasi {
+  align-self: end;
+  font-size: 26px;
+}
+
+.login.langkah-pin .login-outlet {
+  align-self: start;
+  font-size: 14px;
 }
 
 .login.langkah-pin .titik {
