@@ -80,6 +80,25 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
   `node supabase/rakit.mjs`). Jika `skema.sql` berubah, jalankan lagi di SQL Editor.
 - **Log:** Supabase → Edge Functions → api → Logs (lama tiap aksi: "Aksi beranda: 12 ms").
 
+## Function di region yang sama dengan database
+
+Edge Function biasanya berjalan di region terdekat dengan HP, sedangkan database tetap di region project
+(Project Settings → General → Region). Jika keduanya berbeda (misalnya HP di Indonesia, database di Sydney),
+setiap bacaan database menyeberang antarnegara. Karena itu alamat di `config.js` diberi
+`?forceFunctionRegion=<kode region database>`, sehingga function berjalan di samping database dan HP cukup
+menyeberang sekali per permintaan. Kode region: Sydney `ap-southeast-2`, Singapore `ap-southeast-1`.
+
+- **Memeriksa** (dari laptop): buka alamat lengkap dari `config.js` di Chrome → klik kanan → Inspect → tab
+  Network → muat ulang → klik permintaannya. Header jawaban `x-sb-edge-region` harus sama dengan kode region di
+  alamat.
+- **Opsional:** Script Property `SUPABASE_API` di Apps Script boleh diberi akhiran yang sama, supaya salinan ke
+  Sheet (dari server Google) juga berjalan di samping database. Secret `ALAMAT_API` tidak perlu diubah: jadwal
+  pg_cron sudah memanggil dari region database.
+- **Jika region itu sedang gangguan:** permintaan tidak dialihkan otomatis ke region lain. Hapus
+  `?forceFunctionRegion=...` dari `config.js` untuk sementara.
+- **Pindah project ke region lain** tidak bisa dilakukan di tempat; harus membuat project baru dan memindahkan
+  data (lihat dokumentasi Supabase "Change Project Region").
+
 ## Kembali ke Apps Script (jika perlu)
 
 Sheet berisi salinan lengkap (paling lambat 5 menit). Untuk kembali: tunggu satu salinan 5 menit,

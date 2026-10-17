@@ -275,6 +275,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++ | Notifikasi ke HP (permintaan pemilik 17 Oktober 2026): Web Push dari Supabase (kunci VAPID di tabel `info`, enkripsi aes128gcm tanpa library), suhu di luar standar, reset PIN, dan akun terkunci ke HP Pengelola, pengingat cek suhu ke semua HP, lembar Notifikasi di HP ini, jam pengingat di Outlet dan jadwal | Kode selesai (Code.gs v0.19, aplikasi 0.20.0), diuji: enkripsi didekripsi `http_ece` (library milik `web-push`), 12 uji server Code.gs, runtime asli di atas Postgres 16 lokal (kirim sesudah tersimpan, 410 dibuang, `__jadwal`, `pasangTrigger`), service worker tiruan, dan Chromium (layanan push browser ditiru, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali, nyalakan notifikasi dari HP (iPhone: pasang ke Layar Utama dulu) |
 | 12++++++++++ | Arsip tahunan (keputusan pemilik 17 Oktober 2026): tab menyimpan tahun berjalan dan tahun lalu; baris lebih tua (tab Data, `Stock_Harian`, `Log_Perubahan`) pindah ke `Laporan Kitchen/<Outlet>/Arsip/<Tahun>/` sebagai JSON dan Google Sheets "Arsip InventoryKu <Tahun>", rekap terakhir tiap item tetap, trigger tiap jam, tanggal yang sudah diarsip ditolak | Kode selesai (Code.gs v0.20; aplikasi tetap 0.20.0), diuji: 10 uji server Code.gs (juga dengan batas 2 baris per jalan), arsip ke Google Sheets dengan tiruan, runtime asli di atas Postgres 16 lokal (69.250 baris per tab, paling lama 0,9 detik per jalan, stock tetap), jawaban aksi lama sama dengan v0.19. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali (setupSpreadsheet tidak perlu) |
 | 12+++++++++++ | Bacaan database lebih ringkas di Supabase (permintaan pemilik 17 Oktober 2026, saran 2 dari "memuat lebih cepat lagi"): bacaan awal tiap permintaan dan kunci tulis dalam satu kali bolak-balik, tab dimuat sekaligus, `aksi_tab` sekali per isolate, kunci notifikasi dimuat bersamaan | Kode selesai (hanya `supabase/src`; Code.gs tetap v0.20, aplikasi tetap 0.20.0), diuji dengan Postgres 16 lokal: 35 langkah jawaban dan isi database sama dengan sebelumnya, proksi jeda 25 ms per arah (login 1,24 → 0,39 detik, permintaan pertama isolate 1,93 → 0,34 detik), dua runtime menulis bersamaan, urutan kunci, dan file rakitan dijalankan utuh. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy (Code.gs di Apps Script tidak perlu ditempel ulang) |
+| 12++++++++++++ | Function di region database (permintaan pemilik 17 Oktober 2026, pilihan A): database pemilik di Sydney, `config.js` diberi `?forceFunctionRegion=ap-southeast-2` supaya Edge Function berjalan di samping database | Kode selesai (hanya `config.js` dan dokumen; Code.gs, aplikasi, dan rakitan tidak berubah), diuji di Chromium dengan API tiruan (POST ke alamat berparameter, hanya header Content-Type, Login tampil). Belum diuji di Supabase asli (jaringan sesi ini tidak menjangkau Supabase). Menunggu pemilik: gabungkan PR, periksa header `x-sb-edge-region` (PANDUAN), opsional ubah Script Property `SUPABASE_API` |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2023,3 +2024,22 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     posisi baris ganda; kunci tulis menunggu penulis lain dan melihat isinya; file rakitan dijalankan utuh di Node (postgres dan
     jspdf dari npm, `Deno` tiruan) termasuk PDF. Belum diuji di Supabase asli: besar penghematan bergantung pada jarak Edge
     Function ke database (log `Aksi <nama>: <ms> ms` menunjukkan waktu Code.gs saja; sisanya waktu menunggu database dan jaringan).
+
+### Function di region database (17 Oktober 2026)
+
+274. **Asal:** database Supabase pemilik ada di Oceania (Sydney). Edge Function biasanya berjalan di region terdekat dengan
+    HP (kemungkinan Singapore), jadi setiap bacaan database (3 per aksi baca sesudah butir 271, lebih banyak saat isolate baru
+    menyala) menyeberang Singapore–Sydney. Region project tidak bisa diganti di tempat (harus project baru dan pindah data).
+    Pemilik memilih pilihan A: memaksa function berjalan di region database.
+275. **Caranya:** `config.js` = alamat function ditambah `?forceFunctionRegion=ap-southeast-2` (parameter alamat dari Supabase
+    untuk permintaan yang headernya tidak bisa diatur; aturan "hanya header Content-Type" tetap terpenuhi). `panggilApi` memakai
+    alamat itu apa adanya, dan service worker sudah memperbarui `config.js` di latar (butir 196), jadi HP memakai alamat baru
+    mulai pembukaan berikutnya. Edge Function tidak membaca alamat permintaan, jadi tidak ada perubahan di `supabase/src`.
+    Secret `ALAMAT_API` (jadwal pg_cron, `sub` notifikasi) tidak diubah karena pg_net memanggil dari region database;
+    Script Property `SUPABASE_API` di Apps Script boleh diberi akhiran yang sama (opsional, salinan ke Sheet). Jika region
+    itu gangguan, permintaan tidak dialihkan otomatis; parameter dihapus dari `config.js` untuk sementara. Langkah dan cara
+    memeriksa (`x-sb-edge-region`) di `supabase/PANDUAN.md`.
+276. **Uji** (di luar repo): Chromium dengan repo disajikan di `/inventoryku/` dan API tiruan lewat `context.route`: aplikasi
+    mengirim `POST` ke alamat berparameter dengan satu-satunya header `Content-Type: text/plain;charset=utf-8`, Login tampil
+    dengan nama staff, tanpa galat konsol. Belum diuji di Supabase asli: apakah function benar berjalan di `ap-southeast-2`
+    dan berapa waktu yang dihemat.
