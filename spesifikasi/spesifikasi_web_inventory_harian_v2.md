@@ -31,6 +31,8 @@
 > (Bagian 5.4).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik): item nonaktif yang belum punya catatan apa pun,
 > misalnya item yang salah dibuat, bisa dihapus (Bagian 5.1).
+> Diperbarui 17 Oktober 2026 (permintaan pemilik): notifikasi ke HP (Web Push) untuk suhu di luar
+> standar, permintaan reset PIN, akun terkunci, dan pengingat cek suhu (Bagian 7.2, 10.1, 12, 13).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik): penjualan per menu dan pemakaian bahan seharusnya
 > dibanding nyata (Bagian 5.9, 9.3, dan 10).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik, dari telaah keamanan): kunci PIN bertingkat
@@ -1082,8 +1084,8 @@ Role diperiksa di **server** pada setiap permintaan, bukan hanya disembunyikan d
   menyampaikannya langsung ke staff. Permintaan otomatis ditandai selesai.
 - Lupa PIN tidak mengubah dan tidak menampilkan PIN apa pun; hanya mengirim permintaan.
 - Satu permintaan aktif per staff: mengetuk berulang kali tidak menambah pemberitahuan.
-- Pemberitahuan terlihat saat Pengelola membuka aplikasi. Aplikasi tidak mengirim
-  notifikasi ke HP yang aplikasinya sedang tertutup.
+- Pemberitahuan terlihat saat Pengelola membuka aplikasi, dan (sejak 17 Oktober 2026) juga
+  dikirim sebagai notifikasi ke HP Pengelola yang menyalakan notifikasi (Bagian 10.1).
 - **Jika Pengelola yang lupa PIN:** Pengelola lain meresetnya dengan cara yang sama. Jika
   tidak ada Pengelola yang bisa masuk, pemilik Sheet menjalankan fungsi
   `buatKodePemasangan` di editor Apps Script. Kode baru muncul di `M_Konfigurasi` dan
@@ -1338,8 +1340,9 @@ untuk tanggal di bulan itu.
 ## 10. Email Otomatis (Gmail)
 
 Ada **dua email otomatis**: laporan harian, dan rekap bulanan sebulan sekali
-(Bagian 9.3). Tidak ada email pada setiap submit, tidak ada alert instan, dan tidak ada
-email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
+(Bagian 9.3). Tidak ada email pada setiap submit, tidak ada alert instan lewat email, dan tidak
+ada email pengingat terpisah; peringatan seketika dikirim sebagai notifikasi ke HP (Bagian 10.1).
+Keterangan di bawah ini untuk laporan harian.
 
 - **Kapan:** sekali sehari setelah closing, sekitar 22:15 (trigger yang sama dengan PDF harian).
 - **Penerima:** daftar di Pengaturan → Penerima Email, diisi oleh Pengelola dari website.
@@ -1364,6 +1367,32 @@ email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
   seharusnya vs nyata jika porsi per menu pernah dicatat.
 - Sejak pindah ke Supabase (Bagian 4.5) email dikirim lewat Brevo, atau dari Gmail pemilik
   lewat Apps Script jika Brevo tidak dipasang.
+
+### 10.1 Notifikasi ke HP (keputusan pemilik 17 Oktober 2026)
+
+Notifikasi Web Push ke HP, juga saat aplikasi tertutup. Hanya dari server Supabase (Bagian 4.5);
+Apps Script tidak bisa mengirimnya.
+
+- **Menyalakan:** tiap pengguna menyalakannya sendiri di HP-nya (menu nama pengguna →
+  Notifikasi), lalu mengizinkan notifikasi di HP. Satu HP satu orang: menyalakan di HP yang sudah
+  menyala untuk orang lain memindahkannya ke pengguna sekarang. Keluar tidak mematikan notifikasi
+  HP itu. Di iPhone dan iPad hanya untuk aplikasi yang dipasang di Layar Utama (iOS 16.4 ke atas).
+- **Yang dikirim:**
+
+| Notifikasi | Penerima | Kapan |
+|---|---|---|
+| Suhu di luar standar (unit, suhu, tindakan, pengisi) | HP Pengelola | Saat isian Suhu berisi suhu di luar standar diterima |
+| "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
+| "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
+| "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif |
+
+- **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
+  Middle 14.00, Closing 21.00 (nilai awal); jam yang dikosongkan mematikan pengingat itu. Tidak ada
+  pengingat jika form Suhu disembunyikan atau tidak ada unit aktif.
+- Hanya pengguna aktif yang punya PIN yang menerima; Pengelola menurut role saat notifikasi dikirim.
+- Mengetuk notifikasi membuka layar yang sesuai (form Suhu, atau reset PIN staff itu).
+- Notifikasi tidak menggantikan apa pun: pemberitahuan di Beranda, Dashboard, dan email harian tetap.
+- HP yang izinnya dicabut atau aplikasinya dihapus dibuang dari daftar saat layanan push menolaknya.
 
 ---
 
@@ -1439,8 +1468,9 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 - [x] **HPP dan food cost** (keputusan pemilik 17 Oktober 2026, Bagian 5.9): penjualan dicatat
       per hari, harga jual dan penjualan tanpa pajak dan service, target food cost 35%, bahan
       kecil 3%, hasil bersih per baris bahan menu, biaya operasional tidak masuk HPP per porsi.
-- [ ] **Pemberitahuan Lupa PIN** baru terlihat saat Pengelola membuka aplikasi; tidak ada
-      notifikasi ke HP yang aplikasinya tertutup.
+- [x] **Notifikasi ke HP** (keputusan pemilik 17 Oktober 2026, Bagian 10.1): suhu di luar standar,
+      permintaan reset PIN, dan akun terkunci ke HP Pengelola; pengingat cek suhu ke semua HP yang
+      menyalakan notifikasi.
 
 **Form dan data**
 
@@ -1502,6 +1532,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
     Dashboard, penjualan harian, bagian HPP di rekap bulanan
 13. **Penjualan per menu** (17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan,
     pemakaian seharusnya vs nyata di layar HPP, rekap bulanan, dan email
+14. **Notifikasi ke HP** (17 Oktober 2026): Web Push dari Supabase, lembar Notifikasi di HP ini,
+    jam pengingat cek suhu di Outlet dan jadwal
 
 ---
 

@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.19.0';
+  var VERSI_APLIKASI = '0.20.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -452,6 +452,7 @@
     segitiga: '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.5h.01"/>',
     naik: '<path d="M7 17 17 7M9.5 7H17v7.5"/>',
     turun: '<path d="M7 7l10 10M17 9.5V17H9.5"/>',
+    lonceng: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     kamera: '<path d="M3.5 8.5a2 2 0 0 1 2-2h2.5l1.5-2.5h5l1.5 2.5h2.5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>'
   };
 
@@ -1709,7 +1710,7 @@
     });
   }
 
-  /* ---------- Menu nama pengguna: satu pilihan, "Keluar" ----------
+  /* ---------- Menu nama pengguna: "Notifikasi" (sejak aplikasi 0.20.0) dan "Keluar" ----------
    * HP dan tablet: nama di kepala Beranda. Desktop: nama di bar atas, di semua
    * layar (spesifikasi tampilan Bagian 4.3 dan 5.2). */
   var menuPenggunaKini = null;
@@ -1734,11 +1735,20 @@
     if (tadi && tadi.asal === asal) return; // ketukan kedua menutup menu
     var sesi = Sesi.baca();
     if (!sesi) return;
+    var itemNotif = el('button', { type: 'button', class: 'menu-pengguna-item', role: 'menuitem', 'aria-haspopup': 'dialog' }, [
+      ikon('lonceng'),
+      el('span', { text: 'Notifikasi' })
+    ]);
     var item = el('button', { type: 'button', class: 'menu-pengguna-item', role: 'menuitem' }, [
       ikon('keluar'),
       el('span', { text: 'Keluar' })
     ]);
-    var menu = el('div', { class: 'menu-pengguna', role: 'menu', 'aria-label': 'Menu ' + sesi.pengguna.nama }, item);
+    var daftarItem = [itemNotif, item];
+    var menu = el('div', { class: 'menu-pengguna', role: 'menu', 'aria-label': 'Menu ' + sesi.pengguna.nama }, daftarItem);
+    itemNotif.addEventListener('click', function () {
+      tutupMenuPengguna();
+      bukaNotifikasi();
+    });
     item.addEventListener('click', function () {
       tutupMenuPengguna();
       bukaKeluar();
@@ -1766,6 +1776,11 @@
           tutupMenuPengguna(true);
         } else if (ev.key === 'Tab') {
           tutupMenuPengguna();
+        } else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          var i = daftarItem.indexOf(document.activeElement);
+          var n = daftarItem.length;
+          daftarItem[((i < 0 ? 0 : i) + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n].focus({ preventScroll: true });
         }
       }
     };
@@ -1775,7 +1790,194 @@
     document.addEventListener('keydown', m.tombolKeyboard, true);
     window.addEventListener('resize', m.tutup);
     window.addEventListener('scroll', m.tutup, true);
-    item.focus({ preventScroll: true });
+    itemNotif.focus({ preventScroll: true });
+  }
+
+  /* ---------- Notifikasi ke HP (aplikasi 0.20.0; spesifikasi sistem Bagian 10.1, tampilan Bagian 5.11) ----------
+   * Satu langganan Web Push per HP, atas nama pengguna yang menyalakannya. Server (Supabase) mengirim
+   * suhu di luar standar, permintaan reset PIN, dan akun terkunci ke HP Pengelola, dan pengingat cek
+   * suhu ke semua HP. Di iPhone hanya untuk aplikasi yang dipasang di Layar Utama (iOS 16.4 ke atas). */
+
+  function dukunganNotifikasi() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  }
+
+  function apakahTerpasang() {
+    return navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  }
+
+  function kunciPushBytes(b64) {
+    var t = String(b64).replace(/-/g, '+').replace(/_/g, '/');
+    var bin = atob(t + '='.repeat((4 - (t.length % 4)) % 4));
+    var hasil = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) hasil[i] = bin.charCodeAt(i);
+    return hasil;
+  }
+
+  function samaBytes(a, b) {
+    if (!a || !b) return false;
+    a = new Uint8Array(a);
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  /** Service worker yang siap, paling lama 6 detik (tanpa service worker, notifikasi tidak bisa dipakai). */
+  function swSiap() {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (_, gagal) {
+        setTimeout(function () { gagal(new Error('Aplikasi di HP ini belum siap untuk notifikasi. Tutup aplikasi, buka lagi, lalu coba lagi.')); }, 6000);
+      })
+    ]);
+  }
+
+  function bukaNotifikasi() {
+    var sesi = Sesi.baca();
+    if (!sesi) return;
+    var nama = sesi.pengguna.nama;
+    var isi = el('div', { class: 'notif' }, el('p', { class: 'kolom-bantuan', text: 'Memeriksa notifikasi di HP ini…' }));
+    var pesan = el('p', { class: 'pesan-formulir', role: 'status' });
+    var lembar = bukaLembar({ judul: 'Notifikasi di HP ini', isi: [isi, pesan], aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+    var reg = null;
+    var sub = null;
+
+    function kalimat(teks, jenis) {
+      return el('p', { class: 'pesan-formulir' + (jenis ? ' ' + jenis : '') }, [ikon('info'), el('span', { text: teks })]);
+    }
+
+    if (!dukunganNotifikasi()) {
+      kosongkan(isi).appendChild(kalimat(apakahIos() && !apakahTerpasang()
+        ? 'Di iPhone, notifikasi hanya bisa untuk aplikasi yang dipasang di Layar Utama. Buka alamat aplikasi di Safari, ketuk Bagikan, ' +
+          'pilih Tambahkan ke Layar Utama, lalu buka InventoryKu dari ikonnya dan nyalakan notifikasi di sini.'
+        : 'Browser ini belum bisa menerima notifikasi. Pakai Chrome di Android, atau di iPhone pasang aplikasi ke Layar Utama lalu buka dari ikonnya.',
+      'tinjau'));
+      return;
+    }
+
+    function gambar(d) {
+      kosongkan(isi);
+      if (!d.tersedia) {
+        isi.appendChild(kalimat('Notifikasi belum tersedia di server ini. Pemilik perlu memasang versi server terbaru.', 'tinjau'));
+        return;
+      }
+      var jam = d.pengingat.filter(function (p) { return p.jam; }).map(function (p) { return p.waktu + ' ' + p.jam.replace(':', '.'); });
+      var daftar = [];
+      if (d.pengelola) daftar.push('Suhu di luar standar', 'Permintaan reset PIN', 'Akun yang terkunci karena PIN salah');
+      daftar.push(jam.length ? 'Pengingat cek suhu (' + jam.join(', ') + '), jika belum lengkap' : 'Pengingat cek suhu (sedang dimatikan)');
+      isi.appendChild(el('p', { class: 'kartu-teks', text: 'Yang dikirim ke HP ini, juga saat aplikasi tertutup:' }));
+      isi.appendChild(el('ul', { class: 'notif-daftar' }, daftar.map(function (t) { return el('li', { text: t }); })));
+
+      var diblokir = Notification.permission === 'denied';
+      var aktif = d.aktif && !!sub;
+      var sakelar = sakelarTampil({ teks: 'Notifikasi di HP ini', kataYa: 'Nyala', kataTidak: 'Mati', nilai: aktif,
+        ubah: function (b) { if (b) nyalakan(sakelar); else matikan(sakelar); } });
+      if (diblokir && !aktif) sakelar.input.disabled = true;
+      isi.appendChild(el('div', { class: 'notif-sakelar' }, sakelar.wadah));
+      if (diblokir && !aktif) {
+        isi.appendChild(kalimat('Notifikasi diblokir untuk InventoryKu di HP ini. Izinkan notifikasi untuk aplikasi ini di setelan ' +
+          'HP atau browser, lalu buka lembar ini lagi.', 'tinjau'));
+      } else if (aktif && d.atasNama && d.atasNama.toLowerCase() !== nama.toLowerCase()) {
+        var ganti = tombol('Terima untuk ' + nama, 'kedua');
+        ganti.addEventListener('click', function () { nyalakan(sakelar, ganti); });
+        isi.appendChild(kalimat('HP ini menerima notifikasi untuk ' + d.atasNama + '. Satu HP hanya untuk satu orang.', 'info'));
+        isi.appendChild(el('div', {}, ganti));
+      } else if (aktif) {
+        isi.appendChild(el('p', { class: 'kolom-bantuan', text: 'Menyala untuk ' + nama + '.' }));
+      }
+      if (aktif) {
+        var uji = tombol('Kirim notifikasi uji', 'kedua');
+        uji.addEventListener('click', function () {
+          tulisPesan(pesan, '');
+          aturTombolProses(uji, true, 'Mengirim…');
+          panggilApi('ujiNotifikasi', { endpoint: sub.endpoint }).then(function () {
+            aturTombolProses(uji, false);
+            tulisPesan(pesan, 'Notifikasi uji dikirim. Jika tidak muncul dalam satu menit, periksa setelan notifikasi HP.', 'info');
+          }).catch(function (err) {
+            aturTombolProses(uji, false);
+            if (tanganiSesiBerakhir(err)) return;
+            tulisPesan(pesan, pesanGalat(err), 'masalah');
+          });
+        });
+        isi.appendChild(el('div', { class: 'notif-uji' }, uji));
+      }
+    }
+
+    function gagal(sakelar, err, kembali) {
+      if (sakelar) {
+        sakelar.input.disabled = false;
+        sakelar.atur(kembali);
+      }
+      if (tanganiSesiBerakhir(err)) return;
+      tulisPesan(pesan, pesanGalat(err), 'masalah');
+    }
+
+    function nyalakan(sakelar, tombolGanti) {
+      tulisPesan(pesan, '');
+      sakelar.input.disabled = true;
+      if (tombolGanti) aturTombolProses(tombolGanti, true, 'Menyimpan…');
+      var data = null;
+      // requestPermission dipanggil lebih dulu, masih di dalam ketukan (syarat Safari).
+      Notification.requestPermission().then(function (izin) {
+        if (izin !== 'granted') {
+          throw new Error(izin === 'denied' ? 'Notifikasi diblokir. Izinkan notifikasi untuk InventoryKu di setelan HP atau browser.'
+            : 'Izin notifikasi belum diberikan. Ketuk lagi, lalu pilih Izinkan.');
+        }
+        return panggilApi('infoNotifikasi', {});
+      }).then(function (d) {
+        data = d;
+        var kunci = kunciPushBytes(d.kunciPublik);
+        return reg.pushManager.getSubscription().then(function (lama) {
+          if (lama && samaBytes(lama.options && lama.options.applicationServerKey, kunci)) return lama;
+          return (lama ? lama.unsubscribe() : Promise.resolve()).then(function () {
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: kunci });
+          });
+        });
+      }).then(function (baru) {
+        sub = baru;
+        return panggilApi('aturNotifikasi', { aktif: true, langganan: baru.toJSON() });
+      }).then(function (d) {
+        gambar(d);
+        tulisPesan(pesan, 'Notifikasi menyala di HP ini.', 'baik');
+      }).catch(function (err) {
+        if (tombolGanti) aturTombolProses(tombolGanti, false);
+        gagal(sakelar, err, false);
+        if (data && !data.tersedia) gambar(data);
+      });
+    }
+
+    function matikan(sakelar) {
+      tulisPesan(pesan, '');
+      sakelar.input.disabled = true;
+      if (!sub) {
+        sakelar.input.disabled = false;
+        return;
+      }
+      var lama = sub;
+      panggilApi('aturNotifikasi', { aktif: false, endpoint: lama.endpoint }).then(function (d) {
+        return lama.unsubscribe().catch(function () { /* langganan di HP tetap dibuang server */ }).then(function () {
+          sub = null;
+          gambar(d);
+          tulisPesan(pesan, 'Notifikasi di HP ini dimatikan.', 'info');
+        });
+      }).catch(function (err) {
+        gagal(sakelar, err, true);
+      });
+    }
+
+    swSiap().then(function (r) {
+      reg = r;
+      return reg.pushManager.getSubscription();
+    }).then(function (s) {
+      sub = s;
+      return panggilApi('infoNotifikasi', { endpoint: s ? s.endpoint : '' });
+    }).then(gambar).catch(function (err) {
+      if (tanganiSesiBerakhir(err)) {
+        lembar.tutup(true);
+        return;
+      }
+      kosongkan(isi).appendChild(kalimat(pesanGalat(err), 'masalah'));
+    });
   }
 
   /* =======================================================================
@@ -9024,7 +9226,11 @@
         jedaLaporanMenit: String(d.jedaLaporanMenit == null ? 45 : d.jedaLaporanMenit), jadwalOpname: d.jadwalOpname || 'mingguan',
         hariCadangan: d.hariCadangan || 'Minggu', keluarOtomatisMenit: Number(d.keluarOtomatisMenit) || KELUAR_OTOMATIS_AWAL,
         targetFoodCost: String(d.targetFoodCost == null ? 35 : d.targetFoodCost).replace('.', ','),
-        bahanKecilPersen: String(d.bahanKecilPersen == null ? 3 : d.bahanKecilPersen).replace('.', ',')
+        bahanKecilPersen: String(d.bahanKecilPersen == null ? 3 : d.bahanKecilPersen).replace('.', ','),
+        // Jam pengingat cek suhu (Code.gs v0.19); server lama tidak mengirimnya, jadi field tidak ikut dikirim.
+        jamCekOpening: d.jamCekOpening == null ? null : d.jamCekOpening,
+        jamCekMiddle: d.jamCekMiddle == null ? null : d.jamCekMiddle,
+        jamCekClosing: d.jamCekClosing == null ? null : d.jamCekClosing
       };
     }
 
@@ -9097,6 +9303,14 @@
         return n !== null && !isNaN(n) && n >= min && n <= maks;
       }
 
+      // Pengingat cek suhu ke HP (aplikasi 0.20.0): kosong = tanpa pengingat untuk waktu cek itu.
+      var adaPengingat = data.jamCekOpening != null;
+      var kolomPengingat = [['jamCekOpening', 'Opening'], ['jamCekMiddle', 'Middle'], ['jamCekClosing', 'Closing']].map(function (x) {
+        var kk = kolomIsian({ label: 'Pengingat ' + x[1], type: 'time', nilai: isi[x[0]] || '' });
+        kk.input.addEventListener('input', function () { isi[x[0]] = kk.input.value; perbarui(); });
+        return { field: x[0], k: kk };
+      });
+
       simpan.addEventListener('click', function () {
         if (simpan.disabled) return;
         tulisPesan(pesan, '');
@@ -9106,7 +9320,9 @@
           kNama.galat(isi.namaOutlet.trim() ? '' : 'Isi nama outlet.'),
           kJam.galat(/^\d{1,2}:\d{2}$/.test(isi.jamClosing) ? '' : 'Isi jam closing, misalnya 21:30.'),
           kJeda.galat(/^\d{1,3}$/.test(isi.jedaLaporanMenit) && Number(isi.jedaLaporanMenit) <= 240 ? '' : 'Isi menit bulat, 0 sampai 240.')
-        ];
+        ].concat(adaPengingat ? kolomPengingat.map(function (x) {
+          return x.k.galat(!isi[x.field] || /^\d{1,2}:\d{2}$/.test(isi[x.field]) ? '' : 'Isi jam, misalnya 08:00, atau kosongkan.');
+        }) : []);
         if (ok.indexOf(false) >= 0) {
           var salah = wadah.querySelector('[aria-invalid="true"]');
           if (salah) salah.focus();
@@ -9155,6 +9371,15 @@
         el('h2', { class: 'kartu-judul', text: 'HPP dan food cost' }),
         kTarget.wadah, kKecil.wadah
       ]));
+      if (adaPengingat) {
+        wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+          el('h2', { class: 'kartu-judul', text: 'Pengingat cek suhu' }),
+          el('p', { class: 'kartu-teks', text: 'Notifikasi ke semua HP yang menyalakan notifikasi, jika waktu cek itu belum diisi untuk semua unit. ' +
+            'Kosongkan jam untuk mematikan pengingatnya.' })
+        ].concat(kolomPengingat.map(function (x) { return x.k.wadah; }), [
+          data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
+        ])));
+      }
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
     }
 

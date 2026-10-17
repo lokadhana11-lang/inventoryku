@@ -300,6 +300,12 @@ export function buatLayanan(k) {
       getRemainingDailyQuota: () => 300
     },
     Charts: { ChartType: serba('ChartType'), Position: serba('Position') },
+    // Notifikasi ke HP (Code.gs v0.19): Code.gs menitipkan notifikasi; runtime mengirimnya sesudah data tersimpan.
+    // Tidak ada di Apps Script, jadi Code.gs memeriksa typeof NotifikasiHp lebih dulu.
+    NotifikasiHp: {
+      kunciPublik: () => (k.info && k.info.vapidPublik) || '',
+      kirim: (langganan, isi) => { if (k.push) k.push.push({ langganan, isi }); }
+    },
     console: k.log
   };
 }

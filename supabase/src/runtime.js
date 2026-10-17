@@ -34,6 +34,7 @@ function dataSurel(o, Buffer) {
  *   unggah(berkas) → Promise (isi berkas ke Storage), alamatBerkas([id]) → Promise<{ id: url }>,
  *   hapusBerkas([id]) → Promise, kirimSurel(isi) → Promise (Brevo; tanpa ini email menunggu Apps Script),
  *   pasangJadwal(daftar, info) → Promise,
+ *   push: { kunciPublik(), kirimSemua([{ langganan, isi }]) → { hilang } } (opsional; notifikasi ke HP),
  *   Date (opsional, untuk uji), log (opsional)
  * }
  */
@@ -67,6 +68,16 @@ export function buatRuntime(dep) {
       tulis = !(a && a.bacaSaja);
     } else {
       namaKunci = 'fungsi:' + kerja.nama;
+    }
+
+    // Kunci publik VAPID (dibuat sekali, lalu disimpan di memori isolate) sebelum transaksi.
+    let vapidPublik = '';
+    if (dep.push) {
+      try {
+        vapidPublik = await dep.push.kunciPublik();
+      } catch (err) {
+        log.error('Kunci notifikasi tidak bisa dimuat: ' + (err && err.message ? err.message : err));
+      }
     }
 
     const proses = async (tx) => {
@@ -114,7 +125,8 @@ export function buatRuntime(dep) {
         };
         const k = {
           ss, Date: KelasDate, props, propsAwal: Object.assign({ SPREADSHEET_ID: props.SPREADSHEET_ID }, propsAwal),
-          zona: () => ss.getSpreadsheetTimeZone(), info: { emailPemilik: info.emailPemilik, alamatApi: info.alamatApi },
+          zona: () => ss.getSpreadsheetTimeZone(), info: { emailPemilik: info.emailPemilik, alamatApi: info.alamatApi, vapidPublik },
+          push: [],
           crypto: dep.crypto, Buffer: dep.Buffer, htmlKePdf: dep.htmlKePdf, drive: driveKerja,
           jadwal: { daftar: (info.jadwal || []).slice(), berubah: false }, surel: [], log: logPercobaan, perluTab: ss.perluTab
         };
@@ -156,7 +168,7 @@ export function buatRuntime(dep) {
         }
         const dibuang = k.drive ? k.drive.berkas.filter((b) => b.kotor && b.dibuang).map((b) => b.id) : [];
         const teksLog = catatan.map(([j, a]) => (j === 'error' ? 'GALAT: ' : '') + a.map((x) => (typeof x === 'string' ? x : String(x))).join(' '));
-        return { keluaran, surel, jadwal: k.jadwal, tabBerubah, info, dibuang, namaKunci, catatan: teksLog };
+        return { keluaran, surel, jadwal: k.jadwal, tabBerubah, info, dibuang, namaKunci, catatan: teksLog, push: k.push };
       }
       throw new Error('Aksi ' + namaKunci + ' membutuhkan terlalu banyak tab.');
     };
@@ -195,6 +207,17 @@ export function buatRuntime(dep) {
         await dep.pasangJadwal(hasil.jadwal.daftar, hasil.info);
       } catch (err) {
         log.error('Jadwal gagal dipasang: ' + (err && err.stack ? err.stack : err));
+      }
+    }
+    // Notifikasi ke HP sesudah tersimpan. Langganan yang sudah tidak berlaku dibuang dari Script Properties.
+    if (hasil.push.length && dep.push) {
+      try {
+        const r = await dep.push.kirimSemua(hasil.push, log);
+        if (r.hilang.length) {
+          await jalankan({ jenis: 'fungsi', nama: 'hapusLanggananPush_', argumen: [r.hilang], muat: 'master' });
+        }
+      } catch (err) {
+        log.error('Notifikasi gagal dikirim: ' + (err && err.stack ? err.stack : err));
       }
     }
     if (hasil.dibuang.length && dep.hapusBerkas) {

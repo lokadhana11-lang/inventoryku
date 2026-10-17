@@ -5,7 +5,7 @@
    dibuang. Permintaan ke API (POST ke Apps Script) tidak disentuh. */
 'use strict';
 
-var VERSI = '0.19.0';
+var VERSI = '0.20.0';
 var AWALAN_CACHE = 'inventoryku-';
 var CACHE = AWALAN_CACHE + VERSI;
 
@@ -139,3 +139,40 @@ function jaringanDulu(req) {
     });
   });
 }
+
+/* Notifikasi ke HP (aplikasi 0.20.0): isi dari server berupa JSON { judul, isi, url, tag }. */
+self.addEventListener('push', function (event) {
+  var d = {};
+  try {
+    d = event.data ? event.data.json() : {};
+  } catch (err) {
+    d = { judul: 'InventoryKu', isi: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(self.registration.showNotification(d.judul || 'InventoryKu', {
+    body: d.isi || '',
+    icon: './icons/ikon-192.png',
+    badge: './icons/ikon-192.png',
+    tag: d.tag || undefined,
+    renotify: !!d.tag,
+    data: { url: d.url || '#/' },
+    lang: 'id'
+  }));
+});
+
+/** Ketuk notifikasi: buka aplikasi (jendela yang sudah ada dipakai) di alamat tujuannya. */
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var hash = (event.notification.data && event.notification.data.url) || '#/';
+  var tujuan = new URL('./' + (hash.charAt(0) === '#' ? hash : '#/'), self.registration.scope).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (jendela) {
+    for (var i = 0; i < jendela.length; i++) {
+      var j = jendela[i];
+      if (j.url.indexOf(self.registration.scope) === 0 && 'focus' in j) {
+        return j.focus().then(function (fokus) {
+          return fokus && 'navigate' in fokus ? fokus.navigate(tujuan) : fokus;
+        });
+      }
+    }
+    return self.clients.openWindow(tujuan);
+  }));
+});
