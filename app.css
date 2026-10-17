@@ -6584,6 +6584,59 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
   margin: 0;
 }
 
+/* Porsi terjual per menu di lembar Catat penjualan (0.19.0) */
+.porsi-wadah {
+  margin-top: 8px;
+  border-top: 1px solid var(--garis-halus);
+  padding-top: 12px;
+}
+
+.porsi-judul {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.porsi-daftar {
+  display: grid;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.porsi-baris {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  column-gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--garis-halus);
+}
+
+.porsi-nama {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.porsi-nama small {
+  font-size: 13px;
+  color: var(--tinta-redup);
+  font-variant-numeric: tabular-nums;
+}
+
+.porsi-baris .isian-angka {
+  width: 96px;
+}
+
+.porsi-baris .kolom-galat {
+  grid-column: 1 / -1;
+}
+
+.porsi-jumlah {
+  margin-top: 8px;
+}
+
 /* Food cost 6 bulan */
 .grafik-fc-nilai {
   display: grid;
