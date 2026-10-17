@@ -246,6 +246,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++ | Perbaikan jadwal Supabase (laporan harian 16 Oktober 2026 tidak terkirim): pg_cron memanggil Edge Function dengan `Content-Type: application/json`; peringatan di Beranda/Dashboard Pengelola jika laporan harian tidak berjalan | Kode selesai (Code.gs v0.15.1; aplikasi tetap 0.16.1), diuji dengan Postgres 16 lokal (tiruan `net.http_post` dengan pemeriksaan Supabase: versi lama gagal dengan pesan yang sama, versi baru lolos untuk tiga jadwal), pelayan Edge Function dengan body JSON, dan 13 skenario waktu peringatan. Dipasang dan diuji pemilik 17 Oktober 2026 (butir 222): Edge Function dan Code.gs ditempel, `pasangTrigger` dijalankan, jadwal cadangan yang dijalankan manual dijawab 200 `dilewati` |
 | 12+++ | HPP dan food cost (dipilih pemilik dari pratinjau 17 Oktober 2026): Pengaturan → Menu (takaran bersih, hasil bersih, bahan kecil, Salin menu), layar HPP dan food cost dari Dashboard (pemakaian bahan, cek silang, per kategori, grafik 6 bulan, Per menu), penjualan harian, bagian HPP di rekap bulanan, nominal rupiah waste hanya untuk Pengelola | Kode selesai (Code.gs v0.16, aplikasi 0.17.0), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 18 uji server dengan angka dihitung tangan, 34 jawaban aksi lama sama dengan v0.15.1) dan Chromium (13 uji alur, delapan ukuran, "kurangi gerak", 28 layar lama sama piksel per piksel dengan versi sebelumnya). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Menu`, `M_MenuBahan`, `Data_Penjualan`, dua baris konfigurasi), uji dari HP |
 | 12++++ | Hapus item yang belum punya catatan (permintaan pemilik 17 Oktober 2026): tombol Hapus di layar ubah item untuk item nonaktif tanpa catatan stock, resep, menu, atau isian form kustom; baris `M_Item` dan riwayat harganya dihapus | Kode selesai (Code.gs v0.16.1, aplikasi 0.17.1), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 8 uji server) dan Chromium (alur nonaktifkan → Batal → Hapus, sebab tidak bisa dihapus, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
+| 12+++++ | Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (dipilih pemilik dari pratinjau 17 Oktober 2026, pola C): cahaya dan butiran menggantikan tekstur garis di kepala Beranda, kepala layar, Login, pita rel, dan bar atas; bar bawah kaca buram; kartu bergaris rambut | Kode selesai (aplikasi 0.17.2; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (sapuan 10 rute pada delapan ukuran dan "kurangi gerak", kontras kata menu di atas kaca). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1736,3 +1737,36 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Nonaktifkan → Hapus → Batal → Hapus → daftar, item bercatatan, aktif lagi, delapan ukuran tanpa gulir samping dan tombol
     ≥ 44 px, tanpa galat konsol. Belum diuji di Supabase asli dan salinan ke Sheets (baris master yang dihapus; jalurnya sama
     dengan baris `Stock_Harian` yang dihapus `hitungUlangStock_`).
+
+### Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (aplikasi 0.17.2, 17 Oktober 2026)
+
+238. **Asal:** pemilik meminta pola garis diganti supaya tampilan terlihat profesional dan premium. Lima pola dibandingkan di
+    pratinjau (artifact "Pilihan Pola InventoryKu": garis sekarang, kisi titik, cincin halus, cahaya dan butiran, kisi cetak biru)
+    beserta bar bawah dan kartu. Pemilik memilih pola C untuk semua permukaan navy, bar bawah kaca buram, dan kartu bergaris
+    rambut. Pertanyaan pemilik soal library dan gerak baru dijawab terpisah dan belum diputuskan, jadi ATURAN TETAP tidak berubah.
+    Spesifikasi tampilan Bagian 2, 4.2, 4.7, 6, 10, 11. Code.gs tidak berubah.
+239. **Permukaan navy** (app.css, token `--cahaya-navy` dan `--butiran`): `.beranda-kepala`, `.kepala-layar`, dan `.masuk:not(.terang)`
+    memakai `background-image: var(--butiran), var(--cahaya-navy)` dengan `background-blend-mode: overlay` untuk butiran. Butiran =
+    SVG `feTurbulence` di data URI (ubin 160 px, putih 22%). Gradasi tegak berakhir di Navy Pass, jadi pita di bawah rel
+    (`.beranda-tiket::before`, Navy Pass + butiran) menyambung tanpa sambungan. `.bar` juga mendapat butiran (di HP dan tablet
+    yang punya kepala, `background: none` lama tetap menang). Lapisan pudar `::after` versi 1.7 dihapus; cahaya pelan `::before`
+    versi 1.8 tetap. Login memakai `background-attachment: fixed` supaya gradasinya selebar layar, bukan sepanjang halaman.
+    **Ikon PWA dan favicon tidak diubah** (masih bertekstur garis di `icons/ikon.svg`; mengganti ikon tidak sampai ke HP yang sudah
+    memasang aplikasi), jadi Bagian 4.5 tetap.
+240. **Bar bawah kaca buram:** `.menu-grup` di dalam `@supports (backdrop-filter)` berlatar Navy Pass 86% dengan `blur(16px)
+    saturate(150%)`, tepi `rgba(169,184,207,.16)`, kilau `inset 0 1px 0` putih 8%. Pratinjau memakai 78%; dinaikkan ke 86% karena
+    kata menu (Teks di Navy) di atas kartu putih yang terburam hanya sekitar 4,3:1 pada 78%. Desktop mematikan `backdrop-filter`
+    (menu di bar atas). Pil menu aktif bergradasi `#1D3A66` → Navy Lapis dengan kilau tepi atas. Tanpa dukungan buram: Navy Pass
+    padat seperti dulu. Catatan uji: di Chromium tanpa layar, isi yang sedang bergerak masuk (`.ungkap`) sesaat tampak tajam di
+    belakang kaca pada tangkapan layar; setelah geraknya selesai buramnya benar.
+241. **Kartu garis rambut:** satu perubahan token, `--bayang-kartu` = `0 0 0 1px var(--garis-rambut)` (Navy Pass 7%), `0 1px 2px` 4%,
+    `0 12px 32px -12px` 18%. Berlaku untuk semua pemakai token (kartu, bingkai tabel, kartu form, menu nama pengguna, dan lainnya).
+    `.kartu-item.masalah` tetap menaruh tepi Masalah lebih dulu.
+242. **Uji** (di luar repo): server Node yang menjalankan Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` di memori
+    (setupSpreadsheet, pemasangan, staff, item, unit, kiriman Stock/Suhu/Waste), aplikasi dibuka di Chromium dengan alamat API
+    https tiruan yang dialihkan `context.route`. Tangkapan sebelum/sesudah (Login, Beranda, Dashboard, Item, Riwayat di 390 dan
+    1366 px); sapuan 10 rute pada delapan ukuran Bagian 4.6 dan "kurangi gerak" di 390 dan 1366 px: tanpa gulir samping, kotak
+    galat, atau galat konsol, kepala berbutiran tanpa garis, kaca hanya di bar bawah, kartu bergaris rambut, tanpa animasi saat
+    "kurangi gerak". Belum diuji di HP asli: kelancaran buram kaca saat menggulir di HP Android murah (jika berat, kaca bisa
+    dimatikan dengan menghapus satu blok `@supports`), dan tampilan butiran di layar HP.
+

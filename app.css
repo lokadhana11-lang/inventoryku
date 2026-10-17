@@ -50,12 +50,22 @@
   --garis-halus: #E3E8EF; /* pemisah di dalam kartu (1.7) */
   --navy-dalam: #071528;  /* klip tiket (1.7) */
   --navy-lapis: #132B4D;  /* permukaan di atas navy (1.7) */
-  --garis-navy: #24406A;  /* tepi dan tekstur di atas navy (1.7) */
+  --garis-navy: #24406A;  /* tepi dan pemisah di atas navy (1.7) */
+  --garis-rambut: rgba(11, 31, 58, 0.07); /* tepi kartu 1 px (1.11) */
 
-  /* Kedalaman (tampilan Bagian 2, versi 1.7): bayangan lembut menggantikan garis tepi kartu */
-  --bayang-kartu: 0 1px 2px rgba(11, 31, 58, 0.06), 0 8px 24px rgba(11, 31, 58, 0.08);
+  /* Kedalaman (tampilan Bagian 2, versi 1.11): garis rambut dan bayangan panjang yang tipis */
+  --bayang-kartu: 0 0 0 1px var(--garis-rambut), 0 1px 2px rgba(11, 31, 58, 0.04), 0 12px 32px -12px rgba(11, 31, 58, 0.18);
   --bayang-tiket: 0 2px 4px rgba(7, 21, 40, 0.18), 0 14px 28px rgba(7, 21, 40, 0.16);
   --sudut-kartu: 14px;
+
+  /* Permukaan navy (tampilan Bagian 2, versi 1.11): cahaya biru di kanan atas, cahaya amber yang
+     sangat samar di kiri, dan butiran halus. Tepi bawah tetap Navy Pass supaya menyambung dengan
+     pita di bawah rel. Butiran berupa gambar diam (SVG feTurbulence), dicampur overlay. */
+  --butiran: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --cahaya-navy:
+    radial-gradient(90% 75% at 100% 0%, rgba(58, 104, 170, 0.50), rgba(58, 104, 170, 0) 62%),
+    radial-gradient(55% 45% at 0% 45%, rgba(242, 169, 59, 0.08), rgba(242, 169, 59, 0) 65%),
+    linear-gradient(180deg, #0E2546 0%, var(--navy-pass) 100%);
 
   /* Makna status */
   --baik-teks: #067647;
@@ -360,8 +370,19 @@ svg {
   border: 1px solid var(--garis-navy);
   border-radius: 20px;
   background-color: var(--navy-pass);
-  box-shadow: var(--bayang-tiket);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--bayang-tiket);
   pointer-events: auto;
+}
+
+/* Kaca buram (versi 1.11): isi layar terlihat samar di belakang kapsul. Navy 86% supaya kata menu
+   tetap kontras di atas kartu putih; tanpa dukungan buram, kapsul tetap Navy Pass padat. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .menu-grup {
+    border-color: rgba(169, 184, 207, 0.16);
+    background-color: rgba(11, 31, 58, 0.86);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
 }
 
 .menu-item {
@@ -564,6 +585,8 @@ body.papan-ketik .layar {
     border-radius: 0;
     background: none;
     box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .menu-item {
@@ -1486,6 +1509,10 @@ body.papan-ketik .lembar-aksi {
   min-height: 100dvh;
   background: var(--navy-pass);
   color: var(--kertas);
+}
+
+.masuk:not(.terang) {
+  background-attachment: fixed;
 }
 
 .masuk.terang {
@@ -5070,31 +5097,28 @@ textarea.isian-catatan {
  * (spesifikasi tampilan Bagian 2 dan 4.7)
  * ========================================================================= */
 
-/* Tekstur kepala navy: garis 1 px Garis Navy tiap 28 px, memudar ke atas. Satu-satunya
-   pudar yang dipakai, hanya di permukaan navy dan tidak pernah di belakang teks isian. */
+/* Permukaan navy versi 1.11 (menggantikan tekstur garis 1.7): cahaya dan butiran, hanya di
+   permukaan navy dan tidak pernah di belakang teks isian. */
 .beranda-kepala,
 .kepala-layar,
-.beranda-tiket::before {
-  background-image: repeating-linear-gradient(180deg, transparent 0 27px, rgba(36, 64, 106, 0.55) 27px 28px);
+.masuk:not(.terang) {
+  background-color: var(--navy-pass);
+  background-image: var(--butiran), var(--cahaya-navy);
+  background-size: 160px 160px, auto, auto, auto;
+  background-blend-mode: overlay, normal, normal, normal;
 }
 
-.beranda-kepala::after,
-.kepala-layar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(180deg, var(--navy-pass) 0%, rgba(11, 31, 58, 0) 70%);
+/* Pita di bawah rel dan bar atas: Navy Pass dengan butiran yang sama */
+.beranda-tiket::before,
+.bar {
+  background-color: var(--navy-pass);
+  background-image: var(--butiran);
+  background-size: 160px 160px;
+  background-blend-mode: overlay;
 }
 
 .beranda-kepala {
   isolation: isolate;
-}
-
-.beranda-tiket::before {
-  background-color: var(--navy-pass);
-  background-position: 0 -4px;
 }
 
 /* Kepala navy layar (selain Beranda). Dipasang router dari judul dan ringkasan layar. */
@@ -5589,8 +5613,8 @@ textarea.isian-catatan {
   left: 0;
   width: 0;
   border-radius: 14px;
-  background: var(--navy-lapis);
-  box-shadow: inset 0 0 0 1px var(--garis-navy);
+  background: linear-gradient(180deg, #1D3A66 0%, var(--navy-lapis) 100%);
+  box-shadow: inset 0 0 0 1px rgba(169, 184, 207, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   opacity: 0;
   transition: transform 320ms var(--ayun-lembut), opacity 200ms ease-out;
   pointer-events: none;
@@ -5648,11 +5672,6 @@ textarea.isian-catatan {
 .beranda-kepala,
 .kepala-layar {
   overflow: hidden;
-}
-
-.beranda-kepala::after,
-.kepala-layar::after {
-  z-index: -2;
 }
 
 .beranda-kepala::before,

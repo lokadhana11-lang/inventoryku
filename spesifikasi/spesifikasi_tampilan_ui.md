@@ -5,7 +5,11 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.10, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.11, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.10 (dipilih pemilik dari pratinjau "Pilihan Pola InventoryKu", 17 Oktober
+> 2026, pola C): permukaan navy tanpa garis, berupa cahaya lembut dan butiran halus, menggantikan
+> tekstur garis; bar navigasi bawah dari kaca buram; kartu bertepi garis rambut dengan bayangan yang
+> lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
 > Perubahan sejak versi 1.9 (dipilih pemilik dari pratinjau "Rancangan HPP InventoryKu", 17 Oktober
@@ -101,7 +105,7 @@ Rasio kontras sudah dihitung (standar WCAG: teks minimal 4,5; garis komponen min
 | Garis Halus | `#E3E8EF` | Pemisah di dalam kartu (dekoratif) | |
 | Navy Dalam | `#071528` | Klip tiket di rel | |
 | Navy Lapis | `#132B4D` | Permukaan di atas navy (kotak angka utama, chip di kepala) | Teks putih di atasnya: 13,6 |
-| Garis Navy | `#24406A` | Tepi dan pemisah di atas navy, tekstur garis kepala | |
+| Garis Navy | `#24406A` | Tepi dan pemisah di atas navy | |
 
 **Makna status** (selalu disertai ikon dan kata, tidak pernah warna saja)
 
@@ -112,16 +116,24 @@ Rasio kontras sudah dihitung (standar WCAG: teks minimal 4,5; garis komponen min
 | Perlu ditinjau | `#B54708` | `#FFFAEB` | 5,2 | Dilaporkan keliru, Perlu reorder, Stock bahan tidak cukup, Habis besok, Opname lewat jadwal |
 | Menunggu | `#3B5374` | `#EEF2F7` | 7,0 | Menunggu kirim, Belum diisi, Nihil |
 
-Aturan: tidak ada gradasi warna dan tidak ada foto latar. Kedalaman ditunjukkan dengan
-bayangan lembut berlapis dan beda warna latar:
+Aturan: tidak ada gradasi warna dan tidak ada foto latar di layar isi. Kedalaman ditunjukkan
+dengan bayangan lembut berlapis dan beda warna latar:
 
-- **Bayangan kartu:** `0 1px 2px` dan `0 8px 24px`, warna Navy Pass dengan kepekatan 6% dan
-  8%. Menggantikan garis tepi kartu. Pemisah di dalam kartu tetap garis (Garis Halus).
+- **Kartu** (versi 1.11): garis rambut 1 px Navy Pass 7% di sekeliling kartu, ditambah bayangan
+  `0 1px 2px` (4%) dan bayangan panjang yang tipis `0 12px 32px` menyusut 12 px (18%). Garis
+  rambut hampir tidak terlihat, tetapi membuat tepi kartu tegas di atas Baja. Dipakai semua kartu,
+  bingkai tabel, kartu form, dan menu kecil. Pemisah di dalam kartu tetap garis (Garis Halus).
 - **Bayangan tiket** (tiket Beranda, kotak angka yang menggantung di kepala): `0 2px 4px` dan
   `0 14px 28px`, Navy Dalam 18% dan 16%, supaya terlihat tergantung.
-- **Tekstur kepala navy:** garis horizontal 1 px berwarna Garis Navy tiap 28 px, memudar ke
-  atas, seperti kertas bergaris di pass dapur. Ini pengecualian aturan gradasi (pudarnya),
-  hanya di permukaan navy, dan tidak pernah di belakang teks isian.
+- **Permukaan navy** (versi 1.11, menggantikan tekstur garis versi 1.7): kepala Beranda, kepala
+  setiap layar, dan layar Login memakai Navy Pass dengan cahaya biru lembut di kanan atas
+  (`#3A68AA`, 50%, memudar sampai 62% lebar), cahaya amber yang sangat samar di kiri tengah (8%),
+  dan gradasi tegak dari `#0E2546` ke Navy Pass, sehingga tepi bawahnya tetap Navy Pass dan
+  menyambung dengan pita di bawah rel. Di atasnya butiran halus (derau putih 22%, ubin 160 px,
+  dicampur overlay), seperti kertas cetak; butiran juga mencegah gradasi tampak belang di layar
+  HP. Pita di bawah rel dan bar atas desktop: Navy Pass dengan butiran yang sama. Semuanya gambar
+  diam (CSS dan SVG kecil di dalam CSS), hanya di permukaan navy, tidak pernah di belakang teks
+  isian.
 - **Cahaya navy** (versi 1.8): satu bercak lingkaran Garis Navy yang memudar ke tepinya, bergeser
   pelan di belakang isi kepala navy dan layar Login (Bagian 8). Pengecualian kedua, juga hanya
   di permukaan navy. Kilau putih yang lewat sekali di rel saat momen selesai adalah gerak
@@ -211,7 +223,11 @@ Bar navigasi navy di **bawah**, supaya terjangkau ibu jari. Kepala layar navy di
 
 **Bar bawah mengambang** (versi 1.8): kapsul Navy Pass bersudut 20 px, berjarak 12 px dari tepi
 kiri dan kanan dan 8 px di atas jarak aman bawah (6 px di layar pendek), bertepi Garis Navy dan
-berbayangan tiket. Menu aktif ditandai **pil Navy Lapis** di belakang ikon dan katanya, ditambah
+berbayangan tiket. Sejak versi 1.11 kapsul ini **kaca buram**: Navy Pass 86% dengan buram 16 px
+(isi layar di belakangnya terlihat samar), tepi putih kebiruan 16%, dan kilau 1 px di tepi atas.
+86% dipilih supaya kata menu tetap kontras walau di belakangnya kartu putih; browser tanpa
+dukungan buram menampilkan Navy Pass padat. Menu aktif ditandai **pil Navy Lapis** (versi 1.11:
+bergradasi tipis dari `#1D3A66` dengan kilau di tepi atas) di belakang ikon dan katanya, ditambah
 garis amber pendek di tepi atas kapsul; saat pindah menu, pil dan garis itu bergeser ke menu
 yang baru dan ikonnya melonjak sedikit (Bagian 8). Isi layar diberi ruang di bawah supaya baris
 terakhir tidak tertutup kapsul. Pengelola melihat 5 menu, staff 3.
@@ -252,7 +268,7 @@ di tengah selebar isi layar.
 
 ### 4.7 Kepala navy setiap layar
 
-- Setiap layar dibuka dengan kepala navy (Navy Pass dengan tekstur garis halus, Bagian 2):
+- Setiap layar dibuka dengan kepala navy (permukaan navy dengan cahaya dan butiran, Bagian 2):
   tautan kembali (jika ada) dan, di HP dan tablet, status sinyal; judul layar 34 px; lalu
   ringkasan layar itu jika ada. Beranda memakai kepalanya sendiri (Bagian 5.2).
 - **Ringkasan di kepala**, hanya untuk angka yang memang utama di layar itu:
@@ -986,7 +1002,7 @@ menu `#/hpp/menu`).
 | Tombol kedua | Latar Kertas, tepi Garis Isian, teks Tinta. |
 | Tombol berbahaya | Teks Masalah, selalu dengan konfirmasi. |
 | Kolom isian | Latar Kertas, tepi Garis Isian 1 px, tinggi 48 px. Saat aktif: tepi Biru Malam 2 px. |
-| Kartu / tiket | Latar Kertas, tanpa garis tepi, bayangan kartu atau bayangan tiket (Bagian 2). Kartu bersudut 14 px, tiket 6 px. |
+| Kartu / tiket | Latar Kertas, garis rambut dan bayangan kartu, atau bayangan tiket (Bagian 2). Kartu bersudut 14 px, tiket 6 px. |
 | Kepala navy | Di setiap layar: kembali, judul, ringkasan (Bagian 4.7). |
 | Ubin ikon | Kotak 40 px bersudut 12 px berlatar warna makna status (atau Baja), berisi ikon. Dipakai di daftar Perlu perhatian dan di tiket; selalu disertai teks, jadi warnanya bukan satu-satunya tanda. |
 | Keadaan tekan | Tombol, tiket, dan baris yang bisa diketuk sedikit menggelap dan mengecil saat ditekan (Bagian 8). Efek hover hanya untuk mouse. |
@@ -1177,7 +1193,7 @@ indikator putar.
 |---|---|
 | Tema gelap di layar isi form | Sulit dibaca di bawah lampu dapur, silau di layar berminyak |
 | Foto atau video latar | Memperlambat aplikasi dan mengganggu keterbacaan angka |
-| Gradasi warna dan efek kaca | Tidak menambah informasi; membuat tampilan tidak bersih. Pengecualian: pudarnya tekstur garis dan cahaya pelan, keduanya hanya di permukaan navy (Bagian 2) |
+| Gradasi warna dan efek kaca di layar isi | Tidak menambah informasi; membuat tampilan tidak bersih. Pengecualian (versi 1.11): cahaya, gradasi, dan butiran di permukaan navy, dan kaca buram bar navigasi bawah (Bagian 2 dan 4.2) |
 | Lebih dari satu warna aksen | Aksen akan berebut dengan warna makna status |
 | Angka berhitung naik, paralaks, gerak yang menggerakkan ukuran, warna, atau bayangan | Butuh hitungan tiap bingkai dan menyita tenaga HP (versi 1.8 memakai gerak masuk, muncul saat digulir, dan cahaya pelan dengan aturan Bagian 8.2) |
 | Library animasi dan library grafik | Menambah berat unduhan; CSS dan SVG sudah cukup |
@@ -1211,4 +1227,5 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
+| Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
