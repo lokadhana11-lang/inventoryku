@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.18.1';
+  var VERSI_APLIKASI = '0.19.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -10708,6 +10708,9 @@
    * lembar Catat penjualan
    * ===================================================================== */
 
+  /** Selisih seharusnya vs nyata (persen dari seharusnya) yang masih dianggap sesuai porsi terjual. */
+  var BATAS_SELISIH_PORSI = 2;
+
   /** "35%" / "37,2%" */
   function formatPersen(n) {
     return n == null ? '–' : formatAngka(Math.round(n * 10) / 10) + '%';
@@ -10744,7 +10747,9 @@
 
   /**
    * Lembar Catat penjualan (tampilan Bagian 5.10): tanggal (Kemarin atau tanggal lain), penjualan
-   * dalam rupiah, dan catatan. Butuh sinyal. selesai(hasil) dipanggil setelah tersimpan.
+   * dalam rupiah, catatan, dan (sejak aplikasi 0.19.0) porsi terjual per menu. Isian yang sudah
+   * tercatat untuk tanggal itu dibaca dari server (aksi penjualanTanggal). Butuh sinyal.
+   * selesai(hasil) dipanggil setelah tersimpan.
    */
   function bukaCatatPenjualan(opsi) {
     var hari = tanggalIso(new Date());
@@ -10759,27 +10764,124 @@
       bantuan: 'Total penjualan makanan dan minuman dari kasir, sebelum pajak dan service. Hari tutup: isi 0.' });
     var kCatatan = kolomIsian({ label: 'Catatan (tidak wajib)', maxlength: 200 });
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    // Porsi per menu: diisi setelah daftar menu tanggal itu termuat.
+    var porsiJudul = el('h3', { class: 'porsi-judul', text: 'Porsi terjual per menu' });
+    var porsiIsi = el('div', { class: 'porsi-isi', 'aria-live': 'polite' });
+    var porsiWadah = el('section', { class: 'porsi-wadah', 'aria-label': 'Porsi terjual per menu' }, [porsiJudul, porsiIsi]);
+    var kolomPorsi = [];
+    var nomorMuat = 0;
+    var diketik = { jual: false, catatan: false };
+    kJual.input.addEventListener('input', function () { diketik.jual = true; perbaruiJumlah(); });
+    kCatatan.input.addEventListener('input', function () { diketik.catatan = true; });
+    var jumlahHarga = el('p', { class: 'kolom-bantuan porsi-jumlah', 'aria-live': 'polite' });
 
     function tanggalTerpilih() {
       return gTanggal.nilai() === 'Tanggal lain' ? kTanggal.input.value : kemarin;
     }
-    function isiLama() {
+    function bacaPorsi(teks) {
+      var t = String(teks || '').trim();
+      if (t === '') return null;
+      return /^\d{1,6}$/.test(t) ? Number(t) : NaN;
+    }
+    /** "Menurut harga jual: Rp …", untuk memeriksa angka kasir. */
+    function perbaruiJumlah() {
+      var total = 0;
+      var ada = false;
+      kolomPorsi.forEach(function (x) {
+        var n = bacaPorsi(x.k.input.value);
+        if (n > 0 && x.menu.hargaJual > 0) total += n * x.menu.hargaJual;
+        if (n != null && !isNaN(n)) ada = true;
+      });
+      jumlahHarga.textContent = ada ? 'Porsi × harga jual: ' + formatRupiah(total) + '. Bisa berbeda dari kasir karena diskon atau promo.' : '';
+    }
+    function gambarPorsi(d) {
+      kosongkan(porsiIsi);
+      kolomPorsi = [];
+      if (!d.siap || !d.siap.porsi) {
+        porsiIsi.appendChild(el('p', { class: 'kolom-bantuan', text: 'Tab Data_PenjualanMenu belum ada. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet.' }));
+        return;
+      }
+      if (!d.menu.length) {
+        porsiIsi.appendChild(el('p', { class: 'kolom-bantuan', text: 'Belum ada menu aktif. Tambah menu di Pengaturan → Menu.' }));
+        return;
+      }
+      porsiIsi.appendChild(el('p', { class: 'kolom-bantuan', text: 'Dari laporan kasir. Kosong: belum dicatat. 0: tidak terjual. ' +
+        'Dipakai untuk menghitung pemakaian bahan seharusnya.' }));
+      porsiIsi.appendChild(el('ul', { class: 'porsi-daftar' }, d.menu.map(function (m) {
+        var id = 'porsi-' + (++nomorKolom);
+        var input = el('input', { class: 'isian isian-angka', id: id, inputmode: 'numeric', autocomplete: 'off', maxlength: 6,
+          pattern: '[0-9]*', 'aria-describedby': id + '-galat' });
+        if (m.porsi != null) input.value = String(m.porsi);
+        var galat = el('p', { class: 'kolom-galat', id: id + '-galat' });
+        var k = {
+          input: input,
+          galat: function (teks) {
+            kosongkan(galat);
+            input.setAttribute('aria-invalid', teks ? 'true' : 'false');
+            if (teks) {
+              galat.appendChild(ikonStatus('masalah'));
+              galat.appendChild(el('span', { text: teks }));
+            }
+            return !teks;
+          }
+        };
+        input.addEventListener('input', function () {
+          k.galat('');
+          perbaruiJumlah();
+        });
+        kolomPorsi.push({ menu: m, k: k });
+        return el('li', { class: 'porsi-baris' }, [
+          el('label', { class: 'porsi-nama', for: id }, [
+            el('span', { text: m.nama + (m.aktif ? '' : ' (nonaktif)') }),
+            m.hargaJual > 0 ? el('small', { text: formatRupiah(m.hargaJual) }) : null
+          ]),
+          input,
+          galat
+        ]);
+      })));
+      porsiIsi.appendChild(jumlahHarga);
+      perbaruiJumlah();
+    }
+    function muatTanggal() {
       var t = tanggalTerpilih();
-      var ada = (opsi.terakhir || []).filter(function (x) { return x.tanggal === t; })[0];
-      sudah.textContent = ada ? 'Sudah tercatat ' + formatRupiah(ada.nilai) + '. Menyimpan akan menggantinya.' : '';
+      var nomor = ++nomorMuat;
+      sudah.textContent = '';
+      kosongkan(porsiIsi).appendChild(el('p', { class: 'kolom-bantuan', text: t ? 'Memuat menu…' : 'Pilih tanggal untuk mengisi porsi per menu.' }));
+      kolomPorsi = [];
+      if (!t) return;
+      panggilApi('penjualanTanggal', { tanggal: t }).then(function (d) {
+        if (nomor !== nomorMuat) return;
+        if (d.penjualan) {
+          sudah.textContent = 'Sudah tercatat ' + formatRupiah(d.penjualan.nilai) + '. Menyimpan akan menggantinya.';
+          if (!diketik.jual) kJual.input.value = String(d.penjualan.nilai);
+          if (!diketik.catatan) kCatatan.input.value = d.penjualan.catatan || '';
+        } else {
+          if (!diketik.jual) kJual.input.value = '';
+          if (!diketik.catatan) kCatatan.input.value = '';
+        }
+        gambarPorsi(d);
+      }).catch(function (err) {
+        if (nomor !== nomorMuat) return;
+        if (tanganiSesiBerakhir(err)) return;
+        // Server lama tanpa aksi ini, atau tanpa sinyal: penjualan tetap bisa dicatat tanpa porsi.
+        var ada = (opsi.terakhir || []).filter(function (x) { return x.tanggal === t; })[0];
+        sudah.textContent = ada ? 'Sudah tercatat ' + formatRupiah(ada.nilai) + '. Menyimpan akan menggantinya.' : '';
+        kosongkan(porsiIsi).appendChild(el('p', { class: 'kolom-bantuan', text: 'Daftar menu tidak termuat (' + pesanGalat(err).replace(/\.$/, '') +
+          '). Penjualan tetap bisa disimpan tanpa porsi.' }));
+      });
     }
     gTanggal.input.forEach(function (i) {
       i.addEventListener('change', function () {
         kTanggal.wadah.hidden = gTanggal.nilai() !== 'Tanggal lain';
-        isiLama();
+        muatTanggal();
       });
     });
-    kTanggal.input.addEventListener('change', isiLama);
-    isiLama();
+    kTanggal.input.addEventListener('change', muatTanggal);
+    muatTanggal();
 
     bukaLembar({
       judul: 'Catat penjualan',
-      isi: [gTanggal.wadah, kTanggal.wadah, kJual.wadah, sudah, kCatatan.wadah, pesan],
+      isi: [gTanggal.wadah, kTanggal.wadah, kJual.wadah, sudah, kCatatan.wadah, porsiWadah, pesan],
       aksi: [
         { teks: 'Batal', jenis: 'kedua' },
         { teks: 'Simpan penjualan', jenis: 'utama', klik: function (t, lembar) {
@@ -10789,12 +10891,29 @@
           var teks = kJual.input.value.trim().replace(/^rp\s*/i, '').replace(/\./g, '');
           var nilai = bacaAngka(teks);
           var okJual = kJual.galat(nilai === null ? 'Isi penjualan. Hari tutup diisi 0.' : (isNaN(nilai) || nilai < 0 ? 'Isi angka 0 atau lebih, misalnya 3450000.' : ''));
-          if (!okTanggal || !okJual) return;
+          var porsi = [];
+          var okPorsi = true;
+          var salahPertama = null;
+          kolomPorsi.forEach(function (x) {
+            var n = bacaPorsi(x.k.input.value);
+            var ok = x.k.galat(isNaN(n) ? 'Isi bilangan bulat 0 atau lebih, misalnya 12.' : '');
+            if (!ok) {
+              okPorsi = false;
+              if (!salahPertama) salahPertama = x.k.input;
+            } else if (n != null) {
+              porsi.push({ menu: x.menu.nama, porsi: n });
+            }
+          });
+          if (!okTanggal || !okJual || !okPorsi) {
+            if (okTanggal && okJual && salahPertama) salahPertama.focus();
+            return;
+          }
+          var isi = { tanggal: t1, penjualan: nilai, catatan: kCatatan.input.value.trim(), bulan: opsi.bulan, submissionId: buatId() };
+          if (porsi.length) isi.porsi = porsi;
           aturTombolProses(t, true, 'Menyimpan…');
-          jagaProses(panggilApi('simpanPenjualan', { tanggal: t1, penjualan: nilai, catatan: kCatatan.input.value.trim(), bulan: opsi.bulan,
-            submissionId: buatId() })).then(function (hasil) {
+          jagaProses(panggilApi('simpanPenjualan', isi)).then(function (hasil) {
             lembar.tutup();
-            toast('Penjualan ' + tanggalPendek(t1) + ' tersimpan.');
+            toast('Penjualan ' + tanggalPendek(t1) + ' tersimpan' + (porsi.length ? ', dengan porsi ' + porsi.length + ' menu.' : '.'));
             if (opsi.selesai) opsi.selesai(hasil);
           }).catch(function (err) {
             aturTombolProses(t, false);
@@ -10931,10 +11050,12 @@
         ]));
         return;
       }
+      var fcSeharusnya = h.teoritis && h.teoritis.foodCostSeharusnya;
       ringkasKepala.appendChild(el('div', { class: 'kepala-nilai kepala-nilai-diam' }, [
         el('span', { class: 'kepala-nilai-label', text: 'Food cost ' + periode }),
         el('span', { class: 'kepala-nilai-angka' }, [formatPersen(h.foodCost), el('small', { text: ' target ' + formatPersen(h.target) })]),
-        h.foodCost != null && h.foodCost > h.target ? el('span', { class: 'kepala-nilai-selisih', text: 'Di atas target' }) : null
+        h.foodCost != null && h.foodCost > h.target ? el('span', { class: 'kepala-nilai-selisih', text: 'Di atas target' }) : null,
+        fcSeharusnya != null ? el('span', { class: 'kepala-nilai-ket', text: 'Seharusnya ' + formatPersen(fcSeharusnya) + ' menurut porsi terjual' }) : null
       ]));
       ringkasKepala.appendChild(el('div', { class: 'kepala-angka' }, [
         el('div', {}, [
@@ -10963,6 +11084,83 @@
           ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.' }) : null,
         p.stokPembuka ? el('p', { class: 'kolom-bantuan', text: 'Stok pembuka ' + formatRupiah(p.stokPembuka) +
           ' tidak dihitung sebagai selisih stock.' }) : null
+      ]);
+    }
+
+    /** Selisih bertanda: "+Rp 42.000" / "−Rp 3.000". */
+    function rupiahBertanda(n) {
+      return (n > 0 ? '+' : n < 0 ? '−' : '') + formatRupiah(Math.abs(n));
+    }
+
+    /**
+     * Seharusnya vs nyata (spesifikasi sistem Bagian 5.9, sejak aplikasi 0.19.0): pemakaian bahan menurut porsi
+     * terjual dibanding pemakaian nyata. Sebelum porsi per menu pernah dicatat: ajakan mencatatnya.
+     */
+    function kartuTeoritis(h) {
+      var t = h.teoritis;
+      if (!t || !t.siap) return null;
+      var judul = el('h2', { class: 'kartu-judul', text: 'Seharusnya vs nyata' });
+      function tombolCatat(teks, tanggal) {
+        var b = tombol(teks, 'kedua', { 'aria-haspopup': 'dialog' });
+        b.addEventListener('click', function () {
+          bukaCatatPenjualan({ tanggal: tanggal, bulan: h.bulan, terakhir: h.penjualan.terakhir, selesai: function (hasil) { if (hasil.hpp) terima(hasil.hpp); } });
+        });
+        return el('div', {}, b);
+      }
+      if (!t.pernah) {
+        return el('section', { class: 'kartu' }, [judul,
+          el('p', { class: 'kartu-teks', text: 'Catat porsi terjual per menu saat mencatat penjualan. Aplikasi lalu menghitung bahan yang ' +
+            'seharusnya terpakai dan membandingkannya dengan yang nyata terpakai, supaya bocor, porsi berlebih, atau pencatatan keliru terlihat.' }),
+          tombolCatat('Catat penjualan', null)]);
+      }
+      if (!t.lengkap) {
+        var daftar = t.kurang.length > 6 ? teksTanggalBulan(t.kurang.slice(0, 5)) + ', dan ' + (t.kurang.length - 5) + ' hari lain' : teksTanggalBulan(t.kurang);
+        return el('section', { class: 'kartu kartu-menunggu' }, [judul,
+          el('p', {}, tandaStatus('menunggu', 'Menunggu')),
+          el('p', { class: 'kartu-teks', text: 'Porsi per menu belum dicatat untuk ' + t.kurang.length + ' hari: ' + daftar +
+            '. Pemakaian seharusnya dibandingkan setelah semua hari tercatat (hari tutup tidak perlu).' }),
+          tombolCatat('Catat porsi ' + tanggalPendek(t.kurang[0]), t.kurang[0])]);
+      }
+      var batas = Math.abs(t.selisihPersen == null ? 0 : t.selisihPersen) <= BATAS_SELISIH_PORSI;
+      var tanda = batas ? tandaStatus('baik', 'Sesuai porsi terjual')
+        : tandaStatus('tinjau', t.selisih > 0 ? 'Terpakai lebih banyak dari porsi terjual' : 'Terpakai lebih sedikit dari porsi terjual');
+      var persen = t.selisihPersen == null ? '' : ' (' + (t.selisihPersen > 0 ? '+' : t.selisihPersen < 0 ? '−' : '') + formatPersen(Math.abs(t.selisihPersen)) + ')';
+      return el('section', { class: 'kartu' }, [
+        judul,
+        el('p', { class: 'kartu-teks', text: t.porsi + ' porsi terjual. Bahan dinilai dengan harga yang berlaku tiap hari.' }),
+        el('p', {}, tanda),
+        el('div', { class: 'daftar-nilai' }, [
+          barisNilai('Seharusnya, dari porsi terjual', formatRupiah(t.seharusnya.total)),
+          barisNilai('Nyata, pemakaian bahan', formatRupiah(t.nyata)),
+          barisNilai('Selisih', rupiahBertanda(t.selisih) + persen, 'total')
+        ]),
+        t.foodCostSeharusnya != null ? el('p', { class: 'kolom-bantuan', text: 'Food cost seharusnya ' + formatPersen(t.foodCostSeharusnya) +
+          ', nyata ' + formatPersen(h.foodCost) + '.' }) : null,
+        el('details', { class: 'hpp-rinci' }, [
+          el('summary', { text: 'Bahan menu dan bahan lain' }),
+          el('div', { class: 'daftar-nilai' }, [
+            barisNilai('Bahan menu: seharusnya ' + formatRupiah(t.bahanMenu.seharusnya) + ', nyata ' + formatRupiah(t.bahanMenu.nyata),
+              rupiahBertanda(t.bahanMenu.nyata - t.bahanMenu.seharusnya)),
+            barisNilai('Bahan lain (bumbu, minyak, garnish): seharusnya bahan kecil ' + formatPersen(t.kecilPersen) + ' = ' +
+              formatRupiah(t.bahanLain.seharusnya) + ', nyata ' + formatRupiah(t.bahanLain.nyata), rupiahBertanda(t.bahanLain.nyata - t.bahanLain.seharusnya))
+          ])
+        ]),
+        t.item.length ? el('details', { class: 'hpp-rinci' }, [
+          el('summary', { text: 'Selisih per bahan' + (t.jumlahItem > t.item.length ? ' (' + t.item.length + ' terbesar)' : '') }),
+          el('ol', { class: 'daftar-nilai' }, t.item.map(function (x) {
+            return el('li', {}, barisNilai(x.nama + ' · seharusnya ' + formatAngka(x.seharusnya) + ' ' + x.satuan + ', nyata ' +
+              formatAngka(x.nyata) + ' ' + x.satuan, rupiahBertanda(x.selisihRp)));
+          }))
+        ]) : null,
+        el('p', { class: 'kolom-bantuan', text: 'Seharusnya = porsi × bahan per porsi (takaran bersih ÷ hasil bersih; barang jadi dihitung dari ' +
+          'bahan resepnya) + bahan kecil. Selisih plus: bocor, porsi berlebih, waste, atau pencatatan keliru. Barang jadi yang belum ' +
+          'terjual di akhir periode ikut menambah selisih.' }),
+        t.tanpaHarga.length ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+          text: t.tanpaHarga.join(', ') + ' belum punya harga pada sebagian hari, jadi tidak ikut dihitung.' })]) : null,
+        t.menuTakDikenal.length ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+          text: 'Porsi ' + t.menuTakDikenal.join(', ') + ' tidak dihitung karena menunya tidak ada lagi di daftar menu.' })]) : null,
+        t.tidakBisa.length ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+          text: 'Resep ' + t.tidakBisa.join(', ') + ' tidak bisa dipakai (hasil kosong atau tanpa bahan), jadi bahannya tidak ikut dihitung.' })]) : null
       ]);
     }
 
@@ -11051,13 +11249,15 @@
       var kurang = kartuKurang(h);
       if (kurang) wadah.appendChild(kurang);
       wadah.appendChild(el('div', { class: 'hpp-kolom' }, [
-        el('div', { class: 'hpp-kolom-isi' }, [kartuPemakaian(h), kartuCekSilang(h), kartuKategori(h)]),
+        el('div', { class: 'hpp-kolom-isi' }, [kartuPemakaian(h), kartuTeoritis(h), kartuCekSilang(h), kartuKategori(h)]),
         el('div', { class: 'hpp-kolom-isi' }, [grafikFoodCost(h), kartuPenjualan(h)])
       ]));
     }
 
     function gambarMenu(h) {
       var menu = h.menu || [];
+      // Porsi terjual bulan itu (sejak porsi per menu pernah dicatat).
+      var adaPorsi = menu.some(function (m) { return m.porsi != null; });
       if (!h.siap.menu) {
         wadah.appendChild(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'),
           el('span', { text: 'Tab M_Menu belum ada. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet.' })]));
@@ -11067,11 +11267,13 @@
         wadah.appendChild(kotakKosong('Belum ada menu. Tambah menu di Pengaturan → Menu.', 'resep'));
       } else if (mediaDesktop.matches) {
         wadah.appendChild(el('div', { class: 'tabel-bingkai' }, el('table', { class: 'tabel tabel-menu-hpp' }, [
-          el('thead', {}, el('tr', {}, ['Menu', 'Harga jual', 'HPP per porsi', 'Food cost', 'Margin kotor', 'Harga untuk ' + formatPersen(h.target), 'Keadaan']
-            .map(function (j, i) { return el('th', { class: i && i < 6 ? 'angka' : null, scope: 'col', text: j }); }))),
+          el('thead', {}, el('tr', {}, ['Menu'].concat(adaPorsi ? ['Terjual'] : [], ['Harga jual', 'HPP per porsi', 'Food cost', 'Margin kotor',
+            'Harga untuk ' + formatPersen(h.target), 'Keadaan'])
+            .map(function (j, i, semua) { return el('th', { class: i && i < semua.length - 1 ? 'angka' : null, scope: 'col', text: j }); }))),
           el('tbody', {}, menu.map(function (m) {
             return el('tr', {}, [
               el('th', { scope: 'row', class: 'nama-item' }, el('a', { class: 'tabel-tombol', href: hrefMenu(m.nama), text: m.nama })),
+              adaPorsi ? el('td', { class: 'angka', text: formatAngka(m.porsi || 0) + ' porsi' }) : null,
               el('td', { class: 'angka', text: formatRupiah(m.hargaJual) }),
               el('td', { class: 'angka', text: m.hpp == null ? '–' : formatRupiah(m.hpp) }),
               el('td', { class: 'angka', text: formatPersen(m.foodCost) }),
@@ -11087,8 +11289,8 @@
           return el('a', { class: 'daftar-baris menu-hpp', href: hrefMenu(m.nama) }, [
             el('span', { class: 'daftar-baris-isi' }, [
               el('span', { class: 'daftar-baris-judul', text: m.nama }),
-              el('span', { class: 'daftar-baris-ket', text: m.lengkap ? 'Harga jual ' + formatRupiah(m.hargaJual) + ' · HPP ' + formatRupiah(m.hpp)
-                : m.tanpaHarga.join(', ') + ' belum punya harga' }),
+              el('span', { class: 'daftar-baris-ket', text: (m.lengkap ? 'Harga jual ' + formatRupiah(m.hargaJual) + ' · HPP ' + formatRupiah(m.hpp)
+                : m.tanpaHarga.join(', ') + ' belum punya harga') + (m.porsi != null ? ' · ' + formatAngka(m.porsi) + ' porsi terjual' : '') }),
               el('span', { class: 'tanda-deret' }, tandaFoodCost(m))
             ]),
             el('strong', { class: 'menu-hpp-persen', text: formatPersen(m.foodCost) })

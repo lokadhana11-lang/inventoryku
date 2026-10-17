@@ -216,6 +216,13 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Waste tanpa kolom berjenis `rupiah`.
 - Hapus item (Code.gs v0.16.1, 17 Oktober 2026; khusus Pengelola): `hapusItem {nama}` → jawaban `daftarItem` ditambah `dihapus: nama`.
   `daftarItem.item[]` ditambah `sebabTidakBisaHapus` ('' = bisa dihapus setelah nonaktif; selain itu kalimat sebabnya).
+- Penjualan per menu (Code.gs v0.18, 17 Oktober 2026; khusus Pengelola): `penjualanTanggal {tanggal}` → `{ tanggal, penjualan: { nilai,
+  catatan } | null, menu: [{ nama, hargaJual, aktif, porsi | null }], siap: { porsi }, pernahPorsi }`; `simpanPenjualan` menerima juga
+  `porsi: [{ menu, porsi }]` dan menjawab `porsi` (jumlah menu yang dikirim). `hpp` ditambah `teoritis: { siap, pernah, lengkap, kurang,
+  porsi, kecilPersen, perMenu: [{ nama, porsi }], seharusnya: { bahan, kecil, total }, nyata, selisih, selisihPersen, foodCostSeharusnya,
+  bahanMenu: { seharusnya, nyata }, bahanLain: { seharusnya, nyata }, item: [{ nama, satuan, seharusnya, nyata, selisih, nilaiSeharusnya,
+  nilaiNyata, selisihRp }], jumlahItem, tanpaHarga, tidakBisa, menuTakDikenal }`, `menu[].porsi` (null sebelum porsi pernah dicatat), dan
+  `siap.porsi`.
 - Keamanan login (Code.gs v0.17, 17 Oktober 2026): `beranda` (Pengelola) ditambah `terkunci: [{ nama, sampai, panjang }]` (akun aktif
   yang sedang terkunci karena PIN salah); `daftarStaff.staff[]` (dan jawaban aksi staff lain) ditambah `terkunciSampai` dan
   `kunciPanjang`; `dashboard.perhatian[]` boleh berjenis `terkunci` (`data.nama`). `pasang`, `pulihkan`, `tambahStaff`, dan `aturPin`
@@ -253,6 +260,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++ | Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (dipilih pemilik dari pratinjau 17 Oktober 2026, pola C): cahaya dan butiran menggantikan tekstur garis di kepala Beranda, kepala layar, Login, pita rel, dan bar atas; bar bawah kaca buram; kartu bergaris rambut | Kode selesai (aplikasi 0.17.2; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (sapuan 10 rute pada delapan ukuran dan "kurangi gerak", kontras kata menu di atas kaca). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12++++++ | Perpindahan layar yang mulus dan angka berhitung naik, spesifikasi tampilan 1.12 (dipilih pemilik dari pratinjau 17 Oktober 2026); ATURAN TETAP gerak dicabut | Kode selesai (aplikasi 0.18.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan (buka, tutup, maju, mundur, desktop, tanpa View Transitions, "kurangi gerak", angka tengah dan akhir, sapuan delapan ukuran). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12+++++++ | Keamanan login (permintaan pemilik 17 Oktober 2026, dari telaah keamanan): kunci PIN bertingkat (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci di Beranda, Dashboard, Staff dan PIN, dan email harian Pengelola, PIN baru yang terlalu mudah ditebak ditolak | Kode selesai (Code.gs v0.17, aplikasi 0.18.1), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (15 uji server, 15 jawaban aksi sama dengan v0.16.1 selain kolom baru) dan Chromium (pemberitahuan, lembar PIN, Dashboard, Staff dan PIN, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
+| 12++++++++ | Penjualan per menu (permintaan pemilik 17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan (`Data_PenjualanMenu`), pemakaian bahan seharusnya vs nyata di layar HPP, porsi terjual di Per menu, pengingat Dashboard, rekap bulanan PDF dan email | Kode selesai (Code.gs v0.18, aplikasi 0.19.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (10 uji server dengan angka dihitung tangan, 10 jawaban aksi lama sama dengan v0.17) dan Chromium (alur catat porsi, galat porsi, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `Data_PenjualanMenu`), uji dari HP |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1850,3 +1858,41 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     membuka lembar PIN, PIN 123456 ditolak di HP, reset membuka kunci dan pemberitahuan hilang, tanda kunci 24 jam di Staff dan PIN,
     butir Dashboard membuka lembar PIN, delapan ukuran tanpa gulir samping dan pemberitahuan ≥ 44 px, tanpa galat konsol). Hasil
     rakitan lolos pemeriksaan sintaks. Belum diuji di Supabase asli dan di HP.
+
+### Penjualan per menu dan pemakaian seharusnya (Code.gs v0.18, aplikasi 0.19.0, 17 Oktober 2026)
+
+252. **Asal dan keputusan pemilik:** dari telaah aplikasi, pemilik meminta tiga fitur (penjualan per menu, notifikasi HP, arsip
+    tahunan) dan memilih: porsi per menu dicatat **per hari** oleh Pengelola dari laporan kasir; notifikasi ke semua HP yang
+    mengaktifkan (pengingat cek suhu) dan ke HP Pengelola (lainnya); arsip menyimpan tahun berjalan dan tahun lalu; **satu fitur per
+    PR**. Butir ini fitur pertama. Spesifikasi sistem Bagian 5.9, 9.3, 10, 13; tampilan Bagian 5.10 dan 7.
+253. **Data:** `Data_PenjualanMenu` (`TAB_DATA`, dibuat `setupSpreadsheet`): Tanggal, Nama Menu, Porsi (format bulat), Harga Jual (Rp)
+    (tersalin saat baris dibuat, sebagai catatan), kolom sistem; urut tanggal terbaru, nama menu. `simpanPenjualan` dengan `porsi`
+    menulis porsi lebih dulu (`tulisPorsiMenu_`, di dalam kunci yang sama): menu harus ada di `M_Menu` (aktif atau nonaktif), porsi
+    bilangan bulat 0–100.000 (`periksaPorsi_`), menu ganda ditolak; baris yang ada ditimpa (`Log_Perubahan` kolom Porsi), menu yang
+    tidak dikirim tetap. Tanpa tab: `simpanPenjualan` dengan porsi menolak dengan petunjuk setupSpreadsheet, tanpa porsi tetap jalan.
+    Ganti nama menu mengganti Nama Menu di `Data_PenjualanMenu` (`gantiNamaMenuPenjualan_`).
+254. **Hitungan** (`bahanMentahMenu_`, `pemakaianTeoritis_`, `bandingTeoritis_`): bahan mentah per porsi = takaran bersih ÷ hasil
+    bersih; bahan yang punya resep aktif dipecah ke bahan resepnya (qty ÷ hasil × qty bahan, bertingkat; resep tanpa hasil/bahan atau
+    melingkar masuk `tidakBisa`). Item "bahan" = predikat yang sama dengan `pemakaianBahan_` (tidak punya resep aktif), jadi kedua sisi
+    menilai item yang sama. Harga `hargaPada_` hari itu. `pemakaianBahan_` kini juga mengisi `peta` (qty dan nilai per bahan) untuk
+    perbandingan per item. Bahan lain (dipakai nyata tetapi tidak ada di menu mana pun) dibanding bahan kecil %. Lengkap = setiap hari
+    periode punya porsi, kecuali hari penjualan Rp 0 (`porsiKurang_`). Food cost seharusnya hanya jika penjualan juga lengkap. Resep
+    menu yang dipakai: yang sekarang (tidak ada riwayat resep, sama dengan HPP per menu).
+255. **Layar** (app.js): `bukaCatatPenjualan` memanggil `penjualanTanggal` setiap tanggal diganti (nomor muat menjaga jawaban yang
+    terlambat), mengisi penjualan dan catatan yang sudah tercatat jika belum diketik, dan menampilkan daftar porsi (`.porsi-*` di
+    app.css). Gagal memuat (server lama, tanpa sinyal): penjualan tetap bisa disimpan tanpa porsi. Kartu `kartuTeoritis` di layar HPP
+    (kolom kiri, sesudah Pemakaian bahan); `BATAS_SELISIH_PORSI` = 2 (%) memilih tanda Baik atau Perlu ditinjau (keputusan tambahan:
+    spesifikasi tidak menyebut batas). Per menu: `m.porsi` (kolom Terjual di desktop). Kepala: "Seharusnya 43,9% menurut porsi terjual".
+256. **Dashboard dan rekap:** `ringkasHppDashboard_` menggabungkan hari tanpa penjualan dan hari tanpa porsi (sejak porsi pertama) ke
+    pengingat `penjualan`, dengan "(porsi per menu tanggal …)" di keterangannya. Rekap bulanan: `hasil.hpp.teoritis`, bagian PDF
+    `isiPdfRekapTeoritis_` (tabel seharusnya/nyata/selisih, catatan cara hitung, 10 bahan) sebelum "Menu di atas target", dan satu
+    baris di email. Sebelum porsi pernah dicatat, rekap dan email sama persis dengan v0.17.
+257. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js` dengan jam tiruan dan data Oktober
+    (Ayam hasil bersih 80%, Nasi, Sambal dari resep Cabai, Minyak di luar menu, 50 porsi): seharusnya Rp 659.200 (640.000 + bahan kecil
+    3%), nyata Rp 701.200, selisih +Rp 42.000 (+6,4%), food cost seharusnya 43,9% vs 46,7%, per bahan Ayam +1 kg +Rp 40.000, dihitung
+    tangan. 10 uji server (validasi porsi, belum lengkap, hari tutup, Log_Perubahan, ganti nama menu, rekap PDF, Staff ditolak, tanpa
+    tab), 10 jawaban aksi lama (hpp dua bulan, dashboard, daftarMenu, beranda, formStock, riwayat, simpanPenjualan, email harian dan
+    rekap, isi PDF rekap) sama dengan v0.17. Chromium: alur kartu Menunggu → Catat porsi 16 Okt → porsi 2,5 ditolak → simpan → kartu
+    lengkap dan kepala, lembar dibuka lagi terisi, Per menu dan tabel desktop, Dashboard tanpa pengingat, server lama tanpa
+    `penjualanTanggal`, delapan ukuran (tanpa gulir samping, elemen keluar layar, sasaran < 44 px), tanpa galat konsol. Belum diuji di
+    Supabase asli dan di HP.

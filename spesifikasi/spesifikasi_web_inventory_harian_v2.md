@@ -31,6 +31,8 @@
 > (Bagian 5.4).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik): item nonaktif yang belum punya catatan apa pun,
 > misalnya item yang salah dibuat, bisa dihapus (Bagian 5.1).
+> Diperbarui 17 Oktober 2026 (permintaan pemilik): penjualan per menu dan pemakaian bahan seharusnya
+> dibanding nyata (Bagian 5.9, 9.3, dan 10).
 > Diperbarui 17 Oktober 2026 (permintaan pemilik, dari telaah keamanan): kunci PIN bertingkat
 > (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci terlihat oleh Pengelola, dan PIN
 > baru yang terlalu mudah ditebak ditolak (Bagian 7.2 dan 10).
@@ -803,6 +805,7 @@ Semuanya khusus Pengelola dan diperiksa di server.
 | `M_Menu` | Nama Menu, Harga Jual (Rp), Aktif | Harga jual tanpa pajak dan service |
 | `M_MenuBahan` | Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih (%) | Takaran bersih per porsi; Hasil Bersih kosong = 100% |
 | `Data_Penjualan` | Tanggal, Penjualan (Rp), Catatan, ditambah kolom sistem Bagian 5.0 | Satu baris per tanggal |
+| `Data_PenjualanMenu` | Tanggal, Nama Menu, Porsi, Harga Jual (Rp), ditambah kolom sistem Bagian 5.0 | Satu baris per menu per tanggal; harga jual tersalin saat dicatat |
 | `M_Konfigurasi` | `target_food_cost` (persen, awal 35), `bahan_kecil_persen` (persen, awal 3) | Diubah dari Pengaturan → Outlet dan jadwal |
 
 **Aturan menu:**
@@ -869,8 +872,32 @@ Semuanya khusus Pengelola dan diperiksa di server.
 - Pengingat di Dashboard ("Perlu perhatian", Menunggu): hari bulan ini yang belum punya catatan
   penjualan, dihitung mulai penjualan pertama yang pernah dicatat, supaya tidak ada pengingat
   sebelum fitur ini dipakai.
-- Kasir outlet buatan sendiri. Penjualan per menu dan perbandingan pemakaian teoritis dan aktual
-  belum dibangun; kelak bisa memakai data dari kasir itu.
+- Kasir outlet buatan sendiri; angkanya diketik dari laporan kasir harian.
+
+**Penjualan per menu dan pemakaian seharusnya** (keputusan pemilik 17 Oktober 2026):
+
+- Bersama penjualan harian, Pengelola mengetik **porsi terjual per menu** (bilangan bulat 0 atau
+  lebih) di lembar yang sama. Kosong berarti belum dicatat; 0 berarti tidak terjual. Menu yang
+  tidak diisi tidak berubah. Menimpa porsi yang sudah ada tercatat di `Log_Perubahan`. Total
+  penjualan (Rp) tetap diketik sendiri, karena diskon dan promo membuatnya berbeda dari porsi ×
+  harga jual; aplikasi hanya menampilkan porsi × harga jual sebagai pembanding.
+- **Pemakaian seharusnya** = jumlah per hari (porsi terjual × bahan per porsi × harga yang berlaku
+  hari itu), ditambah bahan kecil %. Bahan per porsi = takaran bersih ÷ hasil bersih. Bahan barang
+  jadi dipecah menjadi bahan resepnya (qty ÷ hasil per 1 resep × qty bahan, bertingkat), supaya sama
+  dengan pemakaian nyata yang menghitung bahan saat dipakai prep. Dipakai resep menu yang berlaku
+  sekarang.
+- **Seharusnya vs nyata:** dibandingkan dengan pemakaian bahan (di atas) hanya jika setiap hari dalam
+  periode punya porsi per menu; hari dengan penjualan Rp 0 (tutup) tidak perlu. Selisih = nyata −
+  seharusnya; plus berarti bahan terpakai lebih banyak dari porsi yang terjual (bocor, porsi
+  berlebih, waste, atau pencatatan keliru). Selisih paling banyak 2% dari seharusnya dianggap sesuai.
+  Barang jadi yang belum terjual di akhir periode ikut menambah selisih.
+- Rincian: bahan menu (seharusnya vs nyata), bahan lain yang tidak ada di menu mana pun (bumbu,
+  minyak, garnish) dibanding bahan kecil %, 10 bahan dengan selisih rupiah terbesar (qty seharusnya,
+  nyata, selisih), food cost seharusnya, dan porsi terjual per menu.
+- Pengingat penjualan di Dashboard ikut menyebut hari yang belum punya porsi per menu, dihitung
+  mulai porsi pertama yang pernah dicatat.
+- Menu yang diganti nama membawa catatan porsinya. Porsi menu yang sudah tidak ada di `M_Menu`
+  (diubah tangan di Sheet) tidak dihitung dan namanya disebut.
 
 ---
 
@@ -1293,7 +1320,7 @@ untuk tanggal di bulan itu.
 | Prep | Total resep dan hasil per item |
 | Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat |
 | Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan |
-| HPP dan food cost | Pemakaian bahan dan rinciannya, penjualan, food cost dan target, pemakaian per kategori, menu di atas target (HPP dengan harga hari terakhir bulan itu); Bagian 5.9 |
+| HPP dan food cost | Pemakaian bahan dan rinciannya, penjualan, food cost dan target, pemakaian per kategori, pemakaian seharusnya (dari porsi terjual) vs nyata dengan 10 bahan berselisih terbesar (jika porsi per menu pernah dicatat), menu di atas target (HPP dengan harga hari terakhir bulan itu); Bagian 5.9 |
 
 ### 9.4 Cadangan otomatis mingguan
 
@@ -1333,7 +1360,8 @@ email pengingat terpisah. Keterangan di bawah ini untuk laporan harian.
   Satu email harian ke 2 atau 3 penerima hanya memakai 2 atau 3 dari batas itu.
 - Jika email gagal terkirim, data tetap aman di Sheet dan kegagalannya dicatat agar
   terlihat oleh Pengelola.
-- Email rekap bulanan memuat juga satu bagian HPP dan food cost (Bagian 5.9).
+- Email rekap bulanan memuat juga satu bagian HPP dan food cost (Bagian 5.9), termasuk pemakaian
+  seharusnya vs nyata jika porsi per menu pernah dicatat.
 - Sejak pindah ke Supabase (Bagian 4.5) email dikirim lewat Brevo, atau dari Gmail pemilik
   lewat Apps Script jika Brevo tidak dipasang.
 
@@ -1472,6 +1500,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
 11. **Tahap 11 (opsional):** foto bukti waste, arsip data tahunan, penambahan outlet
 12. **HPP dan food cost** (17 Oktober 2026): Pengaturan → Menu, layar HPP dan food cost dari
     Dashboard, penjualan harian, bagian HPP di rekap bulanan
+13. **Penjualan per menu** (17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan,
+    pemakaian seharusnya vs nyata di layar HPP, rekap bulanan, dan email
 
 ---
 

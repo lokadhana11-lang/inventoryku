@@ -16,6 +16,9 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
+> Tambahan 17 Oktober 2026 (permintaan pemilik): porsi terjual per menu di lembar Catat penjualan,
+> kartu "Seharusnya vs nyata" dan food cost seharusnya di layar HPP, porsi terjual di Per menu
+> (Bagian 5.10 dan 7).
 > Tambahan 17 Oktober 2026 (permintaan pemilik, keamanan login): pesan kunci 24 jam di Login,
 > pemberitahuan akun terkunci di Beranda dan Dashboard Pengelola, tanda kunci di Staff dan PIN, dan
 > pesan PIN yang terlalu mudah ditebak (Bagian 5.1, 5.2, 5.7, dan 7).
@@ -1001,16 +1004,35 @@ menu `#/hpp/menu`).
 - **Penjualan belum lengkap:** food cost di kepala "–", dan di atas rincian kartu Menunggu "Penjualan
   belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat." dengan
   tombol utama "Catat penjualan 9 Okt".
+- **Seharusnya vs nyata** (kartu kedua di kolom kiri, spesifikasi sistem Bagian 5.9): sebelum porsi
+  per menu pernah dicatat, ajakan "Catat porsi terjual per menu saat mencatat penjualan. …" dengan
+  tombol "Catat penjualan". Porsi belum lengkap: kartu Menunggu "Porsi per menu belum dicatat untuk
+  1 hari: 16 Okt. …" dengan "Catat porsi 16 Okt". Lengkap: "50 porsi terjual.", tanda (Baik "Sesuai
+  porsi terjual" jika selisih paling banyak 2% dari seharusnya; selain itu Perlu ditinjau "Terpakai
+  lebih banyak dari porsi terjual" atau "… lebih sedikit …"), Seharusnya, Nyata, Selisih
+  ("+Rp 42.000 (+6,4%)"), "Food cost seharusnya 43,9%, nyata 46,7%.", rincian yang bisa dibuka
+  ("Bahan menu dan bahan lain", "Selisih per bahan": "Ayam · seharusnya 12,5 kg, nyata 13,5 kg
+  +Rp 40.000", 10 terbesar), kalimat cara hitung, dan peringatan bahan tanpa harga, menu yang tidak
+  ada lagi, atau resep yang tidak bisa dipakai. Kepala navy menulis "Seharusnya 43,9% menurut porsi
+  terjual" di bawah food cost.
 - **Per menu:** menu aktif urut food cost tertinggi. HP dan tablet: daftar (nama, "Harga jual Rp
-  55.000 · HPP Rp 21.840", tanda, persen di kanan); laptop/desktop: tabel (Menu, Harga jual, HPP per
-  porsi, Food cost, Margin kotor, Harga untuk 35%, Keadaan). Ketuk menu untuk membukanya di
+  55.000 · HPP Rp 21.840 · 50 porsi terjual", tanda, persen di kanan); laptop/desktop: tabel (Menu,
+  Terjual, Harga jual, HPP per porsi, Food cost, Margin kotor, Harga untuk 35%, Keadaan). Porsi
+  terjual hanya tampil setelah porsi per menu pernah dicatat. Ketuk menu untuk membukanya di
   Pengaturan → Menu. Di bawahnya "Atur menu di Pengaturan".
 - Laptop/desktop: bagian Bulan dua kolom (rincian kiri; grafik dan penjualan kanan).
 - **Lembar "Catat penjualan":** tanggal (tombol berjajar "Kemarin, 16 Okt" dan "Tanggal lain" dengan
   pemilih tanggal, maksimal hari ini), "Penjualan (Rp)" ("Total penjualan makanan dan minuman dari
   kasir, sebelum pajak dan service. Hari tutup: isi 0."), "Sudah tercatat Rp 100.000. Menyimpan
-  akan menggantinya." bila tanggal itu sudah ada, "Catatan (tidak wajib)", "Batal" dan "Simpan
-  penjualan". Sesudahnya "Penjualan 16 Okt tersimpan." dan angka di layar langsung diperbarui.
+  akan menggantinya." bila tanggal itu sudah ada (angka dan catatannya ikut terisi), "Catatan
+  (tidak wajib)", lalu bagian "Porsi terjual per menu": "Dari laporan kasir. Kosong: belum dicatat.
+  0: tidak terjual. …", satu baris per menu aktif (nama, harga jual kecil di bawahnya, kolom angka
+  96 px di kanan; porsi yang sudah tercatat terisi), dan "Porsi × harga jual: Rp 900.000. Bisa
+  berbeda dari kasir karena diskon atau promo.". Porsi yang bukan bilangan bulat: "Isi bilangan
+  bulat 0 atau lebih, misalnya 12." di bawah kolomnya. Daftar menu dimuat dari server setiap tanggal
+  diganti ("Memuat menu…"); jika gagal: "Daftar menu tidak termuat (…). Penjualan tetap bisa disimpan
+  tanpa porsi." "Batal" dan "Simpan penjualan". Sesudahnya "Penjualan 16 Okt tersimpan, dengan porsi
+  2 menu." dan angka di layar langsung diperbarui.
 
 ---
 
@@ -1058,6 +1080,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
+| Seharusnya vs nyata | "Terpakai lebih banyak dari porsi terjual" / "Sesuai porsi terjual" |
 | PIN terlalu mudah | "PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain." |
 | Kunci 24 jam | "PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN." |
 | Form kustom tersimpan | "Form tersimpan dan sudah tampil di Beranda." |
