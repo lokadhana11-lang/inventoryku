@@ -3,7 +3,7 @@
 // layanan pengganti (layanan.js). Dipakai rakit.mjs (Edge Function) dan uji di Node.
 
 export const NAMA_LAYANAN = ['SpreadsheetApp', 'DriveApp', 'MailApp', 'Utilities', 'ScriptApp', 'Session', 'PropertiesService',
-  'CacheService', 'LockService', 'ContentService', 'Charts', 'console', 'Date', 'DI_SUPABASE', 'SUPABASE_'];
+  'CacheService', 'LockService', 'ContentService', 'Charts', 'console', 'Date', 'DI_SUPABASE', 'SUPABASE_', 'NotifikasiHp'];
 
 /** Isi fungsi buatKodeGs(G): Code.gs utuh, lalu objek berisi semua fungsi tingkat atasnya. */
 export function bungkusKodeGs(teks) {

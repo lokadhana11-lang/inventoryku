@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const dasar = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(dasar, 'src');
-const urutan = ['sheet', 'layanan', 'penyimpanan', 'pdf', 'bungkus', 'runtime', 'sinkron', 'adaptor', 'server'];
+const urutan = ['sheet', 'layanan', 'penyimpanan', 'pdf', 'bungkus', 'runtime', 'sinkron', 'adaptor', 'push', 'server'];
 
 function ubahModul(nama, teks) {
   const ekspor = [];
@@ -50,10 +50,11 @@ const adaptor = __adaptor.buatAdaptor({
   sql, url: env('SUPABASE_URL'), kunci: env('SUPABASE_SERVICE_ROLE_KEY'), brevo: env('BREVO_API_KEY'),
   pengirim: env('SUREL_PENGIRIM'), alamatApi
 });
+const push = __push.buatPush({ sql, kontak: alamatApi });
 const runtime = __runtime.buatRuntime({
   sql, buatKodeGs: pabrik, crypto: nodeCrypto, Buffer, htmlKePdf: __pdf.buatHtmlKePdf(jsPDF),
   unggah: adaptor.unggah, alamatBerkas: adaptor.alamatBerkas, hapusBerkas: adaptor.hapusBerkas,
-  kirimSurel: adaptor.kirimSurel, pasangJadwal: adaptor.pasangJadwal, tambahan: { alamatApi }
+  kirimSurel: adaptor.kirimSurel, pasangJadwal: adaptor.pasangJadwal, push, tambahan: { alamatApi }
 });
 Deno.serve(__server.buatPelayan({ runtime, sql, adaptor, rahasiaSinkron: env('RAHASIA_SINKRON') }));
 `;

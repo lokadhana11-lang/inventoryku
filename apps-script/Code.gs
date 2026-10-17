@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.18 (penjualan per menu, pemakaian seharusnya vs nyata)
+// InventoryKu Code.gs v0.19 (notifikasi ke HP)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -54,6 +54,9 @@
  * - 17 Oktober 2026    : penjualan per menu (Data_PenjualanMenu, aksi
  *                        penjualanTanggal, porsi di simpanPenjualan) dan
  *                        pemakaian bahan seharusnya vs nyata (hpp.teoritis).
+ * - 17 Oktober 2026    : notifikasi ke HP (Web Push, hanya di Supabase): aksi
+ *                        infoNotifikasi, aturNotifikasi, ujiNotifikasi;
+ *                        pengingatSuhuOpening/Middle/Closing (trigger harian).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -74,7 +77,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.18';
+var VERSI_KODE = 'v0.19';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -223,7 +226,10 @@ var AKSI_ = {
   simpanPenjualan: { jalankan: aksiSimpanPenjualan_, pengelola: true,
     pesan: 'Penjualan hanya bisa dicatat Head Kitchen atau Manager.' },
   penjualanTanggal: { jalankan: aksiPenjualanTanggal_, bacaSaja: true, pengelola: true,
-    pesan: 'Penjualan hanya bisa dicatat Head Kitchen atau Manager.' }
+    pesan: 'Penjualan hanya bisa dicatat Head Kitchen atau Manager.' },
+  infoNotifikasi: { jalankan: aksiInfoNotifikasi_, bacaSaja: true },
+  aturNotifikasi: { jalankan: aksiAturNotifikasi_ },
+  ujiNotifikasi: { jalankan: aksiUjiNotifikasi_ }
 };
 
 /**
@@ -1168,6 +1174,10 @@ function aksiLogin_(body) {
     if (g.s) {
       // Pemberitahuan "terkunci" di Beranda Pengelola langsung tampil (simpanan Beranda tidak dipakai lagi).
       tandaiDataBerubah_();
+      kirimNotifikasi_('pengelola', { judul: staff.nama + ' terkunci karena PIN salah',
+        isi: (g.p ? 'Salah berulang kali dalam 24 jam; mungkin ada yang mencoba menebaknya. ' : '') +
+          'Terbuka sendiri ' + waktuPendekId_(new Date(g.s)) + '. Ketuk untuk membuat PIN baru.',
+        url: '#/pengaturan/staff/' + encodeURIComponent(staff.nama) + '/pin', tag: 'kunci-' + staff.nama.toLowerCase(), mendesak: !!g.p });
       if (g.p) {
         throw galatPengguna_('PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN.');
       }
@@ -1206,6 +1216,8 @@ function aksiLupaPin_(body) {
     if (staff.reset) return { sudahAda: true, waktu: staff.reset.toISOString() };
     var kini = new Date();
     tulisStaff_(info, staff, { reset: kini });
+    kirimNotifikasi_('pengelola', { judul: staff.nama + ' meminta reset PIN', isi: 'Ketuk untuk membuat PIN baru.',
+      url: '#/pengaturan/staff/' + encodeURIComponent(staff.nama) + '/pin', tag: 'reset-' + staff.nama.toLowerCase() });
     return { sudahAda: false, waktu: kini.toISOString() };
   });
 }
@@ -3010,6 +3022,7 @@ function aksiKirimSuhu_(body, pengguna) {
     }
     var dalamKiriman = {};
     var luar = 0;
+    var daftarLuar = [];
     var baru = masukan.map(function (b) {
       var u = unit[rapikanTeks_(b && b.unit).toLowerCase()];
       if (!u) throw galatPengguna_('Unit ' + rapikanTeks_(b && b.unit) + ' tidak ada di daftar unit. Muat ulang form.');
@@ -3028,6 +3041,7 @@ function aksiKirimSuhu_(body, pengguna) {
       var tindakan = rapikanTeks_(b.tindakan).slice(0, 200);
       if (status === STATUS_SUHU_LUAR) {
         luar++;
+        daftarLuar.push(u.nama + ' ' + suhuId_(suhu) + (tindakan ? ' (' + tindakan + ')' : ''));
         if (!tindakan) {
           throw galatPengguna_('Suhu ' + u.nama + ' di luar standar. Tulis tindakan korektif sebelum mengirim.');
         }
@@ -3047,6 +3061,14 @@ function aksiKirimSuhu_(body, pengguna) {
 
     tambahBarisTabel_(tabel, baru);
     urutkanSuhu_(tabel);
+    // Notifikasi ke HP Pengelola (Code.gs v0.19): suhu di luar standar.
+    if (luar) {
+      kirimNotifikasi_('pengelola', {
+        judul: 'Suhu di luar standar: ' + waktu + (tanggal === hariIni_() ? '' : ' ' + tanggalSedangId_(tanggal)),
+        isi: daftarLuar.join(' · ') + '. Dicatat ' + pengguna.nama + '.',
+        url: '#/suhu', tag: 'suhu-luar', mendesak: true
+      });
+    }
     return { sudahTerkirim: false, jumlah: baru.length, luarStandar: luar, form: dataFormSuhu_(tanggal) };
   });
 }
@@ -4338,6 +4360,183 @@ function aksiAturUnitAktif_(body) {
   });
 }
 
+/* =========================================================================
+ * Notifikasi ke HP (Web Push, Code.gs v0.19; spesifikasi sistem Bagian 10.1).
+ * Hanya di Supabase: layanan NotifikasiHp (supabase/src/layanan.js) menitipkan
+ * notifikasi, dan runtime mengirimnya sesudah data tersimpan. Di Apps Script
+ * NotifikasiHp tidak ada, jadi semua fungsi di sini diam saja.
+ * Langganan per HP disimpan di Script Properties (PUSH_<hash alamat>), atas
+ * nama pengguna yang menyalakannya. Pengelola menerima suhu di luar standar,
+ * permintaan reset PIN, dan akun terkunci; semua HP menerima pengingat cek suhu.
+ * ========================================================================= */
+
+var AWALAN_PUSH = 'PUSH_';
+var LANGGANAN_PUSH_MAKS = 50;
+/** Pengingat cek suhu: waktu cek, kunci M_Konfigurasi, fungsi trigger, jam awal, nama field Outlet dan jadwal. */
+var PENGINGAT_SUHU = [
+  { waktu: 'Opening', kunci: 'jam_cek_opening', fungsi: 'pengingatSuhuOpening', awal: '08:00', field: 'jamCekOpening' },
+  { waktu: 'Middle', kunci: 'jam_cek_middle', fungsi: 'pengingatSuhuMiddle', awal: '14:00', field: 'jamCekMiddle' },
+  { waktu: 'Closing', kunci: 'jam_cek_closing', fungsi: 'pengingatSuhuClosing', awal: '21:00', field: 'jamCekClosing' }
+];
+var KETERANGAN_JAM_CEK = 'Jam pengingat cek suhu ke HP (jj:mm), dikirim jika waktu cek itu belum lengkap. Kosong = tanpa pengingat. ' +
+  'Diubah dari Pengaturan → Outlet dan jadwal.';
+
+/** Notifikasi bisa dikirim: berjalan di Supabase dan kunci VAPID sudah ada. */
+function notifikasiTersedia_() {
+  return typeof NotifikasiHp !== 'undefined' && !!NotifikasiHp.kunciPublik();
+}
+
+function kunciLanggananPush_(endpoint) {
+  return AWALAN_PUSH + sha256Heks_(String(endpoint)).slice(0, 32);
+}
+
+/** Semua langganan: [{ kunci, endpoint, keys: { p256dh, auth }, nama, waktu }], terbaru dulu. */
+function bacaLanggananPush_() {
+  var semua = PropertiesService.getScriptProperties().getProperties();
+  var hasil = [];
+  Object.keys(semua).forEach(function (k) {
+    if (k.indexOf(AWALAN_PUSH) !== 0) return;
+    var l = bacaJson_(semua[k]);
+    if (!l || !l.endpoint || !l.keys) return;
+    l.kunci = k;
+    hasil.push(l);
+  });
+  return hasil.sort(function (a, b) { return (b.waktu || 0) - (a.waktu || 0); });
+}
+
+/** Jam pengingat satu waktu cek: nilai M_Konfigurasi (kosong = mati), atau jam awal jika barisnya belum ada. */
+function jamPengingat_(n, p) {
+  if (!Object.prototype.hasOwnProperty.call(n, p.kunci)) return p.awal;
+  return jamSah_(n[p.kunci]);
+}
+
+/**
+ * Menitipkan notifikasi ke HP yang berlangganan. sasaran: 'pengelola' (HP yang
+ * dinyalakan Head Kitchen atau Manager aktif) atau 'semua' (HP staff aktif mana pun).
+ * isi: { judul, isi, url (alamat di aplikasi, misalnya '#/suhu'), tag, mendesak? }.
+ * Mengembalikan jumlah HP yang dititipi.
+ */
+function kirimNotifikasi_(sasaran, isi) {
+  if (!notifikasiTersedia_()) return 0;
+  var staff = bacaStaff_().daftar;
+  var n = 0;
+  bacaLanggananPush_().forEach(function (l) {
+    var s = cariStaff_(staff, l.nama);
+    if (!s || !s.aktif || !s.hash) return;
+    if (sasaran === 'pengelola' && !apakahPengelola_(s.role)) return;
+    NotifikasiHp.kirim({ endpoint: l.endpoint, keys: l.keys }, isi);
+    n++;
+  });
+  return n;
+}
+
+/** Dipanggil runtime Supabase: langganan yang ditolak layanan push (404/410) dibuang. */
+function hapusLanggananPush_(daftarEndpoint) {
+  var props = PropertiesService.getScriptProperties();
+  (daftarEndpoint || []).forEach(function (e) { props.deleteProperty(kunciLanggananPush_(e)); });
+}
+
+/** Keadaan notifikasi untuk HP ini: { tersedia, kunciPublik, aktif, atasNama, pengelola, pengingat: [{ waktu, jam }] }. */
+function dataNotifikasi_(endpoint, pengguna) {
+  var n = bacaKonfigurasi_().nilai;
+  var tersedia = notifikasiTersedia_();
+  var l = null;
+  if (endpoint) {
+    var x = bacaJson_(PropertiesService.getScriptProperties().getProperty(kunciLanggananPush_(endpoint)));
+    if (x && x.endpoint === endpoint) l = x;
+  }
+  return {
+    tersedia: tersedia,
+    kunciPublik: tersedia ? NotifikasiHp.kunciPublik() : '',
+    aktif: !!l,
+    atasNama: l ? l.nama : '',
+    pengelola: !!pengguna.pengelola,
+    pengingat: PENGINGAT_SUHU.map(function (p) { return { waktu: p.waktu, jam: jamPengingat_(n, p) }; })
+  };
+}
+
+function periksaEndpoint_(e) {
+  e = String(e == null ? '' : e);
+  if (!/^https:\/\/[^\s"'<>]{8,1900}$/.test(e)) throw galatPengguna_('Langganan notifikasi tidak terbaca. Matikan lalu nyalakan lagi.');
+  return e;
+}
+
+function aksiInfoNotifikasi_(body, pengguna) {
+  return dataNotifikasi_(body.endpoint ? periksaEndpoint_(body.endpoint) : '', pengguna);
+}
+
+/**
+ * Menyalakan atau mematikan notifikasi di HP ini. body: { aktif: true, langganan: { endpoint,
+ * keys: { p256dh, auth } } } atau { aktif: false, endpoint }. Menyalakan mengganti pemilik
+ * langganan HP itu menjadi pengguna sekarang. Paling banyak LANGGANAN_PUSH_MAKS HP; yang paling
+ * lama dibuang.
+ */
+function aksiAturNotifikasi_(body, pengguna) {
+  if (body.aktif === true) {
+    if (!notifikasiTersedia_()) throw galatPengguna_('Notifikasi belum tersedia di server ini.');
+    var l = body.langganan || {};
+    var endpoint = periksaEndpoint_(l.endpoint);
+    var keys = l.keys || {};
+    var pola = /^[A-Za-z0-9_-]+={0,2}$/;
+    if (!pola.test(String(keys.p256dh || '')) || String(keys.p256dh).length < 80 || String(keys.p256dh).length > 100 ||
+      !pola.test(String(keys.auth || '')) || String(keys.auth).length < 16 || String(keys.auth).length > 32) {
+      throw galatPengguna_('Langganan notifikasi tidak terbaca. Matikan lalu nyalakan lagi.');
+    }
+    return denganKunci_(function () {
+      var props = PropertiesService.getScriptProperties();
+      props.setProperty(kunciLanggananPush_(endpoint), JSON.stringify({
+        endpoint: endpoint, keys: { p256dh: String(keys.p256dh), auth: String(keys.auth) }, nama: pengguna.nama, waktu: Date.now()
+      }));
+      bacaLanggananPush_().slice(LANGGANAN_PUSH_MAKS).forEach(function (x) { props.deleteProperty(x.kunci); });
+      return dataNotifikasi_(endpoint, pengguna);
+    });
+  }
+  var e = periksaEndpoint_(body.endpoint);
+  return denganKunci_(function () {
+    PropertiesService.getScriptProperties().deleteProperty(kunciLanggananPush_(e));
+    return dataNotifikasi_(e, pengguna);
+  });
+}
+
+/** Notifikasi uji ke HP ini saja (harus sudah berlangganan). */
+function aksiUjiNotifikasi_(body, pengguna) {
+  var e = periksaEndpoint_(body.endpoint);
+  var l = bacaJson_(PropertiesService.getScriptProperties().getProperty(kunciLanggananPush_(e)));
+  if (!l || l.endpoint !== e || !notifikasiTersedia_()) throw galatPengguna_('Notifikasi di HP ini belum menyala.');
+  NotifikasiHp.kirim({ endpoint: l.endpoint, keys: l.keys },
+    { judul: 'Notifikasi InventoryKu menyala', isi: 'HP ini akan menerima notifikasi untuk ' + l.nama + '.', url: '#/', tag: 'uji' });
+  return { terkirim: true };
+}
+
+function pengingatSuhuOpening() { return pengingatSuhu_('Opening'); }
+function pengingatSuhuMiddle() { return pengingatSuhu_('Middle'); }
+function pengingatSuhuClosing() { return pengingatSuhu_('Closing'); }
+
+/**
+ * Pengingat cek suhu (trigger harian pada jam di Outlet dan jadwal): jika waktu cek itu
+ * belum diisi untuk semua unit aktif hari ini, semua HP yang berlangganan diberi notifikasi.
+ * Tidak dikirim jika form Suhu disembunyikan atau tidak ada unit aktif.
+ */
+function pengingatSuhu_(waktu) {
+  if (!notifikasiTersedia_()) return console.log('Notifikasi tidak tersedia; pengingat ' + waktu + ' dilewati.');
+  var suhu = bacaDaftarForm_().filter(function (f) { return f.id === 'SUHU'; })[0];
+  if (!suhu || !suhu.aktif) return console.log('Form Suhu disembunyikan; pengingat dilewati.');
+  var unit = bacaUnit_().filter(function (u) { return u.aktif; });
+  if (!unit.length) return console.log('Tidak ada unit aktif; pengingat dilewati.');
+  var sudah = {};
+  bacaBarisTanggal_('Data_Suhu', hariIni_(), zonaSheet_(), ['Nama Unit', 'Waktu Cek']).forEach(function (b) {
+    if (rapikanTeks_(b['Waktu Cek']).toLowerCase() === waktu.toLowerCase()) sudah[rapikanTeks_(b['Nama Unit']).toLowerCase()] = true;
+  });
+  var kurang = unit.filter(function (u) { return !sudah[u.nama.toLowerCase()]; }).map(function (u) { return u.nama; });
+  if (!kurang.length) return console.log('Suhu ' + waktu + ' sudah lengkap; pengingat tidak dikirim.');
+  var n = kirimNotifikasi_('semua', {
+    judul: 'Waktunya cek suhu ' + waktu,
+    isi: 'Belum diisi: ' + daftarNamaSingkat_(kurang) + '.',
+    url: '#/suhu', tag: 'pengingat-suhu', mendesak: true, ttl: 3 * 3600
+  });
+  console.log('Pengingat suhu ' + waktu + ' dikirim ke ' + n + ' HP.');
+}
+
 /* ---------- Pengaturan → Outlet dan jadwal ---------- */
 
 /** "21:30" dari teks jj:mm atau jj.mm (atau nilai waktu Sheet); '' jika tidak sah. */
@@ -4392,6 +4591,10 @@ function dataOutletJadwal_() {
     keluarOtomatisMenit: keluarOtomatisMenit_(n.keluar_otomatis_menit),
     targetFoodCost: targetFoodCost_(n),
     bahanKecilPersen: bahanKecilPersen_(n),
+    jamCekOpening: jamPengingat_(n, PENGINGAT_SUHU[0]),
+    jamCekMiddle: jamPengingat_(n, PENGINGAT_SUHU[1]),
+    jamCekClosing: jamPengingat_(n, PENGINGAT_SUHU[2]),
+    notifikasiTersedia: notifikasiTersedia_(),
     perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
   };
 }
@@ -4446,6 +4649,13 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     baru.bahanKecilPersen = persenIsian_(body.bahanKecilPersen, 0, BAHAN_KECIL_MAKS);
     if (baru.bahanKecilPersen == null) throw galatPengguna_('Bahan kecil diisi persen 0 sampai ' + BAHAN_KECIL_MAKS + ', misalnya 3.');
   }
+  // Jam pengingat cek suhu: jj:mm, atau kosong untuk mematikan pengingat itu.
+  PENGINGAT_SUHU.forEach(function (p) {
+    if (!ada(p.field)) return;
+    var t = String(body[p.field]).trim();
+    baru[p.field] = t === '' ? '' : jamSah_(t);
+    if (t !== '' && !baru[p.field]) throw galatPengguna_('Jam pengingat ' + p.waktu + ' diisi jj:mm, misalnya 08:00, atau dikosongkan.');
+  });
 
   return denganKunci_(function () {
     var kini = dataOutletJadwal_();
@@ -4475,6 +4685,21 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     }
     if (berubah('bahanKecilPersen')) {
       tulisKonfigurasi_('bahan_kecil_persen', String(baru.bahanKecilPersen).replace('.', ','), KETERANGAN_BAHAN_KECIL);
+    }
+    var pengingatBerubah = false;
+    PENGINGAT_SUHU.forEach(function (p) {
+      if (!berubah(p.field)) return;
+      tulisKonfigurasi_(p.kunci, baru[p.field], KETERANGAN_JAM_CEK);
+      pengingatBerubah = true;
+    });
+    // Pengingat hanya berjalan di Supabase; di sana jadwalnya langsung dipasang ulang.
+    if (pengingatBerubah && DI_SUPABASE_ && !(berubah('zonaWaktu') || berubah('jamClosing') || berubah('jedaLaporanMenit') ||
+      berubah('hariCadangan'))) {
+      try {
+        pasangTrigger();
+      } catch (err) {
+        console.error('Jadwal pengingat tidak bisa dipasang ulang: ' + err);
+      }
     }
     var jadwalBerubah = berubah('zonaWaktu') || berubah('jamClosing') || berubah('jedaLaporanMenit') || berubah('hariCadangan');
     if (jadwalBerubah) {
@@ -9907,8 +10132,20 @@ function pasangTrigger() {
     .onWeekDay(ScriptApp.WeekDay[hari]).atHour(JAM_CADANGAN).inTimezone(zona).create();
   ScriptApp.newTrigger('kirimRekapBulanan').timeBased()
     .onMonthDay(1).atHour(JAM_REKAP).inTimezone(zona).create();
+  // Pengingat cek suhu ke HP (Code.gs v0.19): hanya di Supabase, karena Apps Script tidak bisa mengirim notifikasi.
+  var pengingat = [];
+  if (DI_SUPABASE_) {
+    PENGINGAT_SUHU.forEach(function (p) {
+      var jam = jamPengingat_(konf, p);
+      if (!jam) return;
+      ScriptApp.newTrigger(p.fungsi).timeBased()
+        .atHour(Number(jam.slice(0, 2))).nearMinute(Number(jam.slice(3, 5))).everyDays(1).inTimezone(zona).create();
+      pengingat.push(p.waktu + ' ' + jam);
+    });
+  }
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
-  var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00';
+  var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00' +
+    (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '');
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');
   catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +

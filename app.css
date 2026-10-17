@@ -6584,6 +6584,24 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
   margin: 0;
 }
 
+/* Lembar Notifikasi di HP ini (0.20.0) */
+.notif {
+  display: grid;
+  gap: 12px;
+}
+
+.notif-daftar {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.notif-sakelar {
+  border-top: 1px solid var(--garis-halus);
+  padding-top: 12px;
+}
+
 /* Porsi terjual per menu di lembar Catat penjualan (0.19.0) */
 .porsi-wadah {
   margin-top: 8px;

@@ -36,7 +36,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 │   ├── skema.sql      tabel Postgres (skema inventoryku), bucket arsip, pg_cron/pg_net; ditempel di SQL Editor
 │   ├── src/           runtime Edge Function: sheet.js (tiruan SpreadsheetApp), layanan.js (Drive, Mail, Properties,
 │   │                  Utilities, ScriptApp), penyimpanan.js, runtime.js, pdf.js (HTML laporan → PDF), sinkron.js
-│   │                  (impor, salinan ke Sheets, berkas, email), adaptor.js (Storage, Brevo, pg_cron), server.js (HTTP)
+│   │                  (impor, salinan ke Sheets, berkas, email), adaptor.js (Storage, Brevo, pg_cron), push.js
+│   │                  (notifikasi Web Push: kunci VAPID, enkripsi aes128gcm), server.js (HTTP)
 │   ├── rakit.mjs      node supabase/rakit.mjs → functions/api/index.ts (src + Code.gs dalam satu file)
 │   ├── functions/api/index.ts   HASIL RAKITAN, ditempel tangan ke editor Edge Function; jangan diubah langsung
 │   └── PANDUAN.md     langkah pemilik untuk pindah
@@ -223,6 +224,12 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   bahanMenu: { seharusnya, nyata }, bahanLain: { seharusnya, nyata }, item: [{ nama, satuan, seharusnya, nyata, selisih, nilaiSeharusnya,
   nilaiNyata, selisihRp }], jumlahItem, tanpaHarga, tidakBisa, menuTakDikenal }`, `menu[].porsi` (null sebelum porsi pernah dicatat), dan
   `siap.porsi`.
+- Notifikasi ke HP (Code.gs v0.19, 17 Oktober 2026; bertoken, semua role): `infoNotifikasi {endpoint?}` → `{ tersedia, kunciPublik,
+  aktif, atasNama, pengelola, pengingat: [{ waktu, jam }] }`; `aturNotifikasi {aktif: true, langganan: { endpoint, keys: { p256dh, auth } }}`
+  atau `{aktif: false, endpoint}` → jawaban yang sama; `ujiNotifikasi {endpoint}` → `{ terkirim }`. `bacaOutletJadwal`/`simpanOutletJadwal`
+  ditambah `jamCekOpening`, `jamCekMiddle`, `jamCekClosing` ('' = mati) dan (baca) `notifikasiTersedia`. Fungsi trigger:
+  `pengingatSuhuOpening`, `pengingatSuhuMiddle`, `pengingatSuhuClosing` (juga di `FUNGSI_JADWAL` server.js). Isi notifikasi (JSON di
+  dalam Web Push): `{ judul, isi, url, tag, mendesak?, ttl? }`.
 - Keamanan login (Code.gs v0.17, 17 Oktober 2026): `beranda` (Pengelola) ditambah `terkunci: [{ nama, sampai, panjang }]` (akun aktif
   yang sedang terkunci karena PIN salah); `daftarStaff.staff[]` (dan jawaban aksi staff lain) ditambah `terkunciSampai` dan
   `kunciPanjang`; `dashboard.perhatian[]` boleh berjenis `terkunci` (`data.nama`). `pasang`, `pulihkan`, `tambahStaff`, dan `aturPin`
@@ -261,6 +268,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++ | Perpindahan layar yang mulus dan angka berhitung naik, spesifikasi tampilan 1.12 (dipilih pemilik dari pratinjau 17 Oktober 2026); ATURAN TETAP gerak dicabut | Kode selesai (aplikasi 0.18.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan (buka, tutup, maju, mundur, desktop, tanpa View Transitions, "kurangi gerak", angka tengah dan akhir, sapuan delapan ukuran). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12+++++++ | Keamanan login (permintaan pemilik 17 Oktober 2026, dari telaah keamanan): kunci PIN bertingkat (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci di Beranda, Dashboard, Staff dan PIN, dan email harian Pengelola, PIN baru yang terlalu mudah ditebak ditolak | Kode selesai (Code.gs v0.17, aplikasi 0.18.1), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (15 uji server, 15 jawaban aksi sama dengan v0.16.1 selain kolom baru) dan Chromium (pemberitahuan, lembar PIN, Dashboard, Staff dan PIN, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12++++++++ | Penjualan per menu (permintaan pemilik 17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan (`Data_PenjualanMenu`), pemakaian bahan seharusnya vs nyata di layar HPP, porsi terjual di Per menu, pengingat Dashboard, rekap bulanan PDF dan email | Kode selesai (Code.gs v0.18, aplikasi 0.19.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (10 uji server dengan angka dihitung tangan, 10 jawaban aksi lama sama dengan v0.17) dan Chromium (alur catat porsi, galat porsi, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `Data_PenjualanMenu`), uji dari HP |
+| 12+++++++++ | Notifikasi ke HP (permintaan pemilik 17 Oktober 2026): Web Push dari Supabase (kunci VAPID di tabel `info`, enkripsi aes128gcm tanpa library), suhu di luar standar, reset PIN, dan akun terkunci ke HP Pengelola, pengingat cek suhu ke semua HP, lembar Notifikasi di HP ini, jam pengingat di Outlet dan jadwal | Kode selesai (Code.gs v0.19, aplikasi 0.20.0), diuji: enkripsi didekripsi `http_ece` (library milik `web-push`), 12 uji server Code.gs, runtime asli di atas Postgres 16 lokal (kirim sesudah tersimpan, 410 dibuang, `__jadwal`, `pasangTrigger`), service worker tiruan, dan Chromium (layanan push browser ditiru, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali, nyalakan notifikasi dari HP (iPhone: pasang ke Layar Utama dulu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1896,3 +1904,46 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     lengkap dan kepala, lembar dibuka lagi terisi, Per menu dan tabel desktop, Dashboard tanpa pengingat, server lama tanpa
     `penjualanTanggal`, delapan ukuran (tanpa gulir samping, elemen keluar layar, sasaran < 44 px), tanpa galat konsol. Belum diuji di
     Supabase asli dan di HP.
+
+### Notifikasi ke HP (Code.gs v0.19, aplikasi 0.20.0, 17 Oktober 2026)
+
+258. **Asal:** fitur kedua dari permintaan butir 252 (pemilik memilih pengingat cek suhu ke semua HP yang menyalakan notifikasi, sisanya
+    ke HP Pengelola). Spesifikasi sistem Bagian 7.2, 10.1 (baru), 12, 13; tampilan Bagian 4.3, 5.2, 5.7, 5.11 (baru), 7.
+259. **Pengiriman (Supabase saja)** `supabase/src/push.js`: Web Push RFC 8030/8291/8292 dengan WebCrypto (`crypto.subtle`), tanpa
+    library (rakitan tetap satu file). Kunci VAPID ECDSA P-256 dibuat sekali dan disimpan di `inventoryku.info` kunci `vapid`
+    (`{ publik, privat: JWK }`), jadi pemilik tidak memasang secret; JWT ES256 per origin layanan push (aud), berlaku 12 jam, disimpan
+    1 jam, `sub` = alamat Edge Function (`ALAMAT_API`). Isi JSON dienkripsi aes128gcm (rs 4096, satu rekaman). Header `TTL` (bawaan
+    1 hari, pengingat 3 jam), `Urgency` high untuk suhu dan kunci 24 jam. `kirimSemua` mengirim bersamaan; 404/410 = langganan hilang.
+260. **Alur** (`layanan.js` `NotifikasiHp`, `runtime.js`): runtime memuat kunci publik sebelum transaksi (`k.info.vapidPublik`); Code.gs
+    memanggil `NotifikasiHp.kirim(langganan, isi)` yang hanya menitip ke `k.push`; sesudah transaksi tersimpan runtime memanggil
+    `push.kirimSemua`, lalu menjalankan `hapusLanggananPush_` untuk yang hilang. Aksi yang gagal sebelum commit tidak mengirim apa pun;
+    galat dari `doPost` yang ditangkap (misalnya PIN salah yang mengunci) tetap tersimpan dan mengirim. Di Apps Script `NotifikasiHp`
+    tidak ada (`typeof`), jadi semua fungsi notifikasi diam (`notifikasiTersedia_`).
+261. **Code.gs:** langganan per HP di Script Properties `PUSH_<sha256 endpoint 32>` = `{ endpoint, keys, nama, waktu }` (tidak tersalin ke
+    Sheets); paling banyak 50, yang paling lama dibuang. `kirimNotifikasi_(sasaran, isi)`: `pengelola` = staff aktif ber-PIN dengan role
+    Pengelola saat dikirim, `semua` = staff aktif ber-PIN. Pemicu: `aksiKirimSuhu_` (ada suhu di luar standar; satu notifikasi berisi
+    semua unit itu), `aksiLupaPin_` (permintaan baru saja), kunci PIN baru di `aksiLogin_`, `pengingatSuhu_(waktu)` (form Suhu tampil,
+    ada unit aktif, dan waktu cek itu belum diisi semua unit hari ini). Jam pengingat `M_Konfigurasi` `jam_cek_opening/middle/closing`
+    (baris belum ada = 08:00/14:00/21:00; kosong = mati; `jamPengingat_`). `pasangTrigger` memasang trigger harian `pengingatSuhu*`
+    hanya `DI_SUPABASE_`; mengubah jam pengingat di Outlet dan jadwal langsung memasang ulang jadwal di Supabase (tanpa "Perlu
+    dijalankan"). `__jadwal` menjalankan pengingat dengan `muat: 'master'` supaya ringan.
+262. **HP:** `sw.js` menangani `push` (ikon 192, `tag` + `renotify`, `data.url`) dan `notificationclick` (jendela aplikasi yang ada
+    difokus lalu `navigate`, selain itu `openWindow`). Menu nama pengguna kini dua pilihan, "Notifikasi" (ikon `lonceng`, difokus
+    pertama) dan "Keluar", dengan panah atas/bawah. `bukaNotifikasi` (app.js): dukungan dicek (`serviceWorker`, `PushManager`,
+    `Notification`; iPhone di Safari tanpa Layar Utama mendapat petunjuk pasang), `navigator.serviceWorker.ready` dengan batas 6 detik,
+    `infoNotifikasi` dengan endpoint HP ini. Menyalakan: `Notification.requestPermission()` dipanggil pertama di dalam ketukan (syarat
+    Safari), lalu `subscribe({ userVisibleOnly, applicationServerKey })` (langganan lama dengan kunci lain dibuang dulu), lalu
+    `aturNotifikasi`. Mematikan: server dulu, lalu `unsubscribe`. Keluar tidak mematikan notifikasi HP itu (keputusan tambahan: HP dapur
+    dipakai bersama, dan pengingat suhu memang untuk HP, bukan orang). Outlet dan jadwal: kartu "Pengingat cek suhu" hanya jika server
+    mengirim `jamCekOpening` (server lama: tidak tampil dan tidak dikirim).
+263. **Uji** (di luar repo): (1) `push.js`: kunci tersimpan dan dibaca ulang oleh isolate baru, isi didekripsi sesuai RFC 8291 dan oleh
+    `http_ece@1.2.0` (library yang dipakai `web-push`), JWT diverifikasi dengan kunci publik, garam berbeda tiap kiriman, 410 → hilang,
+    500 dan galat jaringan dicatat. (2) 12 uji Code.gs di atas Spreadsheet tiruan `supabase/src` (sasaran Pengelola/semua, isi suhu,
+    Lupa PIN sekali, kunci, pengingat lengkap/kurang/form disembunyikan/staff nonaktif, uji, HP berpindah pemilik, hapus, jadwal dan
+    Outlet, server tanpa kunci). (3) Runtime asli (`runtime.js`, `server.js`, `push.js`) di atas Postgres 16 lokal dengan skema.sql:
+    notifikasi suhu dikirim sesudah tersimpan dan didekripsi `http_ece`, langganan 410 hilang dari tabel `properti`, `__jadwal`
+    pengingat dengan rahasia benar/salah, `pasangTrigger` menyimpan tiga jadwal pengingat. (4) `sw.js` di lingkungan service worker
+    tiruan (tampil, isi bukan JSON, ketuk tanpa jendela dan dengan jendela). (5) Chromium dengan layanan push browser ditiru: nyalakan,
+    uji, tutup-buka, matikan; Staff; iPhone Safari; izin diblokir; server tanpa notifikasi; Outlet dan jadwal; menu dengan panah; delapan
+    ukuran. Jawaban aksi lama sama dengan v0.18 kecuali `bacaOutletJadwal` (kolom baru). Belum diuji: layanan push asli (Google FCM,
+    Apple, Mozilla) dan HP asli, terutama iPhone dengan aplikasi di Layar Utama.

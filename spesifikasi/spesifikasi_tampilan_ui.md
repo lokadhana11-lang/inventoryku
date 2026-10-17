@@ -16,6 +16,9 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
+> Tambahan 17 Oktober 2026 (permintaan pemilik): notifikasi ke HP, yaitu pilihan "Notifikasi" di menu
+> nama pengguna, lembar "Notifikasi di HP ini", dan kartu "Pengingat cek suhu" di Outlet dan jadwal
+> (Bagian 4.3, 5.2, 5.7, 5.11, dan 7).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): porsi terjual per menu di lembar Catat penjualan,
 > kartu "Seharusnya vs nyata" dan food cost seharusnya di layar HPP, porsi terjual di Per menu
 > (Bagian 5.10 dan 7).
@@ -266,8 +269,9 @@ aturan ini.
 Di kiri bar: logo lencana, nama aplikasi dua warna, dan nama outlet kecil di bawahnya (Bagian
 4.5). Menu aktif ditandai pil Navy Lapis yang memudar di tempatnya dan garis amber di bawahnya;
 bar bertepi bawah Garis Navy. Di kanan: nama pengguna. Klik nama itu untuk
-membuka menu berisi satu pilihan, "Keluar". Karena bar ini ada di semua layar, tombol
-"Keluar" bisa dicapai dari layar mana pun.
+membuka menu berisi dua pilihan, "Notifikasi" (Bagian 5.11) dan "Keluar". Karena bar ini ada di
+semua layar, keduanya bisa dicapai dari layar mana pun. Panah atas/bawah berpindah di antara
+keduanya.
 
 Titik lebar hanya dua: **600 px** (kartu form menjadi dua kolom) dan **1.024 px** (bar
 navigasi pindah ke atas, tabel menggantikan kartu, dua kolom di Dashboard dan Riwayat).
@@ -532,7 +536,7 @@ Satu-satunya layar yang sepenuhnya navy.
   misalnya "7 dari 9 pengecekan".
 - **Nama pengguna dan Keluar.** Di kepala navy, di bawah nama outlet, tampil nama yang
   sedang masuk, dengan ikon panah kecil supaya terlihat bisa diketuk. Ketuk untuk membuka
-  pilihan "Keluar". Jika masih ada isian di antrean: "2 isian Rina belum terkirim. Isian
+  pilihan "Notifikasi" (Bagian 5.11) dan "Keluar". Jika masih ada isian di antrean saat Keluar: "2 isian Rina belum terkirim. Isian
   tetap tersimpan dan dikirim saat Rina masuk lagi." Tombol ini sebelumnya bernama
   "Ganti pengguna".
 - **Masa simpan.** Di bawah tiket, untuk semua role: daftar "Lewat masa simpan" (tanda
@@ -840,6 +844,11 @@ Satu-satunya layar yang sepenuhnya navy.
   Di bawahnya satu baris keterangan: "Berlaku untuk semua pengguna di semua perangkat."
 - Kartu "HPP dan food cost" (versi 1.10): "Target food cost (%)" (1 sampai 100) dan "Bahan kecil (%)"
   (0 sampai 15), masing-masing dengan keterangan satu baris.
+- Kartu "Pengingat cek suhu": keterangan "Notifikasi ke semua HP yang menyalakan notifikasi, jika
+  waktu cek itu belum diisi untuk semua unit. Kosongkan jam untuk mematikan pengingatnya.", lalu tiga
+  pemilih jam "Pengingat Opening/Middle/Closing" (awal 08.00, 14.00, 21.00). Jika server belum bisa
+  mengirim notifikasi: "Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim."
+  Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
 
 **Pengaturan → Item:**
 
@@ -1034,6 +1043,29 @@ menu `#/hpp/menu`).
   tanpa porsi." "Batal" dan "Simpan penjualan". Sesudahnya "Penjualan 16 Okt tersimpan, dengan porsi
   2 menu." dan angka di layar langsung diperbarui.
 
+### 5.11 Notifikasi di HP ini (semua role)
+
+Lembar (dialog di desktop) dari menu nama pengguna → "Notifikasi" (spesifikasi sistem Bagian 10.1).
+
+- "Yang dikirim ke HP ini, juga saat aplikasi tertutup:" lalu daftar. Pengelola: Suhu di luar
+  standar, Permintaan reset PIN, Akun yang terkunci karena PIN salah, dan "Pengingat cek suhu
+  (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap". Staff: hanya baris pengingat.
+- Sakelar "Notifikasi di HP ini" dengan kata "Nyala"/"Mati". Menyalakan meminta izin HP lebih dulu;
+  sesudahnya "Notifikasi menyala di HP ini." (Baik), "Menyala untuk Budi.", dan tombol kedua
+  "Kirim notifikasi uji" ("Notifikasi uji dikirim. Jika tidak muncul dalam satu menit, periksa
+  setelan notifikasi HP."). Mematikan: "Notifikasi di HP ini dimatikan."
+- HP yang menyala untuk orang lain: "HP ini menerima notifikasi untuk Budi. Satu HP hanya untuk
+  satu orang." dengan tombol "Terima untuk Rina".
+- Izin diblokir: sakelar nonaktif dan "Notifikasi diblokir untuk InventoryKu di HP ini. Izinkan
+  notifikasi untuk aplikasi ini di setelan HP atau browser, lalu buka lembar ini lagi." (Perlu ditinjau).
+- iPhone yang belum memasang aplikasi di Layar Utama: "Di iPhone, notifikasi hanya bisa untuk aplikasi
+  yang dipasang di Layar Utama. Buka alamat aplikasi di Safari, ketuk Bagikan, pilih Tambahkan ke
+  Layar Utama, lalu buka InventoryKu dari ikonnya dan nyalakan notifikasi di sini." Browser lain
+  tanpa dukungan: "Browser ini belum bisa menerima notifikasi. …". Server lama: "Notifikasi belum
+  tersedia di server ini. …".
+- Notifikasi memakai ikon aplikasi; judul dan isinya ditulis server (Bagian 7). Mengetuknya membuka
+  aplikasi di layar tujuannya.
+
 ---
 
 ## 6. Komponen
@@ -1081,6 +1113,9 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
 | Seharusnya vs nyata | "Terpakai lebih banyak dari porsi terjual" / "Sesuai porsi terjual" |
+| Notifikasi suhu (judul, isi) | "Suhu di luar standar: Opening", "Chiller 1 9 °C (Pintu ditutup). Dicatat Rina." |
+| Notifikasi pengingat | "Waktunya cek suhu Middle", "Belum diisi: Chiller 1 dan Freezer 1." |
+| Notifikasi reset PIN dan kunci | "Rina meminta reset PIN" / "Rina terkunci karena PIN salah", "… Ketuk untuk membuat PIN baru." |
 | PIN terlalu mudah | "PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain." |
 | Kunci 24 jam | "PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN." |
 | Form kustom tersimpan | "Form tersimpan dan sudah tampil di Beranda." |

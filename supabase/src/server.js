@@ -14,7 +14,8 @@ const CORS = {
 // Fungsi Code.gs yang boleh dijalankan pemilik dari editor Apps Script (diteruskan) atau oleh jadwal.
 const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekarang', 'kirimRekapSekarang', 'buatKodePemasangan',
   'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan'];
-const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan'];
+const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
+  'pengingatSuhuClosing'];
 
 function samaAman(a, b) {
   a = String(a || '');
@@ -52,7 +53,9 @@ export function buatPelayan(dep) {
         if (syarat.hari && String(bagian.weekday).toUpperCase() !== String(syarat.hari).toUpperCase()) return { dilewati: true };
         if (syarat.tanggal && Number(bagian.day) !== Number(syarat.tanggal)) return { dilewati: true };
       }
-      const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: [] });
+      // Pengingat cek suhu cukup memuat tab master (tab lain dimuat saat dibutuhkan), supaya ringan.
+      const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: [],
+        muat: /^pengingatSuhu/.test(body.nama) ? 'master' : undefined });
       return { catatan: h.catatan };
     }
     if (!dep.rahasiaSinkron) throw new Error('Secret RAHASIA_SINKRON belum dipasang di Supabase (Edge Functions → Secrets).');
