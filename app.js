@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.17.1';
+  var VERSI_APLIKASI = '0.18.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1268,6 +1268,7 @@
   }
 
   function tampilMode(mode) {
+    if (mode !== 'aplikasi') jalurTampil = null; // layar pertama sesudah login tidak berpindah mulus
     $('#masuk').hidden = mode !== 'masuk';
     $('#aplikasi').hidden = mode !== 'aplikasi';
     document.body.classList.toggle('mode-masuk', mode === 'masuk');
@@ -1353,15 +1354,55 @@
     if (lembarKini) lembarKini.tutup(true);
     tutupMenuPengguna();
     kosongkan($('#lembar-wadah')); // lembar yang sedang menutup langsung hilang
+
+    // Perpindahan mulus (tampilan Bagian 8, versi 1.12): hanya jika layar lama ada, alamatnya berbeda,
+    // browser mendukung View Transitions, dan HP tidak diatur "kurangi gerak". Selain itu seperti dulu.
+    var jalurLama = jalurTampil;
+    var menuLama = menuAktif;
+    jalurTampil = jalur;
+    var jenis = jalurLama && jalurLama !== jalur && $('#aplikasi').hidden === false
+      ? jenisPindah(jalurLama, menuLama, jalur, rute.menu) : null;
+    if (!jenis || typeof document.startViewTransition !== 'function' || kurangiGerak() || document.hidden) {
+      gambarRute(rute, cocok, sesi, jalur, true);
+      return;
+    }
+    var akar = document.documentElement;
+    var nomor = ++nomorPindah;
+    var namaLama = namaiPindah(jenis, jalurLama, jalur, true);
+    var namaBaru = [];
+    akar.classList.add('vt-' + jenis);
+    transisiAktif = true;
+    var vt = document.startViewTransition(function () {
+      lepasNamaPindah(namaLama);
+      if (nomor !== nomorPindah) return; // sudah disusul perpindahan lain
+      gambarRute(rute, cocok, sesi, jalur, false);
+      namaBaru = namaiPindah(jenis, jalurLama, jalur, false);
+    });
+    var selesai = function () {
+      akar.classList.remove('vt-' + jenis);
+      lepasNamaPindah(namaBaru);
+      if (nomor === nomorPindah) transisiAktif = false;
+    };
+    vt.ready.catch(function () { /* dilewati browser: layar tetap digambar */ });
+    vt.updateCallbackDone.catch(function () { /* galatnya sudah tercatat di konsol */ });
+    vt.finished.then(selesai, selesai);
+  }
+
+  /** Menggambar layar rute. gerakMasuk: isi naik bertahap (dipakai jika tidak ada perpindahan mulus). */
+  function gambarRute(rute, cocok, sesi, jalur, gerakMasuk) {
     nomorLayar++;
     bersihkanLayar();
     var main = $('#layar');
     kosongkanLayar();
     main.classList.remove('layar-masuk');
-    void main.offsetWidth; // mulai ulang gerak ganti layar
-    main.classList.add('layar-masuk');
-    // Gerak masuk hanya untuk isi pertama layar; isi yang digambar ulang sesudahnya (data dari server) diam.
+    if (gerakMasuk) {
+      void main.offsetWidth; // mulai ulang gerak ganti layar
+      main.classList.add('layar-masuk');
+    }
+    // Gerak masuk dan angka berhitung hanya untuk isi pertama layar; isi yang digambar ulang sesudahnya
+    // (data dari server) diam.
     var nomorMasuk = nomorLayar;
+    layarBaruSampai = Date.now() + 900;
     setTimeout(function () { if (nomorMasuk === nomorLayar) main.classList.remove('layar-masuk'); }, 900);
     $('#aplikasi').classList.toggle('di-beranda', rute.menu === 'beranda' && jalur === '/');
     aturMenuAktif(rute.menu);
@@ -1370,6 +1411,159 @@
     tempatkanPita();
     aturSinyal();
     window.scrollTo(0, 0);
+  }
+
+  /* -----------------------------------------------------------------------
+   * Perpindahan layar yang mulus (View Transitions, tampilan Bagian 8.5)
+   * --------------------------------------------------------------------- */
+
+  var jalurTampil = null; // alamat layar yang sedang tampil
+  var nomorPindah = 0;
+  var transisiAktif = false; // selama perpindahan mulus: gerak masuk lain (tiket turun) tidak dipakai
+  var POLA_FORM = /^\/(stock|waste|suhu|prep|form\/[^/?]+)$/;
+
+  function kurangiGerak() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function kedalamanJalur(j) {
+    return j.split('?')[0].split('/').filter(Boolean).length;
+  }
+
+  /**
+   * buka: tiket Beranda → layar form; tutup: kebalikannya; maju/mundur: menu di kanan/kiri, atau layar
+   * yang lebih dalam/dangkal di menu yang sama; ganti: selain itu (memudar).
+   */
+  function jenisPindah(lama, menuLama, baru, menuBaru) {
+    if (lama === '/' && POLA_FORM.test(baru)) return 'buka';
+    if (POLA_FORM.test(lama) && baru === '/') return 'tutup';
+    if (menuLama && menuLama !== menuBaru) {
+      var urut = Array.prototype.map.call($('#menu-grup').querySelectorAll('.menu-item'), function (a) {
+        return a.getAttribute('data-menu');
+      });
+      return urut.indexOf(menuBaru) >= urut.indexOf(menuLama) ? 'maju' : 'mundur';
+    }
+    var dl = kedalamanJalur(lama);
+    var db = kedalamanJalur(baru);
+    return db > dl ? 'maju' : db < dl ? 'mundur' : 'ganti';
+  }
+
+  function idFormJalur(j) {
+    var m = j.match(/^\/form\/([^/?]+)$/);
+    if (m) {
+      try { return decodeURIComponent(m[1]); } catch (err) { return m[1]; }
+    }
+    for (var id in LAYAR_FORM) if (LAYAR_FORM[id] === '#' + j) return id;
+    return null;
+  }
+
+  /**
+   * Nama tiket di Beranda terbang ke judul layar form (buka), atau sebaliknya (tutup). lama: dipanggil
+   * sebelum layar diganti (menamai layar lama). Mengembalikan elemen yang diberi nama.
+   */
+  function namaiPindah(jenis, jalurLama, jalurBaru, lama) {
+    if (jenis !== 'buka' && jenis !== 'tutup') return [];
+    var diBeranda = (jenis === 'buka') === lama;
+    var id = idFormJalur(jenis === 'buka' ? jalurBaru : jalurLama);
+    var sasaran = null;
+    if (diBeranda) {
+      if (!id) return [];
+      var tiket = Array.prototype.find.call($('#layar').querySelectorAll('.tiket'), function (t) {
+        return t.getAttribute('data-form') === id;
+      });
+      sasaran = tiket && tiket.querySelector('.tiket-nama');
+    } else {
+      sasaran = $('#layar .kepala-layar .judul-layar') || $('#layar .kepala-layar h1');
+    }
+    if (!sasaran) return [];
+    sasaran.style.viewTransitionName = 'judul-form';
+    return [sasaran];
+  }
+
+  function lepasNamaPindah(daftar) {
+    daftar.forEach(function (e) { e.style.viewTransitionName = ''; });
+  }
+
+  /* -----------------------------------------------------------------------
+   * Angka utama berhitung naik (tampilan Bagian 8.5): dari 0 ke angkanya dalam 0,9 detik, melambat di
+   * akhir. Hanya untuk angka yang muncul bersama isi pertama layar; mati saat "kurangi gerak".
+   * --------------------------------------------------------------------- */
+
+  var PILIH_HITUNG = '.kepala-nilai-angka, .ubin-nilai, .kemajuan-angka, .kepala-angka-nilai';
+  var LAMA_HITUNG = 900;
+  var POLA_ANGKA = /\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/;
+  var layarBaruSampai = 0;
+  var formatHitung = {};
+
+  function teksHitung(n, desimal) {
+    if (!formatHitung[desimal]) {
+      formatHitung[desimal] = typeof Intl !== 'undefined' && Intl.NumberFormat
+        ? new Intl.NumberFormat('id-ID', { minimumFractionDigits: desimal, maximumFractionDigits: desimal })
+        : { format: function (x) { return x.toFixed(desimal).replace('.', ','); } };
+    }
+    return formatHitung[desimal].format(n);
+  }
+
+  function hitungNaik(wadah) {
+    // Hanya angka pertama di luar <small>: "2 dari 4" berhitung 0 → 2, "dari 4" diam.
+    var bagian = [];
+    var jalan = document.createTreeWalker(wadah, NodeFilter.SHOW_TEXT, null);
+    for (var n = jalan.nextNode(); n && !bagian.length; n = jalan.nextNode()) {
+      if (n.parentNode.closest('small')) continue;
+      var m = n.data.match(POLA_ANGKA);
+      if (!m) continue;
+      var koma = m[0].indexOf(',');
+      var nilai = Number(m[0].replace(/\./g, '').replace(',', '.'));
+      if (!nilai) continue;
+      bagian.push({
+        simpul: n, asli: n.data, nilai: nilai, desimal: koma < 0 ? 0 : m[0].length - koma - 1,
+        depan: n.data.slice(0, m.index), belakang: n.data.slice(m.index + m[0].length)
+      });
+    }
+    if (!bagian.length) return;
+    // Pembaca layar langsung membaca angka akhirnya; angka yang berhitung disembunyikan darinya.
+    var teksAkhir = el('span', { class: 'sr', text: wadah.textContent });
+    wadah.setAttribute('aria-hidden', 'true');
+    wadah.after(teksAkhir);
+    var mulai = null;
+    function langkah(kini) {
+      if (mulai === null) mulai = kini;
+      var t = Math.min(1, (kini - mulai) / LAMA_HITUNG);
+      var e = 1 - Math.pow(1 - t, 3);
+      var hidup = wadah.isConnected;
+      bagian.forEach(function (b) {
+        if (t >= 1 || !hidup) b.simpul.data = b.asli;
+        else b.simpul.data = b.depan + teksHitung(b.nilai * e, b.desimal) + b.belakang;
+      });
+      if (t < 1 && hidup) {
+        requestAnimationFrame(langkah);
+        return;
+      }
+      wadah.removeAttribute('aria-hidden');
+      teksAkhir.remove();
+    }
+    bagian.forEach(function (b) { b.simpul.data = b.depan + teksHitung(0, b.desimal) + b.belakang; });
+    requestAnimationFrame(langkah);
+  }
+
+  function pasangHitungNaik() {
+    var main = $('#layar');
+    if (!main || !window.MutationObserver || !window.requestAnimationFrame) return;
+    var tertunda = false;
+    function periksa() {
+      tertunda = false;
+      if (Date.now() > layarBaruSampai || kurangiGerak()) return;
+      Array.prototype.forEach.call(main.querySelectorAll(PILIH_HITUNG), function (e) {
+        if (e.hasAttribute('data-hitung')) return;
+        e.setAttribute('data-hitung', '');
+        hitungNaik(e);
+      });
+    }
+    new MutationObserver(function () {
+      if (tertunda) return;
+      tertunda = true;
+      Promise.resolve().then(periksa); // sebelum dilukis: angka langsung mulai dari 0, tanpa kedip
+    }).observe(main, { childList: true, subtree: true });
   }
 
   /** Pita sinyal di bawah kepala layar. Di Beranda: di atas kepala navy, supaya tiket tetap tergantung di rel. */
@@ -2346,7 +2540,7 @@
         grid.appendChild(kotakKosong('Belum ada form yang tampil. Pengelola mengatur form di Pengaturan.'));
         return;
       }
-      var gerak = !tiketSudahTampil;
+      var gerak = !tiketSudahTampil && !transisiAktif;
       form.forEach(function (f, i) {
         var st = STATUS_TIKET[f.status] || STATUS_TIKET.belum;
         var kataTiket = st.kata || f.detail || 'Belum diisi';
@@ -12653,6 +12847,7 @@
     pitaSinyal = $('#pita-sinyal');
     pasangPapanKetik();
     pasangUngkap();
+    pasangHitungNaik();
     window.addEventListener('online', function () {
       aturSinyal();
       // Antrean dikirim saat sinyal kembali; layar diperbarui sesudahnya.

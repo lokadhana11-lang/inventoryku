@@ -56,7 +56,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Repo ini public. Jangan pernah menulis PIN, kata sandi, alamat email, atau ID spreadsheet ke dalam repo.
 - Semua teks antarmuka berbahasa Indonesia dan mengikuti Bagian 7 spesifikasi tampilan.
 - Tata letak mengikuti Bagian 4.6 spesifikasi tampilan: aplikasi yang sama untuk HP, tablet, laptop, dan desktop, dan halaman tidak pernah bergulir ke samping.
-- Gerak mengikuti Bagian 8 spesifikasi tampilan: hanya CSS, hanya transform dan opacity, dan mati saat perangkat diatur "kurangi gerak". Grafik digambar dengan SVG. Tanpa library animasi dan tanpa library grafik.
+- Gerak mengikuti Bagian 8 spesifikasi tampilan. Sejak 17 Oktober 2026 (keputusan pemilik, butir 243) gerak tidak lagi dibatasi CSS, transform, dan opacity: JavaScript, View Transitions, library animasi, dan library grafik boleh dipakai. Library disimpan di repo (seperti huruf di fonts/), bukan dari CDN, supaya aplikasi tetap jalan tanpa sinyal dan tanpa langkah build. Gerak tetap mati saat perangkat diatur "kurangi gerak" (setelan aksesibilitas di HP pengguna).
 - Huruf Barlow dan Barlow Condensed disimpan di repo (folder fonts/), bukan dari CDN. Ambil file woff2 dari paket npm @fontsource/barlow dan @fontsource/barlow-condensed. Jika tidak bisa diunduh, pakai huruf sistem dan catat di CLAUDE.md.
 - Jangan membuat file di .github/workflows.
 - Uji frontend dengan API tiruan sebelum selesai. Kamu tidak bisa menguji sambungan ke akun Google saya; itu saya uji sendiri dari HP.
@@ -246,6 +246,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++ | Perbaikan jadwal Supabase (laporan harian 16 Oktober 2026 tidak terkirim): pg_cron memanggil Edge Function dengan `Content-Type: application/json`; peringatan di Beranda/Dashboard Pengelola jika laporan harian tidak berjalan | Kode selesai (Code.gs v0.15.1; aplikasi tetap 0.16.1), diuji dengan Postgres 16 lokal (tiruan `net.http_post` dengan pemeriksaan Supabase: versi lama gagal dengan pesan yang sama, versi baru lolos untuk tiga jadwal), pelayan Edge Function dengan body JSON, dan 13 skenario waktu peringatan. Dipasang dan diuji pemilik 17 Oktober 2026 (butir 222): Edge Function dan Code.gs ditempel, `pasangTrigger` dijalankan, jadwal cadangan yang dijalankan manual dijawab 200 `dilewati` |
 | 12+++ | HPP dan food cost (dipilih pemilik dari pratinjau 17 Oktober 2026): Pengaturan → Menu (takaran bersih, hasil bersih, bahan kecil, Salin menu), layar HPP dan food cost dari Dashboard (pemakaian bahan, cek silang, per kategori, grafik 6 bulan, Per menu), penjualan harian, bagian HPP di rekap bulanan, nominal rupiah waste hanya untuk Pengelola | Kode selesai (Code.gs v0.16, aplikasi 0.17.0), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 18 uji server dengan angka dihitung tangan, 34 jawaban aksi lama sama dengan v0.15.1) dan Chromium (13 uji alur, delapan ukuran, "kurangi gerak", 28 layar lama sama piksel per piksel dengan versi sebelumnya). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Menu`, `M_MenuBahan`, `Data_Penjualan`, dua baris konfigurasi), uji dari HP |
 | 12++++ | Hapus item yang belum punya catatan (permintaan pemilik 17 Oktober 2026): tombol Hapus di layar ubah item untuk item nonaktif tanpa catatan stock, resep, menu, atau isian form kustom; baris `M_Item` dan riwayat harganya dihapus | Kode selesai (Code.gs v0.16.1, aplikasi 0.17.1), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 8 uji server) dan Chromium (alur nonaktifkan → Batal → Hapus, sebab tidak bisa dihapus, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
+| 12+++++ | Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (dipilih pemilik dari pratinjau 17 Oktober 2026, pola C): cahaya dan butiran menggantikan tekstur garis di kepala Beranda, kepala layar, Login, pita rel, dan bar atas; bar bawah kaca buram; kartu bergaris rambut | Kode selesai (aplikasi 0.17.2; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (sapuan 10 rute pada delapan ukuran dan "kurangi gerak", kontras kata menu di atas kaca). Menunggu pemilik: uji dari HP (cukup buka aplikasi; tidak perlu tempel Code.gs atau setupSpreadsheet) |
+| 12++++++ | Perpindahan layar yang mulus dan angka berhitung naik, spesifikasi tampilan 1.12 (dipilih pemilik dari pratinjau 17 Oktober 2026); ATURAN TETAP gerak dicabut | Kode selesai (aplikasi 0.18.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan (buka, tutup, maju, mundur, desktop, tanpa View Transitions, "kurangi gerak", angka tengah dan akhir, sapuan delapan ukuran). Menunggu pemilik: uji dari HP (cukup buka aplikasi) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1736,3 +1738,72 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Nonaktifkan → Hapus → Batal → Hapus → daftar, item bercatatan, aktif lagi, delapan ukuran tanpa gulir samping dan tombol
     ≥ 44 px, tanpa galat konsol. Belum diuji di Supabase asli dan salinan ke Sheets (baris master yang dihapus; jalurnya sama
     dengan baris `Stock_Harian` yang dihapus `hitungUlangStock_`).
+
+### Pola navy, bar, dan kartu, spesifikasi tampilan 1.11 (aplikasi 0.17.2, 17 Oktober 2026)
+
+238. **Asal:** pemilik meminta pola garis diganti supaya tampilan terlihat profesional dan premium. Lima pola dibandingkan di
+    pratinjau (artifact "Pilihan Pola InventoryKu": garis sekarang, kisi titik, cincin halus, cahaya dan butiran, kisi cetak biru)
+    beserta bar bawah dan kartu. Pemilik memilih pola C untuk semua permukaan navy, bar bawah kaca buram, dan kartu bergaris
+    rambut. Pertanyaan pemilik soal library dan gerak baru dijawab terpisah dan belum diputuskan, jadi ATURAN TETAP tidak berubah.
+    Spesifikasi tampilan Bagian 2, 4.2, 4.7, 6, 10, 11. Code.gs tidak berubah.
+239. **Permukaan navy** (app.css, token `--cahaya-navy` dan `--butiran`): `.beranda-kepala`, `.kepala-layar`, dan `.masuk:not(.terang)`
+    memakai `background-image: var(--butiran), var(--cahaya-navy)` dengan `background-blend-mode: overlay` untuk butiran. Butiran =
+    SVG `feTurbulence` di data URI (ubin 160 px, putih 22%). Gradasi tegak berakhir di Navy Pass, jadi pita di bawah rel
+    (`.beranda-tiket::before`, Navy Pass + butiran) menyambung tanpa sambungan. `.bar` juga mendapat butiran (di HP dan tablet
+    yang punya kepala, `background: none` lama tetap menang). Lapisan pudar `::after` versi 1.7 dihapus; cahaya pelan `::before`
+    versi 1.8 tetap. Login memakai `background-attachment: fixed` supaya gradasinya selebar layar, bukan sepanjang halaman.
+    **Ikon PWA dan favicon tidak diubah** (masih bertekstur garis di `icons/ikon.svg`; mengganti ikon tidak sampai ke HP yang sudah
+    memasang aplikasi), jadi Bagian 4.5 tetap.
+240. **Bar bawah kaca buram:** `.menu-grup` di dalam `@supports (backdrop-filter)` berlatar Navy Pass 86% dengan `blur(16px)
+    saturate(150%)`, tepi `rgba(169,184,207,.16)`, kilau `inset 0 1px 0` putih 8%. Pratinjau memakai 78%; dinaikkan ke 86% karena
+    kata menu (Teks di Navy) di atas kartu putih yang terburam hanya sekitar 4,3:1 pada 78%. Desktop mematikan `backdrop-filter`
+    (menu di bar atas). Pil menu aktif bergradasi `#1D3A66` → Navy Lapis dengan kilau tepi atas. Tanpa dukungan buram: Navy Pass
+    padat seperti dulu. Catatan uji: di Chromium tanpa layar, isi yang sedang bergerak masuk (`.ungkap`) sesaat tampak tajam di
+    belakang kaca pada tangkapan layar; setelah geraknya selesai buramnya benar.
+241. **Kartu garis rambut:** satu perubahan token, `--bayang-kartu` = `0 0 0 1px var(--garis-rambut)` (Navy Pass 7%), `0 1px 2px` 4%,
+    `0 12px 32px -12px` 18%. Berlaku untuk semua pemakai token (kartu, bingkai tabel, kartu form, menu nama pengguna, dan lainnya).
+    `.kartu-item.masalah` tetap menaruh tepi Masalah lebih dulu.
+242. **Uji** (di luar repo): server Node yang menjalankan Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` di memori
+    (setupSpreadsheet, pemasangan, staff, item, unit, kiriman Stock/Suhu/Waste), aplikasi dibuka di Chromium dengan alamat API
+    https tiruan yang dialihkan `context.route`. Tangkapan sebelum/sesudah (Login, Beranda, Dashboard, Item, Riwayat di 390 dan
+    1366 px); sapuan 10 rute pada delapan ukuran Bagian 4.6 dan "kurangi gerak" di 390 dan 1366 px: tanpa gulir samping, kotak
+    galat, atau galat konsol, kepala berbutiran tanpa garis, kaca hanya di bar bawah, kartu bergaris rambut, tanpa animasi saat
+    "kurangi gerak". Belum diuji di HP asli: kelancaran buram kaca saat menggulir di HP Android murah (jika berat, kaca bisa
+    dimatikan dengan menghapus satu blok `@supports`), dan tampilan butiran di layar HP.
+
+### Perpindahan layar dan angka berhitung, spesifikasi tampilan 1.12 (aplikasi 0.18.0, 17 Oktober 2026)
+
+243. **Asal dan keputusan pemilik.** Sesudah pola navy (butir 238) pemilik bertanya bagaimana jika ada library dan gerak
+    baru. Pratinjau (artifact "Pratinjau Gerak InventoryKu") menunjukkan perpindahan layar dengan View Transitions dan angka
+    yang berhitung naik dalam tiga kecepatan. Pemilik memilih keduanya, kecepatan sedang (900 ms), dan **mencabut ATURAN TETAP
+    gerak tanpa batasan**, supaya library bisa dipakai kelak. ATURAN TETAP kini: gerak boleh JavaScript, View Transitions, dan
+    library animasi/grafik; library disimpan di repo (alasan teknis: PWA tanpa sinyal dan tanpa langkah build); "kurangi gerak"
+    tetap dihormati. Rilis ini sendiri tidak memakai library. Spesifikasi tampilan Bagian 8.1–8.3, 8.5 (baru), 10, 11.
+244. **Perpindahan layar** (`jalankanRute` → `gambarRute`, app.js): `jenisPindah(lama, menuLama, baru, menuBaru)` memberi
+    `buka` (`/` → rute form, `POLA_FORM`), `tutup` (kebalikannya), `maju`/`mundur` (urutan menu di `#menu-grup`; di menu yang
+    sama: jumlah segmen alamat), atau `ganti`. Tanpa perpindahan mulus jika: belum ada layar sebelumnya (`jalurTampil`, dikosongkan
+    `tampilMode` saat bukan mode aplikasi), alamat sama, `document.startViewTransition` tidak ada, "kurangi gerak", atau halaman
+    tersembunyi; saat itu `gambarRute(..., true)` memasang `.layar-masuk` seperti dulu. Dengan perpindahan mulus, `.layar-masuk`
+    tidak dipasang (supaya tidak dobel) dan tiket Beranda tidak turun (`transisiAktif`). `html.vt-<jenis>` memilih animasi
+    `::view-transition-old/new(root)` di app.css: layar lama memudar dulu 120–150 ms, layar baru masuk 200–300 ms sesudah jeda
+    60–100 ms (tanpa jeda, isi kedua layar bertumpuk dan sulit dibaca). `.menu` (HP/tablet) dan `.bar` (desktop) punya
+    `view-transition-name` sendiri; gambar lamanya disembunyikan dan gambar barunya hidup, jadi pil menu tetap bergeser lewat
+    transisi CSS-nya. Buka/tutup: `namaiPindah` memberi `view-transition-name: judul-form` pada `.tiket-nama` tiket form itu
+    (`data-form`, dari `LAYAR_FORM` atau `/form/<ID>`) dan pada judul kepala layar form; nama dilepas sesudahnya. Perpindahan yang
+    disusul perpindahan lain tidak menggambar layarnya (`nomorPindah`). Selama perpindahan, kaca bar bawah tidak memburam isi di
+    belakangnya (gambar bar dirender terpisah), sekitar 0,3 detik.
+245. **Angka berhitung** (`pasangHitungNaik`, `hitungNaik`): MutationObserver pada `#layar` (microtask, sebelum dilukis) mencari
+    `.kepala-nilai-angka`, `.ubin-nilai`, `.kemajuan-angka`, `.kepala-angka-nilai` yang muncul dalam 900 ms sesudah layar digambar
+    (`layarBaruSampai`) dan belum bertanda `data-hitung`. Angka = teks pertama di luar `<small>` yang cocok `POLA_ANGKA` (ribuan
+    titik, desimal koma); awalan dan akhiran ("Rp ", "%", "−") tetap. 900 ms, kurva `1 − (1 − t)³`, format `Intl.NumberFormat
+    ('id-ID')` dengan jumlah desimal yang sama; di akhir teks asli dikembalikan persis. Selama berhitung elemennya `aria-hidden`
+    dan teks akhirnya ada di `<span class="sr">` di sebelahnya. Angka 0 dan "–" tidak berhitung. CSS: animasi `angka-naik` untuk
+    keempat kelas itu dihapus (tanggal pembuka Beranda tetap), ditambah `tabular-nums`.
+246. **Uji** (di luar repo; server dan Chromium seperti butir 242): Beranda → Riwayat (`vt-maju`), kembali (`vt-mundur`), tiket
+    Stock (`vt-buka`, nama tiket bernama sebelum, judul "Stock Inventory" sesudah, nama dilepas), kembali ke Beranda (`vt-tutup`,
+    tidak ada nama tersisa), Dashboard: angka di tengah (Rp 385.902, "1 dari 4") dan akhir persis (Rp 548.500, "2 dari 4"), tanpa
+    `aria-hidden` tersisa; tanpa perpindahan setelah login; "kurangi gerak": tanpa View Transitions dan angka langsung akhir;
+    `startViewTransition` dihapus: `.layar-masuk` seperti dulu dan angka tetap berhitung; desktop 1366 maju, mundur, buka Waste;
+    tanpa galat konsol; sapuan 10 rute pada delapan ukuran dan "kurangi gerak". Belum diuji di HP asli (rasa geraknya dan Safari
+    iPhone).
+
