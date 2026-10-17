@@ -29,6 +29,8 @@
 > food cost (Bagian 5.9): menu dengan takaran per porsi, HPP per porsi, penjualan harian, dan food
 > cost per bulan, khusus Pengelola. Nominal rupiah waste kini hanya terlihat oleh Pengelola
 > (Bagian 5.4).
+> Diperbarui 17 Oktober 2026 (permintaan pemilik): item nonaktif yang belum punya catatan apa pun,
+> misalnya item yang salah dibuat, bisa dihapus (Bagian 5.1).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -97,6 +99,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Login | PIN 6 angka, dibuat oleh Manager/Head Kitchen. Sesi berlaku paling lama 12 jam. Ada tombol "Keluar" untuk perangkat yang dipakai bergantian. |
 | Keluar otomatis | Aplikasi keluar sendiri setelah 5 menit tidak dipakai, untuk semua role. Lamanya bisa diubah Pengelola. Isian yang belum dikirim tidak hilang (Bagian 7.2). |
 | Menghapus staff | Hanya untuk staff yang sudah nonaktif. Namanya hilang dari aplikasi, tetapi tetap terbaca di riwayat (Bagian 5.1). |
+| Menghapus item | Hanya untuk item nonaktif yang belum punya catatan apa pun, misalnya item yang salah dibuat (Bagian 5.1). |
 | Tanggal isian | Staff boleh mengisi untuk hari ini dan kemarin. Tanggal lebih lama hanya Pengelola. Tanggal masa depan ditolak. |
 | PWA | Perlu |
 | Jam closing | 21:30 |
@@ -442,11 +445,23 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 **Aturan menonaktifkan master:**
 
 - Master tidak pernah dihapus, hanya dinonaktifkan, supaya riwayat tetap terbaca.
-  Satu-satunya yang punya tombol "Hapus" adalah staff, dengan aturan di bawah.
+  Yang punya tombol "Hapus" hanya staff dan item yang belum punya catatan, dengan aturan
+  di bawah.
 - Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif, atau
   bahan menu yang aktif (Bagian 5.9).
 - Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan.
 - Satuan dasar sebuah item tidak bisa diganti setelah item itu punya catatan stock.
+
+**Menghapus item** (17 Oktober 2026, untuk item yang salah dibuat):
+
+- Hanya untuk item yang sudah nonaktif dan belum punya catatan apa pun: tidak punya catatan
+  stock (rekap `Stock_Harian`, gerakan stock, prep, waste, penyesuaian, stock opname), tidak
+  punya resep, tidak menjadi bahan resep atau menu mana pun (aktif maupun nonaktif), dan
+  tidak pernah dipilih di kolom Item form kustom. Item yang sudah punya catatan cukup
+  dinonaktifkan.
+- Baris item di `M_Item` dan semua baris riwayat harganya di `M_HargaItem` dihapus. Penghapusan
+  tercatat di `Log_Perubahan`. Nama itu boleh dipakai lagi untuk item baru.
+- Hapus tidak bisa dibatalkan dari aplikasi; item yang terhapus dibuat ulang sebagai item baru.
 
 **Menonaktifkan dan menghapus staff:**
 
@@ -1369,6 +1384,9 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
       Pengelola bisa menaikkannya menjadi 10, 15, atau 30 menit dari Pengaturan.
 - [ ] **Menghapus staff** hanya menyembunyikan namanya dari aplikasi. Barisnya tetap ada
       di spreadsheet, dan pemulihannya hanya bisa dilakukan pemilik Sheet.
+- [x] **Menghapus item** (permintaan pemilik 17 Oktober 2026) hanya untuk item nonaktif yang
+      belum punya catatan apa pun. Barisnya benar-benar dihapus dari `M_Item`, bersama riwayat
+      harganya (Bagian 5.1).
 - [ ] **Hanya Pengelola** yang melihat nilai rupiah stock, daftar belanja, rekap bulanan,
       dan yang melakukan stock opname.
 - [x] **Nominal waste (Rp) hanya terlihat Pengelola** (keputusan pemilik 17 Oktober 2026):

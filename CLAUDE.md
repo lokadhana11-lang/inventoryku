@@ -214,6 +214,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `menu` dan `penjualan` (`data.tanggal`); `daftarItem.item[]` ditambah `dipakaiMenu`. Nominal rupiah waste untuk Staff: `formWaste` (dan
   `kirimWaste.form`) tanpa `item[].harga`, `kiriman.totalRp`, `baris[].estimasi`, ditambah `tanpaRupiah: true`; `riwayat`/`detailKiriman`
   Waste tanpa kolom berjenis `rupiah`.
+- Hapus item (Code.gs v0.16.1, 17 Oktober 2026; khusus Pengelola): `hapusItem {nama}` → jawaban `daftarItem` ditambah `dihapus: nama`.
+  `daftarItem.item[]` ditambah `sebabTidakBisaHapus` ('' = bisa dihapus setelah nonaktif; selain itu kalimat sebabnya).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -243,6 +245,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+ | Login lebih bersih, spesifikasi tampilan 1.9 (dipilih pemilik dari pratinjau 17 Oktober 2026, cara 3): HP mengingat pengguna terakhir dan Login langsung menyapanya dengan papan PIN, daftar nama berupa lingkaran inisial lewat "Ganti nama" | Kode selesai (aplikasi 0.16.1; Code.gs tidak berubah), diuji di Chromium dengan API tiruan (delapan ukuran untuk sapaan dan daftar nama, alur pilih nama/PIN salah/login/ingat, nama yang tidak bisa masuk lagi, keterangan keluar otomatis, nama panjang, "kurangi gerak"). Digabung dan diuji pemilik dari HP 17 Oktober 2026: tampilan sesuai |
 | 12++ | Perbaikan jadwal Supabase (laporan harian 16 Oktober 2026 tidak terkirim): pg_cron memanggil Edge Function dengan `Content-Type: application/json`; peringatan di Beranda/Dashboard Pengelola jika laporan harian tidak berjalan | Kode selesai (Code.gs v0.15.1; aplikasi tetap 0.16.1), diuji dengan Postgres 16 lokal (tiruan `net.http_post` dengan pemeriksaan Supabase: versi lama gagal dengan pesan yang sama, versi baru lolos untuk tiga jadwal), pelayan Edge Function dengan body JSON, dan 13 skenario waktu peringatan. Dipasang dan diuji pemilik 17 Oktober 2026 (butir 222): Edge Function dan Code.gs ditempel, `pasangTrigger` dijalankan, jadwal cadangan yang dijalankan manual dijawab 200 `dilewati` |
 | 12+++ | HPP dan food cost (dipilih pemilik dari pratinjau 17 Oktober 2026): Pengaturan → Menu (takaran bersih, hasil bersih, bahan kecil, Salin menu), layar HPP dan food cost dari Dashboard (pemakaian bahan, cek silang, per kategori, grafik 6 bulan, Per menu), penjualan harian, bagian HPP di rekap bulanan, nominal rupiah waste hanya untuk Pengelola | Kode selesai (Code.gs v0.16, aplikasi 0.17.0), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 18 uji server dengan angka dihitung tangan, 34 jawaban aksi lama sama dengan v0.15.1) dan Chromium (13 uji alur, delapan ukuran, "kurangi gerak", 28 layar lama sama piksel per piksel dengan versi sebelumnya). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Menu`, `M_MenuBahan`, `Data_Penjualan`, dua baris konfigurasi), uji dari HP |
+| 12++++ | Hapus item yang belum punya catatan (permintaan pemilik 17 Oktober 2026): tombol Hapus di layar ubah item untuk item nonaktif tanpa catatan stock, resep, menu, atau isian form kustom; baris `M_Item` dan riwayat harganya dihapus | Kode selesai (Code.gs v0.16.1, aplikasi 0.17.1), diuji dengan API tiruan (Code.gs di Node di atas Spreadsheet tiruan `supabase/src`, 8 uji server) dan Chromium (alur nonaktifkan → Batal → Hapus, sebab tidak bisa dihapus, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1705,3 +1708,31 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 232. **Belum diuji di sini:** Supabase dan Google asli (tab baru tersalin ke Sheets, `setupSpreadsheet` di Sheet), tampilan di HP asli,
     dan PDF rekap jsPDF dengan bagian baru.
 
+### Hapus item yang belum punya catatan (Code.gs v0.16.1, aplikasi 0.17.1, 17 Oktober 2026)
+
+233. **Asal:** pemilik bertanya apakah item bisa dihapus dari daftar stock, lalu meminta hapus untuk item yang belum punya
+    catatan (misalnya item yang salah dibuat). Aturan "master tidak pernah dihapus" (sistem Bagian 5.1) kini punya
+    pengecualian kedua selain staff. Spesifikasi sistem Bagian 3, 5.1, 13; tampilan versi 1.10 tambahan (Bagian 5.7, 7, 11).
+234. **Syarat** (`rujukanItem_`, `sebabTidakBisaHapus_`, dipakai `dataItem_` dan `aksiHapusItem_` sehingga HP dan server sama):
+    item sudah nonaktif (seperti hapus staff: "Nonaktifkan dulu untuk bisa menghapus."), tidak punya catatan stock
+    (`itemBercatatan_`: `Stock_Harian`, semua `SUMBER_STOCK`, `Data_Opname`), tidak punya resep (aktif atau nonaktif), tidak
+    menjadi bahan resep atau menu mana pun (aktif atau nonaktif, karena barisnya menyimpan nama item), dan tidak pernah dipilih
+    di kolom Item form kustom mana pun (termasuk form dan kolom yang dihapus/diarsipkan). Urutan sebab: catatan stock, resep
+    sendiri, bahan resep, bahan menu, form kustom.
+235. **Hapus** (`hapusItem`): semua baris `M_HargaItem` item itu (riwayat harga tanpa pemakaian tidak berarti apa-apa, dan
+    jika dibiarkan, item baru dengan nama yang sama akan mewarisinya) lalu baris `M_Item` dihapus dengan `deleteRow`; satu
+    baris `Log_Perubahan` (Tab `M_Item`, row_id nama, Kolom Nama Item, Nilai Lama nama, Nilai Baru "(dihapus)"). Nama itu
+    boleh dipakai item baru. Isian di antrean HP yang masih memuat item itu akan ditolak server (item tidak ada); karena item
+    harus nonaktif dulu dan belum punya catatan, hal ini hanya mungkin untuk isian yang dibuat sebelum dinonaktifkan.
+236. **Layar** (Pengaturan → Item, ubah): bagian `.bagian-hapus` paling bawah seperti hapus staff. Nonaktif tanpa sebab:
+    tombol "Hapus" (bahaya) → konfirmasi → kembali ke daftar dengan "Tomat dihapus dari daftar item." (draft item dibuang).
+    Aktif tanpa sebab: "Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus." Nonaktif dengan sebab: kalimat
+    sebabnya. Aktif dengan sebab: tidak tampil. Server lama (tanpa `sebabTidakBisaHapus`): tidak tampil. Kalimat di daftar
+    item diganti menjadi "Item yang sudah punya catatan cukup dinonaktifkan, …; item yang belum punya catatan bisa dihapus."
+237. **Uji** (di luar repo): Code.gs di Node di atas Spreadsheet tiruan `supabase/src` (8 uji: sebab kosong dan aktif ditolak;
+    hapus membersihkan `M_Item` dan `M_HargaItem` dua baris, log, nama dipakai lagi tanpa mewarisi harga; catatan stock; bahan
+    dan hasil resep nonaktif; bahan menu nonaktif; form kustom termasuk sesudah diarsipkan; Staff ditolak; setupSpreadsheet,
+    formStock, dashboard, beranda sesudahnya). Chromium dengan API tiruan yang memanggil `doPost` asli: alur aktif →
+    Nonaktifkan → Hapus → Batal → Hapus → daftar, item bercatatan, aktif lagi, delapan ukuran tanpa gulir samping dan tombol
+    ≥ 44 px, tanpa galat konsol. Belum diuji di Supabase asli dan salinan ke Sheets (baris master yang dihapus; jalurnya sama
+    dengan baris `Stock_Harian` yang dihapus `hitungUlangStock_`).

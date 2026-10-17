@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.17.0';
+  var VERSI_APLIKASI = '0.17.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -8972,7 +8972,7 @@
     k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
       tautanKembali('Pengaturan', '#/pengaturan'),
       el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Item' }), tambah]),
-      el('p', { class: 'kartu-teks', text: 'Bahan dan barang jadi yang dipakai semua form. Item tidak dihapus, hanya dinonaktifkan, supaya riwayatnya tetap terbaca.' }),
+      el('p', { class: 'kartu-teks', text: 'Bahan dan barang jadi yang dipakai semua form. Item yang sudah punya catatan cukup dinonaktifkan, supaya riwayatnya tetap terbaca; item yang belum punya catatan bisa dihapus.' }),
       kCari.wadah,
       penanda,
       wadah
@@ -9346,6 +9346,17 @@
           keadaan.push(tombol('Aktifkan lagi', 'kedua', { onclick: aktifkan }));
         }
         wadah.appendChild(el('section', { class: 'kartu' }, keadaan));
+
+        // Hapus item (tampilan Bagian 5.7): paling bawah, terpisah, hanya untuk item nonaktif yang belum punya catatan.
+        // Server lama tidak mengirim sebabTidakBisaHapus, jadi bagian ini tidak tampil.
+        var sebabHapus = it.sebabTidakBisaHapus;
+        if (typeof sebabHapus === 'string' && !(it.aktif && sebabHapus)) {
+          wadah.appendChild(el('div', { class: 'bagian-hapus' }, sebabHapus
+            ? el('p', { class: 'kolom-bantuan', text: sebabHapus })
+            : (it.aktif
+              ? el('p', { class: 'kolom-bantuan', text: 'Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus.' })
+              : tombol('Hapus', 'bahaya', { onclick: hapusItem }))));
+        }
       }
     }
 
@@ -9590,6 +9601,25 @@
         isi = null;
         gambar(hasil);
         toast(it.nama + ' dinonaktifkan.');
+      });
+    }
+
+    function hapusItem() {
+      var it = itemKini;
+      konfirmasi({
+        judul: 'Hapus ' + it.nama + ' dari daftar item?',
+        teks: it.nama + ' belum punya catatan, jadi tidak ada riwayat yang hilang. Riwayat harganya ikut terhapus. ' +
+          'Tindakan ini tidak bisa dibatalkan dari aplikasi.',
+        teksYa: 'Hapus',
+        teksProses: 'Menghapus…',
+        bahaya: true,
+        jalankan: function () { return panggilApi('hapusItem', { nama: it.nama }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Draft.hapus(kunciDraft);
+        Cache.tulis('item', hasil);
+        location.hash = '#/pengaturan/item';
+        toast(hasil.dihapus + ' dihapus dari daftar item.');
       });
     }
 

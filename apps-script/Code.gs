@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.16 (HPP dan food cost: menu, penjualan harian; nominal waste hanya untuk Pengelola)
+// InventoryKu Code.gs v0.16.1 (hapus item yang belum punya catatan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -71,7 +71,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.16';
+var VERSI_KODE = 'v0.16.1';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -135,6 +135,8 @@ var AKSI_ = {
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
   aturItemAktif: { jalankan: aksiAturItemAktif_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
+  hapusItem: { jalankan: aksiHapusItem_, pengelola: true,
+    pesan: 'Menghapus item hanya bisa dilakukan Head Kitchen atau Manager.' },
   daftarItem: { jalankan: aksiDaftarItem_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan item hanya untuk Head Kitchen dan Manager.' },
   simpanItem: { jalankan: aksiSimpanItem_, pengelola: true,
@@ -3748,6 +3750,7 @@ function dataItem_() {
   var catatan = itemBercatatan_();
   var hari = hariIni_();
   var menu = bacaMenu_().menu;
+  var rujukan = rujukanItem_(catatan, resep, menu);
   var dipakai = {};
   var diResep = {};
   var diMenu = {};
@@ -3784,7 +3787,8 @@ function dataItem_() {
       bisaGantiNama: !catatan[k] && !diResep[k] && !diMenu[k],
       resepAktif: !!(resep[k] && resep[k].aktif),
       dipakaiResep: (dipakai[k] || []).sort(function (a, b) { return a.localeCompare(b, 'id'); }),
-      dipakaiMenu: menuPemakai_(menu, k)
+      dipakaiMenu: menuPemakai_(menu, k),
+      sebabTidakBisaHapus: sebabTidakBisaHapus_(rujukan, k, m.nama)
     };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   return {
@@ -3936,6 +3940,81 @@ function aksiAturItemAktif_(body) {
     tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
     var data = dataItem_();
     data.diubah = { nama: nama, aktif: aktif };
+    return data;
+  });
+}
+
+/**
+ * Rujukan ke item (untuk hapus item): catatan stock (itemBercatatan_), semua
+ * resep dan menu (aktif maupun nonaktif) yang memakai nama itu, dan form
+ * kustom (termasuk yang diarsipkan) yang kolom Item-nya pernah berisi nama itu.
+ * Kunci: nama item huruf kecil.
+ */
+function rujukanItem_(catatan, resep, menu) {
+  var r = { catatan: catatan, punyaResep: {}, resep: {}, menu: {}, form: {} };
+  function tambah(peta, kecil, nama) {
+    var d = peta[kecil] = peta[kecil] || [];
+    if (d.indexOf(nama) < 0) d.push(nama);
+  }
+  Object.keys(resep).forEach(function (k) {
+    r.punyaResep[k] = true;
+    resep[k].bahan.forEach(function (b) { tambah(r.resep, b.item.toLowerCase(), resep[k].itemHasil); });
+  });
+  Object.keys(menu).forEach(function (k) {
+    menu[k].bahan.forEach(function (b) { tambah(r.menu, b.item.toLowerCase(), menu[k].nama); });
+  });
+  bacaDaftarForm_(true).forEach(function (f) {
+    if (f.jenis !== 'kustom') return;
+    kolomForm_(f.id).forEach(function (c) {
+      if (c.jenis !== 'Item') return;
+      var ada = namaDiKolom_(tabDataForm_(f.id), c.label, {});
+      Object.keys(ada).forEach(function (kecil) { tambah(r.form, kecil, f.nama); });
+    });
+  });
+  return r;
+}
+
+/** Kalimat mengapa item belum bisa dihapus, atau '' jika bisa (selain syarat nonaktif). */
+function sebabTidakBisaHapus_(r, kecil, nama) {
+  function daftar(d) { return d.slice().sort(function (a, b) { return a.localeCompare(b, 'id'); }).join(', '); }
+  if (r.catatan[kecil]) return 'Tidak bisa dihapus karena ' + nama + ' sudah punya catatan stock. Riwayatnya tetap tersimpan selama item nonaktif.';
+  if (r.punyaResep[kecil]) return 'Tidak bisa dihapus selama ' + nama + ' punya resep.';
+  if (r.resep[kecil]) return 'Tidak bisa dihapus: masih menjadi bahan resep ' + daftar(r.resep[kecil]) + '.';
+  if (r.menu[kecil]) return 'Tidak bisa dihapus: masih menjadi bahan menu ' + daftar(r.menu[kecil]) + '.';
+  if (r.form[kecil]) return 'Tidak bisa dihapus karena sudah tercatat di form ' + daftar(r.form[kecil]) + '.';
+  return '';
+}
+
+/**
+ * Hapus item (Bagian 5.1), khusus Pengelola: hanya item nonaktif yang belum
+ * punya catatan apa pun (sebabTidakBisaHapus_ kosong), misalnya item yang salah
+ * dibuat. Baris M_Item dan semua baris M_HargaItem item itu dihapus, dan
+ * Log_Perubahan mencatatnya. Nama itu lalu boleh dipakai item baru.
+ * Jawaban: daftarItem ditambah dihapus: nama.
+ */
+function aksiHapusItem_(body, pengguna) {
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Item');
+    var nomor = barisMaster_(t, 'Nama Item', body.nama);
+    if (!nomor) throw galatPengguna_('Item ' + rapikanTeks_(body.nama) + ' tidak ditemukan. Kembali ke daftar item.');
+    var m = bacaItem_()[rapikanTeks_(body.nama).toLowerCase()];
+    var kecil = m.nama.toLowerCase();
+    if (m.aktif) throw galatPengguna_('Nonaktifkan dulu untuk bisa menghapus.');
+    var sebab = sebabTidakBisaHapus_(rujukanItem_(itemBercatatan_(), bacaResep_(), bacaMenu_().menu), kecil, m.nama);
+    if (sebab) throw galatPengguna_(sebab);
+    var th = bacaTabel_(TAB_HARGA);
+    if (th) {
+      var c = th.kol['Nama Item'];
+      th.baris.map(function (b, i) { return rapikanTeks_(b[c]).toLowerCase() === kecil ? i + 2 : 0; })
+        .filter(function (n) { return n; })
+        .sort(function (a, b) { return b - a; })
+        .forEach(function (n) { th.sheet.deleteRow(n); });
+      MEMO_HARGA_ = null;
+    }
+    t.sheet.deleteRow(nomor);
+    catatLog_('M_Item', m.nama, pengguna, new Date(), [['Nama Item', m.nama, '(dihapus)']]);
+    var data = dataItem_();
+    data.dihapus = m.nama;
     return data;
   });
 }
