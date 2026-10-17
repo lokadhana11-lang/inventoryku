@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.18.0';
+  var VERSI_APLIKASI = '0.18.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -32,6 +32,7 @@
     formBelumDibangun: 'Form ini dibangun di tahap berikutnya.',
     pinHarus6: 'PIN harus 6 angka.',
     pinTidakSama: 'Ulangi PIN tidak sama dengan PIN. Ketik ulang.',
+    pinLemah: 'PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain.',
     lupaPinTerkirim: 'Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager.',
     memperbarui: 'Memperbarui…',
     iphoneTidakBisaSimpan: 'iPhone ini belum bisa menyimpan file dari aplikasi. Buka alamat website di Safari, lalu unduh dari sana.'
@@ -861,11 +862,33 @@
     });
   }
 
-  /** PIN 6 angka dan ulangannya sama. */
+  var PIN_LEMAH_LAIN = ['112233', '111222', '123321', '147258', '258369', '159753', '147852', '102030'];
+
+  /** PIN yang mudah ditebak; aturan sama dengan pinLemah_ di Code.gs (server tetap memeriksanya). */
+  function pinLemah(pin) {
+    for (var p = 1; p <= 3; p++) {
+      if (pin.slice(p) === pin.slice(0, pin.length - p)) return true;
+    }
+    var naik = true;
+    var turun = true;
+    for (var i = 1; i < pin.length; i++) {
+      var beda = pin.charCodeAt(i) - pin.charCodeAt(i - 1);
+      if (beda !== 1 && beda !== -9) naik = false;
+      if (beda !== -1 && beda !== 9) turun = false;
+    }
+    return naik || turun || PIN_LEMAH_LAIN.indexOf(pin) >= 0;
+  }
+
+  /** PIN 6 angka yang tidak mudah ditebak, dan ulangannya sama. */
   function periksaPinGanda(kPin, kUlang) {
     var pin = kPin.input.value;
     if (!/^\d{6}$/.test(pin)) {
       kPin.galat(PESAN.pinHarus6);
+      kUlang.galat('');
+      return false;
+    }
+    if (pinLemah(pin)) {
+      kPin.galat(PESAN.pinLemah);
       kUlang.galat('');
       return false;
     }
@@ -2529,7 +2552,7 @@
       gambarTiket(form);
       gambarKemajuan(form);
       gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null,
-        data.opname || null);
+        data.opname || null, data.terkunci || []);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
@@ -2628,7 +2651,7 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci) {
       kosongkan(bawah);
       // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
       var simpan = barisMasaSimpan(masaSimpan);
@@ -2650,7 +2673,7 @@
           ]));
         })), bawah.firstChild);
       }
-      if (!permintaan.length) return;
+      if (!permintaan.length && !terkunci.length) return;
       var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemberitahuan' });
       permintaan.forEach(function (p) {
         daftar.appendChild(el('a', {
@@ -2660,6 +2683,17 @@
           el('span', { class: 'daftar-baris-isi' }, [
             tandaStatus('tinjau', p.nama + ' meminta reset PIN'),
             el('span', { class: 'daftar-baris-ket', text: 'Diminta ' + waktuSingkat(p.waktu) + '. Ketuk untuk membuat PIN baru.' })
+          ]),
+          ikon('kanan')
+        ]));
+      });
+      // Akun yang terkunci karena PIN salah (Code.gs v0.17), di bawah permintaan reset PIN.
+      terkunci.forEach(function (a) {
+        daftar.appendChild(el('a', { class: 'daftar-baris pemberitahuan', href: hrefStaff(a.nama, true) }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            tandaStatus('tinjau', a.nama + ' terkunci karena PIN salah'),
+            el('span', { class: 'daftar-baris-ket', text: (a.panjang ? 'Salah berulang kali dalam 24 jam. ' : '') +
+              'Terbuka sendiri ' + waktuSingkat(a.sampai) + '. Ketuk untuk membuat PIN baru.' })
           ]),
           ikon('kanan')
         ]));
@@ -8004,7 +8038,8 @@
       } };
       case 'dilaporkan': return { href: riwayat('dilaporkan') };
       case 'belumDiperiksa': return { href: riwayat('terkirim') };
-      case 'resetPin': return { href: hrefStaff(data.nama, true) };
+      case 'resetPin':
+      case 'terkunci': return { href: hrefStaff(data.nama, true) };
       case 'formBelum': return { href: '#/' };
       case 'jadwal': return { href: '#/pengaturan/outlet' };
       case 'opname': return { href: '#/opname' };
@@ -8020,7 +8055,7 @@
   /** Ikon ubin di daftar Perlu perhatian (versi 1.7), menurut jenis butirnya. */
   var IKON_PERHATIAN = {
     suhu: 'termometer', minus: 'kotak', bawahMinimum: 'kotak', lewatMasaSimpan: 'jam', habisBesok: 'jam', sistem: 'segitiga',
-    dilaporkan: 'bendera', resetPin: 'kunci', jadwal: 'jam', opname: 'opname', formBelum: 'tiket', belumDiperiksa: 'centang',
+    dilaporkan: 'bendera', resetPin: 'kunci', terkunci: 'kunci', jadwal: 'jam', opname: 'opname', formBelum: 'tiket', belumDiperiksa: 'centang',
     tanpaHarga: 'label', menu: 'resep', penjualan: 'label'
   };
   var KATA_TINGKAT = { masalah: 'Masalah', tinjau: 'Perlu ditinjau', menunggu: 'Menunggu' };
@@ -12471,7 +12506,10 @@
       var tombolPin = tombol(s.punyaPin ? 'Reset PIN' : 'Buat PIN', 'utama', { onclick: function () { bukaLembarPin(s); } });
       var tandaPin = [s.punyaPin ? tandaStatus('baik', 'PIN sudah dibuat') : tandaStatus('menunggu', 'Belum punya PIN')];
       if (s.permintaanReset) tandaPin.push(tandaStatus('tinjau', 'Meminta reset PIN ' + waktuSingkat(s.permintaanReset)));
-      if (s.terkunci) tandaPin.push(tandaStatus('masalah', 'Terkunci karena PIN salah 5 kali'));
+      if (s.terkunci) {
+        tandaPin.push(tandaStatus('masalah', (s.kunciPanjang ? 'Terkunci 24 jam karena PIN salah berulang kali' : 'Terkunci karena PIN salah 5 kali') +
+          (s.terkunciSampai ? ', terbuka sendiri ' + waktuSingkat(s.terkunciSampai) : '')));
+      }
       wadah.appendChild(el('section', { class: 'kartu' }, [
         el('h2', { class: 'kartu-judul', text: 'PIN' }),
         el('div', { class: 'deret-tombol', style: 'margin-bottom:16px' }, tandaPin),
@@ -12689,13 +12727,13 @@
     });
   }
 
-  /** Setelah PIN direset, pemberitahuan di Beranda langsung hilang (server juga menandainya selesai). */
+  /** Setelah PIN direset, pemberitahuan di Beranda (minta reset dan terkunci) langsung hilang (server juga menandainya selesai). */
   function hapusPermintaanDiBeranda(nama) {
     var beranda = Cache.baca('beranda');
-    if (!beranda || !beranda.data.permintaanReset) return;
-    beranda.data.permintaanReset = beranda.data.permintaanReset.filter(function (p) {
-      return p.nama.toLowerCase() !== nama.toLowerCase();
-    });
+    if (!beranda) return;
+    function bukanDia(p) { return p.nama.toLowerCase() !== nama.toLowerCase(); }
+    if (beranda.data.permintaanReset) beranda.data.permintaanReset = beranda.data.permintaanReset.filter(bukanDia);
+    if (beranda.data.terkunci) beranda.data.terkunci = beranda.data.terkunci.filter(bukanDia);
     Cache.tulis('beranda', beranda.data);
   }
 
