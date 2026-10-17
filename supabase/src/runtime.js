@@ -70,27 +70,25 @@ export function buatRuntime(dep) {
       namaKunci = 'fungsi:' + kerja.nama;
     }
 
-    // Kunci publik VAPID (dibuat sekali, lalu disimpan di memori isolate) sebelum transaksi.
-    let vapidPublik = '';
-    if (dep.push) {
-      try {
-        vapidPublik = await dep.push.kunciPublik();
-      } catch (err) {
-        log.error('Kunci notifikasi tidak bisa dimuat: ' + (err && err.message ? err.message : err));
-      }
-    }
+    // Kunci publik VAPID (dibuat sekali, lalu disimpan di memori isolate), dimuat bersamaan dengan transaksi.
+    const janjiVapid = dep.push ? dep.push.kunciPublik().catch((err) => {
+      log.error('Kunci notifikasi tidak bisa dimuat: ' + (err && err.message ? err.message : err));
+      return '';
+    }) : Promise.resolve('');
 
     const proses = async (tx) => {
-      if (tulis) await tx`select pg_advisory_xact_lock(${KUNCI_TULIS})`;
-      const metas = await simpan.muatMeta(tx);
+      // Aksi yang menulis: kunci tulis diambil di kiriman yang sama dengan bacaan awal (satu kali bolak-balik).
+      const awal = await simpan.muatAwal(tx, namaKunci, tulis ? KUNCI_TULIS : null);
+      const metas = awal.metas;
       const versi = {};
       metas.forEach((m) => { versi[m.nama] = Number(m.versi); });
-      const propsAwal = await simpan.muatProperti(tx);
-      const info = await simpan.muatInfo(tx);
+      const propsAwal = awal.props;
+      const info = awal.info;
+      const vapidPublik = await janjiVapid;
       // Fungsi dengan muat: 'master' (jadwal ringan, arsip tahunan) tidak memuat tab yang pernah dipelajari: tab lain dimuat saat
       // dibutuhkan, supaya jalan yang tidak mengerjakan apa-apa tetap murah.
       const ringan = kerja.jenis === 'fungsi' && kerja.muat === 'master';
-      const perlu = new Set(ringan ? [] : await simpan.tabAksi(tx, namaKunci));
+      const perlu = new Set(ringan ? [] : awal.tabAksi);
       // Tab master selalu dimuat; fungsi terjadwal dan dari pemilik (setupSpreadsheet, laporan, rekap) memuat semua tab.
       const semua = kerja.jenis === 'fungsi' && kerja.muat !== 'master';
       metas.forEach((m) => { if (/^M_/.test(m.nama) || semua) perlu.add(m.nama); });
@@ -99,13 +97,15 @@ export function buatRuntime(dep) {
       const dipelajari = [];
 
       for (let ulang = 0; ulang < BATAS_ULANG; ulang++) {
+        const muat = [];
         for (const nama of perlu) {
           if (nama === '__drive') {
             if (!drive) drive = await simpan.muatDrive(tx);
           } else if (!dataTab[nama] && Object.prototype.hasOwnProperty.call(versi, nama)) {
-            dataTab[nama] = await simpan.muatTab(tx, nama, versi[nama]);
+            muat.push({ nama, versi: versi[nama] });
           }
         }
+        if (muat.length) Object.assign(dataTab, await simpan.muatTabBanyak(tx, muat));
         const ss = new Spreadsheet({
           Date: KelasDate,
           tabMeta: metas.map((m) => ({ nama: m.nama, urutan: m.urutan, meta: m.meta })),

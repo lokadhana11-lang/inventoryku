@@ -274,6 +274,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++ | Penjualan per menu (permintaan pemilik 17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan (`Data_PenjualanMenu`), pemakaian bahan seharusnya vs nyata di layar HPP, porsi terjual di Per menu, pengingat Dashboard, rekap bulanan PDF dan email | Kode selesai (Code.gs v0.18, aplikasi 0.19.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (10 uji server dengan angka dihitung tangan, 10 jawaban aksi lama sama dengan v0.17) dan Chromium (alur catat porsi, galat porsi, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `Data_PenjualanMenu`), uji dari HP |
 | 12+++++++++ | Notifikasi ke HP (permintaan pemilik 17 Oktober 2026): Web Push dari Supabase (kunci VAPID di tabel `info`, enkripsi aes128gcm tanpa library), suhu di luar standar, reset PIN, dan akun terkunci ke HP Pengelola, pengingat cek suhu ke semua HP, lembar Notifikasi di HP ini, jam pengingat di Outlet dan jadwal | Kode selesai (Code.gs v0.19, aplikasi 0.20.0), diuji: enkripsi didekripsi `http_ece` (library milik `web-push`), 12 uji server Code.gs, runtime asli di atas Postgres 16 lokal (kirim sesudah tersimpan, 410 dibuang, `__jadwal`, `pasangTrigger`), service worker tiruan, dan Chromium (layanan push browser ditiru, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali, nyalakan notifikasi dari HP (iPhone: pasang ke Layar Utama dulu) |
 | 12++++++++++ | Arsip tahunan (keputusan pemilik 17 Oktober 2026): tab menyimpan tahun berjalan dan tahun lalu; baris lebih tua (tab Data, `Stock_Harian`, `Log_Perubahan`) pindah ke `Laporan Kitchen/<Outlet>/Arsip/<Tahun>/` sebagai JSON dan Google Sheets "Arsip InventoryKu <Tahun>", rekap terakhir tiap item tetap, trigger tiap jam, tanggal yang sudah diarsip ditolak | Kode selesai (Code.gs v0.20; aplikasi tetap 0.20.0), diuji: 10 uji server Code.gs (juga dengan batas 2 baris per jalan), arsip ke Google Sheets dengan tiruan, runtime asli di atas Postgres 16 lokal (69.250 baris per tab, paling lama 0,9 detik per jalan, stock tetap), jawaban aksi lama sama dengan v0.19. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali (setupSpreadsheet tidak perlu) |
+| 12+++++++++++ | Bacaan database lebih ringkas di Supabase (permintaan pemilik 17 Oktober 2026, saran 2 dari "memuat lebih cepat lagi"): bacaan awal tiap permintaan dan kunci tulis dalam satu kali bolak-balik, tab dimuat sekaligus, `aksi_tab` sekali per isolate, kunci notifikasi dimuat bersamaan | Kode selesai (hanya `supabase/src`; Code.gs tetap v0.20, aplikasi tetap 0.20.0), diuji dengan Postgres 16 lokal: 35 langkah jawaban dan isi database sama dengan sebelumnya, proksi jeda 25 ms per arah (login 1,24 → 0,39 detik, permintaan pertama isolate 1,93 → 0,34 detik), dua runtime menulis bersamaan, urutan kunci, dan file rakitan dijalankan utuh. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy (Code.gs di Apps Script tidak perlu ditempel ulang) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -1994,3 +1995,31 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     diarsip dalam 14 jalan, paling lama 922 ms, jalan tanpa pekerjaan 2 ms, 50 rekap terbawa, stock tetap, enam berkas terunggah.
     Jawaban 25 aksi lama sama dengan v0.19; uji PIN, porsi, notifikasi, dan runtime push tetap lulus. Belum diuji: Supabase dan Google
     asli (Drive, pembuatan Google Sheets, batas waktu Apps Script).
+
+### Bacaan database lebih ringkas di Supabase (17 Oktober 2026)
+
+270. **Asal:** pemilik bertanya apakah aplikasi bisa dimuat lebih cepat lagi dan memilih saran 2: mengurangi bolak-balik ke
+    database di Edge Function. Code.gs, aplikasi, dan skema tidak berubah; jawaban semua aksi sama.
+271. **Yang diubah** (`penyimpanan.js`, `runtime.js`): (a) `muatAwal` membaca daftar tab, Script Properties, dan info dalam satu
+    query tanpa parameter (dulu tiga query ditambah `aksi_tab` berparameter). Dengan `prepare: false`, postgres.js mengirim query
+    berparameter dalam dua kali bolak-balik (meminta jenis parameter dulu), dan di dalam `sql.begin` query tidak dikirim beruntun,
+    jadi hanya query tanpa parameter yang hemat. (b) Aksi tulis: `select pg_advisory_xact_lock(4207)` dikirim di kiriman yang
+    sama dengan bacaan awal (dua perintah dalam satu query sederhana). Postgres menjalankannya berurutan dan, pada read committed,
+    bacaan memakai keadaan sesudah kunci didapat (diuji: penulis lain yang memegang kunci terlihat isinya). (c) `aksi_tab` dibaca
+    sekali per isolate dan diperbarui di memori saat tab baru dipelajari; isolate lain yang mempelajari tab baru hanya
+    menyebabkan satu percobaan ulang. (d) Tab yang belum ada di simpanan isolate dibaca dalam satu query (`muatTabBanyak`), bukan
+    satu query per tab; ini yang paling terasa saat isolate baru menyala (semua tab master dimuat). (e) `muatDrive` satu kiriman.
+    (f) Kunci publik notifikasi dimuat bersamaan dengan transaksi, bukan sebelumnya. Bolak-balik aksi baca yang sudah hangat:
+    7 → 3 (begin, bacaan awal, commit). Penulisan perubahan (`tulis`) tetap satu query berparameter per perintah.
+272. **jsPDF tetap dimuat saat Edge Function menyala.** Memuatnya hanya saat membuat PDF butuh `import()` dinamis, dan dukungannya
+    pada Edge Function yang dideploy (dibungkus eszip) tidak bisa dipastikan dari dokumentasi atau diuji di sini; jika gagal,
+    PDF dan laporan harian rusak. Penghematannya hanya saat isolate baru menyala.
+273. **Uji** (di luar repo; Postgres 16 lokal dengan tabel `skema.sql`, Code.gs asli, jam tiruan): 35 langkah (setupSpreadsheet,
+    pasang, staff, kategori, item, unit, Stock, kiriman ganda, Suhu, Waste, Beranda, Riwayat, Dashboard, PDF, HPP, PIN salah,
+    login, laporan harian, keluar) dengan jawaban dan isi `tab_baris`, `tab_meta`, `aksi_tab` sama dengan versi sebelumnya (selain
+    UUID dan garam PIN acak, yang juga berbeda antara dua jalan versi lama); proksi TCP jeda 25 ms per arah: isolate baru
+    infoLogin 1.927 → 336 ms, login 1.240 → 393 ms, Beranda 478 → 268 ms, kirimStock 1.128 → 697 ms, Beranda hangat 370 →
+    164 ms; dua runtime (dua isolate) mengirim 6 kiriman Stock dan 6 Beranda bersamaan (tiga kali): stock naik tepat 6, tanpa
+    posisi baris ganda; kunci tulis menunggu penulis lain dan melihat isinya; file rakitan dijalankan utuh di Node (postgres dan
+    jspdf dari npm, `Deno` tiruan) termasuk PDF. Belum diuji di Supabase asli: besar penghematan bergantung pada jarak Edge
+    Function ke database (log `Aksi <nama>: <ms> ms` menunjukkan waktu Code.gs saja; sisanya waktu menunggu database dan jaringan).
