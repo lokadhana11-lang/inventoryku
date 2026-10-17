@@ -95,10 +95,12 @@ export function buatAdaptor(o) {
         if (t.hariMinggu) syarat.hari = t.hariMinggu;
         if (t.tanggalBulan) syarat.tanggal = Number(t.tanggalBulan);
         const cronTeks = (t.setiapMenit ? '*/' + t.setiapMenit + ' * * * *' : (utc % 60) + ' ' + Math.floor(utc / 60) + ' * * *');
+        // pg_net mengirim body jsonb dan menolak Content-Type selain application/json ("Content-Type header must be
+        // \"application/json\""), jadi jadwal tidak memakai text/plain seperti aplikasi. Edge Function membaca body sebagai teks.
         const perintah = "select net.http_post(url := (select nilai #>> '{}' from inventoryku.info where kunci = 'alamatApi'), " +
           "body := jsonb_build_object('action', '__jadwal', 'nama', " + teksSql(t.fungsi) + ", 'syarat', " +
           teksSql(JSON.stringify(syarat)) + "::jsonb, 'rahasia', (select nilai #>> '{}' from inventoryku.info where kunci = 'rahasiaJadwal')), " +
-          "headers := '{\"Content-Type\": \"text/plain;charset=utf-8\"}'::jsonb, timeout_milliseconds := 300000)";
+          "headers := '{\"Content-Type\": \"application/json\"}'::jsonb, timeout_milliseconds := 300000)";
         await tx`select cron.schedule(${'inventoryku-' + t.fungsi}, ${cronTeks}, ${perintah})`;
       }
     });
