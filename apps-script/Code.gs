@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.15.1 (pindah ke Supabase; peringatan laporan harian yang tidak berjalan)
+// InventoryKu Code.gs v0.16 (HPP dan food cost: menu, penjualan harian; nominal waste hanya untuk Pengelola)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -47,6 +47,10 @@
  * - 11 Oktober 2026    : riwayat harga item (M_HargaItem, aksi gantiHarga,
  *                        harga yang berlaku pada tanggal untuk semua nilai
  *                        rupiah, selisih karena perubahan harga).
+ * - 17 Oktober 2026    : HPP dan food cost (M_Menu, M_MenuBahan, Data_Penjualan,
+ *                        aksi hpp, daftarMenu, simpanMenu, aturMenuAktif,
+ *                        simpanPenjualan); nominal rupiah waste hanya untuk
+ *                        Pengelola.
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -67,7 +71,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.15.1';
+var VERSI_KODE = 'v0.16';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -202,7 +206,17 @@ var AKSI_ = {
   arsipkanForm: { jalankan: aksiArsipkanForm_, pengelola: true,
     pesan: 'Form hanya bisa dihapus Head Kitchen atau Manager.' },
   pulihkanForm: { jalankan: aksiPulihkanForm_, pengelola: true,
-    pesan: 'Form hanya bisa dipulihkan Head Kitchen atau Manager.' }
+    pesan: 'Form hanya bisa dipulihkan Head Kitchen atau Manager.' },
+  hpp: { jalankan: aksiHpp_, bacaSaja: true, pengelola: true,
+    pesan: 'HPP dan food cost hanya untuk Head Kitchen dan Manager.' },
+  daftarMenu: { jalankan: aksiDaftarMenu_, bacaSaja: true, pengelola: true,
+    pesan: 'Pengaturan menu hanya untuk Head Kitchen dan Manager.' },
+  simpanMenu: { jalankan: aksiSimpanMenu_, pengelola: true,
+    pesan: 'Menu hanya bisa diubah Head Kitchen atau Manager.' },
+  aturMenuAktif: { jalankan: aksiAturMenuAktif_, pengelola: true,
+    pesan: 'Menu hanya bisa diubah Head Kitchen atau Manager.' },
+  simpanPenjualan: { jalankan: aksiSimpanPenjualan_, pengelola: true,
+    pesan: 'Penjualan hanya bisa dicatat Head Kitchen atau Manager.' }
 };
 
 /**
@@ -963,6 +977,8 @@ var KUNCI_MASTER = {
   M_ResepBahan: 'Item Hasil',
   M_Item: 'Nama Item',
   M_HargaItem: 'Nama Item',
+  M_Menu: 'Nama Menu',
+  M_MenuBahan: 'Nama Menu',
   M_Kategori: 'Nama Kategori',
   M_Unit: 'Nama Unit'
 };
@@ -2548,13 +2564,23 @@ function periksaBarisWaste_(kategori, alasan, label) {
  * kategori waste dan shift, waste yang sudah tercatat pada tanggal itu, dan
  * tanda nihil.
  */
+/**
+ * Nominal rupiah waste (harga satuan, estimasi kerugian) hanya untuk Pengelola
+ * (keputusan pemilik 17 Oktober 2026, Bagian 5.4). Tanpa pengguna (trigger
+ * laporan harian, email, Drive) nominalnya tetap ada.
+ */
+function rupiahWasteTerlihat_() {
+  return !PENGGUNA_AKSI_ || !!PENGGUNA_AKSI_.pengelola;
+}
+
 function dataFormWaste_(tanggal) {
   var zona = zonaSheet_();
+  var rupiah = rupiahWasteTerlihat_();
   // Harga pada tanggal waste; barang jadi yang kosong dihitung dari resepnya (Bagian 5.3, Tahap 6).
   var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
   var item = Object.keys(master).filter(function (k) { return master[k].aktif; }).map(function (k) {
     var m = master[k];
-    return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga };
+    return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: rupiah ? m.harga : undefined };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   var kiriman = bacaBarisTanggal_('Data_Waste', tanggal, zona,
     ['submission_id', 'Item / Produk', 'Kategori Waste', 'Qty', 'Satuan', 'Estimasi Kerugian (Rp)']);
@@ -2569,7 +2595,7 @@ function dataFormWaste_(tanggal) {
       kategori: rapikanTeks_(b['Kategori Waste']),
       qty: Number(b.Qty) || 0,
       satuan: rapikanTeks_(b.Satuan),
-      estimasi: rp,
+      estimasi: rupiah ? rp : undefined,
       oleh: b.oleh,
       waktu: b.waktu ? b.waktu.toISOString() : null
     };
@@ -2581,8 +2607,9 @@ function dataFormWaste_(tanggal) {
     tanggal: tanggal,
     kategoriWaste: KATEGORI_WASTE,
     shift: SHIFT,
+    tanpaRupiah: rupiah ? undefined : true,
     item: item,
-    kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman), totalRp: Math.round(total), baris: baris },
+    kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman), totalRp: rupiah ? Math.round(total) : undefined, baris: baris },
     nihil: kiriman.length ? null : barisTerakhir_(nihil)
   };
 }
@@ -3720,8 +3747,13 @@ function dataItem_() {
   var rekap = bacaRekap_();
   var catatan = itemBercatatan_();
   var hari = hariIni_();
+  var menu = bacaMenu_().menu;
   var dipakai = {};
   var diResep = {};
+  var diMenu = {};
+  Object.keys(menu).forEach(function (k) {
+    menu[k].bahan.forEach(function (b) { diMenu[b.item.toLowerCase()] = true; });
+  });
   Object.keys(resep).forEach(function (k) {
     var r = resep[k];
     diResep[k] = true;
@@ -3749,9 +3781,10 @@ function dataItem_() {
       aktif: m.aktif,
       stock: posisiStock_(rekap.item[k], hari).akhir,
       punyaCatatan: !!catatan[k],
-      bisaGantiNama: !catatan[k] && !diResep[k],
+      bisaGantiNama: !catatan[k] && !diResep[k] && !diMenu[k],
       resepAktif: !!(resep[k] && resep[k].aktif),
-      dipakaiResep: (dipakai[k] || []).sort(function (a, b) { return a.localeCompare(b, 'id'); })
+      dipakaiResep: (dipakai[k] || []).sort(function (a, b) { return a.localeCompare(b, 'id'); }),
+      dipakaiMenu: menuPemakai_(menu, k)
     };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   return {
@@ -3814,9 +3847,13 @@ function aksiSimpanItem_(body, pengguna) {
       var diResep = !!resep[lama.nama.toLowerCase()] || Object.keys(resep).some(function (k) {
         return resep[k].bahan.some(function (b) { return b.item.toLowerCase() === lama.nama.toLowerCase(); });
       });
-      if (catatan || diResep) {
+      var menuLama = bacaMenu_().menu;
+      var diMenu = Object.keys(menuLama).some(function (k) {
+        return menuLama[k].bahan.some(function (b) { return b.item.toLowerCase() === lama.nama.toLowerCase(); });
+      });
+      if (catatan || diResep || diMenu) {
         throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena item ini sudah ' +
-          (catatan ? 'punya catatan stock' : 'dipakai resep') + '. Catatan lama menyimpan nama ini.');
+          (catatan ? 'punya catatan stock' : diResep ? 'dipakai resep' : 'dipakai menu') + '. Catatan lama menyimpan nama ini.');
       }
     }
     var kategori = pilihMaster_(bacaSemuaKategori_(), 'nama', body.kategori, lama && lama.kategori, 'kategori');
@@ -3890,6 +3927,10 @@ function aksiAturItemAktif_(body) {
       }).map(function (k) { return resep[k].itemHasil; });
       if (pemakai.length) {
         throw galatPengguna_(nama + ' masih dipakai resep ' + pemakai.join(', ') + '. Ubah atau nonaktifkan resepnya dulu.');
+      }
+      var menu = menuPemakai_(bacaMenu_().menu, kecil);
+      if (menu.length) {
+        throw galatPengguna_('Tidak bisa dinonaktifkan: masih dipakai menu ' + menu.join(', ') + '. Ubah atau nonaktifkan menunya dulu.');
       }
     }
     tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
@@ -4165,6 +4206,8 @@ function dataOutletJadwal_() {
     jadwalOpname: JADWAL_OPNAME.indexOf(opname) >= 0 ? opname : 'mingguan',
     hariCadangan: hariSah_(n.hari_cadangan) || 'Minggu',
     keluarOtomatisMenit: keluarOtomatisMenit_(n.keluar_otomatis_menit),
+    targetFoodCost: targetFoodCost_(n),
+    bahanKecilPersen: bahanKecilPersen_(n),
     perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
   };
 }
@@ -4211,6 +4254,14 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     baru.keluarOtomatisMenit = Number(body.keluarOtomatisMenit);
     if (PILIHAN_KELUAR_OTOMATIS.indexOf(baru.keluarOtomatisMenit) < 0) throw galatPengguna_('Pilih 5, 10, 15, atau 30 menit.');
   }
+  if (ada('targetFoodCost')) {
+    baru.targetFoodCost = persenIsian_(body.targetFoodCost, 1, 100);
+    if (baru.targetFoodCost == null) throw galatPengguna_('Target food cost diisi persen 1 sampai 100, misalnya 35.');
+  }
+  if (ada('bahanKecilPersen')) {
+    baru.bahanKecilPersen = persenIsian_(body.bahanKecilPersen, 0, BAHAN_KECIL_MAKS);
+    if (baru.bahanKecilPersen == null) throw galatPengguna_('Bahan kecil diisi persen 0 sampai ' + BAHAN_KECIL_MAKS + ', misalnya 3.');
+  }
 
   return denganKunci_(function () {
     var kini = dataOutletJadwal_();
@@ -4234,6 +4285,12 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     if (berubah('hariCadangan')) tulisKonfigurasi_('hari_cadangan', baru.hariCadangan);
     if (berubah('keluarOtomatisMenit')) {
       tulisKonfigurasi_('keluar_otomatis_menit', String(baru.keluarOtomatisMenit), KETERANGAN_KELUAR_OTOMATIS);
+    }
+    if (berubah('targetFoodCost')) {
+      tulisKonfigurasi_('target_food_cost', String(baru.targetFoodCost).replace('.', ','), KETERANGAN_TARGET_FOOD_COST);
+    }
+    if (berubah('bahanKecilPersen')) {
+      tulisKonfigurasi_('bahan_kecil_persen', String(baru.bahanKecilPersen).replace('.', ','), KETERANGAN_BAHAN_KECIL);
     }
     var jadwalBerubah = berubah('zonaWaktu') || berubah('jamClosing') || berubah('jedaLaporanMenit') || berubah('hariCadangan');
     if (jadwalBerubah) {
@@ -4447,6 +4504,10 @@ function perhatianDashboard_(d) {
     tambah('opname', 'tinjau', teksPengingatOpname_(d.opname).replace(/\.$/, ''), 'Jadwal ' + d.opname.jadwal + '. Hitung barang nyata ' +
       'sebelum opening atau setelah closing.');
   }
+  if (d.hpp && d.hpp.menuDiAtas.length) {
+    tambah('menu', 'tinjau', d.hpp.menuDiAtas.length + ' menu di atas target food cost ' + persenId_(d.hpp.target),
+      daftarNamaSingkat_(d.hpp.menuDiAtas.map(function (m) { return m.nama + ' ' + persenId_(m.foodCost); })) + '.');
+  }
   var belum = d.form.filter(function (f) { return f.wajib && !f.lengkap; });
   if (belum.length) {
     tambah('formBelum', 'menunggu', belum.length + ' form belum lengkap hari ini', belum.map(function (f) {
@@ -4456,6 +4517,13 @@ function perhatianDashboard_(d) {
   if (d.pemeriksaan.belumDiperiksa) {
     tambah('belumDiperiksa', 'menunggu', d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa', BATAS_RIWAYAT_HARI + ' hari terakhir.',
       { formId: d.pemeriksaan.formBelum, dari: d.pemeriksaan.dari, sampai: d.pemeriksaan.sampai });
+  }
+  if (d.hpp && d.hpp.penjualanKurang.length) {
+    var kurang = d.hpp.penjualanKurang;
+    tambah('penjualan', 'menunggu', kurang.length === 1 && kurang[0] === d.hpp.kemarin ? 'Penjualan kemarin belum dicatat'
+      : 'Penjualan ' + kurang.length + ' hari belum dicatat',
+      (kurang.length > 5 ? 'Antara lain tanggal ' + teksHariBulan_(kurang.slice(-4)) : 'Tanggal ' + teksHariBulan_(kurang)) +
+      '. Food cost bulan ini dihitung setelah semua hari tercatat.', { tanggal: kurang[kurang.length - 1] });
   }
   if (d.nilai.tanpaHarga.length) {
     tambah('tanpaHarga', 'menunggu', d.nilai.tanpaHarga.length + ' item belum punya harga',
@@ -4497,7 +4565,8 @@ function aksiDashboard_(body) {
       return a.reset.getTime() - b.reset.getTime();
     }),
     peringatan: peringatanSistem_(),
-    opname: statusOpname_()
+    opname: statusOpname_(),
+    hpp: ringkasHppDashboard_(tanggal)
   };
   var hariIniWaste = d.waste.hari[d.waste.hari.length - 1];
   return {
@@ -4517,7 +4586,629 @@ function aksiDashboard_(body) {
     grafikWaste: d.waste,
     grafikSuhu: d.suhu,
     opname: d.opname,
+    hpp: { bulan: d.hpp.bulan, nama: d.hpp.nama, foodCost: d.hpp.foodCost, target: d.hpp.target },
     alamatSheet: alamatDashboardSheet_()
+  };
+}
+
+/* =========================================================================
+ * HPP dan food cost (keputusan pemilik 17 Oktober 2026; spesifikasi sistem
+ * Bagian 5.9, tampilan Bagian 5.10): menu dengan takaran per porsi, HPP per
+ * porsi, penjualan harian, dan food cost per bulan. Semuanya khusus Pengelola.
+ * ========================================================================= */
+
+var TAB_MENU = 'M_Menu';
+var TAB_MENU_BAHAN = 'M_MenuBahan';
+var TAB_PENJUALAN = 'Data_Penjualan';
+var PANJANG_MENU_MAKS = 60;
+var MENU_BAHAN_MAKS = 40;
+var TARGET_FOOD_COST_AWAL = 35;
+var BAHAN_KECIL_AWAL = 3;
+var BAHAN_KECIL_MAKS = 15;
+var BULAN_GRAFIK_HPP = 6;
+var URUTAN_PENJUALAN = [['Tanggal', false], ['timestamp_server', true]];
+var KETERANGAN_TARGET_FOOD_COST = 'Target food cost (%). Menu dan bulan di atas angka ini ditandai. Diubah dari Pengaturan → Outlet dan jadwal.';
+var KETERANGAN_BAHAN_KECIL = 'Bahan kecil (%): bumbu, minyak, dan garnish yang ditambahkan ke HPP semua menu. Diubah dari Pengaturan → Outlet dan jadwal.';
+
+/** Persen dari M_Konfigurasi: angka di antara min dan maks (satu angka di belakang koma), selain itu nilai awal. */
+function persenKonfigurasi_(nilai, awal, min, maks) {
+  var t = String(nilai == null ? '' : nilai).trim().replace(',', '.');
+  var n = Number(t);
+  if (t === '' || !isFinite(n) || n < min || n > maks) return awal;
+  return Math.round(n * 10) / 10;
+}
+
+function targetFoodCost_(n) {
+  return persenKonfigurasi_((n || bacaKonfigurasi_().nilai).target_food_cost, TARGET_FOOD_COST_AWAL, 1, 100);
+}
+
+function bahanKecilPersen_(n) {
+  return persenKonfigurasi_((n || bacaKonfigurasi_().nilai).bahan_kecil_persen, BAHAN_KECIL_AWAL, 0, BAHAN_KECIL_MAKS);
+}
+
+/** Persen dari isian Pengaturan: angka min sampai maks, satu angka di belakang koma; null jika salah. */
+function persenIsian_(nilai, min, maks) {
+  var t = String(nilai == null ? '' : nilai).trim().replace(',', '.');
+  var n = Number(t);
+  if (t === '' || !isFinite(n) || n < min || n > maks) return null;
+  return Math.round(n * 10) / 10;
+}
+
+/** "35%" / "37,2%" */
+function persenId_(n) {
+  return n == null ? '–' : String(Math.round(n * 10) / 10).replace('.', ',') + '%';
+}
+
+/**
+ * Menu dari M_Menu dan M_MenuBahan: { ada (kedua tab ada), menu: { namaKecil:
+ * { nama, hargaJual, aktif, nomor, bahan: [{ item, qty, hasilBersih }] } } }.
+ * Bahan dihubungkan lewat Nama Menu. Hasil Bersih kosong = 100%. Nama yang
+ * tertulis dua kali (diisi tangan): baris yang lebih atas dipakai.
+ */
+function bacaMenu_() {
+  var t = bacaTabel_(TAB_MENU);
+  var tb = bacaTabel_(TAB_MENU_BAHAN);
+  var hasil = { ada: !!(t && tb), menu: {} };
+  if (!t || !tb) return hasil;
+  t.baris.forEach(function (b, i) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Menu'));
+    if (!nama || hasil.menu[nama.toLowerCase()]) return;
+    hasil.menu[nama.toLowerCase()] = {
+      nama: nama,
+      hargaJual: angkaAtauNull_(nilai_(t, b, 'Harga Jual (Rp)')),
+      aktif: benar_(nilai_(t, b, 'Aktif')),
+      nomor: i + 2,
+      bahan: []
+    };
+  });
+  tb.baris.forEach(function (b) {
+    var m = hasil.menu[rapikanTeks_(nilai_(tb, b, 'Nama Menu')).toLowerCase()];
+    var item = rapikanTeks_(nilai_(tb, b, 'Item Bahan'));
+    var qty = angkaAtauNull_(nilai_(tb, b, 'Qty per Porsi'));
+    if (!m || !item || !(qty > 0)) return;
+    var hasilBersih = angkaAtauNull_(nilai_(tb, b, 'Hasil Bersih (%)'));
+    m.bahan.push({ item: item, qty: qty, hasilBersih: hasilBersih > 0 && hasilBersih <= 100 ? hasilBersih : 100 });
+  });
+  return hasil;
+}
+
+/** Menu aktif yang memakai item itu sebagai bahan (nama menu, urut abjad). */
+function menuPemakai_(menu, kecil) {
+  return Object.keys(menu).filter(function (k) {
+    return menu[k].aktif && menu[k].bahan.some(function (b) { return b.item.toLowerCase() === kecil; });
+  }).map(function (k) { return menu[k].nama; }).sort(function (a, b) { return a.localeCompare(b, 'id'); });
+}
+
+/**
+ * HPP satu menu (Bagian 5.9). master: item dengan harga yang berlaku pada
+ * tanggal yang dinilai, barang jadi tanpa harga sudah diisi dari resepnya
+ * (lengkapiHargaResep_). Bahan yang dibeli = takaran bersih ÷ hasil bersih;
+ * HPP = biaya bahan × (1 + bahan kecil %). Jika satu bahan belum punya harga,
+ * HPP tidak dihitung (lengkap: false). target dalam persen.
+ */
+function hppMenu_(menu, master, kecilPersen, target) {
+  var masalah = [];
+  var tanpaHarga = [];
+  var biayaBahan = 0;
+  var bahan = menu.bahan.map(function (b) {
+    var m = master[b.item.toLowerCase()];
+    if (!m) masalah.push('Bahan ' + b.item + ' tidak ada di daftar item.');
+    else if (!m.aktif) masalah.push('Bahan ' + m.nama + ' nonaktif.');
+    var harga = m ? m.harga : null;
+    var beli = b.qty / (b.hasilBersih / 100);
+    var biaya = harga == null ? null : beli * harga;
+    if (harga == null) tanpaHarga.push(m ? m.nama : b.item);
+    else biayaBahan += biaya;
+    return {
+      item: m ? m.nama : b.item, qty: b.qty, hasilBersih: b.hasilBersih, satuan: m ? m.satuan : '',
+      harga: harga, hargaDariResep: !!(m && m.hargaDariResep), beli: bulat_(beli),
+      biaya: biaya == null ? null : Math.round(biaya * 100) / 100
+    };
+  });
+  var lengkap = !tanpaHarga.length && bahan.length > 0;
+  var kecil = lengkap ? biayaBahan * kecilPersen / 100 : null;
+  var hpp = lengkap ? biayaBahan + kecil : null;
+  var jual = menu.hargaJual;
+  var foodCost = hpp != null && jual > 0 ? Math.round(hpp / jual * 1000) / 10 : null;
+  return {
+    nama: menu.nama,
+    hargaJual: jual,
+    aktif: menu.aktif,
+    bahan: bahan,
+    biayaBahan: lengkap ? Math.round(biayaBahan * 100) / 100 : null,
+    bahanKecil: kecil == null ? null : Math.round(kecil * 100) / 100,
+    hpp: hpp == null ? null : Math.round(hpp * 100) / 100,
+    foodCost: foodCost,
+    margin: hpp != null && jual != null ? Math.round((jual - hpp) * 100) / 100 : null,
+    hargaTarget: hpp != null ? Math.ceil(hpp / (target / 100) / 100) * 100 : null,
+    diAtasTarget: foodCost != null && foodCost > target,
+    lengkap: lengkap,
+    tanpaHarga: tanpaHarga,
+    masalah: masalah
+  };
+}
+
+/** HPP semua menu (aktif saja jika hanyaAktif) dengan harga yang berlaku pada tanggal itu. */
+function hppSemuaMenu_(tanggal, hanyaAktif, konf) {
+  var data = bacaMenu_();
+  var n = konf || bacaKonfigurasi_().nilai;
+  var target = targetFoodCost_(n);
+  var kecil = bahanKecilPersen_(n);
+  var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
+  return Object.keys(data.menu).filter(function (k) { return !hanyaAktif || data.menu[k].aktif; }).map(function (k) {
+    return hppMenu_(data.menu[k], master, kecil, target);
+  });
+}
+
+/** Urutan Per menu: food cost tertinggi dulu; menu yang belum lengkap di bawah, abjad. */
+function urutMenuFoodCost_(a, b) {
+  var fa = a.foodCost == null ? -1 : a.foodCost;
+  var fb = b.foodCost == null ? -1 : b.foodCost;
+  return fb - fa || a.nama.localeCompare(b.nama, 'id');
+}
+
+/** Jawaban Pengaturan → Menu: semua menu (aktif dulu, abjad), daftar item dengan harga hari ini, target, dan bahan kecil. */
+function dataMenu_() {
+  var hari = hariIni_();
+  var data = bacaMenu_();
+  var n = bacaKonfigurasi_().nilai;
+  var target = targetFoodCost_(n);
+  var kecil = bahanKecilPersen_(n);
+  var master = lengkapiHargaResep_(itemPadaTanggal_(hari));
+  var menu = Object.keys(data.menu).map(function (k) {
+    return hppMenu_(data.menu[k], master, kecil, target);
+  }).sort(function (a, b) {
+    return (b.aktif ? 1 : 0) - (a.aktif ? 1 : 0) || a.nama.localeCompare(b.nama, 'id');
+  });
+  var item = Object.keys(master).map(function (k) {
+    var m = master[k];
+    return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga, hargaDariResep: !!m.hargaDariResep, aktif: m.aktif };
+  }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+  return { siap: data.ada, hariIni: hari, menu: menu, item: item, target: target, bahanKecilPersen: kecil };
+}
+
+function aksiDaftarMenu_() {
+  return dataMenu_();
+}
+
+function wajibTabMenu_() {
+  if (!bacaMenu_().ada) {
+    throw galatPengguna_('Tab ' + TAB_MENU + ' dan ' + TAB_MENU_BAHAN + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+  }
+}
+
+/** Menulis ulang baris M_MenuBahan satu menu (baris menu lain tetap, urutannya tidak berubah). */
+function tulisBahanMenu_(kecilLama, nama, bahan) {
+  var sheet = ambilTab_(TAB_MENU_BAHAN);
+  var kol = posisiKolom_(sheet, { menu: 'Nama Menu', bahan: 'Item Bahan', qty: 'Qty per Porsi', hasil: 'Hasil Bersih (%)' });
+  var lebar = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  var semua = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lebar).getValues() : [];
+  var tetap = semua.filter(function (b) {
+    return kunciTerisi_(b[kol.menu - 1]) && rapikanTeks_(b[kol.menu - 1]).toLowerCase() !== kecilLama;
+  });
+  bahan.forEach(function (x) {
+    var baris = [];
+    for (var i = 0; i < lebar; i++) baris.push('');
+    baris[kol.menu - 1] = nama;
+    baris[kol.bahan - 1] = x.item;
+    baris[kol.qty - 1] = x.qty;
+    baris[kol.hasil - 1] = x.hasilBersih;
+    tetap.push(baris);
+  });
+  var perlu = tetap.length + 1;
+  if (sheet.getMaxRows() < perlu) sheet.insertRowsAfter(sheet.getMaxRows(), perlu - sheet.getMaxRows());
+  if (tetap.length) sheet.getRange(2, 1, tetap.length, lebar).setValues(tetap);
+  if (semua.length > tetap.length) sheet.getRange(tetap.length + 2, 1, semua.length - tetap.length, lebar).clearContent();
+}
+
+/**
+ * Simpan menu (Pengaturan → Menu), khusus Pengelola. body: { baru, namaLama,
+ * nama, hargaJual, bahan: [{ item, qty, hasilBersih }] }. Nama unik (huruf
+ * besar/kecil tidak dibedakan) dan boleh diganti, karena menu tidak dirujuk
+ * catatan mana pun. Bahan: item aktif, tidak ganda, takaran bersih lebih dari
+ * 0 dalam satuan dasar, hasil bersih di atas 0 sampai 100 (kosong = 100).
+ * Menu baru langsung aktif. Perubahan harga jual tercatat di Log_Perubahan.
+ */
+function aksiSimpanMenu_(body, pengguna) {
+  var nama = periksaNama_(body.nama, 'Nama menu', PANJANG_MENU_MAKS);
+  if (body.hargaJual === '' || body.hargaJual == null) throw galatPengguna_('Isi harga jual.');
+  var jual = angkaOpsional_(body.hargaJual, 'Harga jual', 2);
+  if (!(jual > 0)) throw galatPengguna_('Harga jual harus lebih dari 0.');
+  var master = bacaItem_();
+  var masukan = Array.isArray(body.bahan) ? body.bahan : [];
+  if (!masukan.length) throw galatPengguna_('Tambah minimal satu bahan.');
+  if (masukan.length > MENU_BAHAN_MAKS) throw galatPengguna_('Bahan terlalu banyak untuk satu menu.');
+  var sudah = {};
+  var bahan = masukan.map(function (b) {
+    var mb = master[rapikanTeks_(b && b.item).toLowerCase()];
+    if (!mb) throw galatPengguna_('Bahan ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang layar ini.');
+    if (!mb.aktif) throw galatPengguna_('Bahan ' + mb.nama + ' nonaktif. Pilih bahan yang aktif.');
+    var k = mb.nama.toLowerCase();
+    if (sudah[k]) throw galatPengguna_(mb.nama + ' tertulis dua kali. Gabungkan takarannya di satu baris.');
+    sudah[k] = true;
+    if (b.qty === '' || b.qty == null) throw galatPengguna_('Isi takaran ' + mb.nama + ' per porsi.');
+    var qty = angkaIsian_(b.qty, 'Takaran ' + mb.nama);
+    if (!qty) throw galatPengguna_('Takaran ' + mb.nama + ' per porsi harus lebih dari 0.');
+    var hasil = b.hasilBersih === '' || b.hasilBersih == null ? 100 : persenIsian_(b.hasilBersih, 0.1, 100);
+    if (hasil == null) throw galatPengguna_('Hasil bersih ' + mb.nama + ' diisi persen di atas 0 sampai 100, misalnya 85.');
+    return { item: mb.nama, qty: qty, hasilBersih: hasil };
+  });
+
+  return denganKunci_(function () {
+    wajibTabMenu_();
+    var data = bacaMenu_();
+    var lama = null;
+    if (!body.baru) {
+      lama = data.menu[rapikanTeks_(body.namaLama).toLowerCase()] || null;
+      if (!lama) throw galatPengguna_('Menu ' + rapikanTeks_(body.namaLama) + ' tidak ditemukan. Kembali ke daftar menu.');
+    }
+    var ada = data.menu[nama.toLowerCase()];
+    if (ada && ada !== lama) {
+      throw galatPengguna_('Menu ' + ada.nama + ' sudah ada' + (ada.aktif ? '' : ' tetapi nonaktif') + '. ' +
+        (ada.aktif ? 'Pakai nama lain.' : 'Buka ' + ada.nama + ' di daftar menu untuk mengaktifkannya lagi.'));
+    }
+    var t = wajibTabel_(TAB_MENU);
+    if (lama) {
+      tulisBarisMaster_(t, lama.nomor, { 'Nama Menu': nama, 'Harga Jual (Rp)': jual });
+      var ubah = [];
+      if (lama.nama !== nama) ubah.push(['Nama Menu', lama.nama, nama]);
+      if (lama.hargaJual !== jual) ubah.push(['Harga Jual (Rp)', lama.hargaJual == null ? '' : lama.hargaJual, jual]);
+      if (ubah.length) catatLog_(TAB_MENU, nama, pengguna, new Date(), ubah);
+    } else {
+      tambahBarisMaster_(TAB_MENU, { 'Nama Menu': nama, 'Harga Jual (Rp)': jual, 'Aktif': true });
+    }
+    tulisBahanMenu_(lama ? lama.nama.toLowerCase() : nama.toLowerCase(), nama, bahan);
+    var hasil = dataMenu_();
+    hasil.disimpan = nama;
+    return hasil;
+  });
+}
+
+/** Menonaktifkan atau mengaktifkan lagi satu menu. Mengaktifkan memeriksa bahan yang nonaktif. */
+function aksiAturMenuAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    wajibTabMenu_();
+    var m = bacaMenu_().menu[rapikanTeks_(body.nama).toLowerCase()];
+    if (!m) throw galatPengguna_('Menu tidak ditemukan. Kembali ke daftar menu.');
+    if (aktif) {
+      var master = bacaItem_();
+      m.bahan.forEach(function (b) {
+        var mb = master[b.item.toLowerCase()];
+        if (!mb || !mb.aktif) throw galatPengguna_('Bahan ' + b.item + ' nonaktif. Ganti bahannya dulu.');
+      });
+    }
+    var t = wajibTabel_(TAB_MENU);
+    tulisBarisMaster_(t, m.nomor, { 'Aktif': aktif });
+    var hasil = dataMenu_();
+    hasil.diubah = { nama: m.nama, aktif: aktif };
+    return hasil;
+  });
+}
+
+/* ---------- Penjualan harian ---------- */
+
+/**
+ * Data_Penjualan: { ada, tabel, hari: { 'yyyy-mm-dd': { nilai, catatan, nomor,
+ * rowId, oleh, waktu } }, pertama: tanggal terawal }. Satu baris per tanggal;
+ * jika satu tanggal tertulis dua kali (diisi tangan), baris yang lebih atas dipakai.
+ */
+function bacaPenjualan_() {
+  var t = bacaTabel_(TAB_PENJUALAN);
+  var hasil = { ada: !!t, tabel: t, hari: {}, pertama: '' };
+  if (!t) return hasil;
+  var zona = zonaSheet_();
+  t.baris.forEach(function (b, i) {
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    var n = angkaAtauNull_(nilai_(t, b, 'Penjualan (Rp)'));
+    if (!tg || n == null || hasil.hari[tg]) return;
+    var w = nilai_(t, b, 'timestamp_server');
+    hasil.hari[tg] = {
+      nilai: n, catatan: rapikanTeks_(nilai_(t, b, 'Catatan')), nomor: i + 2, rowId: String(nilai_(t, b, 'row_id') || ''),
+      oleh: rapikanTeks_(nilai_(t, b, 'updated_by')) || rapikanTeks_(nilai_(t, b, 'submitted_by')),
+      waktu: isoAtauNull_(nilai_(t, b, 'updated_at')) || isoAtauNull_(w)
+    };
+    if (!hasil.pertama || tg < hasil.pertama) hasil.pertama = tg;
+  });
+  return hasil;
+}
+
+/** Penjualan dari dari sampai sampai: { total, hari (tercatat), jumlahHari, kurang: [tanggal] }. */
+function penjualanRentang_(jual, dari, sampai) {
+  var hasil = { total: 0, hari: 0, jumlahHari: 0, kurang: [] };
+  for (var d = dari; d <= sampai; d = geserTanggal_(d, 1)) {
+    hasil.jumlahHari++;
+    var x = jual.hari[d];
+    if (x) {
+      hasil.total += x.nilai;
+      hasil.hari++;
+    } else {
+      hasil.kurang.push(d);
+    }
+  }
+  hasil.total = Math.round(hasil.total);
+  return hasil;
+}
+
+/**
+ * Mencatat penjualan satu tanggal (khusus Pengelola). body: { tanggal,
+ * penjualan, catatan, submissionId, bulan (opsional: jawaban ditambah hpp
+ * bulan itu) }. Hari ini atau tanggal yang sudah lewat. Tanggal yang sudah
+ * punya catatan ditimpa dan perubahannya tercatat di Log_Perubahan.
+ */
+function aksiSimpanPenjualan_(body, pengguna) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  var tanggal = body.tanggal;
+  if (tanggal > hariIni_()) throw galatPengguna_('Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat.');
+  if (body.penjualan === '' || body.penjualan == null) throw galatPengguna_('Isi penjualan. Hari tutup diisi 0.');
+  var nilai = angkaOpsional_(body.penjualan, 'Penjualan', 2);
+  var catatan = teksAman_(rapikanTeks_(body.catatan).slice(0, 200));
+  var sid = typeof body.submissionId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(body.submissionId) ? body.submissionId : Utilities.getUuid();
+
+  return denganKunci_(function () {
+    var jual = bacaPenjualan_();
+    if (!jual.ada) throw galatPengguna_('Tab ' + TAB_PENJUALAN + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var t = jual.tabel;
+    var lama = jual.hari[tanggal];
+    var kini = new Date();
+    if (lama) {
+      var ubah = [];
+      if (lama.nilai !== nilai) ubah.push(['Penjualan (Rp)', lama.nilai, nilai]);
+      if (lama.catatan !== catatan) ubah.push(['Catatan', lama.catatan, catatan]);
+      if (ubah.length) {
+        var baris = t.baris[lama.nomor - 2];
+        ubah.forEach(function (u) { t.sheet.getRange(lama.nomor, t.kol[u[0]] + 1).setValue(u[2]); });
+        if (t.kol.updated_by !== undefined) t.sheet.getRange(lama.nomor, t.kol.updated_by + 1).setValue(pengguna.nama);
+        if (t.kol.updated_at !== undefined) t.sheet.getRange(lama.nomor, t.kol.updated_at + 1).setValue(kini);
+        catatLog_(TAB_PENJUALAN, String(nilai_(t, baris, 'row_id') || tanggal), pengguna, kini, ubah);
+      }
+    } else {
+      tambahBarisTabel_(t, [gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'Penjualan (Rp)': nilai,
+        'Catatan': catatan
+      }, isiSistem_({ sid: sid, outlet: namaOutlet_(), kini: kini, waktuPerangkat: '', pengguna: pengguna }))]);
+      urutkanTabel_(t, URUTAN_PENJUALAN);
+    }
+    var hasil = { tanggal: tanggal, penjualan: nilai, catatan: catatan, mengganti: lama ? lama.nilai : null };
+    if (bulanSah_(body.bulan)) hasil.hpp = dataHpp_(body.bulan);
+    return hasil;
+  });
+}
+
+/* ---------- Food cost per bulan ---------- */
+
+/**
+ * Stok pembuka per item per tanggal dari Data_Penyesuaian (alasan "Stok
+ * pembuka"): { 'namaKecil|yyyy-mm-dd': selisih }. Stok pembuka adalah barang
+ * yang sudah ada sebelum dicatat, bukan selisih stock, jadi tidak mengurangi
+ * pemakaian bahan.
+ */
+function stokPembuka_() {
+  var t = bacaTabel_('Data_Penyesuaian');
+  var hasil = {};
+  if (!t) return hasil;
+  var zona = zonaSheet_();
+  t.baris.forEach(function (b) {
+    if (rapikanTeks_(nilai_(t, b, 'Alasan')) !== ALASAN_PENYESUAIAN[0]) return;
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Item')).toLowerCase();
+    if (!tg || !nama) return;
+    var kunci = nama + '|' + tg;
+    hasil[kunci] = (hasil[kunci] || 0) + (Number(nilai_(t, b, 'Selisih')) || 0);
+  });
+  return hasil;
+}
+
+/** Estimasi kerugian yang tercatat di Data_Waste: [{ tanggal, kecil (nama item huruf kecil), rp }]. */
+function nilaiWasteTercatat_() {
+  var t = bacaTabel_('Data_Waste');
+  if (!t) return [];
+  var zona = zonaSheet_();
+  return t.baris.map(function (b) {
+    return { tanggal: teksTanggal_(nilai_(t, b, 'Tanggal'), zona), kecil: rapikanTeks_(nilai_(t, b, 'Item / Produk')).toLowerCase(),
+      rp: Number(nilai_(t, b, 'Estimasi Kerugian (Rp)')) || 0 };
+  }).filter(function (x) { return x.tanggal && x.kecil; });
+}
+
+/**
+ * Bahan yang dipakai pada satu periode (Bagian 5.9), dari rekap Stock_Harian:
+ * untuk item yang bukan hasil resep aktif, tiap hari (Stock Keluar + Dipakai
+ * Prep − Hasil Prep) + Waste − Penyesuaian, × harga yang berlaku hari itu.
+ * Barang jadi tidak dihitung lagi (biayanya terhitung saat bahannya dipakai);
+ * waste barang jadi hanya dilaporkan (estimasi yang tercatat). Stok pembuka tidak dihitung sebagai
+ * selisih stock. Cek silang: nilai stock bahan awal + nilai masuk + stok
+ * pembuka − nilai stock bahan akhir + selisih karena perubahan harga.
+ * ctx: { master, rekap, resep, urutKat, namaKat, pembuka, waste }.
+ */
+function pemakaianBahan_(ctx, dari, sampai) {
+  var hasil = { terpakai: 0, waste: 0, selisihStock: 0, total: 0, wasteBarangJadi: 0, masuk: 0, stokPembuka: 0,
+    perKategori: [], bahanTerbesar: [], tanpaHarga: [], cek: null };
+  if (sampai < dari) return hasil;
+  var perKat = {};
+  var perItem = [];
+  var tanpa = {};
+  var kunciBahan = {};
+  var sebelum = geserTanggal_(dari, -1);
+  var awal = 0;
+  var akhir = 0;
+  Object.keys(ctx.master).forEach(function (k) {
+    var m = ctx.master[k];
+    var bahan = !(ctx.resep[k] && ctx.resep[k].aktif);
+    var rekapItem = ctx.rekap.item[k] || [];
+    if (bahan) {
+      kunciBahan[k] = true;
+      var ha = hargaPada_(m, sebelum);
+      var sa = posisiStock_(rekapItem, sebelum).akhir;
+      if (ha != null) awal += sa * ha;
+      var hz = hargaPada_(m, sampai);
+      var sz = posisiStock_(rekapItem, sampai).akhir;
+      if (hz != null) akhir += sz * hz;
+    }
+    var x = { nama: m.nama, satuan: m.satuan, kategori: m.kategori, qty: 0, nilai: 0 };
+    rekapItem.forEach(function (r) {
+      if (r.tanggal < dari || r.tanggal > sampai) return;
+      if (!bahan) return;
+      var h = hargaPada_(m, r.tanggal);
+      var pakai = r.keluar + r.dipakaiPrep - r.hasilPrep;
+      var pembuka = (ctx.pembuka || {})[k + '|' + r.tanggal] || 0;
+      var lain = r.penyesuaian - pembuka;
+      var qty = pakai + r.waste - lain;
+      if (h == null) {
+        if (qty || r.masuk) tanpa[m.nama] = true;
+        return;
+      }
+      hasil.terpakai += pakai * h;
+      hasil.waste += r.waste * h;
+      hasil.selisihStock -= lain * h;
+      hasil.masuk += r.masuk * h;
+      hasil.stokPembuka += pembuka * h;
+      x.qty += qty;
+      x.nilai += qty * h;
+    });
+    if (!bahan || !x.nilai) return;
+    var kat = ctx.namaKat[String(m.kategori).toLowerCase()] || m.kategori || 'Tanpa kategori';
+    var g = perKat[kat.toLowerCase()] = perKat[kat.toLowerCase()] || { kategori: kat, nilai: 0 };
+    g.nilai += x.nilai;
+    perItem.push(x);
+  });
+  hasil.total = hasil.terpakai + hasil.waste + hasil.selisihStock;
+  (ctx.waste || []).forEach(function (w) {
+    if (w.tanggal >= dari && w.tanggal <= sampai && !kunciBahan[w.kecil] && ctx.master[w.kecil]) hasil.wasteBarangJadi += w.rp;
+  });
+  var selisih = selisihHarga_(ctx.master, ctx.rekap, dari, sampai);
+  var sh = 0;
+  var nSh = 0;
+  selisih.item.forEach(function (s) {
+    if (!kunciBahan[s.nama.toLowerCase()]) return;
+    sh += s.selisih;
+    nSh++;
+  });
+  var cekTotal = awal + hasil.masuk + hasil.stokPembuka - akhir + sh;
+  hasil.cek = {
+    awal: Math.round(awal), masuk: Math.round(hasil.masuk), stokPembuka: Math.round(hasil.stokPembuka), akhir: Math.round(akhir),
+    selisihHarga: Math.round(sh),
+    tanggalAwal: sebelum, tanggalAkhir: sampai,
+    beda: Math.round(hasil.total - cekTotal),
+    // Selisih harga dibulatkan per item, jadi beda beberapa rupiah masih dianggap sama.
+    cocok: Math.abs(hasil.total - cekTotal) <= 1 + nSh
+  };
+  ['terpakai', 'waste', 'selisihStock', 'total', 'wasteBarangJadi', 'masuk', 'stokPembuka'].forEach(function (j) { hasil[j] = Math.round(hasil[j]); });
+  var posisi = function (nama) {
+    var u = ctx.urutKat[nama.toLowerCase()];
+    return u == null ? 1e6 : u;
+  };
+  hasil.perKategori = Object.keys(perKat).map(function (k) {
+    return { kategori: perKat[k].kategori, nilai: Math.round(perKat[k].nilai) };
+  }).filter(function (x) { return x.nilai; }).sort(function (a, b) {
+    return b.nilai - a.nilai || posisi(a.kategori) - posisi(b.kategori);
+  });
+  hasil.bahanTerbesar = perItem.sort(function (a, b) { return b.nilai - a.nilai; }).slice(0, 10).map(function (x) {
+    return { nama: x.nama, satuan: x.satuan, qty: bulat_(x.qty), nilai: Math.round(x.nilai) };
+  });
+  hasil.tanpaHarga = Object.keys(tanpa).sort(function (a, b) { return a.localeCompare(b, 'id'); });
+  return hasil;
+}
+
+/** Bahan yang dibaca sekali untuk beberapa bulan HPP. */
+function konteksHpp_() {
+  var urutKat = {};
+  var namaKat = {};
+  bacaSemuaKategori_().forEach(function (k, i) {
+    urutKat[k.nama.toLowerCase()] = i;
+    namaKat[k.nama.toLowerCase()] = k.nama;
+  });
+  return { master: bacaItem_(), rekap: bacaRekap_(), resep: bacaResep_(), urutKat: urutKat, namaKat: namaKat,
+    pembuka: stokPembuka_(), waste: nilaiWasteTercatat_(), jual: bacaPenjualan_(), hari: hariIni_() };
+}
+
+/** Rentang yang dinilai untuk satu bulan: bulan berjalan sampai kemarin (hari ini belum closing). */
+function rentangHpp_(bulan, hari) {
+  var dari = bulan + '-01';
+  var akhir = akhirBulan_(bulan);
+  var berjalan = akhir >= hari;
+  return { dari: dari, sampai: berjalan ? geserTanggal_(hari, -1) : akhir, akhirBulan: akhir, berjalan: berjalan };
+}
+
+/** Food cost satu bulan: { pemakaian, penjualan, foodCost } (foodCost null jika penjualan belum lengkap atau 0). */
+function foodCostBulan_(ctx, bulan) {
+  var r = rentangHpp_(bulan, ctx.hari);
+  var pakai = pemakaianBahan_(ctx, r.dari, r.sampai);
+  var jual = r.sampai >= r.dari ? penjualanRentang_(ctx.jual, r.dari, r.sampai) : { total: 0, hari: 0, jumlahHari: 0, kurang: [] };
+  var fc = jual.jumlahHari && !jual.kurang.length && jual.total > 0 ? Math.round(pakai.total / jual.total * 1000) / 10 : null;
+  return { rentang: r, pemakaian: pakai, penjualan: jual, foodCost: fc };
+}
+
+/**
+ * Jawaban layar HPP dan food cost untuk satu bulan "yyyy-mm" (Bagian 5.9):
+ * pemakaian bahan dan rinciannya, cek silang, penjualan, food cost, food
+ * cost 6 bulan sampai bulan itu, dan HPP menu aktif (harga hari ini untuk
+ * bulan berjalan, harga hari terakhir untuk bulan yang sudah lewat).
+ */
+function dataHpp_(bulan) {
+  var ctx = konteksHpp_();
+  if (!bulanSah_(bulan)) bulan = ctx.hari.slice(0, 7);
+  if (bulan + '-01' > ctx.hari) throw galatPengguna_('Bulan ' + namaBulanId_(bulan) + ' belum dimulai. Pilih bulan lain.');
+  var n = bacaKonfigurasi_().nilai;
+  var target = targetFoodCost_(n);
+  var x = foodCostBulan_(ctx, bulan);
+  var r = x.rentang;
+  var grafik = [];
+  for (var i = BULAN_GRAFIK_HPP - 1; i >= 0; i--) {
+    var b = bulan;
+    for (var j = 0; j < i; j++) b = bulanLalu_(b + '-01');
+    var g = b === bulan ? x : foodCostBulan_(ctx, b);
+    grafik.push({ bulan: b, foodCost: g.foodCost, pemakaian: g.pemakaian.total, penjualan: g.penjualan.total,
+      lengkap: g.penjualan.jumlahHari > 0 && !g.penjualan.kurang.length });
+  }
+  var terakhir = Object.keys(ctx.jual.hari).sort().reverse().slice(0, 3).map(function (t) {
+    var p = ctx.jual.hari[t];
+    return { tanggal: t, nilai: p.nilai, catatan: p.catatan, oleh: p.oleh };
+  });
+  var dataMenu = bacaMenu_();
+  var menu = hppSemuaMenu_(r.berjalan ? ctx.hari : r.akhirBulan, true, n).sort(urutMenuFoodCost_);
+  var p = x.pemakaian;
+  return {
+    bulan: bulan, nama: namaBulanId_(bulan), dari: r.dari, sampai: r.sampai, berjalan: r.berjalan, hariIni: ctx.hari,
+    target: target, bahanKecilPersen: bahanKecilPersen_(n),
+    pemakaian: { terpakai: p.terpakai, waste: p.waste, selisihStock: p.selisihStock, total: p.total, wasteBarangJadi: p.wasteBarangJadi,
+      stokPembuka: p.stokPembuka },
+    cekSilang: p.cek,
+    penjualan: gabung_(x.penjualan, { terakhir: terakhir, pernah: !!ctx.jual.pertama }),
+    foodCost: x.foodCost,
+    perKategori: p.perKategori,
+    bahanTerbesar: p.bahanTerbesar,
+    tanpaHarga: p.tanpaHarga,
+    grafik: grafik,
+    menu: menu,
+    siap: { menu: dataMenu.ada, penjualan: ctx.jual.ada }
+  };
+}
+
+function aksiHpp_(body) {
+  return dataHpp_(String(body.bulan || ''));
+}
+
+/**
+ * Ringkasan HPP untuk Dashboard: food cost bulan ini, penjualan yang belum
+ * dicatat sejak penjualan pertama (untuk pengingat), dan menu di atas target.
+ */
+function ringkasHppDashboard_(tanggal) {
+  var ctx = konteksHpp_();
+  var bulan = ctx.hari.slice(0, 7);
+  var x = foodCostBulan_(ctx, bulan);
+  var n = bacaKonfigurasi_().nilai;
+  var kurang = [];
+  if (ctx.jual.pertama) {
+    var mulai = ctx.jual.pertama > x.rentang.dari ? ctx.jual.pertama : x.rentang.dari;
+    if (mulai <= x.rentang.sampai) kurang = penjualanRentang_(ctx.jual, mulai, x.rentang.sampai).kurang;
+  }
+  var diAtas = hppSemuaMenu_(tanggal, true, n).filter(function (m) { return m.diAtasTarget; }).sort(urutMenuFoodCost_);
+  return {
+    bulan: bulan, nama: namaBulanId_(bulan), foodCost: x.foodCost, target: targetFoodCost_(n),
+    penjualanKurang: kurang, kemarin: geserTanggal_(ctx.hari, -1),
+    menuDiAtas: diAtas.map(function (m) { return { nama: m.nama, foodCost: m.foodCost }; })
   };
 }
 
@@ -5879,7 +6570,12 @@ var RIWAYAT_FORM = {
 /** Definisi Riwayat satu form, atau null jika Riwayat form itu belum dibangun. */
 function defRiwayat_(idForm) {
   var id = rapikanTeks_(idForm).toUpperCase();
-  return RIWAYAT_FORM[id] || (id ? defRiwayatKustom_(id) : null);
+  var def = RIWAYAT_FORM[id] || (id ? defRiwayatKustom_(id) : null);
+  // Estimasi kerugian waste tidak dikirim ke Staff (Bagian 5.4).
+  if (id === 'WASTE' && def && !rupiahWasteTerlihat_()) {
+    def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.jenis !== 'rupiah'; }) });
+  }
+  return def;
 }
 
 function wajibDefRiwayat_(idForm) {
@@ -6940,6 +7636,8 @@ function barisDataTanggal_(namaTab, tanggal) {
  */
 function isiPdfWaste_(tanggal) {
   var baris = barisDataTanggal_('Data_Waste', tanggal);
+  // PDF yang diunduh Staff tanpa nominal rupiah (Bagian 5.4); email dan Drive tetap lengkap.
+  var rupiah = rupiahWasteTerlihat_();
   var total = 0;
   var adaTanpaHarga = false;
   var isi = baris.map(function (b, i) {
@@ -6956,20 +7654,20 @@ function isiPdfWaste_(tanggal) {
       '<td class="angka">' + angkaId_(Number(b['Qty']) || 0) + '</td>' +
       '<td>' + escHtml_(b['Satuan']) + '</td>' +
       '<td>' + escHtml_(b['Alasan / Keterangan']) + '</td>' +
-      '<td class="angka">' + rupiahId_(rp) + '</td>' +
+      (rupiah ? '<td class="angka">' + rupiahId_(rp) + '</td>' : '') +
       '</tr>';
   });
-  var judul = ['No', 'Nama Staff', 'Shift', 'Item / Produk', 'Kategori Waste', 'Qty', 'Satuan', 'Alasan',
-    'Estimasi Kerugian (Rp)'];
-  var tabel = '<table class="data"><colgroup><col style="width:4%"><col style="width:11%"><col style="width:7%">' +
-    '<col style="width:17%"><col style="width:12%"><col style="width:8%"><col style="width:7%"><col style="width:20%">' +
-    '<col style="width:14%"></colgroup><thead><tr>' +
+  var judul = ['No', 'Nama Staff', 'Shift', 'Item / Produk', 'Kategori Waste', 'Qty', 'Satuan', 'Alasan'];
+  if (rupiah) judul.push('Estimasi Kerugian (Rp)');
+  var lebar = rupiah ? [4, 11, 7, 17, 12, 8, 7, 20, 14] : [4, 12, 8, 20, 14, 9, 8, 25];
+  var tabel = '<table class="data"><colgroup>' + lebar.map(function (l) { return '<col style="width:' + l + '%">'; }).join('') +
+    '</colgroup><thead><tr>' +
     judul.map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr></thead><tbody>' +
-    (isi.length ? isi.join('') : '<tr><td colspan="9">Belum ada isian.</td></tr>') +
-    '<tr class="total"><td colspan="8">Total estimasi kerugian</td><td class="angka">' + rupiahId_(total) + '</td></tr>' +
+    (isi.length ? isi.join('') : '<tr><td colspan="' + judul.length + '">Belum ada isian.</td></tr>') +
+    (rupiah ? '<tr class="total"><td colspan="8">Total estimasi kerugian</td><td class="angka">' + rupiahId_(total) + '</td></tr>' : '') +
     '</tbody></table>';
-  var catatan = ['Estimasi kerugian = Qty × Harga Satuan yang tercatat saat waste dicatat.'];
-  if (adaTanpaHarga) catatan.push('Item tanpa harga satuan ditulis "–" dan tidak ikut dijumlahkan.');
+  var catatan = rupiah ? ['Estimasi kerugian = Qty × Harga Satuan yang tercatat saat waste dicatat.'] : [];
+  if (rupiah && adaTanpaHarga) catatan.push('Item tanpa harga satuan ditulis "–" dan tidak ikut dijumlahkan.');
   if (baris.some(function (b) { return rapikanTeks_(b['Foto Bukti']); })) {
     catatan.push('Foto bukti tersimpan di Google Drive, folder ' + FOLDER_LAPORAN + '/' + (namaOutlet_() || 'Outlet') + '/' +
       FOLDER_FOTO_WASTE + '; tautannya ada di kolom Foto Bukti tab Data_Waste.');
@@ -8206,6 +8904,17 @@ function dataRekapBulan_(bulan) {
   var tSesuai = tabel('Data_Penyesuaian');
   if (!adaIsian && tSesuai) adaIsian = tSesuai.baris.some(function (b) { return !!dalam(tSesuai, b); });
   hasil.adaIsian = adaIsian;
+
+  /* ---------- HPP dan food cost (Bagian 5.9): pemakaian bahan, penjualan, menu di atas target ---------- */
+  var konf = bacaKonfigurasi_().nilai;
+  var fcb = foodCostBulan_({ master: master, rekap: rekap, resep: resep, urutKat: urutKat, namaKat: namaKat, pembuka: stokPembuka_(),
+    waste: nilaiWasteTercatat_(), jual: bacaPenjualan_(), hari: hari }, bulan);
+  var menuHpp = hppSemuaMenu_(fcb.rentang.berjalan ? hari : akhirBulan, true, konf);
+  hasil.hpp = {
+    dari: fcb.rentang.dari, sampai: fcb.rentang.sampai, target: targetFoodCost_(konf), pemakaian: fcb.pemakaian,
+    penjualan: fcb.penjualan, foodCost: fcb.foodCost, jumlahMenu: menuHpp.length,
+    menuDiAtas: menuHpp.filter(function (m) { return m.diAtasTarget; }).sort(urutMenuFoodCost_)
+  };
   return hasil;
 }
 
@@ -8245,6 +8954,57 @@ function tabelRekap_(kolom, baris, total, kosong) {
     if (total) html += '<tr class="total">' + total.map(function (c, i) { return sel(c, i, 'td'); }).join('') + '</tr>';
   }
   return html + '</tbody></table>';
+}
+
+/** Bagian "HPP dan food cost" di rekap bulanan (Bagian 9.3 dan 5.9). */
+function isiPdfRekapHpp_(h) {
+  var e = escHtml_;
+  var html = '<h2>HPP dan food cost</h2>';
+  if (h.sampai < h.dari) {
+    return html + '<p class="isi">Belum ada hari yang dinilai: hari pertama bulan ini belum selesai.</p>';
+  }
+  var p = h.pemakaian;
+  var j = h.penjualan;
+  var teksJual = j.hari + ' dari ' + j.jumlahHari + ' hari tercatat';
+  html += tabelRekap_([{ judul: 'Uraian', lebar: 70 }, { judul: 'Nilai (Rp)', lebar: 30, angka: true }], [
+    ['Bahan terpakai (keluar dan prep)', rupiahId_(p.terpakai)],
+    ['Waste bahan', rupiahId_(p.waste)],
+    ['Selisih stock (opname dan penyesuaian)', rupiahId_(p.selisihStock)],
+    [{ html: '<b>Pemakaian bahan</b>' }, { html: '<b>' + rupiahId_(p.total) + '</b>' }],
+    ['Penjualan (' + teksJual + ')', j.hari ? rupiahId_(j.total) : '–']
+  ], [e('Food cost (target ' + persenId_(h.target) + ')'),
+    { html: h.foodCost == null ? '–' : persenId_(h.foodCost) + (h.foodCost > h.target ? ' *' : ''),
+      kelas: h.foodCost != null && h.foodCost > h.target ? 'akhir' : '' }], '');
+  var catatanHpp = ['Pemakaian bahan = jumlah per hari × harga yang berlaku pada hari itu, hanya bahan mentah (barang jadi terhitung ' +
+    'saat bahannya dipakai prep). Selisih stock: stock yang hilang menurut opname dan penyesuaian menambah pemakaian. Food cost = ' +
+    'pemakaian bahan ÷ penjualan (sebelum pajak dan service).'];
+  if (h.foodCost != null && h.foodCost > h.target) catatanHpp.push('* Di atas target.');
+  if (h.foodCost == null && j.kurang.length) {
+    catatanHpp.push('Food cost tidak dihitung: penjualan belum dicatat untuk ' + j.kurang.length + ' hari (' +
+      (j.kurang.length > 8 ? 'antara lain ' + teksHariBulan_(j.kurang.slice(0, 8)) : teksHariBulan_(j.kurang)) + ').');
+  }
+  if (p.wasteBarangJadi) catatanHpp.push('Waste barang jadi ' + rupiahId_(p.wasteBarangJadi) + ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.');
+  if (p.tanpaHarga.length) catatanHpp.push(p.tanpaHarga.length + ' bahan belum punya harga pada sebagian hari dan tidak ikut dihitung: ' + daftarNamaSingkat_(p.tanpaHarga) + '.');
+  if (p.stokPembuka) catatanHpp.push('Stok pembuka ' + rupiahId_(p.stokPembuka) + ' tidak dihitung sebagai selisih stock.');
+  html += catatanHpp.map(function (c) { return '<p class="catatan">' + e(c) + '</p>'; }).join('');
+  if (p.perKategori.length) {
+    html += '<h3>Pemakaian bahan per kategori</h3>' + tabelRekap_([
+      { judul: 'Kategori', lebar: 50 }, { judul: 'Pemakaian (Rp)', lebar: 30, angka: true }, { judul: 'Bagian', lebar: 20, angka: true }
+    ], p.perKategori.map(function (x) {
+      return [e(x.kategori), rupiahId_(x.nilai), p.total ? persenId_(x.nilai / p.total * 100) : '–'];
+    }), null, '');
+  }
+  html += '<h3>Menu di atas target</h3>' + tabelRekap_([
+    { judul: 'Menu', lebar: 46 }, { judul: 'Harga jual (Rp)', lebar: 18, angka: true }, { judul: 'HPP (Rp)', lebar: 18, angka: true },
+    { judul: 'Food cost', lebar: 18, angka: true }
+  ], h.menuDiAtas.map(function (m) {
+    return [e(m.nama), rupiahId_(m.hargaJual), rupiahId_(m.hpp), persenId_(m.foodCost)];
+  }), null, h.jumlahMenu ? 'Semua menu aktif di bawah atau sama dengan target.' : 'Belum ada menu di Pengaturan → Menu.');
+  if (h.menuDiAtas.length) {
+    html += '<p class="catatan">' + e('HPP per porsi memakai harga bahan pada ' + tanggalSedangId_(h.sampai > h.dari ? h.sampai : h.dari) +
+      ', termasuk bahan kecil.') + '</p>';
+  }
+  return html;
 }
 
 /** Isi HTML rekap bulanan (semua bagian Bagian 9.3), untuk htmlLaporan_. */
@@ -8377,6 +9137,9 @@ function isiPdfRekap_(d) {
   'Belum ada form.');
   html += catatan('Lengkap menurut aturan kelengkapan: ada kiriman atau ditandai nihil; Suhu lengkap jika semua unit aktif punya ' +
     'Opening, Middle, dan Closing. Isian = kiriman pada bulan ini; belum diperiksa dan dilaporkan keliru dihitung saat rekap dibuat.');
+
+  // HPP dan food cost (Bagian 5.9)
+  html += isiPdfRekapHpp_(d.hpp);
   return html;
 }
 
@@ -8471,6 +9234,16 @@ function htmlEmailRekap_(d, x) {
     k.hariDinilai ? (tidak.length ? 'Form tidak lengkap: ' + tidak.join(', ') : 'Semua form wajib lengkap selama ' + k.hariDinilai + ' hari yang dinilai')
       : 'Belum ada hari yang dinilai',
     k.total.belumDiperiksa + ' isian belum diperiksa, ' + k.total.dilaporkan + ' baris dilaporkan keliru'
+  ]);
+  var h = d.hpp;
+  html += bagian('HPP dan food cost', h.sampai < h.dari ? ['Belum ada hari yang dinilai.'] : [
+    'Pemakaian bahan ' + rupiahId_(h.pemakaian.total) + (h.penjualan.hari ? ', penjualan ' + rupiahId_(h.penjualan.total) : ''),
+    h.foodCost == null
+      ? 'Food cost belum dihitung: penjualan baru tercatat ' + h.penjualan.hari + ' dari ' + h.penjualan.jumlahHari + ' hari'
+      : 'Food cost ' + e(d.nama.split(' ')[0]) + ' ' + (h.foodCost > h.target ? '<b style="color:' + w.masalah + '">' + persenId_(h.foodCost) + '</b>' :
+        '<b>' + persenId_(h.foodCost) + '</b>') + ' (target ' + persenId_(h.target) + ')',
+    h.menuDiAtas.length ? h.menuDiAtas.length + ' menu di atas target: ' + e(daftarNamaSingkat_(h.menuDiAtas.map(function (m) { return m.nama; })))
+      : (h.jumlahMenu ? 'Semua menu aktif di bawah atau sama dengan target' : 'Belum ada menu di Pengaturan → Menu')
   ]);
   html += bagian('Lampiran', [e(x.namaFile) + (x.drive ? ' (tersimpan di Drive: ' + e(x.lokasi) + ')' : ' (gagal disimpan ke Drive)')]);
   html += '<p style="margin:20px 0 0">' + (x.alamat
@@ -9101,6 +9874,10 @@ var TAB_DATA = [
   {
     nama: 'Data_Nihil',
     kolom: [k_('Tanggal', 'tanggal'), k_('ID Form'), k_('Nama Form')]
+  },
+  {
+    nama: 'Data_Penjualan',
+    kolom: [k_('Tanggal', 'tanggal'), k_('Penjualan (Rp)', 'rupiah'), k_('Catatan')]
   }
 ];
 
@@ -9171,6 +9948,23 @@ var TAB_MASTER = [
       k_('Item Hasil', 'teks', { sumber: 'M_Resep!A2:A' }),
       k_('Item Bahan', 'teks', { sumber: 'M_Item!A2:A' }),
       k_('Qty per 1 Resep', 'angka')
+    ]
+  },
+  {
+    nama: 'M_Menu',
+    kolom: [
+      k_('Nama Menu'),
+      k_('Harga Jual (Rp)', 'rupiah'),
+      k_('Aktif', null, { centang: true })
+    ]
+  },
+  {
+    nama: 'M_MenuBahan',
+    kolom: [
+      k_('Nama Menu', 'teks', { sumber: 'M_Menu!A2:A' }),
+      k_('Item Bahan', 'teks', { sumber: 'M_Item!A2:A' }),
+      k_('Qty per Porsi', 'angka'),
+      k_('Hasil Bersih (%)', 'angka')
     ]
   },
   {
@@ -9319,7 +10113,9 @@ function konfigurasiAwal_() {
     ['suhu_freezer_maks', '-18', 'Freezer normal jika suhunya sama dengan atau lebih rendah dari angka ini (°C).'],
     ['jadwal_opname', 'mingguan', 'Jadwal stock opname: mingguan atau bulanan.'],
     ['hari_cadangan', 'Minggu', 'Hari salinan cadangan mingguan dibuat (dini hari).'],
-    ['keluar_otomatis_menit', String(KELUAR_OTOMATIS_AWAL), KETERANGAN_KELUAR_OTOMATIS]
+    ['keluar_otomatis_menit', String(KELUAR_OTOMATIS_AWAL), KETERANGAN_KELUAR_OTOMATIS],
+    ['target_food_cost', String(TARGET_FOOD_COST_AWAL), KETERANGAN_TARGET_FOOD_COST],
+    ['bahan_kecil_persen', String(BAHAN_KECIL_AWAL), KETERANGAN_BAHAN_KECIL]
   ];
 }
 

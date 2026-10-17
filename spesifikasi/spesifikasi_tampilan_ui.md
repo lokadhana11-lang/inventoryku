@@ -5,7 +5,11 @@
 > tampilan: warna, huruf, tata letak, layar, dan teks antarmuka.
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
-> Versi 1.9, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Versi 1.10, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Perubahan sejak versi 1.9 (dipilih pemilik dari pratinjau "Rancangan HPP InventoryKu", 17 Oktober
+> 2026): layar HPP dan food cost yang dibuka dari Dashboard (Bagian 5.6 dan 5.10), Pengaturan →
+> Menu dan dua isian HPP di Outlet dan jadwal (Bagian 5.7), ringkasan kepala untuk keduanya (Bagian
+> 4.7), nominal rupiah waste disembunyikan dari Staff (Bagian 5.3), teks baru (Bagian 7 dan 11).
 > Perubahan sejak versi 1.8 (dipilih pemilik dari pratinjau Login 17 Oktober 2026, supaya Login
 > lebih bersih): HP mengingat orang yang terakhir masuk, jadi Login langsung menyapanya ("Halo,
 > Rina") dengan papan angka PIN; daftar nama berupa lingkaran inisial dan hanya tampil saat HP
@@ -255,6 +259,10 @@ di tengah selebar isi layar.
   - Dashboard: kotak "Nilai stock" (Navy Lapis) berisi nilai, selisih karena perubahan harga
     bulan ini (Lampu Pass), dan jumlah item yang belum punya harga; ketuk untuk lembar Nilai
     stock.
+  - HPP dan food cost: kotak Navy Lapis berisi food cost bulan itu (40 px) dengan targetnya, lalu
+    pemakaian bahan dan penjualan berdampingan. Di bagian Per menu: jumlah menu di atas target.
+  - Pengaturan → Menu (ubah): jumlah bahan, keadaan, dan tanda target sebagai chip, lalu "HPP per
+    porsi" dan "Food cost" berdampingan; keduanya berubah saat isian diketik.
   - Layar lain: judul saja. Tombol "Tambah" di layar daftar ikut di kepala, di kanan judul.
 - Di HP dan tablet kepala ini menggantikan judul di bar atas dan ikut bergulir bersama isi;
   bar navigasi bawah tetap. Di laptop dan desktop bar atas tetap di tempatnya dan kepala
@@ -605,6 +613,9 @@ Satu-satunya layar yang sepenuhnya navy.
 - Tombol "Tambah item" sama seperti Prep List.
 - Satu kartu per item: kategori waste berupa pilihan tombol, qty, satuan (otomatis),
   alasan, estimasi kerugian (otomatis), dan foto bukti (opsional).
+- **Staff tidak melihat nominal rupiah** (versi 1.10): estimasi kerugian, harga di daftar Tambah
+  item, total di status kiriman, kolom Estimasi kerugian di tabel laptop/desktop, dan kolom
+  rupiah di Riwayat dan PDF Waste tidak tampil untuk Staff. Pengelola tetap melihat semuanya.
 - Di HP, item yang sudah selesai diisi diringkas menjadi satu baris; hanya item yang
   sedang diisi yang terbuka.
 - Geser kartu ke kiri atau ketuk ikon tempat sampah untuk menghapus baris sebelum dikirim.
@@ -683,6 +694,12 @@ Satu-satunya layar yang sepenuhnya navy.
   HP dan tablet: dua kolom, "Form terisi" selebar dua kolom. Laptop/desktop: satu baris.
 - Daftar "Perlu perhatian": tiap baris diawali ubin ikon (Bagian 6) berwarna makna statusnya.
 - Tombol "Stock opname" di bagian atas, dengan tanggal opname terakhir di sampingnya.
+- Di sampingnya (di bawahnya di HP dan tablet) tombol "HPP dan food cost" dengan food cost bulan
+  ini dan targetnya ("Oktober 33,8% · target 35%"; bertanda Perlu ditinjau jika di atas target).
+  Jumlah menu utama tetap lima.
+- Perlu perhatian bertambah dua jenis: "n menu di atas target food cost 35%" (Perlu ditinjau,
+  membuka HPP bagian Per menu) dan "Penjualan kemarin belum dicatat" / "Penjualan n hari belum
+  dicatat" (Menunggu, membuka lembar Catat penjualan).
 - Di bawahnya daftar "Perlu perhatian", diurutkan dari yang paling mendesak.
 - **Dua grafik kecil** di bawah daftar itu. Di laptop/desktop keduanya berada di kolom kanan.
 
@@ -740,8 +757,9 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.7 Pengaturan (Pengelola)
 
-- Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Unit, Kategori dan
-  satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname).
+- Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Menu, Unit, Kategori dan
+  satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
+  food cost, bahan kecil).
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
 - Staff yang meminta reset PIN diberi tanda Perlu ditinjau di daftar Staff.
@@ -759,11 +777,28 @@ Satu-satunya layar yang sepenuhnya navy.
 - Setelah dihapus, nama itu hilang dari daftar dan muncul pesan "Rina dihapus dari daftar
   staff."
 
+**Pengaturan → Menu** (versi 1.10, spesifikasi sistem Bagian 5.9):
+
+- Daftar menu dengan pencarian: nama, harga jual, HPP, food cost, dan tanda target; menu
+  nonaktif di bawah. Tombol "Tambah" di kepala.
+- Layar ubah: nama menu, "Harga jual (Rp)" ("Harga di daftar menu, tanpa pajak dan service."),
+  lalu "Bahan per porsi". Tiap bahan: nama dan ikon hapus; dua isian berdampingan "Takaran bersih"
+  (satuan otomatis) dan "Hasil bersih" (%, kosong berarti 100); baris kecil "Dibeli 0,212 kg × Rp
+  58.000 per kg" dengan biayanya di kanan. Barang jadi menulis "Hasil bersih: sudah di resep" dan
+  "harga dari resep". "Tambah bahan" memakai lembar pencarian item yang sama dengan resep.
+- Kartu "Perkiraan" yang berubah saat diketik: bahan, bahan kecil (persennya), HPP per porsi,
+  food cost, margin kotor, dan harga jual untuk target, dengan tanda Di atas target / Sesuai target.
+- Kartu "Keadaan menu": sakelar Aktif/Nonaktif (menonaktifkan meminta konfirmasi), lalu tombol
+  kedua "Salin menu" untuk versi bungkus ("Chicken steak (bungkus)").
+- Tombol utama "Simpan menu", lalu "Menu tersimpan." Draft tersimpan seperti resep.
+
 **Pengaturan → Outlet dan jadwal:**
 
 - Selain nama outlet, zona waktu, jam closing, dan jadwal stock opname, ada pilihan
   "Keluar otomatis setelah tidak dipakai": 5, 10, 15, atau 30 menit. Nilai awalnya 5 menit.
   Di bawahnya satu baris keterangan: "Berlaku untuk semua pengguna di semua perangkat."
+- Kartu "HPP dan food cost" (versi 1.10): "Target food cost (%)" (1 sampai 100) dan "Bahan kecil (%)"
+  (0 sampai 15), masing-masing dengan keterangan satu baris.
 
 **Pengaturan → Item:**
 
@@ -879,6 +914,55 @@ Satu-satunya layar yang sepenuhnya navy.
 - Tombol utama "Unduh PDF". Jika tidak ada item di bawah minimum: "Semua stock di atas
   batas minimum."
 
+### 5.10 HPP dan food cost (Pengelola)
+
+Versi 1.10 (spesifikasi sistem Bagian 5.9). Dibuka dari tombol di Dashboard (`#/hpp`; bagian Per
+menu `#/hpp/menu`).
+
+```
+┌──────────────────────────────┐
+│▓ ‹ Dashboard        ● Online ▓│
+│▓ HPP dan food cost           ▓│
+│▓ ┌ Food cost 1–16 Oktober ──┐ ▓│
+│▓ │ 33,8%  target 35%        │ ▓│
+│▓ └──────────────────────────┘ ▓│
+│▓ Pemakaian bahan │ Penjualan  ▓│
+│▓ Rp 541.000      │ Rp 1,6 jt  ▓│
+├──────────────────────────────┤
+│ Bulan [Oktober 2026 ▾]       │
+│ [ Bulan ] [ Per menu ]       │
+│ Pemakaian bahan              │
+│ Cocok dengan nilai stock     │
+│ Per kategori ▬▬▬▬▬▬          │
+│ Food cost 6 bulan ▮ ▮ ▮      │
+│ Penjualan  [Catat penjualan] │
+└──────────────────────────────┘
+```
+
+- Pilihan "Bulan": bulan berjalan dan 23 bulan sebelumnya (seperti Rekap bulanan); pilihannya
+  diingat. Dua tombol berjajar "Bulan" dan "Per menu".
+- **Bulan:** kartu Pemakaian bahan (terpakai, waste bahan, selisih stock, total; keterangan waste
+  barang jadi dan stok pembuka), kartu "Cocok dengan nilai stock" (stock bahan awal + barang masuk
+  + stok pembuka − stock bahan akhir ± selisih harga = pemakaian, dengan tanda Baik "Sama dengan
+  rincian di atas"), Per kategori (batang mendatar, nilai dan persen, "Bahan dengan pemakaian
+  terbesar" yang bisa dibuka, dan bahan tanpa harga bertanda Perlu ditinjau), grafik "Food cost 6
+  bulan" (SVG; batang Biru Malam, bulan di atas target berwarna Perlu ditinjau, angka tertulis di
+  atas tiap batang, garis target putus-putus, "–" untuk bulan yang penjualannya belum lengkap), dan
+  kartu Penjualan (jumlah hari tercatat, tiga catatan terakhir, "Catat penjualan").
+- **Penjualan belum lengkap:** food cost di kepala "–", dan di atas rincian kartu Menunggu "Penjualan
+  belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat." dengan
+  tombol utama "Catat penjualan 9 Okt".
+- **Per menu:** menu aktif urut food cost tertinggi. HP dan tablet: daftar (nama, "Harga jual Rp
+  55.000 · HPP Rp 21.840", tanda, persen di kanan); laptop/desktop: tabel (Menu, Harga jual, HPP per
+  porsi, Food cost, Margin kotor, Harga untuk 35%, Keadaan). Ketuk menu untuk membukanya di
+  Pengaturan → Menu. Di bawahnya "Atur menu di Pengaturan".
+- Laptop/desktop: bagian Bulan dua kolom (rincian kiri; grafik dan penjualan kanan).
+- **Lembar "Catat penjualan":** tanggal (tombol berjajar "Kemarin, 16 Okt" dan "Tanggal lain" dengan
+  pemilih tanggal, maksimal hari ini), "Penjualan (Rp)" ("Total penjualan makanan dan minuman dari
+  kasir, sebelum pajak dan service. Hari tutup: isi 0."), "Sudah tercatat Rp 100.000. Menyimpan
+  akan menggantinya." bila tanggal itu sudah ada, "Catatan (tidak wajib)", "Batal" dan "Simpan
+  penjualan". Sesudahnya "Penjualan 16 Okt tersimpan." dan angka di layar langsung diperbarui.
+
 ---
 
 ## 6. Komponen
@@ -949,6 +1033,12 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Riwayat kosong | "Belum ada isian pada tanggal ini." |
 | Tanda diperiksa | "Diperiksa Budi, 3 Okt 21.50" |
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
+| Menu tersimpan | "Menu tersimpan." |
+| Penjualan tersimpan | "Penjualan 16 Okt tersimpan." |
+| Penjualan belum lengkap | "Penjualan belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat." |
+| Bahan menu tanpa harga | "Garam belum punya harga, jadi HPP belum lengkap." |
+| Item dipakai menu | "Tidak bisa dinonaktifkan: masih dipakai menu Ayam bakar. Ubah atau nonaktifkan menunya dulu." |
+| Penjualan masa depan | "Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat." |
 
 Pesan kesalahan menyebut apa yang salah dan apa yang harus dilakukan. Tidak ada
 permintaan maaf dan tidak ada kode teknis.
@@ -1101,6 +1191,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Keluar otomatis | Setelah 5 menit tidak dipakai, tanpa peringatan, dengan keterangan di layar Login (Bagian 5.1) |
 | Login (17 Oktober 2026) | HP mengingat orang yang terakhir masuk: Login langsung menyapanya dengan papan angka PIN; daftar nama berupa lingkaran inisial hanya lewat "Ganti nama" atau saat HP belum mengingat siapa pun (Bagian 5.1). Login dengan PIN saja dan mengetik nama tidak dipilih. |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
+| HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
