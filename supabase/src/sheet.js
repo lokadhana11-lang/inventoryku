@@ -208,7 +208,14 @@ export class Sheet {
     }
     return this;
   }
-  deleteRows(r, n) { for (let i = 0; i < n; i++) this.deleteRow(r); return this; }
+  // Satu splice untuk seluruh rentang (arsip tahunan menghapus puluhan ribu baris sekaligus).
+  deleteRows(r, n) {
+    this.periksaDimuat();
+    const hapus = this.baris.splice(r - 1, n);
+    hapus.forEach((b) => { if (b.id != null) this.dihapusId.push(b.id); });
+    if (hapus.length) this.tandaiUbah();
+    return this;
+  }
   getFrozenRows() { return this.meta.beku || 0; }
   setFrozenRows(n) { this.meta.beku = n; this.metaBerubah = true; this.tandaiUbah(); return this; }
   getFilter() { return this.meta.adaFilter ? serba('Filter') : null; }

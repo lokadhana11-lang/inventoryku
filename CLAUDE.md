@@ -230,6 +230,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   ditambah `jamCekOpening`, `jamCekMiddle`, `jamCekClosing` ('' = mati) dan (baca) `notifikasiTersedia`. Fungsi trigger:
   `pengingatSuhuOpening`, `pengingatSuhuMiddle`, `pengingatSuhuClosing` (juga di `FUNGSI_JADWAL` server.js). Isi notifikasi (JSON di
   dalam Web Push): `{ judul, isi, url, tag, mendesak?, ttl? }`.
+- Arsip tahunan (Code.gs v0.20, 17 Oktober 2026): tidak ada aksi baru. Fungsi trigger `arsipTahunan` (tiap jam; juga di `FUNGSI_JADWAL`
+  dan `FUNGSI_PEMILIK` server.js). `M_Konfigurasi` mendapat `arsip_sampai` (yyyy-mm-dd) dan `arsip_terakhir` (dibuat otomatis; "Gagal …"
+  ikut `beranda.peringatanSistem` dan butir `sistem` Dashboard). Aksi yang menerima tanggal sebelum `arsip_sampai` (isian, `riwayat`,
+  `unduhPdf`, `simpanPdfDrive`, `unduhPdfRekap`, `hpp`, `simpanPenjualan`) menjawab `{ ok: false, pesan }` yang menyebut folder arsip.
 - Keamanan login (Code.gs v0.17, 17 Oktober 2026): `beranda` (Pengelola) ditambah `terkunci: [{ nama, sampai, panjang }]` (akun aktif
   yang sedang terkunci karena PIN salah); `daftarStaff.staff[]` (dan jawaban aksi staff lain) ditambah `terkunciSampai` dan
   `kunciPanjang`; `dashboard.perhatian[]` boleh berjenis `terkunci` (`data.nama`). `pasang`, `pulihkan`, `tambahStaff`, dan `aturPin`
@@ -269,7 +273,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++ | Keamanan login (permintaan pemilik 17 Oktober 2026, dari telaah keamanan): kunci PIN bertingkat (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci di Beranda, Dashboard, Staff dan PIN, dan email harian Pengelola, PIN baru yang terlalu mudah ditebak ditolak | Kode selesai (Code.gs v0.17, aplikasi 0.18.1), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (15 uji server, 15 jawaban aksi sama dengan v0.16.1 selain kolom baru) dan Chromium (pemberitahuan, lembar PIN, Dashboard, Staff dan PIN, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12++++++++ | Penjualan per menu (permintaan pemilik 17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan (`Data_PenjualanMenu`), pemakaian bahan seharusnya vs nyata di layar HPP, porsi terjual di Per menu, pengingat Dashboard, rekap bulanan PDF dan email | Kode selesai (Code.gs v0.18, aplikasi 0.19.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (10 uji server dengan angka dihitung tangan, 10 jawaban aksi lama sama dengan v0.17) dan Chromium (alur catat porsi, galat porsi, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `Data_PenjualanMenu`), uji dari HP |
 | 12+++++++++ | Notifikasi ke HP (permintaan pemilik 17 Oktober 2026): Web Push dari Supabase (kunci VAPID di tabel `info`, enkripsi aes128gcm tanpa library), suhu di luar standar, reset PIN, dan akun terkunci ke HP Pengelola, pengingat cek suhu ke semua HP, lembar Notifikasi di HP ini, jam pengingat di Outlet dan jadwal | Kode selesai (Code.gs v0.19, aplikasi 0.20.0), diuji: enkripsi didekripsi `http_ece` (library milik `web-push`), 12 uji server Code.gs, runtime asli di atas Postgres 16 lokal (kirim sesudah tersimpan, 410 dibuang, `__jadwal`, `pasangTrigger`), service worker tiruan, dan Chromium (layanan push browser ditiru, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali, nyalakan notifikasi dari HP (iPhone: pasang ke Layar Utama dulu) |
-| 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan dan outlet tambahan: belum |
+| 12++++++++++ | Arsip tahunan (keputusan pemilik 17 Oktober 2026): tab menyimpan tahun berjalan dan tahun lalu; baris lebih tua (tab Data, `Stock_Harian`, `Log_Perubahan`) pindah ke `Laporan Kitchen/<Outlet>/Arsip/<Tahun>/` sebagai JSON dan Google Sheets "Arsip InventoryKu <Tahun>", rekap terakhir tiap item tetap, trigger tiap jam, tanggal yang sudah diarsip ditolak | Kode selesai (Code.gs v0.20; aplikasi tetap 0.20.0), diuji: 10 uji server Code.gs (juga dengan batas 2 baris per jalan), arsip ke Google Sheets dengan tiruan, runtime asli di atas Postgres 16 lokal (69.250 baris per tab, paling lama 0,9 detik per jalan, stock tetap), jawaban aksi lama sama dengan v0.19. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali (setupSpreadsheet tidak perlu) |
+| 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
 
@@ -1947,3 +1952,45 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     uji, tutup-buka, matikan; Staff; iPhone Safari; izin diblokir; server tanpa notifikasi; Outlet dan jadwal; menu dengan panah; delapan
     ukuran. Jawaban aksi lama sama dengan v0.18 kecuali `bacaOutletJadwal` (kolom baru). Belum diuji: layanan push asli (Google FCM,
     Apple, Mozilla) dan HP asli, terutama iPhone dengan aplikasi di Layar Utama.
+
+### Arsip tahunan (Code.gs v0.20, 17 Oktober 2026)
+
+264. **Asal:** fitur ketiga dari permintaan butir 252. Pemilik memilih: simpan 2 tahun (tahun berjalan dan tahun lalu), arsip berupa
+    berkas per tahun yang juga dibuka sebagai Google Sheets di Drive, Riwayat dan rekap tahun yang sudah diarsip tidak dibuka dari
+    aplikasi, dan stock akhir terbawa. Spesifikasi sistem Bagian 8.4, 8.6 (baru), 12, 13; tampilan Bagian 7 (satu pesan).
+265. **Yang dipindah** (`tabArsip_`, `arsipkanTab_`): baris semua tab `Data_*` (termasuk `Data_K_<ID>`), `Stock_Harian`, dan
+    `Log_Perubahan` yang tanggalnya (kolom Tanggal, atau Waktu) sebelum `batasArsip_()` = 1 Januari tahun lalu menurut zona tersimpan.
+    **Stock terbawa:** Stock Awal berasal dari rekap terakhir sebelumnya (`hitungUlangStock_`), jadi rekap terakhir tiap item sebelum
+    batas tetap di `Stock_Harian`; tahun berikutnya rekap itu ikut pindah jika sudah ada rekap yang lebih baru. Baris dihapus per
+    rentang berurutan dari bawah (`deleteRows`). Tab master, Harian, dan Dashboard tidak disentuh. Data lama yang dibaca fitur lain
+    (opname terakhir, isian Suhu pertama untuk "terlewat", penjualan pertama) kini dihitung dari data yang tersisa.
+266. **Berkas** `Laporan Kitchen/{Outlet}/Arsip/{Tahun}/Arsip_{Tahun}_{Tab}_{batas}[_{bagian}].json` berisi `{ jenis: 'arsip-inventoryku',
+    tahun, tab, batas, dibuat, outlet, judul, baris }`; tanggal ditulis teks `yyyy-mm-dd` (atau dengan jam). Berkas bernama sama yang
+    sudah ada dibuang lebih dulu (jalan ulang sesudah gagal). **Google Sheets:** `arsipJsonKeSheets_` menulis isinya ke
+    "Arsip InventoryKu {Tahun}" di folder yang sama (satu tab per tab data, judul tebal dan dibekukan, ditambahkan di bawah per 5.000
+    baris); tab "Keterangan" mencatat nama berkas yang sudah ditulis supaya tidak ganda. Di Apps Script (belum pindah) dipanggil
+    langsung; di Supabase oleh `salinBerkasKeDrive_` (salinan 5 menit) untuk berkas `Arsip_<tahun>_…json`, dan kegagalannya hanya
+    dicatat di log (berkas JSON tetap tersalin).
+267. **Jalannya** (`arsipTahunan`, trigger `everyHours(1)` dari `pasangTrigger`; di Supabase pg_cron menit 7 tiap jam, `setiapJam` di
+    adaptor.js): jika `arsip_sampai` ≥ batas, selesai tanpa menulis (hanya `M_Konfigurasi` dibaca; server.js menjalankannya dengan
+    `muat: 'master'` dan runtime.js tidak memuat atau mempelajari `aksi_tab` untuk fungsi itu, jadi tab besar dimuat hanya saat ada
+    pekerjaan: 2 ms di Postgres lokal). Kemajuan di Script Property `ARSIP_PROSES` `{ batas, selesai: [tab], baris, bagian: { tab: n } }`.
+    Supabase: satu tab per jalan dan paling banyak `BARIS_ARSIP_PER_JALAN` (20.000) baris, yang tertua dulu, sisanya bagian berikutnya
+    (batas CPU Edge Function); Apps Script: tab demi tab sampai 4 menit. Tiap tab di dalam `denganKunci_`. Setelah semua tab selesai:
+    `arsip_sampai` = batas dan `arsip_terakhir` "Berhasil … (n baris) …"; galat: `arsip_terakhir` "Gagal …", dicoba lagi jam berikutnya.
+    Selama bertahap (di Supabase beberapa jam di awal Januari), Riwayat tahun yang sedang dipindah bisa belum lengkap; tanggalnya baru
+    ditolak sesudah `arsip_sampai` diisi. `sheet.js` `deleteRows` kini satu `splice`.
+268. **Penolakan** (`periksaBelumDiarsip_`): `periksaTanggalIsian_` (semua isian), `rentangRiwayat_` (tanggal `dari`), `aksiUnduhPdf_`,
+    `aksiSimpanPdfDrive_`, `aksiUnduhPdfRekap_` dan `dataHpp_` (tanggal 1 bulan itu), `aksiSimpanPenjualan_`: "Data sebelum 1 Januari
+    2026 sudah dipindah ke arsip tahunan (Google Drive: Laporan Kitchen/<Outlet>/Arsip). Pilih tanggal yang lebih baru." Aplikasi
+    tidak berubah: pesan server tampil seperti galat lain (bulan rekap dan HPP yang sudah diarsip tetap ada di pilihan bulan).
+    Arsip tidak bisa dikembalikan dari aplikasi; pemilik memasukkannya sendiri jika perlu, seperti memulihkan cadangan.
+269. **Uji** (di luar repo): (1) Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js` dengan jam tiruan dan data 2024–2026:
+    10 uji (satu tab per jalan lalu tidak bekerja lagi, baris 2024 hilang dan 2025–2026 tetap, satu rekap terbawa per item dan stock
+    serta pemakaian HPP sama, isi berkas, penolakan tujuh aksi, hitung ulang stock sesudah arsip memakai rekap terbawa, setahun kemudian
+    2025 diarsip dan rekap terbawa 2024 pindah, peringatan Gagal, `pasangTrigger`), diulang dengan batas 2 baris per jalan (berkas `_2`,
+    yang tertua dulu). (2) `arsipJsonKeSheets_` dengan SpreadsheetApp/DriveApp tiruan (Sheets dibuat, ditambahkan, berkas sama tidak
+    ditulis dua kali). (3) Runtime asli di atas Postgres 16 lokal lewat `__jadwal`: 50 item × 1.385 hari (69.250 baris per tab), dua tahun
+    diarsip dalam 14 jalan, paling lama 922 ms, jalan tanpa pekerjaan 2 ms, 50 rekap terbawa, stock tetap, enam berkas terunggah.
+    Jawaban 25 aksi lama sama dengan v0.19; uji PIN, porsi, notifikasi, dan runtime push tetap lulus. Belum diuji: Supabase dan Google
+    asli (Drive, pembuatan Google Sheets, batas waktu Apps Script).

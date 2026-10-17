@@ -38,6 +38,9 @@
 > Diperbarui 17 Oktober 2026 (permintaan pemilik, dari telaah keamanan): kunci PIN bertingkat
 > (kunci ketiga dalam 24 jam berlangsung 24 jam), akun terkunci terlihat oleh Pengelola, dan PIN
 > baru yang terlalu mudah ditebak ditolak (Bagian 7.2 dan 10).
+> Diperbarui 17 Oktober 2026 (keputusan pemilik): arsip tahunan. Tab hanya menyimpan tahun berjalan
+> dan tahun lalu; data yang lebih tua dipindah otomatis ke berkas arsip per tahun di Drive
+> (Bagian 8.6, 12, dan 13).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -349,7 +352,7 @@ Apps Script (menempel di Google Sheet yang sama)
   Edge Function yang membacanya.
 - **Batas.** Edge Function dibatasi sekitar 2 detik waktu CPU per permintaan. Dengan data satu tahun
   (diuji), aksi aplikasi memakai 0,1–0,8 detik dan laporan harian sekitar 0,6–1,1 detik. Arsip
-  tahunan (Tahap 11, opsional) menjaga angka ini tetap rendah.
+  tahunan (Bagian 8.6) menjaga data paling banyak dua tahun, jadi angka ini tetap rendah.
 
 ---
 
@@ -1182,8 +1185,8 @@ Tab Data adalah sumber semua tampilan lain, jadi kerapiannya dijaga oleh script:
 - **Format seragam:** tanggal, angka desimal, dan rupiah memakai format yang sama di semua tab.
 - **Diproteksi.** Perubahan data dilakukan lewat aplikasi agar tercatat di `Log_Perubahan`.
 - **Pertumbuhan data.** Satu outlet menghasilkan puluhan ribu baris per tahun. Supaya tetap
-  cepat, data tahun yang sudah lewat dipindahkan ke file arsip (Tahap 11), dan hitung
-  ulang stock hanya menyentuh item yang terkait, tidak seluruh tab.
+  cepat, data yang lebih tua dari tahun lalu dipindahkan ke berkas arsip (Bagian 8.6), dan
+  hitung ulang stock hanya menyentuh item yang terkait, tidak seluruh tab.
 
 ### 8.5 Tab Dashboard
 
@@ -1225,6 +1228,33 @@ Tab Data adalah sumber semua tampilan lain, jadi kerapiannya dijaga oleh script:
   dihitung sebagai selisih.
 - Nilai waste dan nilai selisih opname dilaporkan terpisah, memakai nilai yang tercatat saat
   dicatat.
+
+### 8.6 Arsip tahunan (keputusan pemilik 17 Oktober 2026)
+
+- **Yang disimpan di tab:** tahun berjalan dan tahun lalu. Pada 2027, data sebelum 1 Januari 2026
+  dipindah; pada 2028, data sebelum 1 Januari 2027, dan seterusnya.
+- **Yang dipindah:** baris semua tab Data (termasuk form kustom), `Stock_Harian`, dan
+  `Log_Perubahan` yang tanggalnya (Waktu, untuk `Log_Perubahan`) sebelum batas itu. Tab master,
+  Harian, dan Dashboard tidak disentuh.
+- **Stock tetap benar.** Stock Awal dihitung dari rekap terakhir sebelumnya, jadi rekap terakhir
+  tiap item sebelum batas tetap di `Stock_Harian`. Rekap itu ikut dipindah tahun berikutnya jika
+  sudah ada rekap yang lebih baru.
+- **Ke mana:** satu berkas per tahun per tab di `Laporan Kitchen/{Nama Outlet}/Arsip/{Tahun}/`
+  (`Arsip_{Tahun}_{Tab}_{batas}.json`), dan isinya juga ditulis ke Google Sheets
+  "Arsip InventoryKu {Tahun}" di folder yang sama, satu tab per tab data, supaya bisa dibuka dan
+  dicari seperti biasa. Di Supabase berkas disimpan di Storage, lalu disalin ke Drive dan ditulis ke
+  Google Sheets oleh salinan 5 menit.
+- **Kapan:** server memeriksa tiap jam. Selama tidak ada yang perlu dipindah, pemeriksaan itu tidak
+  menulis apa pun. Di awal tahun, pemindahan berjalan bertahap (di Supabase satu tab per jam, paling
+  banyak 20.000 baris sekali jalan, yang tertua dulu) sampai semua tab selesai; baru sesudah itu
+  tanggal arsip dianggap tertutup. Selama bertahap, Riwayat untuk tahun yang sedang dipindah bisa
+  terlihat belum lengkap.
+- **Di aplikasi:** tanggal sebelum batas arsip tidak bisa dibuka atau diisi lagi (Riwayat, unduh PDF,
+  rekap bulanan, HPP, isian, penjualan). Pesannya menyebut letak arsip di Drive.
+- **Kegagalan** dicatat di `M_Konfigurasi` (`arsip_terakhir`), tampil di Beranda dan Dashboard
+  Pengelola, dan dicoba lagi satu jam kemudian.
+- **Tidak bisa dikembalikan dari aplikasi.** Memasukkan lagi data arsip ke aplikasi dilakukan pemilik
+  dengan tangan, seperti memulihkan cadangan (Bagian 9.4).
 
 ---
 
@@ -1474,6 +1504,10 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 
 **Form dan data**
 
+- [x] **Arsip tahunan** (keputusan pemilik 17 Oktober 2026, Bagian 8.6): tab menyimpan tahun
+      berjalan dan tahun lalu; yang lebih tua pindah ke berkas arsip per tahun di Drive, juga dalam
+      bentuk Google Sheets. Riwayat dan rekap tahun yang sudah diarsip tidak dibuka dari aplikasi.
+
 - [ ] **Menghapus form kustom** berarti form hilang dari website, tetapi datanya tetap ada
       di spreadsheet dan bisa dipulihkan. Data tidak pernah dihapus permanen dari aplikasi.
 - [ ] **Form bawaan** (Stock, Suhu, Prep List, Waste) hanya bisa diganti nama, diurutkan,
@@ -1534,6 +1568,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
     pemakaian seharusnya vs nyata di layar HPP, rekap bulanan, dan email
 14. **Notifikasi ke HP** (17 Oktober 2026): Web Push dari Supabase, lembar Notifikasi di HP ini,
     jam pengingat cek suhu di Outlet dan jadwal
+15. **Arsip tahunan** (17 Oktober 2026): pemindahan otomatis tiap jam, berkas JSON dan Google Sheets
+    per tahun di Drive, penolakan tanggal yang sudah diarsip
 
 ---
 

@@ -13,9 +13,11 @@ const CORS = {
 
 // Fungsi Code.gs yang boleh dijalankan pemilik dari editor Apps Script (diteruskan) atau oleh jadwal.
 const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekarang', 'kirimRekapSekarang', 'buatKodePemasangan',
-  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan'];
+  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan'];
 const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
-  'pengingatSuhuClosing'];
+  'pengingatSuhuClosing', 'arsipTahunan'];
+// Jadwal yang cukup memuat tab master; tab lain dimuat saat dibutuhkan.
+const JADWAL_RINGAN = /^(pengingatSuhu|arsipTahunan$)/;
 
 function samaAman(a, b) {
   a = String(a || '');
@@ -55,7 +57,7 @@ export function buatPelayan(dep) {
       }
       // Pengingat cek suhu cukup memuat tab master (tab lain dimuat saat dibutuhkan), supaya ringan.
       const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: [],
-        muat: /^pengingatSuhu/.test(body.nama) ? 'master' : undefined });
+        muat: JADWAL_RINGAN.test(body.nama) ? 'master' : undefined });
       return { catatan: h.catatan };
     }
     if (!dep.rahasiaSinkron) throw new Error('Secret RAHASIA_SINKRON belum dipasang di Supabase (Edge Functions → Secrets).');
@@ -86,7 +88,8 @@ export function buatPelayan(dep) {
       }
       case '__fungsi': {
         if (FUNGSI_PEMILIK.indexOf(body.nama) < 0) throw new Error('Fungsi ' + body.nama + ' tidak bisa dijalankan dari sini.');
-        const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: body.argumen || [] });
+        const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: body.argumen || [],
+          muat: JADWAL_RINGAN.test(body.nama) ? 'master' : undefined });
         return { keluaran: h.keluaran === undefined ? null : h.keluaran, catatan: h.catatan };
       }
       default:

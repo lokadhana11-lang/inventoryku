@@ -1133,6 +1133,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Item belum punya catatan dan masih aktif | "Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus." |
 | Pilihan kategori di Laporan | Label "Kategori", nilai awal "Semua kategori" |
 | Tanggal ditolak | "Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini." |
+| Tanggal sudah diarsip | "Data sebelum 1 Januari 2026 sudah dipindah ke arsip tahunan (Google Drive: Laporan Kitchen/Dapur Pusat/Arsip). Pilih tanggal yang lebih baru." |
 | Opname tersimpan | "Opname tersimpan. 3 item diluruskan." |
 | Kemajuan hari ini | "1 dari 4 form terisi" |
 | Semua form lengkap | "Semua form hari ini sudah terisi" |

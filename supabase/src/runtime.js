@@ -87,7 +87,10 @@ export function buatRuntime(dep) {
       metas.forEach((m) => { versi[m.nama] = Number(m.versi); });
       const propsAwal = await simpan.muatProperti(tx);
       const info = await simpan.muatInfo(tx);
-      const perlu = new Set(await simpan.tabAksi(tx, namaKunci));
+      // Fungsi dengan muat: 'master' (jadwal ringan, arsip tahunan) tidak memuat tab yang pernah dipelajari: tab lain dimuat saat
+      // dibutuhkan, supaya jalan yang tidak mengerjakan apa-apa tetap murah.
+      const ringan = kerja.jenis === 'fungsi' && kerja.muat === 'master';
+      const perlu = new Set(ringan ? [] : await simpan.tabAksi(tx, namaKunci));
       // Tab master selalu dimuat; fungsi terjadwal dan dari pemilik (setupSpreadsheet, laporan, rekap) memuat semua tab.
       const semua = kerja.jenis === 'fungsi' && kerja.muat !== 'master';
       metas.forEach((m) => { if (/^M_/.test(m.nama) || semua) perlu.add(m.nama); });
@@ -153,7 +156,7 @@ export function buatRuntime(dep) {
         }
         catatan.forEach(([j, a]) => (log[j] || log.log).apply(log, a));
         if (galat && !(galat.message || '').startsWith(TAB_BELUM_DIMUAT)) throw galat;
-        if (dipelajari.length) await simpan.catatTabAksi(tx, namaKunci, dipelajari);
+        if (dipelajari.length && !ringan) await simpan.catatTabAksi(tx, namaKunci, dipelajari);
         k.propsAwal = Object.assign({}, propsAwal);
         if (!Object.prototype.hasOwnProperty.call(propsAwal, 'SPREADSHEET_ID') && k.props.SPREADSHEET_ID === 'supabase') {
           delete k.props.SPREADSHEET_ID;
