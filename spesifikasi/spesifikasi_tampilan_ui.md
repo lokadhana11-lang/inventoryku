@@ -14,6 +14,8 @@
 > 2026, pola C): permukaan navy tanpa garis, berupa cahaya lembut dan butiran halus, menggantikan
 > tekstur garis; bar navigasi bawah dari kaca buram; kartu bertepi garis rambut dengan bayangan yang
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
+> Tambahan 18 Oktober 2026 (permintaan pemilik): kartu stok di lembar riwayat per item, yaitu
+> pilihan "Rekap harian" / "Transaksi" (Bagian 5.4).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): notifikasi ke HP, yaitu pilihan "Notifikasi" di menu
@@ -687,6 +689,16 @@ Satu-satunya layar yang sepenuhnya navy.
   Penyesuaian, Akhir). Hari dengan Stock Akhir minus diberi tanda Masalah. Stock Masuk
   yang diketik dalam satuan besar menampilkan angka aslinya: "24 botol (2 dus)". Di HP
   tabel ini digulir ke samping di dalam lembar, dengan kolom tanggal tetap diam (Bagian 4.6).
+- **Kartu stok** (18 Oktober 2026): di atas isi lembar riwayat per item ada dua tombol
+  "Rekap harian" (bawaan, tabel di atas) dan "Transaksi". Tanggal di tabel rekap bisa diketuk
+  dan membuka Transaksi pada tanggal itu. Transaksi dikelompokkan per tanggal dengan judul
+  "Minggu, 18 Oktober" dan "Awal 30 kg" di kanan. Tiap baris: "Waste · Rina, 14.10" (tanggal ikut
+  jika dicatat di hari lain), keterangan di bawahnya ("Rusak", "Untuk Sauce bolognese (1,5
+  resep)", "Pernah dikoreksi"), dan di kanan jumlahnya ("+2 kg" atau "−0,5 kg") serta "Saldo
+  31,5" (Masalah jika minus). Masuk dan keluar dibedakan dengan tanda + dan −, bukan warna.
+  Baris Stock, Prep List, dan Waste berupa tautan ke detail isiannya di Riwayat (ikon panah);
+  penyesuaian dan stock opname tidak bisa diketuk. Di bawah daftar: "Urut menurut jam diterima
+  server. Saldo = stock sesudah transaksi itu, dalam kg."
 - **Sesuaikan stock** (Pengelola): tombol di lembar riwayat per item. Isinya satu kolom
   "Stock sebenarnya", pilihan alasan, dan catatan. Sebelum disimpan tampil
   "Tercatat 12 kg, sebenarnya 10 kg. Selisih −2 kg."

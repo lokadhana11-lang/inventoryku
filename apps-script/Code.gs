@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.20 (arsip tahunan)
+// InventoryKu Code.gs v0.21 (kartu stok per transaksi)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -59,6 +59,7 @@
  *                        pengingatSuhuOpening/Middle/Closing (trigger harian).
  * - 17 Oktober 2026    : arsip tahunan (arsipTahunan, trigger tiap jam): data
  *                        sebelum tahun lalu dipindah ke berkas arsip di Drive.
+ * - 18 Oktober 2026    : kartu stok per transaksi (riwayatItem.transaksi).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -79,7 +80,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.20';
+var VERSI_KODE = 'v0.21';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -7835,8 +7836,100 @@ function dataRiwayatItem_(namaItem) {
     },
     hariIni: hari,
     tercatat: posisiStock_(semua, hari).akhir,
-    rekap: tujuh.map(function (r) { return barisRekap_(r, master, asli); })
+    rekap: tujuh.map(function (r) { return barisRekap_(r, master, asli); }),
+    transaksi: transaksiItem_(kecil, tujuh)
   };
+}
+
+/**
+ * Kartu stok: setiap catatan yang menggerakkan stock satu item pada tanggal
+ * rekapnya (sumber SUMBER_STOCK), urut tanggal lalu waktu diterima server,
+ * dengan saldo sesudah tiap transaksi (mulai dari Stock Awal rekap hari itu).
+ * Baris yang tidak menggerakkan stock (angka nol, prep tanpa resep) dilewati.
+ * Hasil: [{ tanggal, waktu, jenis, formId, submissionId, rowId, oleh, dikoreksi,
+ * masuk, keluar, saldo, ket }]. formId hanya untuk kiriman yang punya detail di
+ * Riwayat (Stock, Prep, Waste); penyesuaian dan stock opname tidak.
+ */
+function transaksiItem_(kecil, rekap) {
+  var awal = {};
+  rekap.forEach(function (r) { awal[r.tanggal] = r.awal; });
+  var zona = zonaSheet_();
+  var daftar = [];
+  var urut = 0;
+  SUMBER_STOCK.forEach(function (s) {
+    var t = bacaTabel_(s.tab);
+    if (!t || t.kol[s.item] === undefined || t.kol.Tanggal === undefined) return;
+    t.baris.forEach(function (b) {
+      if (rapikanTeks_(nilai_(t, b, s.item)).toLowerCase() !== kecil) return;
+      var tanggal = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+      if (!tanggal || !(tanggal in awal)) return;
+      var angka = function (judul) { return Number(nilai_(t, b, judul)) || 0; };
+      var x = { masuk: 0, keluar: 0, formId: null, ket: '' };
+      if (s.tab === 'Data_Stock') {
+        x.jenis = 'Stock';
+        x.formId = 'STOCK';
+        x.masuk = angka('Stock Masuk');
+        x.keluar = angka('Stock Keluar');
+        var diketik = rapikanTeks_(nilai_(t, b, 'Masuk Diketik'));
+        if (diketik) x.ket = 'Masuk diketik ' + diketik;
+      } else if (s.tab === 'Data_Prep') {
+        x.jenis = 'Hasil prep';
+        x.formId = 'PREP';
+        x.masuk = angka('Hasil');
+        x.ket = [angka('Jumlah Resep') ? teksAngka_(angka('Jumlah Resep')) + ' resep' : '',
+          rapikanTeks_(nilai_(t, b, 'Shift')) ? 'Shift ' + rapikanTeks_(nilai_(t, b, 'Shift')) : '']
+          .filter(Boolean).join(' · ');
+      } else if (s.tab === 'Data_PrepBahan') {
+        x.jenis = 'Dipakai prep';
+        x.formId = 'PREP';
+        x.keluar = angka('Qty Terpakai');
+        var hasil = rapikanTeks_(nilai_(t, b, 'Item Hasil'));
+        if (hasil) x.ket = 'Untuk ' + hasil + (angka('Jumlah Resep') ? ' (' + teksAngka_(angka('Jumlah Resep')) + ' resep)' : '');
+      } else if (s.tab === 'Data_Waste') {
+        x.jenis = 'Waste';
+        x.formId = 'WASTE';
+        x.keluar = angka('Qty');
+        x.ket = [rapikanTeks_(nilai_(t, b, 'Kategori Waste')), rapikanTeks_(nilai_(t, b, 'Alasan / Keterangan'))]
+          .filter(Boolean).join(': ');
+      } else {
+        var alasan = rapikanTeks_(nilai_(t, b, 'Alasan'));
+        var selisih = angka('Selisih');
+        x.jenis = alasan === ALASAN_OPNAME ? 'Stock opname' : 'Penyesuaian';
+        if (selisih > 0) x.masuk = selisih;
+        else x.keluar = -selisih;
+        x.ket = alasan === ALASAN_OPNAME ? '' : [alasan, rapikanTeks_(nilai_(t, b, 'Catatan'))].filter(Boolean).join(': ');
+      }
+      if (!x.masuk && !x.keluar) return;
+      var w = nilai_(t, b, 'timestamp_server');
+      x.tanggal = tanggal;
+      x.ms = w instanceof Date && !isNaN(w.getTime()) ? w.getTime() : 0;
+      x.waktu = isoAtauNull_(w);
+      x.submissionId = String(nilai_(t, b, 'submission_id') || '');
+      x.rowId = String(nilai_(t, b, 'row_id') || '');
+      x.oleh = rapikanTeks_(nilai_(t, b, 'submitted_by'));
+      x.dikoreksi = !!rapikanTeks_(nilai_(t, b, 'updated_by'));
+      x.urut = urut++;
+      daftar.push(x);
+    });
+  });
+  daftar.sort(function (a, b) {
+    if (a.tanggal !== b.tanggal) return a.tanggal < b.tanggal ? -1 : 1;
+    return a.ms - b.ms || a.urut - b.urut;
+  });
+  var saldo = null;
+  var hariIni = '';
+  return daftar.map(function (x) {
+    if (x.tanggal !== hariIni) {
+      hariIni = x.tanggal;
+      saldo = awal[x.tanggal];
+    }
+    saldo = bulat_(saldo + x.masuk - x.keluar);
+    return {
+      tanggal: x.tanggal, waktu: x.waktu, jenis: x.jenis, formId: x.formId,
+      submissionId: x.formId ? x.submissionId : '', rowId: x.rowId, oleh: x.oleh, dikoreksi: x.dikoreksi,
+      masuk: bulat_(x.masuk), keluar: bulat_(x.keluar), saldo: saldo, ket: x.ket
+    };
+  });
 }
 
 function aksiRiwayatItem_(body) {
