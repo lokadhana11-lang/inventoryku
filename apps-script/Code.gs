@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.21 (kartu stok per transaksi)
+// InventoryKu Code.gs v0.22 (pengingat stock ke HP Pengelola)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -60,6 +60,8 @@
  * - 17 Oktober 2026    : arsip tahunan (arsipTahunan, trigger tiap jam): data
  *                        sebelum tahun lalu dipindah ke berkas arsip di Drive.
  * - 18 Oktober 2026    : kartu stok per transaksi (riwayatItem.transaksi).
+ * - 18 Oktober 2026    : pengingatStock (trigger harian, hanya Supabase): stock di
+ *                        bawah minimum, minus, dan masa simpan ke HP Pengelola.
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -80,7 +82,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.21';
+var VERSI_KODE = 'v0.22';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -4371,7 +4373,8 @@ function aksiAturUnitAktif_(body) {
  * NotifikasiHp tidak ada, jadi semua fungsi di sini diam saja.
  * Langganan per HP disimpan di Script Properties (PUSH_<hash alamat>), atas
  * nama pengguna yang menyalakannya. Pengelola menerima suhu di luar standar,
- * permintaan reset PIN, dan akun terkunci; semua HP menerima pengingat cek suhu.
+ * permintaan reset PIN, akun terkunci, dan pengingat stock pagi; semua HP menerima
+ * pengingat cek suhu.
  * ========================================================================= */
 
 var AWALAN_PUSH = 'PUSH_';
@@ -4384,6 +4387,14 @@ var PENGINGAT_SUHU = [
 ];
 var KETERANGAN_JAM_CEK = 'Jam pengingat cek suhu ke HP (jj:mm), dikirim jika waktu cek itu belum lengkap. Kosong = tanpa pengingat. ' +
   'Diubah dari Pengaturan → Outlet dan jadwal.';
+/** Pengingat stock pagi ke HP Pengelola (Code.gs v0.22); bentuknya sama dengan PENGINGAT_SUHU. */
+var PENGINGAT_STOCK = {
+  waktu: 'stock', kunci: 'jam_pengingat_stock', fungsi: 'pengingatStock', awal: '07:00', field: 'jamPengingatStock',
+  keterangan: 'Jam pengingat stock ke HP Head Kitchen dan Manager (jj:mm): item di bawah stok minimum, stock minus, lewat masa ' +
+    'simpan, dan habis besok; dikirim hanya jika ada. Kosong = tanpa pengingat. Diubah dari Pengaturan → Outlet dan jadwal.'
+};
+/** Semua pengingat berjam yang diatur di Outlet dan jadwal. */
+var PENGINGAT_JAM = PENGINGAT_SUHU.concat([PENGINGAT_STOCK]);
 
 /** Notifikasi bisa dikirim: berjalan di Supabase dan kunci VAPID sudah ada. */
 function notifikasiTersedia_() {
@@ -4455,7 +4466,8 @@ function dataNotifikasi_(endpoint, pengguna) {
     aktif: !!l,
     atasNama: l ? l.nama : '',
     pengelola: !!pengguna.pengelola,
-    pengingat: PENGINGAT_SUHU.map(function (p) { return { waktu: p.waktu, jam: jamPengingat_(n, p) }; })
+    pengingat: PENGINGAT_SUHU.map(function (p) { return { waktu: p.waktu, jam: jamPengingat_(n, p) }; }),
+    pengingatStock: jamPengingat_(n, PENGINGAT_STOCK)
   };
 }
 
@@ -4541,6 +4553,63 @@ function pengingatSuhu_(waktu) {
   console.log('Pengingat suhu ' + waktu + ' dikirim ke ' + n + ' HP.');
 }
 
+function pengingatStock() { return pengingatStock_(); }
+
+/**
+ * Pengingat stock (trigger harian pada jam di Outlet dan jadwal, bawaan 07:00): stock
+ * hari ini menurut catatan (sama dengan Dashboard): item aktif yang minus, item di bawah
+ * stok minimum, dan barang jadi yang lewat masa simpan atau habis besok. Dikirim ke HP
+ * Pengelola hanya jika ada salah satunya. Mengembalikan isi notifikasi (atau null).
+ */
+function pengingatStock_() {
+  if (!notifikasiTersedia_()) {
+    console.log('Notifikasi tidak tersedia; pengingat stock dilewati.');
+    return null;
+  }
+  var isi = isiPengingatStock_(hariIni_());
+  if (!isi) {
+    console.log('Stock aman; pengingat stock tidak dikirim.');
+    return null;
+  }
+  var n = kirimNotifikasi_('pengelola', isi);
+  console.log('Pengingat stock dikirim ke ' + n + ' HP.');
+  return isi;
+}
+
+/** Isi notifikasi pengingat stock pada tanggal itu: { judul, isi, url, tag, ttl }, atau null jika tidak ada yang perlu dikabarkan. */
+function isiPengingatStock_(tanggal) {
+  var stock = ringkasStockHari_(tanggal);
+  var masa = masaSimpan_(tanggal);
+  var nama = function (x) { return x.m.nama; };
+  var minus = stock.minus.map(nama);
+  var kecil = {};
+  minus.forEach(function (x) { kecil[x.toLowerCase()] = true; });
+  // Item minus sudah disebut sendiri; tidak diulang di bawah minimum.
+  var bawah = stock.belanja.map(nama).filter(function (x) { return !kecil[x.toLowerCase()]; });
+  var lewat = masa.lewat.map(function (x) { return x.item; });
+  var besok = masa.habisBesok.map(function (x) { return x.item; });
+  var judul = [];
+  var baris = [];
+  if (minus.length) {
+    judul.push(minus.length + ' minus');
+    baris.push('Minus: ' + daftarNamaSingkat_(minus) + '.');
+  }
+  if (bawah.length) {
+    judul.push(bawah.length + ' di bawah minimum');
+    baris.push('Di bawah minimum: ' + daftarNamaSingkat_(bawah) + '.');
+  }
+  if (lewat.length) {
+    judul.push(lewat.length + ' lewat masa simpan');
+    baris.push('Lewat masa simpan: ' + daftarNamaSingkat_(lewat) + '.');
+  }
+  if (besok.length) {
+    judul.push(besok.length + ' habis besok');
+    baris.push('Habis besok: ' + daftarNamaSingkat_(besok) + '.');
+  }
+  if (!judul.length) return null;
+  return { judul: 'Stock hari ini: ' + judul.join(', '), isi: baris.join(' '), url: '#/dashboard', tag: 'pengingat-stock', ttl: 12 * 3600 };
+}
+
 /* ---------- Pengaturan → Outlet dan jadwal ---------- */
 
 /** "21:30" dari teks jj:mm atau jj.mm (atau nilai waktu Sheet); '' jika tidak sah. */
@@ -4598,6 +4667,7 @@ function dataOutletJadwal_() {
     jamCekOpening: jamPengingat_(n, PENGINGAT_SUHU[0]),
     jamCekMiddle: jamPengingat_(n, PENGINGAT_SUHU[1]),
     jamCekClosing: jamPengingat_(n, PENGINGAT_SUHU[2]),
+    jamPengingatStock: jamPengingat_(n, PENGINGAT_STOCK),
     notifikasiTersedia: notifikasiTersedia_(),
     perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
   };
@@ -4653,8 +4723,8 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     baru.bahanKecilPersen = persenIsian_(body.bahanKecilPersen, 0, BAHAN_KECIL_MAKS);
     if (baru.bahanKecilPersen == null) throw galatPengguna_('Bahan kecil diisi persen 0 sampai ' + BAHAN_KECIL_MAKS + ', misalnya 3.');
   }
-  // Jam pengingat cek suhu: jj:mm, atau kosong untuk mematikan pengingat itu.
-  PENGINGAT_SUHU.forEach(function (p) {
+  // Jam pengingat cek suhu dan stock: jj:mm, atau kosong untuk mematikan pengingat itu.
+  PENGINGAT_JAM.forEach(function (p) {
     if (!ada(p.field)) return;
     var t = String(body[p.field]).trim();
     baru[p.field] = t === '' ? '' : jamSah_(t);
@@ -4691,9 +4761,9 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
       tulisKonfigurasi_('bahan_kecil_persen', String(baru.bahanKecilPersen).replace('.', ','), KETERANGAN_BAHAN_KECIL);
     }
     var pengingatBerubah = false;
-    PENGINGAT_SUHU.forEach(function (p) {
+    PENGINGAT_JAM.forEach(function (p) {
       if (!berubah(p.field)) return;
-      tulisKonfigurasi_(p.kunci, baru[p.field], KETERANGAN_JAM_CEK);
+      tulisKonfigurasi_(p.kunci, baru[p.field], p.keterangan || KETERANGAN_JAM_CEK);
       pengingatBerubah = true;
     });
     // Pengingat hanya berjalan di Supabase; di sana jadwalnya langsung dipasang ulang.
@@ -10235,22 +10305,26 @@ function pasangTrigger() {
     .onWeekDay(ScriptApp.WeekDay[hari]).atHour(JAM_CADANGAN).inTimezone(zona).create();
   ScriptApp.newTrigger('kirimRekapBulanan').timeBased()
     .onMonthDay(1).atHour(JAM_REKAP).inTimezone(zona).create();
-  // Pengingat cek suhu ke HP (Code.gs v0.19): hanya di Supabase, karena Apps Script tidak bisa mengirim notifikasi.
+  // Pengingat cek suhu (Code.gs v0.19) dan stock (v0.22) ke HP: hanya di Supabase, karena Apps Script tidak bisa
+  // mengirim notifikasi.
   var pengingat = [];
+  var jamStock = '';
   if (DI_SUPABASE_) {
-    PENGINGAT_SUHU.forEach(function (p) {
+    PENGINGAT_JAM.forEach(function (p) {
       var jam = jamPengingat_(konf, p);
       if (!jam) return;
       ScriptApp.newTrigger(p.fungsi).timeBased()
         .atHour(Number(jam.slice(0, 2))).nearMinute(Number(jam.slice(3, 5))).everyDays(1).inTimezone(zona).create();
-      pengingat.push(p.waktu + ' ' + jam);
+      if (p === PENGINGAT_STOCK) jamStock = jam;
+      else pengingat.push(p.waktu + ' ' + jam);
     });
   }
   // Arsip tahunan (Code.gs v0.20): tiap jam, tanpa kerja kecuali ada data yang perlu dipindah.
   ScriptApp.newTrigger('arsipTahunan').timeBased().everyHours(1).create();
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
   var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00' +
-    (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '') + ', arsip tahunan tiap jam';
+    (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '') + (jamStock ? ', pengingat stock ' + jamStock : '') +
+    ', arsip tahunan tiap jam';
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');
   catatStatusSistem_('pasang_trigger', 'Terpasang ' + waktuSekarangId_() + ' (zona ' + zona + '): laporan harian sekitar ' +

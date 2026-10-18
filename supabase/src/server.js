@@ -15,9 +15,9 @@ const CORS = {
 const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekarang', 'kirimRekapSekarang', 'buatKodePemasangan',
   'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan'];
 const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
-  'pengingatSuhuClosing', 'arsipTahunan'];
+  'pengingatSuhuClosing', 'pengingatStock', 'arsipTahunan'];
 // Jadwal yang cukup memuat tab master; tab lain dimuat saat dibutuhkan.
-const JADWAL_RINGAN = /^(pengingatSuhu|arsipTahunan$)/;
+const JADWAL_RINGAN = /^(pengingatSuhu|pengingatStock$|arsipTahunan$)/;
 
 function samaAman(a, b) {
   a = String(a || '');

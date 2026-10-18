@@ -16,6 +16,8 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu stok di lembar riwayat per item, yaitu
 > pilihan "Rekap harian" / "Transaksi" (Bagian 5.4).
+> Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
+> baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): notifikasi ke HP, yaitu pilihan "Notifikasi" di menu
@@ -861,6 +863,11 @@ Satu-satunya layar yang sepenuhnya navy.
   pemilih jam "Pengingat Opening/Middle/Closing" (awal 08.00, 14.00, 21.00). Jika server belum bisa
   mengirim notifikasi: "Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim."
   Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
+- Kartu "Pengingat stock" (18 Oktober 2026), di bawah Pengingat cek suhu: keterangan "Notifikasi pagi
+  ke HP Head Kitchen dan Manager yang menyalakan notifikasi, hanya jika ada item di bawah stok
+  minimum, stock minus, atau barang jadi yang lewat masa simpan atau habis besok. Kosongkan jam untuk
+  mematikannya.", lalu pemilih jam "Jam pengingat stock" (awal 07.00) dan kalimat yang sama jika
+  server belum bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.
 
 **Pengaturan → Item:**
 
@@ -1061,7 +1068,9 @@ Lembar (dialog di desktop) dari menu nama pengguna → "Notifikasi" (spesifikasi
 
 - "Yang dikirim ke HP ini, juga saat aplikasi tertutup:" lalu daftar. Pengelola: Suhu di luar
   standar, Permintaan reset PIN, Akun yang terkunci karena PIN salah, dan "Pengingat cek suhu
-  (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap". Staff: hanya baris pengingat.
+  (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap". Pengelola juga "Pengingat stock
+  (07.00), jika ada item di bawah minimum, minus, atau lewat masa simpan" (atau "Pengingat stock
+  (sedang dimatikan)"), di atas pengingat cek suhu. Staff: hanya baris pengingat cek suhu.
 - Sakelar "Notifikasi di HP ini" dengan kata "Nyala"/"Mati". Menyalakan meminta izin HP lebih dulu;
   sesudahnya "Notifikasi menyala di HP ini." (Baik), "Menyala untuk Budi.", dan tombol kedua
   "Kirim notifikasi uji" ("Notifikasi uji dikirim. Jika tidak muncul dalam satu menit, periksa
