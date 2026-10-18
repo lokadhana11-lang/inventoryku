@@ -16,6 +16,9 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu stok di lembar riwayat per item, yaitu
 > pilihan "Rekap harian" / "Transaksi" (Bagian 5.4).
+> Tambahan 18 Oktober 2026 (keputusan pemilik): pemasok dan harga beli, yaitu pilihan Pemasok dan
+> kolom "Harga beli" di form Stock, Pengaturan → Pemasok, dan butir "harga beli berbeda" di Dashboard
+> (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
@@ -610,6 +613,15 @@ Satu-satunya layar yang sepenuhnya navy.
 - Stock akhir minus: angka dan kartu diberi tanda Masalah dengan tulisan
   "Stock akhir minus. Periksa angka yang diketik, atau minta Pengelola meluruskan stock."
 - Stock akhir di bawah stok minimum: tanda Perlu ditinjau "Perlu reorder".
+- **Pemasok dan harga beli** (18 Oktober 2026, tidak wajib, semua role): kotak info punya
+  `<select>` "Pemasok (tidak wajib)" berisi "Tanpa pemasok" dan pemasok aktif, dengan keterangan
+  "Berlaku untuk semua item yang masuk di kiriman ini."; pilihannya tetap untuk kiriman
+  berikutnya. Jika daftarnya kosong: "Belum ada pemasok" (nonaktif) dan petunjuk ke Pengaturan →
+  Pemasok. Di kartu HP/tablet, kolom "Harga beli per kg (tidak wajib)" dengan awalan "Rp" muncul di
+  bawah Tambah masuk setelah Tambah masuk diisi; satuannya ikut pilihan satuan besar ("per dus").
+  Di tabel laptop/desktop kolom "Harga Beli (Rp)" di sebelah Tambah Masuk. Titik di antara
+  kelompok tiga angka dibaca pemisah ribuan ("16.000" = 16000). Galat: "Periksa harga beli Tomat.
+  Isi rupiah, misalnya 15000 atau 15.000."
 - Di laptop/desktop: tabel dengan kolom No, Nama Item, Stock Awal, Tercatat Hari Ini,
   Tambah Masuk, Tambah Keluar, Stock Akhir, Satuan. Kolom otomatis berlatar Baja.
 - Di PDF dan tab Harian, item dikelompokkan di bawah baris judul kategorinya, dengan
@@ -686,6 +698,10 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Riwayat Stock punya dua tampilan**, dipilih lewat dua tombol di atas daftar:
   "Catatan" (tiap kiriman: siapa, jam, item, masuk, keluar) dan "Rekap harian" (satu
   baris per item per hari, dikelompokkan per kategori).
+- **Pemasok dan harga beli di Riwayat Stock** (18 Oktober 2026): kepala kiriman "Sayur, dari
+  Sumber Segar"; tiap baris punya "Harga beli Rp 16.000" (per satuan dasar). Lembar Koreksi
+  Pengelola punya kolom "Harga beli (Rp per kg)" yang boleh dikosongkan. Kartu stok menulis
+  "Dari Sumber Segar · Harga beli Rp 16.000/kg" di keterangan baris Stock.
 - **Riwayat per item** (Stock): ketuk nama item, muncul lembar dari bawah berisi tabel
   7 rekap terakhir item itu (Awal, Masuk, Hasil Prep, Keluar, Dipakai Prep, Waste,
   Penyesuaian, Akhir). Hari dengan Stock Akhir minus diberi tanda Masalah. Stock Masuk
@@ -751,6 +767,12 @@ Satu-satunya layar yang sepenuhnya navy.
 - Di sampingnya (di bawahnya di HP dan tablet) tombol "HPP dan food cost" dengan food cost bulan
   ini dan targetnya ("Oktober 33,8% · target 35%"; bertanda Perlu ditinjau jika di atas target).
   Jumlah menu utama tetap lima.
+- **Harga beli berbeda** (18 Oktober 2026): butir Perlu ditinjau "n harga beli berbeda dari harga
+  satuan" (ikon truk). Ketukan membuka lembar: penjelasan "Pakai" dan "Abaikan", lalu per item nama
+  (tautan ke layar item), "Dibeli Rp 16.000/kg pada 17 Okt dari Sumber Segar, dicatat Rina. Harga
+  satuan Rp 15.000/kg (beli lebih mahal Rp 1.000)." dan dua tombol kedua "Pakai Rp 16.000" dan
+  "Abaikan". Item yang selesai hilang dari lembar dengan pesan singkat; Dashboard dimuat ulang saat
+  lembar ditutup.
 - Perlu perhatian bertambah dua jenis: "n menu di atas target food cost 35%" (Perlu ditinjau,
   membuka HPP bagian Per menu) dan "Penjualan kemarin belum dicatat" / "Penjualan n hari belum
   dicatat" (Menunggu, membuka lembar Catat penjualan).
@@ -811,8 +833,8 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.7 Pengaturan (Pengelola)
 
-- Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Menu, Unit, Kategori dan
-  satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
+- Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Menu, Unit, Pemasok, Kategori
+  dan satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
   food cost, bahan kecil).
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
@@ -868,6 +890,16 @@ Satu-satunya layar yang sepenuhnya navy.
   minimum, stock minus, atau barang jadi yang lewat masa simpan atau habis besok. Kosongkan jam untuk
   mematikannya.", lalu pemilih jam "Jam pengingat stock" (awal 07.00) dan kalimat yang sama jika
   server belum bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.
+
+**Pengaturan → Pemasok** (18 Oktober 2026):
+
+- Daftar (aktif dulu, lalu nonaktif bertanda "Nonaktif"): nama, kontak, dan "Bulan ini Rp 568.000
+  dari 3 kiriman (1 item tanpa harga beli)" atau "Belum ada barang masuk bulan ini.". Di bawahnya
+  barang masuk tanpa pemasok bulan ini. Tombol "Tambah" di kepala.
+- Lembar ubah: "Nama pemasok" (terkunci jika sudah tercatat di barang masuk), "Kontak (tidak
+  wajib)", "Catatan (tidak wajib)", lalu bagian Nonaktifkan (dengan konfirmasi) / Aktifkan lagi,
+  seperti Unit.
+- Sebelum pemilik menjalankan setupSpreadsheet: "Pemasok dan harga beli belum bisa dicatat. …"
 
 **Pengaturan → Item:**
 

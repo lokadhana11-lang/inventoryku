@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.22 (pengingat stock ke HP Pengelola)
+// InventoryKu Code.gs v0.23 (pemasok dan harga beli)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -62,6 +62,9 @@
  * - 18 Oktober 2026    : kartu stok per transaksi (riwayatItem.transaksi).
  * - 18 Oktober 2026    : pengingatStock (trigger harian, hanya Supabase): stock di
  *                        bawah minimum, minus, dan masa simpan ke HP Pengelola.
+ * - 18 Oktober 2026    : pemasok dan harga beli (M_Pemasok, kolom Pemasok dan
+ *                        Harga Beli di Data_Stock; aksi daftarPemasok, simpanPemasok,
+ *                        aturPemasokAktif, abaikanHargaBeli).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -82,7 +85,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.22';
+var VERSI_KODE = 'v0.23';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -172,6 +175,14 @@ var AKSI_ = {
     pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
   aturUnitAktif: { jalankan: aksiAturUnitAktif_, pengelola: true,
     pesan: 'Unit hanya bisa diubah Head Kitchen atau Manager.' },
+  daftarPemasok: { jalankan: aksiDaftarPemasok_, bacaSaja: true, pengelola: true,
+    pesan: 'Pengaturan pemasok hanya untuk Head Kitchen dan Manager.' },
+  simpanPemasok: { jalankan: aksiSimpanPemasok_, pengelola: true,
+    pesan: 'Pemasok hanya bisa diubah Head Kitchen atau Manager.' },
+  aturPemasokAktif: { jalankan: aksiAturPemasokAktif_, pengelola: true,
+    pesan: 'Pemasok hanya bisa diubah Head Kitchen atau Manager.' },
+  abaikanHargaBeli: { jalankan: aksiAbaikanHargaBeli_, pengelola: true,
+    pesan: 'Harga hanya bisa diubah Head Kitchen atau Manager.' },
   dashboard: { jalankan: aksiDashboard_, bacaSaja: true, pengelola: true,
     pesan: 'Dashboard hanya untuk Head Kitchen dan Manager.' },
   riwayat: { jalankan: aksiRiwayat_, bacaSaja: true },
@@ -1081,7 +1092,8 @@ var KUNCI_MASTER = {
   M_Menu: 'Nama Menu',
   M_MenuBahan: 'Nama Menu',
   M_Kategori: 'Nama Kategori',
-  M_Unit: 'Nama Unit'
+  M_Unit: 'Nama Unit',
+  M_Pemasok: 'Nama Pemasok'
 };
 
 function kolomKunciMaster_(sheet) {
@@ -2504,12 +2516,16 @@ function dataFormStock_(tanggal) {
   var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(function (n) {
     return rapikanTeks_(n['ID Form']).toUpperCase() === 'STOCK';
   });
+  // Pemasok dan harga beli (Code.gs v0.23): hanya setelah setupSpreadsheet membuat tab dan kolomnya.
+  var siap = pembelianSiap_();
   return {
     tanggal: tanggal,
     kategori: kategori.filter(function (k) { return dipakai[k.nama]; }).map(function (k) { return k.nama; }),
     item: item,
     kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman) },
-    nihil: kiriman.length ? null : barisTerakhir_(nihil)
+    nihil: kiriman.length ? null : barisTerakhir_(nihil),
+    pembelianSiap: siap,
+    pemasok: siap ? bacaPemasok_().filter(function (p) { return p.aktif; }).map(function (p) { return p.nama; }) : []
   };
 }
 
@@ -2536,6 +2552,18 @@ function aksiKirimStock_(body, pengguna) {
       return { sudahTerkirim: true, jumlah: 0, form: dataFormStock_(tanggal) };
     }
     var master = bacaItem_();
+    // Pemasok dan harga beli (tidak wajib): pemasok satu untuk seluruh kiriman, harga beli per item yang masuk.
+    var adaHarga = masukan.some(function (b) { return b && b.hargaBeli !== '' && b.hargaBeli != null; });
+    var pemasok = rapikanTeks_(body.pemasok);
+    if ((pemasok || adaHarga) && !pembelianSiap_()) {
+      throw galatPengguna_('Pemasok dan harga beli belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
+    if (pemasok) {
+      // Pemasok yang sudah dinonaktifkan tetap diterima (kiriman dari antrean di HP).
+      var p = bacaPemasok_().filter(function (x) { return x.nama.toLowerCase() === pemasok.toLowerCase(); })[0];
+      if (!p) throw galatPengguna_('Pemasok ' + pemasok + ' tidak ada di daftar pemasok. Muat ulang form.');
+      pemasok = p.nama;
+    }
     var baru = [];
     masukan.forEach(function (b) {
       var m = master[rapikanTeks_(b && b.item).toLowerCase()];
@@ -2544,10 +2572,14 @@ function aksiKirimStock_(body, pengguna) {
       var keluar = angkaIsian_(b.keluar, 'Tambah keluar ' + m.nama);
       if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
       var diketik = '';
-      if (b.satuanMasuk === 'besar' && masuk) {
+      var besar = b.satuanMasuk === 'besar' && masuk;
+      // Harga beli per satuan yang diketik (per dus jika masuk dalam satuan besar); disimpan per satuan dasar.
+      var harga = masuk ? angkaOpsional_(b.hargaBeli, 'Harga beli ' + m.nama, 2) : null;
+      if (besar) {
         if (!m.satuanBesar) throw galatPengguna_(m.nama + ' tidak punya satuan besar. Isi Tambah masuk dalam ' + m.satuan + '.');
         diketik = teksAngka_(masuk) + ' ' + m.satuanBesar;
         masuk = bulat_(masuk * m.isiSatuanBesar);
+        if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
       baru.push(gabung_({
         'Tanggal': tanggalSel_(tanggal),
@@ -2556,7 +2588,9 @@ function aksiKirimStock_(body, pengguna) {
         'Stock Masuk': masuk,
         'Stock Keluar': keluar,
         'Satuan': m.satuan,
-        'Masuk Diketik': diketik
+        'Masuk Diketik': diketik,
+        'Pemasok': masuk ? pemasok : '',
+        'Harga Beli (Rp)': harga == null ? '' : harga
       }, isiSistem_(konteks)));
     });
     if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
@@ -4366,6 +4400,228 @@ function aksiAturUnitAktif_(body) {
   });
 }
 
+/* ---------- Pengaturan → Pemasok dan harga beli (Code.gs v0.23; spesifikasi sistem Bagian 5.1, 5.2, 9.3) ---------- */
+
+var TAB_PEMASOK = 'M_Pemasok';
+var PANJANG_KONTAK_MAKS = 60;
+var PANJANG_CATATAN_PEMASOK_MAKS = 120;
+var PROP_HARGA_BELI_DITINJAU = 'HARGA_BELI_DITINJAU';
+/** Harga beli yang dibandingkan di Dashboard: pembelian terakhir tiap item dalam sekian hari. */
+var HARI_HARGA_BELI = 31;
+
+/** M_Pemasok: [{ nama, kontak, catatan, aktif }] menurut urutan di Sheet (nama ganda dilewati); [] jika tab belum ada. */
+function bacaPemasok_() {
+  var t = bacaTabel_(TAB_PEMASOK);
+  var hasil = [];
+  if (!t) return hasil;
+  var sudah = {};
+  t.baris.forEach(function (b) {
+    var nama = rapikanTeks_(nilai_(t, b, 'Nama Pemasok'));
+    if (!nama || sudah[nama.toLowerCase()]) return;
+    sudah[nama.toLowerCase()] = true;
+    hasil.push({ nama: nama, kontak: rapikanTeks_(nilai_(t, b, 'Kontak')), catatan: rapikanTeks_(nilai_(t, b, 'Catatan')),
+      aktif: benar_(nilai_(t, b, 'Aktif')) });
+  });
+  return hasil;
+}
+
+/** Pemasok dan harga beli bisa dicatat: tab M_Pemasok dan kolom Pemasok/Harga Beli di Data_Stock sudah dibuat setupSpreadsheet. */
+function pembelianSiap_() {
+  var t = bacaTabel_('Data_Stock');
+  return !!bacaTabel_(TAB_PEMASOK) && !!t && t.kol['Pemasok'] !== undefined && t.kol['Harga Beli (Rp)'] !== undefined;
+}
+
+/**
+ * Pembelian = baris Data_Stock dengan Stock Masuk > 0, dari dari sampai sampai: [{ tanggal, item, satuan,
+ * masuk, hargaBeli (per satuan dasar, atau null), nilai (masuk × harga beli, dibulatkan; null tanpa harga),
+ * pemasok, sid, ms, oleh }].
+ */
+function bacaPembelian_(dari, sampai) {
+  var t = bacaTabel_('Data_Stock');
+  var hasil = [];
+  if (!t) return hasil;
+  var zona = zonaSheet_();
+  t.baris.forEach(function (b) {
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    var masuk = Number(nilai_(t, b, 'Stock Masuk')) || 0;
+    if (!tg || tg < dari || tg > sampai || masuk <= 0) return;
+    var harga = angkaAtauNull_(nilai_(t, b, 'Harga Beli (Rp)'));
+    var w = nilai_(t, b, 'timestamp_server');
+    hasil.push({
+      tanggal: tg, item: rapikanTeks_(nilai_(t, b, 'Nama Item')), satuan: rapikanTeks_(nilai_(t, b, 'Satuan')), masuk: masuk,
+      hargaBeli: harga, nilai: harga == null ? null : Math.round(masuk * harga), pemasok: rapikanTeks_(nilai_(t, b, 'Pemasok')),
+      sid: String(nilai_(t, b, 'submission_id') || ''), ms: w instanceof Date && !isNaN(w.getTime()) ? w.getTime() : 0,
+      oleh: rapikanTeks_(nilai_(t, b, 'submitted_by'))
+    });
+  });
+  return hasil;
+}
+
+/**
+ * Ringkasan pembelian per pemasok: { ada (ada pemasok atau harga beli yang dicatat), pemasok: [{ nama ('' = tanpa
+ * pemasok), kiriman, item, baris, nilai, tanpaHarga }], total: { kiriman, item, baris, nilai, tanpaHarga } }.
+ * Urut nilai terbesar, lalu nama; tanpa pemasok paling bawah. Baris tanpa harga beli tidak ikut nilai.
+ */
+function ringkasPembelian_(baris) {
+  var peta = {};
+  var semua = { kiriman: {}, item: {}, baris: 0, nilai: 0, tanpaHarga: 0 };
+  var ada = false;
+  baris.forEach(function (p) {
+    if (p.pemasok || p.hargaBeli != null) ada = true;
+    var k = p.pemasok.toLowerCase();
+    var x = peta[k] = peta[k] || { nama: p.pemasok, kiriman: {}, item: {}, baris: 0, nilai: 0, tanpaHarga: 0 };
+    [x, semua].forEach(function (y) {
+      y.kiriman[p.sid] = true;
+      y.item[p.item.toLowerCase()] = true;
+      y.baris++;
+      if (p.nilai == null) y.tanpaHarga++;
+      else y.nilai += p.nilai;
+    });
+  });
+  var hitung = function (x) {
+    return { nama: x.nama, kiriman: Object.keys(x.kiriman).length, item: Object.keys(x.item).length, baris: x.baris, nilai: x.nilai,
+      tanpaHarga: x.tanpaHarga };
+  };
+  var daftar = Object.keys(peta).map(function (k) { return hitung(peta[k]); }).sort(function (a, b) {
+    if (!a.nama !== !b.nama) return a.nama ? -1 : 1;
+    return b.nilai - a.nilai || a.nama.localeCompare(b.nama, 'id');
+  });
+  var total = hitung(semua);
+  delete total.nama;
+  return { ada: ada, pemasok: daftar, total: total };
+}
+
+/**
+ * Jawaban Pengaturan → Pemasok: { siap, hariIni, dari (awal bulan), pemasok: [{ nama, kontak, catatan, aktif,
+ * punyaCatatan, bulanIni: { kiriman, item, nilai, tanpaHarga } | null }], tanpaPemasok: ringkasan | null }.
+ */
+function dataPemasok_() {
+  var siap = pembelianSiap_();
+  var hari = hariIni_();
+  var dari = hari.slice(0, 8) + '01';
+  var r = ringkasPembelian_(siap ? bacaPembelian_(dari, hari) : []);
+  var peta = {};
+  r.pemasok.forEach(function (x) { peta[x.nama.toLowerCase()] = x; });
+  var catatan = siap ? namaDiKolom_('Data_Stock', 'Pemasok', {}) : {};
+  var bulan = function (x) { return x ? { kiriman: x.kiriman, item: x.item, nilai: x.nilai, tanpaHarga: x.tanpaHarga } : null; };
+  return {
+    siap: siap,
+    hariIni: hari,
+    dari: dari,
+    pemasok: bacaPemasok_().map(function (p) {
+      return { nama: p.nama, kontak: p.kontak, catatan: p.catatan, aktif: p.aktif, punyaCatatan: !!catatan[p.nama.toLowerCase()],
+        bulanIni: bulan(peta[p.nama.toLowerCase()]) };
+    }),
+    tanpaPemasok: bulan(peta[''])
+  };
+}
+
+function aksiDaftarPemasok_() {
+  return dataPemasok_();
+}
+
+/** Teks bebas pendek untuk master (kontak, catatan): kosong boleh; paling panjang maks huruf. */
+function teksMaster_(nilai, label, maks) {
+  var teks = rapikanTeks_(nilai);
+  if (teks.length > maks) throw galatPengguna_(label + ' paling panjang ' + maks + ' huruf.');
+  return teks;
+}
+
+/**
+ * Tambah atau ubah pemasok. Pemasok baru aktif dan diletakkan paling bawah. Nama hanya bisa
+ * diganti selama pemasok itu belum tercatat di barang masuk (Data_Stock).
+ */
+function aksiSimpanPemasok_(body) {
+  var nama = periksaNama_(body.nama, 'Nama pemasok', PANJANG_MASTER_MAKS);
+  var kontak = teksMaster_(body.kontak, 'Kontak', PANJANG_KONTAK_MAKS);
+  var catatan = teksMaster_(body.catatan, 'Catatan', PANJANG_CATATAN_PEMASOK_MAKS);
+  return denganKunci_(function () {
+    if (!pembelianSiap_()) throw galatPengguna_('Tab ' + TAB_PEMASOK + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var t = wajibTabel_(TAB_PEMASOK);
+    var data = dataPemasok_();
+    var cari = function (n) {
+      return data.pemasok.filter(function (p) { return p.nama.toLowerCase() === rapikanTeks_(n).toLowerCase(); })[0] || null;
+    };
+    var lama = body.baru ? null : cari(body.namaLama);
+    if (!body.baru && !lama) throw galatPengguna_('Pemasok tidak ditemukan. Muat ulang layar ini.');
+    var ada = cari(nama);
+    if (ada && ada !== lama) {
+      throw galatPengguna_('Pemasok ' + ada.nama + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif. Aktifkan lagi dari daftar.'));
+    }
+    var isi = { 'Nama Pemasok': nama, 'Kontak': teksAman_(kontak), 'Catatan': teksAman_(catatan) };
+    if (lama) {
+      if (nama !== lama.nama && nama.toLowerCase() !== lama.nama.toLowerCase() && lama.punyaCatatan) {
+        throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena pemasok ini sudah tercatat di barang masuk.');
+      }
+      tulisBarisMaster_(t, barisMaster_(t, 'Nama Pemasok', lama.nama), isi);
+    } else {
+      tambahBarisMaster_(TAB_PEMASOK, gabung_(isi, { 'Aktif': true }));
+    }
+    var hasil = dataPemasok_();
+    hasil.disimpan = nama;
+    return hasil;
+  });
+}
+
+/** Pemasok nonaktif tidak tampil di pilihan form Stock; catatan lamanya tetap. */
+function aksiAturPemasokAktif_(body) {
+  var aktif = body.aktif === true;
+  return denganKunci_(function () {
+    var t = bacaTabel_(TAB_PEMASOK);
+    var nomor = t ? barisMaster_(t, 'Nama Pemasok', body.nama) : 0;
+    if (!nomor) throw galatPengguna_('Pemasok tidak ditemukan. Muat ulang layar ini.');
+    tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
+    var hasil = dataPemasok_();
+    hasil.diubah = { nama: rapikanTeks_(body.nama), aktif: aktif };
+    return hasil;
+  });
+}
+
+/**
+ * Harga beli yang berbeda dari harga satuan (Dashboard, Perlu ditinjau): pembelian terakhir tiap item aktif dalam
+ * HARI_HARGA_BELI hari sampai tanggal itu yang punya harga beli, dibanding harga satuan yang berlaku pada tanggal
+ * pembelian itu (item tanpa harga juga). Yang sudah diabaikan Pengelola (sesudah pembelian itu dicatat) dilewati.
+ * [{ nama, satuan, hargaBeli, harga (null = belum punya harga), tanggal, pemasok, oleh }], urut nama.
+ */
+function hargaBeliBerbeda_(tanggal, master) {
+  if (!pembelianSiap_()) return [];
+  master = master || bacaItem_();
+  var terakhir = {};
+  bacaPembelian_(geserTanggal_(tanggal, -(HARI_HARGA_BELI - 1)), tanggal).forEach(function (p) {
+    if (p.hargaBeli == null) return;
+    var k = p.item.toLowerCase();
+    var x = terakhir[k];
+    if (!x || p.tanggal > x.tanggal || (p.tanggal === x.tanggal && p.ms >= x.ms)) terakhir[k] = p;
+  });
+  var ditinjau = bacaJson_(PropertiesService.getScriptProperties().getProperty(PROP_HARGA_BELI_DITINJAU)) || {};
+  var hasil = [];
+  Object.keys(terakhir).forEach(function (k) {
+    var p = terakhir[k];
+    var m = master[k];
+    if (!m || !m.aktif || (ditinjau[k] && ditinjau[k] >= p.ms)) return;
+    var harga = hargaPada_(m, p.tanggal);
+    if (harga != null && Math.abs(harga - p.hargaBeli) < 0.005) return;
+    hasil.push({ nama: m.nama, satuan: m.satuan, hargaBeli: p.hargaBeli, harga: harga, tanggal: p.tanggal, pemasok: p.pemasok, oleh: p.oleh });
+  });
+  return hasil.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+}
+
+/** "Abaikan" di Dashboard: harga beli item ini yang sudah tercatat tidak ditandai lagi; pembelian berikutnya dibandingkan lagi. */
+function aksiAbaikanHargaBeli_(body) {
+  var m = bacaItem_()[rapikanTeks_(body.nama).toLowerCase()];
+  if (!m) throw galatPengguna_('Item ' + rapikanTeks_(body.nama) + ' tidak ditemukan. Muat ulang Dashboard.');
+  return denganKunci_(function () {
+    var props = PropertiesService.getScriptProperties();
+    var ditinjau = bacaJson_(props.getProperty(PROP_HARGA_BELI_DITINJAU)) || {};
+    var aktif = bacaItem_();
+    // Item yang sudah tidak ada dibuang supaya catatan ini tidak tumbuh terus.
+    Object.keys(ditinjau).forEach(function (k) { if (!aktif[k]) delete ditinjau[k]; });
+    ditinjau[m.nama.toLowerCase()] = Date.now();
+    props.setProperty(PROP_HARGA_BELI_DITINJAU, JSON.stringify(ditinjau));
+    return { diabaikan: m.nama };
+  });
+}
+
 /* =========================================================================
  * Notifikasi ke HP (Web Push, Code.gs v0.19; spesifikasi sistem Bagian 10.1).
  * Hanya di Supabase: layanan NotifikasiHp (supabase/src/layanan.js) menitipkan
@@ -4981,6 +5237,10 @@ function perhatianDashboard_(d) {
       daftarNamaSingkat_(d.stock.belanja.map(function (x) { return x.m.nama; })) + '.',
       { item: d.stock.belanja.map(function (x) { return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan, stokMin: x.m.stokMin, saran: x.saran }; }) });
   }
+  if (d.hargaBeli && d.hargaBeli.length) {
+    tambah('hargaBeli', 'tinjau', d.hargaBeli.length + ' harga beli berbeda dari harga satuan',
+      daftarNamaSingkat_(d.hargaBeli.map(function (x) { return x.nama; })) + '. Pakai harga belinya atau abaikan.', { item: d.hargaBeli });
+  }
   if (d.masaSimpan.habisBesok.length) {
     tambah('habisBesok', 'tinjau', d.masaSimpan.habisBesok.length + ' barang jadi habis besok',
       daftarNamaSingkat_(d.masaSimpan.habisBesok.map(function (x) { return x.item; })) + '.', { habisBesok: d.masaSimpan.habisBesok });
@@ -5056,7 +5316,8 @@ function aksiDashboard_(body) {
     terkunci: akunTerkunci_().filter(function (a) { return a.sampai; }),
     peringatan: peringatanSistem_(),
     opname: statusOpname_(),
-    hpp: ringkasHppDashboard_(tanggal)
+    hpp: ringkasHppDashboard_(tanggal),
+    hargaBeli: hargaBeliBerbeda_(tanggal, master)
   };
   var hariIniWaste = d.waste.hari[d.waste.hari.length - 1];
   return {
@@ -7255,12 +7516,22 @@ var STATUS_DIPERIKSA = 'Diperiksa';
 var RIWAYAT_FORM = {
   STOCK: {
     tab: 'Data_Stock',
-    kepala: [{ judul: 'Kategori', kunci: 'kategori', label: 'Kategori' }],
+    kepala: [{ judul: 'Kategori', kunci: 'kategori', label: 'Kategori' }, { judul: 'Pemasok', kunci: 'pemasok', label: 'Pemasok' }],
     kolom: [
       { judul: 'Nama Item', kunci: 'item', label: 'Nama Item', jenis: 'item' },
       { judul: 'Stock Masuk', kunci: 'masuk', label: 'Stock Masuk', singkat: 'masuk', jenis: 'angka', koreksi: true, satuan: true, asli: 'Masuk Diketik' },
-      { judul: 'Stock Keluar', kunci: 'keluar', label: 'Stock Keluar', singkat: 'keluar', jenis: 'angka', koreksi: true, satuan: true }
+      { judul: 'Stock Keluar', kunci: 'keluar', label: 'Stock Keluar', singkat: 'keluar', jenis: 'angka', koreksi: true, satuan: true },
+      // Harga beli per satuan dasar (Code.gs v0.23); tidak wajib, jadi boleh dikosongkan saat koreksi.
+      { judul: 'Harga Beli (Rp)', kunci: 'hargaBeli', label: 'Harga beli', singkat: 'harga beli', jenis: 'rupiah', koreksi: true, opsional: true,
+        bantuan: 'Rupiah per satuan dasar (per kg, per botol). Kosongkan jika tidak ada.',
+        normal: function (v) { var n = angkaAtauNull_(v); return n == null ? '' : n; },
+        ubah: function (v, label) { var n = angkaOpsional_(v, label, 2); return n == null ? '' : n; } }
     ],
+    periksaKoreksi: function (g) {
+      if (g['Harga Beli (Rp)'] !== '' && g['Harga Beli (Rp)'] != null && !(Number(g['Stock Masuk']) > 0)) {
+        throw galatPengguna_('Harga beli hanya untuk barang masuk. Kosongkan harga beli, atau isi Stock Masuk.');
+      }
+    },
     satuan: 'Satuan',
     item: 'Nama Item',
     kategori: 'Kategori',
@@ -7358,6 +7629,13 @@ var RIWAYAT_FORM = {
 function defRiwayat_(idForm) {
   var id = rapikanTeks_(idForm).toUpperCase();
   var def = RIWAYAT_FORM[id] || (id ? defRiwayatKustom_(id) : null);
+  // Harga beli dan pemasok baru ada setelah setupSpreadsheet (Code.gs v0.23).
+  if (id === 'STOCK' && def && !pembelianSiap_()) {
+    def = gabung_(def, {
+      kepala: def.kepala.filter(function (k) { return k.kunci !== 'pemasok'; }),
+      kolom: def.kolom.filter(function (k) { return k.kunci !== 'hargaBeli'; })
+    });
+  }
   // Estimasi kerugian waste tidak dikirim ke Staff (Bagian 5.4).
   if (id === 'WASTE' && def && !rupiahWasteTerlihat_()) {
     def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.jenis !== 'rupiah'; }) });
@@ -7941,7 +8219,10 @@ function transaksiItem_(kecil, rekap) {
         x.masuk = angka('Stock Masuk');
         x.keluar = angka('Stock Keluar');
         var diketik = rapikanTeks_(nilai_(t, b, 'Masuk Diketik'));
-        if (diketik) x.ket = 'Masuk diketik ' + diketik;
+        var dari = rapikanTeks_(nilai_(t, b, 'Pemasok'));
+        var beli = x.masuk ? angkaAtauNull_(nilai_(t, b, 'Harga Beli (Rp)')) : null;
+        x.ket = [diketik ? 'Masuk diketik ' + diketik : '', dari ? 'Dari ' + dari : '',
+          beli != null ? 'Harga beli ' + rupiahId_(beli) + '/' + rapikanTeks_(nilai_(t, b, 'Satuan')) : ''].filter(Boolean).join(' · ');
       } else if (s.tab === 'Data_Prep') {
         x.jenis = 'Hasil prep';
         x.formId = 'PREP';
@@ -9808,6 +10089,9 @@ function dataRekapBulan_(bulan) {
     menuDiAtas: menuHpp.filter(function (m) { return m.diAtasTarget; }).sort(urutMenuFoodCost_),
     teoritis: bandingTeoritis_(ctxHpp, fcb.rentang, fcb.pemakaian, fcb.penjualan)
   };
+
+  /* ---------- Pembelian per pemasok (Code.gs v0.23): stock masuk × harga beli yang dicatat ---------- */
+  hasil.pembelian = ringkasPembelian_(pembelianSiap_() ? bacaPembelian_(dari, sampai) : []);
   return hasil;
 }
 
@@ -10068,7 +10352,24 @@ function isiPdfRekap_(d) {
 
   // HPP dan food cost (Bagian 5.9)
   html += isiPdfRekapHpp_(d.hpp);
+  html += isiPdfRekapPembelian_(d.pembelian);
   return html;
+}
+
+/** Bagian Pembelian rekap bulanan; kosong jika bulan itu tidak ada pemasok atau harga beli yang dicatat. */
+function isiPdfRekapPembelian_(p) {
+  if (!p || !p.ada) return '';
+  var e = escHtml_;
+  var rp = function (n) { return rupiahId_(n); };
+  var html = '<h2>Pembelian</h2>' + tabelRekap_([
+    { judul: 'Pemasok', lebar: 34 }, { judul: 'Kiriman', lebar: 12, angka: true }, { judul: 'Item', lebar: 12, angka: true },
+    { judul: 'Nilai pembelian (Rp)', lebar: 22, angka: true }, { judul: 'Tanpa harga beli', lebar: 20, angka: true }
+  ], p.pemasok.map(function (x) {
+    return [x.nama ? e(x.nama) : 'Tanpa pemasok', String(x.kiriman), String(x.item), rp(x.nilai), String(x.tanpaHarga)];
+  }), ['Total', String(p.total.kiriman), String(p.total.item), rp(p.total.nilai), String(p.total.tanpaHarga)], 'Tidak ada barang masuk.');
+  return html + '<p class="catatan">' + e('Nilai pembelian = stock masuk × harga beli yang dicatat saat barang masuk. Barang masuk ' +
+    'tanpa harga beli dihitung di kolom terakhir dan tidak ikut dinilai. Nilai Masuk di bagian Stock memakai harga satuan, ' +
+    'jadi bisa berbeda.') + '</p>';
 }
 
 /**
@@ -10177,6 +10478,15 @@ function htmlEmailRekap_(d, x) {
     ? 'Pemakaian seharusnya dari ' + h.teoritis.porsi + ' porsi terjual ' + rupiahId_(h.teoritis.seharusnya.total) + ', nyata ' +
       rupiahId_(h.teoritis.nyata) + ': selisih <b>' + (h.teoritis.selisih > 0 ? '+' : '') + rupiahId_(h.teoritis.selisih) + '</b>'
     : 'Seharusnya vs nyata belum dibandingkan: porsi per menu belum dicatat untuk ' + h.teoritis.kurang.length + ' hari'] : []));
+  var pb = d.pembelian;
+  if (pb && pb.ada) {
+    var berpemasok = pb.pemasok.filter(function (y) { return y.nama; });
+    html += bagian('Pembelian', [
+      'Nilai pembelian <b>' + rupiahId_(pb.total.nilai) + '</b> dari ' + pb.total.kiriman + ' kiriman barang masuk' +
+        (berpemasok.length ? ', ' + berpemasok.length + ' pemasok' : ''),
+      berpemasok.length ? 'Terbesar: ' + e(berpemasok[0].nama) + ' ' + rupiahId_(berpemasok[0].nilai) : 'Belum ada pemasok yang dicatat'
+    ].concat(pb.total.tanpaHarga ? [pb.total.tanpaHarga + ' barang masuk tanpa harga beli, tidak ikut dinilai'] : []));
+  }
   html += bagian('Lampiran', [e(x.namaFile) + (x.drive ? ' (tersimpan di Drive: ' + e(x.lokasi) + ')' : ' (gagal disimpan ke Drive)')]);
   html += '<p style="margin:20px 0 0">' + (x.alamat
     ? '<a href="' + e(x.alamat) + '" style="color:' + w.navy + ';font-weight:bold">Buka InventoryKu</a>'
@@ -10987,7 +11297,7 @@ var TAB_DATA = [
     kolom: [
       k_('Tanggal', 'tanggal'), k_('Kategori'), k_('Nama Item'),
       k_('Stock Masuk', 'angka'), k_('Stock Keluar', 'angka'), k_('Satuan'),
-      k_('Masuk Diketik')
+      k_('Masuk Diketik'), k_('Pemasok'), k_('Harga Beli (Rp)', 'rupiah')
     ]
   },
   {
@@ -11067,6 +11377,10 @@ var TAB_MASTER = [
       k_('Tipe', 'teks', { pilihan: ['Chiller', 'Freezer'] }),
       k_('Aktif', null, { centang: true })
     ]
+  },
+  {
+    nama: 'M_Pemasok',
+    kolom: [k_('Nama Pemasok'), k_('Kontak'), k_('Catatan'), k_('Aktif', null, { centang: true })]
   },
   {
     nama: 'M_Staff',
