@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.23.0';
+  var VERSI_APLIKASI = '0.24.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -5324,12 +5324,15 @@
       return null;
     }
 
-    /** Hasil pemeriksaan satu baris: { resep, jumlah, qty, salah: 'jumlah' | 'qty' | '' }. */
+    /** Hasil pemeriksaan satu baris: { resep, jumlah, aktual, qty, salah: 'jumlah' | 'aktual' | 'qty' | '' }. */
     function periksa(b) {
       var r = resepUntuk(b.item);
       if (r) {
         var j = bacaAngka(b.jumlah);
-        return { resep: r, jumlah: j, salah: j === null || isNaN(j) || !(j > 0) ? 'jumlah' : '' };
+        // Hasil aktual (aplikasi 0.24.0): tidak wajib; kosong = hasil menurut resep.
+        var a = data && data.hasilAktualSiap ? bacaAngka(b.aktual) : null;
+        return { resep: r, jumlah: j, aktual: a !== null && !isNaN(a) ? a : null,
+          salah: j === null || isNaN(j) || !(j > 0) ? 'jumlah' : (a !== null && isNaN(a) ? 'aktual' : '') };
       }
       var q = bacaAngka(b.qty);
       return { resep: null, qty: q, salah: q === null || isNaN(q) || !(q > 0) ? 'qty' : '' };
@@ -5436,6 +5439,26 @@
         });
         x.isian = el('div', { class: 'kolom' }, [fs, x.galat]);
         x.inputUtama = inLain;
+        if (data && data.hasilAktualSiap) {
+          var idAktual = 'aktual-prep-' + nomor;
+          var inAktual = el('input', { class: 'isian isian-angka', id: idAktual, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+            'data-kunci': b.id + '|aktual', 'aria-describedby': idAktual + '-bantuan' });
+          inAktual.value = b.aktual || '';
+          x.bantuanAktual = el('p', { class: 'kolom-bantuan', id: idAktual + '-bantuan' });
+          x.galatAktual = el('p', { class: 'kolom-galat' });
+          x.aktual = el('div', { class: 'kolom kolom-hasil-aktual' }, [
+            el('label', { class: 'kolom-label', for: idAktual, text: 'Hasil aktual (tidak wajib)' }),
+            el('div', { class: 'baris-angka' }, [inAktual, el('span', { class: 'satuan-tetap', text: it.satuan })]),
+            x.bantuanAktual,
+            x.galatAktual
+          ]);
+          x.inputAktual = inAktual;
+          inAktual.addEventListener('input', function () {
+            b.aktual = inAktual.value;
+            simpanDraft();
+            perbaruiSemua();
+          });
+        }
         x.hasil = el('p', { class: 'otomatis hasil-prep' });
         x.baik = el('p', { class: 'baik-sampai' });
         x.bahan = el('p', { class: 'otomatis bahan-prep' });
@@ -5453,11 +5476,25 @@
           kosongkan(x.baik);
           kosongkan(x.bahan);
           kosongkan(x.peringatan);
-          if (h.salah) {
+          if (x.inputAktual) {
+            var aktualSalah = h.salah === 'aktual';
+            x.inputAktual.setAttribute('aria-invalid', aktualSalah ? 'true' : 'false');
+            kosongkan(x.galatAktual);
+            if (aktualSalah) {
+              x.galatAktual.appendChild(ikonStatus('masalah'));
+              x.galatAktual.appendChild(el('span', { text: 'Isi angka 0 atau lebih, misalnya 7,5, atau kosongkan.' }));
+            }
+            var standar = h.jumlah > 0 ? bulat3(h.jumlah * r.hasil) : null;
+            x.bantuanAktual.textContent = h.aktual != null && standar
+              ? formatAngka(Math.round(h.aktual / standar * 1000) / 10) + '% dari hasil menurut resep. Stock bertambah ' +
+                formatAngka(h.aktual) + ' ' + it.satuan + '.'
+              : (x.dalamTabel ? 'Kosong = hasil resep.' : 'Yang benar-benar jadi. Kosongkan jika sama dengan hasil menurut resep.');
+          }
+          if (h.salah === 'jumlah') {
             x.hasil.textContent = 'Hasil per 1 resep ' + formatAngka(r.hasil) + ' ' + it.satuan + '. Pilih jumlah resep.';
             return;
           }
-          x.hasil.appendChild(document.createTextNode('Hasil '));
+          x.hasil.appendChild(document.createTextNode(x.inputAktual ? 'Hasil menurut resep ' : 'Hasil '));
           x.hasil.appendChild(el('strong', { class: 'angka-satuan', text: formatAngka(bulat3(h.jumlah * r.hasil)) + ' ' + it.satuan }));
           if (r.masaSimpan != null) x.baik.textContent = (x.dalamTabel ? '' : 'Baik sampai ') + tanggalPendek(geserHari(tanggal, r.masaSimpan));
           var daftar = semua[b.id] || [];
@@ -5505,7 +5542,7 @@
       return el('article', { class: 'kartu-item', 'aria-label': b.item }, [
         el('div', { class: 'kartu-item-kepala' }, [el('h2', { class: 'kartu-item-nama', text: b.item }), x.hapus]),
         x.isian,
-        x.hasil, x.baik || null, x.bahan || null, x.peringatan || null,
+        x.hasil, x.aktual || null, x.baik || null, x.bahan || null, x.peringatan || null,
         x.kKet.wadah
       ]);
     }
@@ -5523,11 +5560,16 @@
       } else {
         x.isian.querySelector('legend').classList.add('sr');
       }
+      if (x.aktual) {
+        x.aktual.querySelector('label').classList.add('sr');
+        x.inputAktual.setAttribute('aria-label', 'Hasil aktual ' + b.item);
+      }
       return el('tr', {}, [
         el('td', { class: 'angka', text: String(nomor) }),
         el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: b.item })),
         el('td', { class: 'sel-jumlah-prep' }, x.isian),
         el('td', { class: 'otomatis sel-hasil-prep' }, [x.hasil, x.bahan || null, x.peringatan || null]),
+        data.hasilAktualSiap ? el('td', { class: 'sel-aktual-prep' }, x.aktual || el('span', { class: 'otomatis', text: '–' })) : null,
         el('td', { class: 'otomatis' }, x.baik || el('span', { text: '–' })),
         el('td', { class: 'sel-alasan' }, x.kKet.wadah),
         el('td', {}, x.hapus)
@@ -5547,7 +5589,8 @@
         var badan = el('tbody');
         draft.baris.forEach(function (b, i) { badan.appendChild(barisTabel(b, i + 1)); });
         wadahBaris.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-prep' }, [
-          el('thead', {}, el('tr', {}, ['No', 'Item / Menu Prep', 'Jumlah resep atau Qty', 'Hasil dan bahan', 'Baik sampai', 'Keterangan', '']
+          el('thead', {}, el('tr', {}, ['No', 'Item / Menu Prep', 'Jumlah resep atau Qty', 'Hasil dan bahan']
+            .concat(data.hasilAktualSiap ? ['Hasil aktual'] : [], ['Baik sampai', 'Keterangan', ''])
             .map(function (j, i) { return el('th', { scope: 'col', class: i === 0 ? 'angka' : null, text: j }); }))),
           badan
         ])));
@@ -5560,7 +5603,7 @@
     }
 
     function tambahBaris(nama) {
-      var b = { id: buatId(), item: nama, jumlah: '', ketik: false, qty: '', keterangan: '' };
+      var b = { id: buatId(), item: nama, jumlah: '', ketik: false, qty: '', keterangan: '', aktual: '' };
       draft.baris.push(b);
       simpanDraft();
       gambarBaris();
@@ -5597,7 +5640,8 @@
           el('span', { class: 'kolom-bantuan', text: ' ' + kr.jumlah + ' kiriman' + (t ? ', terakhir ' + jam(t.waktu) + ', ' + t.oleh : '') + '.' })]));
         statusForm.appendChild(el('p', { class: 'kolom-bantuan lebar-penuh', text: 'Tercatat: ' + kr.baris.map(function (b) {
           return b.item + ' ' + (b.jumlahResep != null
-            ? formatAngka(b.jumlahResep) + ' resep (' + formatAngka(b.hasil) + ' ' + b.satuan + ')'
+            ? formatAngka(b.jumlahResep) + ' resep (' + formatAngka(b.hasil) + ' ' + b.satuan +
+              (b.hasilAktual != null && b.hasilStandar != null ? ', resep ' + formatAngka(b.hasilStandar) : '') + ')'
             : formatAngka(b.qty) + (b.satuan ? ' ' + b.satuan : '')) +
             (b.baikSampai ? ', baik sampai ' + tanggalPendek(b.baikSampai) : '');
         }).join('; ') + '.' }));
@@ -5650,7 +5694,8 @@
       });
       if (salah) {
         tulisPesan(pesan, salah.jenis === 'jumlah' ? 'Isi jumlah resep untuk ' + salah.b.item + '.'
-          : 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.', 'masalah');
+          : (salah.jenis === 'aktual' ? 'Periksa hasil aktual ' + salah.b.item + '. Isi angka, misalnya 7,5, atau kosongkan.'
+            : 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.'), 'masalah');
         var kolom = wadahBaris.querySelector('[data-kunci="' + salah.b.id + '|' + salah.jenis + '"]');
         if (kolom) kolom.focus();
         return;
@@ -5659,7 +5704,8 @@
       var baris = draft.baris.map(function (b) {
         var h = periksa(b);
         return h.resep
-          ? { item: b.item, jumlahResep: h.jumlah, qty: '', keterangan: String(b.keterangan || '').trim() }
+          ? Object.assign({ item: b.item, jumlahResep: h.jumlah, qty: '', keterangan: String(b.keterangan || '').trim() },
+            h.aktual != null ? { hasilAktual: h.aktual } : {})
           : { item: b.item, jumlahResep: '', qty: h.qty, keterangan: String(b.keterangan || '').trim() };
       });
       // "Baik sampai" untuk label wadah, dihitung di HP (server menghitung ulang dengan resep yang berlaku).
@@ -6403,6 +6449,11 @@
     return tanda;
   }
 
+  /** Kolom dengan jikaKolom (hasil aktual prep) hanya berlaku untuk baris yang kolom itu berisi (baris beresep). */
+  function kolomBerlaku(k, b) {
+    return !k.jikaKolom || b.nilai[k.jikaKolom] != null;
+  }
+
   /** Nilai satu kolom: nilai lama dicoret (jika pernah dikoreksi), nilai sekarang, angka asli. */
   function nilaiKolom(b, kol) {
     var v = b.nilai[kol.kunci];
@@ -6413,12 +6464,13 @@
       var lama = kor.lama === '' || kor.lama == null ? null : Number(kor.lama);
       isi.push(el('del', { class: 'nilai-lama' }, [
         el('span', { class: 'sr', text: 'Nilai lama ' }),
-        kol.jenis === 'angka' ? formatAngka(lama || 0) + (satuan ? ' ' + satuan : '')
+        kol.jenis === 'angka' ? (lama == null && (kol.jikaAda || kol.opsional) ? '(kosong)' : formatAngka(lama || 0) + (satuan ? ' ' + satuan : ''))
           : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama === '' || kor.lama == null ? '(kosong)' : kor.lama))
       ]));
       isi.push(' ');
     }
-    if ((kol.jikaAda || kol.opsional) && v == null && !kor) isi.push(el('span', { class: 'otomatis', text: '–' }));
+    // Kolom tidak wajib yang kosong (juga setelah dikosongkan lewat koreksi) ditulis "–", bukan 0.
+    if ((kol.jikaAda || kol.opsional) && v == null) isi.push(el('span', { class: 'otomatis', text: '–' }));
     else if (kol.jenis === 'tanggal') isi.push(el('span', { class: 'angka-satuan', text: v ? tanggalPendek(v) : '–' }));
     else if (kol.jenis === 'angka') isi.push(angkaSatuan(v || 0, satuan));
     else if (kol.jenis === 'rupiah') isi.push(el('span', { class: 'angka-satuan', text: formatRupiah(v) }));
@@ -7317,7 +7369,7 @@
             b.satuan ? el('span', { class: 'kartu-item-satuan', text: b.satuan }) : null
           ]),
           el('dl', { class: 'nilai-daftar' }, kolom.filter(function (k) {
-            return k !== nama && !(k.jikaAda && b.nilai[k.kunci] == null && !(b.koreksi && b.koreksi[k.kunci]));
+            return k !== nama && kolomBerlaku(k, b) && !(k.jikaAda && b.nilai[k.kunci] == null && !(b.koreksi && b.koreksi[k.kunci]));
           }).map(function (k) {
             return [el('dt', { text: k.label }), el('dd', {}, nilaiKolom(b, k))];
           })),
@@ -7437,7 +7489,7 @@
    */
   function bukaKoreksi(info, b, selesai) {
     // Kolom "jikaAda" hanya untuk baris yang berisi (prep: jumlah resep atau Qty).
-    var kolom = (info.kolom || []).filter(function (k) { return k.koreksi && !(k.jikaAda && b.nilai[k.kunci] == null); });
+    var kolom = (info.kolom || []).filter(function (k) { return k.koreksi && kolomBerlaku(k, b) && !(k.jikaAda && b.nilai[k.kunci] == null); });
     var nama = kolomNama(info.kolom || []);
     var namaBaris = nama ? b.nilai[nama.kunci] : '';
     var kolomIsi = kolom.map(function (k) {

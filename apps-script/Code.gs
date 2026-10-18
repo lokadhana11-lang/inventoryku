@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.23 (pemasok dan harga beli)
+// InventoryKu Code.gs v0.24 (hasil prep aktual)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -65,6 +65,8 @@
  * - 18 Oktober 2026    : pemasok dan harga beli (M_Pemasok, kolom Pemasok dan
  *                        Harga Beli di Data_Stock; aksi daftarPemasok, simpanPemasok,
  *                        aturPemasokAktif, abaikanHargaBeli).
+ * - 18 Oktober 2026    : hasil prep aktual (kolom Hasil Aktual di Data_Prep;
+ *                        kirimPrep baris[].hasilAktual).
  * - kirimLaporanHarian : dijalankan trigger harian (sekitar 22.15).
  * - buatCadangan       : dijalankan trigger mingguan.
  * - kirimRekapBulanan  : dijalankan trigger bulanan (tanggal 1).
@@ -85,7 +87,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.23';
+var VERSI_KODE = 'v0.24';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -1869,6 +1871,13 @@ function nilai_(tabel, baris, judul) {
 }
 
 /** Baris tabel (array) dari objek { judul: nilai }. */
+/** Isi untuk kolom yang ditambahkan versi baru: hanya kunci yang kolomnya sudah ada di tab (sebelum setupSpreadsheet dijalankan ulang). */
+function kolomAda_(tabel, isi) {
+  var hasil = {};
+  Object.keys(isi).forEach(function (judul) { if (tabel.kol[judul] !== undefined) hasil[judul] = isi[judul]; });
+  return hasil;
+}
+
 function susunBaris_(tabel, isi) {
   var baris = [];
   for (var i = 0; i < tabel.judul.length; i++) baris.push('');
@@ -2581,17 +2590,19 @@ function aksiKirimStock_(body, pengguna) {
         masuk = bulat_(masuk * m.isiSatuanBesar);
         if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
-      baru.push(gabung_({
+      baru.push(gabung_(gabung_({
         'Tanggal': tanggalSel_(tanggal),
         'Kategori': m.kategori,
         'Nama Item': m.nama,
         'Stock Masuk': masuk,
         'Stock Keluar': keluar,
         'Satuan': m.satuan,
-        'Masuk Diketik': diketik,
+        'Masuk Diketik': diketik
+      }, isiSistem_(konteks)), kolomAda_(tabel, {
+        // Kolom Code.gs v0.23: hanya ditulis jika setupSpreadsheet sudah menambahkannya.
         'Pemasok': masuk ? pemasok : '',
         'Harga Beli (Rp)': harga == null ? '' : harga
-      }, isiSistem_(konteks)));
+      })));
     });
     if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
 
@@ -3504,14 +3515,19 @@ function dataFormPrep_(tanggal) {
     return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, aktif: m.aktif, stock: posisiStock_(rekap.item[k], tanggal).akhir };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   var kiriman = bacaBarisTanggal_('Data_Prep', tanggal, zona,
-    ['submission_id', 'Item / Menu Prep', 'Jumlah Resep', 'Hasil', 'Qty', 'Satuan', 'Baik Sampai']);
+    ['submission_id', 'Item / Menu Prep', 'Jumlah Resep', 'Hasil per 1 Resep', 'Hasil', 'Hasil Aktual', 'Qty', 'Satuan', 'Baik Sampai']);
   var sid = {};
   var baris = kiriman.map(function (b) {
     sid[b.submission_id] = true;
+    var per1 = angkaAtauNull_(b['Hasil per 1 Resep']);
+    var jr = angkaAtauNull_(b['Jumlah Resep']);
     return {
       item: rapikanTeks_(b['Item / Menu Prep']),
-      jumlahResep: angkaAtauNull_(b['Jumlah Resep']),
+      jumlahResep: jr,
       hasil: angkaAtauNull_(b['Hasil']),
+      // Hasil aktual (Code.gs v0.24): hasil = hasil aktual jika diisi; hasilStandar = jumlah resep × hasil per resep.
+      hasilAktual: angkaAtauNull_(b['Hasil Aktual']),
+      hasilStandar: per1 != null && jr != null ? bulat_(jr * per1) : null,
       qty: angkaAtauNull_(b['Qty']),
       satuan: rapikanTeks_(b['Satuan']),
       baikSampai: teksTanggal_(b['Baik Sampai'], zona),
@@ -3528,8 +3544,15 @@ function dataFormPrep_(tanggal) {
     item: item,
     resep: daftarResep.sort(function (a, b) { return a.item.localeCompare(b.item, 'id'); }),
     kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman), baris: baris },
-    nihil: kiriman.length ? null : barisTerakhir_(nihil)
+    nihil: kiriman.length ? null : barisTerakhir_(nihil),
+    hasilAktualSiap: hasilAktualSiap_()
   };
+}
+
+/** Hasil aktual bisa dicatat: kolom Hasil Aktual di Data_Prep sudah dibuat setupSpreadsheet (Code.gs v0.24). */
+function hasilAktualSiap_() {
+  var t = bacaTabel_('Data_Prep');
+  return !!t && t.kol['Hasil Aktual'] !== undefined;
 }
 
 function aksiFormPrep_(body) {
@@ -3560,6 +3583,9 @@ function aksiKirimPrep_(body, pengguna) {
   return denganKunci_(function () {
     var tabel = wajibTabel_('Data_Prep');
     var tabelBahan = wajibTabel_('Data_PrepBahan');
+    if (masukan.some(function (b) { return b && !kosong(b.hasilAktual); }) && !hasilAktualSiap_()) {
+      throw galatPengguna_('Hasil aktual belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     if (adaSubmission_(tabel, konteks.sid)) {
       return { sudahTerkirim: true, jumlah: 0, form: dataFormPrep_(tanggal), baikSampai: [], peringatan: [] };
     }
@@ -3592,7 +3618,10 @@ function aksiKirimPrep_(body, pengguna) {
         if (!jr) throw galatPengguna_('Isi jumlah resep untuk ' + m.nama + '.');
         isi['Jumlah Resep'] = jr;
         isi['Hasil per 1 Resep'] = r.hasil;
-        isi['Hasil'] = bulat_(jr * r.hasil);
+        // Hasil aktual (tidak wajib): yang benar-benar jadi; jika diisi, itulah yang menambah stock.
+        var aktual = angkaOpsional_(b.hasilAktual, 'Hasil aktual ' + m.nama, 3);
+        if (tabel.kol['Hasil Aktual'] !== undefined) isi['Hasil Aktual'] = aktual == null ? '' : aktual;
+        isi['Hasil'] = aktual == null ? bulat_(jr * r.hasil) : aktual;
         isi['Qty'] = '';
         isi['Baik Sampai'] = r.masaSimpan == null ? '' : tanggalSel_(geserTanggal_(tanggal, r.masaSimpan));
         if (r.masaSimpan != null) baikSampai.push({ item: m.nama, tanggal: geserTanggal_(tanggal, r.masaSimpan) });
@@ -7600,6 +7629,12 @@ var RIWAYAT_FORM = {
       { judul: 'Jumlah Resep', kunci: 'jumlahResep', label: 'Jumlah resep', singkat: 'jumlah resep', jenis: 'angka', koreksi: true, jikaAda: true,
         bantuan: 'Hasil dan bahan dihitung ulang dengan resep yang tercatat saat prep dibuat.' },
       { judul: 'Hasil', kunci: 'hasil', label: 'Hasil', singkat: 'hasil', jenis: 'angka', satuan: true, jikaAda: true },
+      // Hasil aktual (Code.gs v0.24): hanya untuk baris beresep (jikaKolom); kosong = hasil menurut resep.
+      { judul: 'Hasil Aktual', kunci: 'hasilAktual', label: 'Hasil aktual', singkat: 'aktual', jenis: 'angka', koreksi: true, satuan: true,
+        opsional: true, jikaKolom: 'jumlahResep', ringkas: false,
+        bantuan: 'Hasil yang benar-benar jadi. Kosongkan untuk memakai hasil menurut resep.',
+        normal: function (v) { var n = angkaAtauNull_(v); return n == null ? '' : n; },
+        ubah: function (v, label) { var n = angkaOpsional_(v, label, 3); return n == null ? '' : n; } },
       { judul: 'Qty', kunci: 'qty', label: 'Qty', singkat: 'qty', jenis: 'angka', koreksi: true, satuan: true, jikaAda: true },
       { judul: 'Baik Sampai', kunci: 'baikSampai', label: 'Baik sampai', singkat: 'baik sampai', jenis: 'tanggal' },
       { judul: 'Keterangan', kunci: 'keterangan', label: 'Keterangan', singkat: 'ket', jenis: 'teks', koreksi: true }
@@ -7609,15 +7644,21 @@ var RIWAYAT_FORM = {
     kategoriDariItem: true,
     gerakStock: true,
     rincian: rincianPrep_,
-    // Hasil = Jumlah Resep × Hasil per 1 Resep yang tercatat di baris itu (resep saat prep dibuat).
+    // Hasil = hasil aktual jika diisi, selain itu Jumlah Resep × Hasil per 1 Resep yang tercatat di baris itu
+    // (resep saat prep dibuat).
     turunan: function (n) {
       var per1 = n['Hasil per 1 Resep'];
       if (per1 === '' || per1 == null) return {};
+      var aktual = n['Hasil Aktual'];
+      if (aktual !== '' && aktual != null) return { 'Hasil': Number(aktual) };
       return { 'Hasil': bulat_((Number(n['Jumlah Resep']) || 0) * Number(per1)) };
     },
     periksaKoreksi: function (n) {
       var nama = rapikanTeks_(n['Item / Menu Prep']);
       var beresep = n['Hasil per 1 Resep'] !== '' && n['Hasil per 1 Resep'] != null;
+      if (!beresep && n['Hasil Aktual'] !== '' && n['Hasil Aktual'] != null) {
+        throw galatPengguna_(nama + ' dicatat tanpa resep. Hasilnya sudah ditulis di Qty.');
+      }
       if (beresep && Number(n['Qty'])) throw galatPengguna_(nama + ' dibuat dengan resep. Koreksi jumlah resepnya, bukan Qty.');
       if (!beresep && Number(n['Jumlah Resep'])) throw galatPengguna_(nama + ' dicatat tanpa resep. Koreksi Qty-nya.');
     },
@@ -7635,6 +7676,10 @@ function defRiwayat_(idForm) {
       kepala: def.kepala.filter(function (k) { return k.kunci !== 'pemasok'; }),
       kolom: def.kolom.filter(function (k) { return k.kunci !== 'hargaBeli'; })
     });
+  }
+  // Hasil aktual prep baru ada setelah setupSpreadsheet (Code.gs v0.24).
+  if (id === 'PREP' && def && !hasilAktualSiap_()) {
+    def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.kunci !== 'hasilAktual'; }) });
   }
   // Estimasi kerugian waste tidak dikirim ke Staff (Bagian 5.4).
   if (id === 'WASTE' && def && !rupiahWasteTerlihat_()) {
@@ -8139,6 +8184,7 @@ function infoKolom_(def) {
     if (k.pilihan) info.pilihan = k.pilihan;
     if (k.ringkas === false) info.ringkas = false;
     if (k.jikaAda) info.jikaAda = true;
+    if (k.jikaKolom) info.jikaKolom = k.jikaKolom;
     if (k.bantuan) info.bantuan = k.bantuan;
     if (k.opsional) info.opsional = true;
     if (k.waktu) info.waktu = true;
@@ -8227,7 +8273,10 @@ function transaksiItem_(kecil, rekap) {
         x.jenis = 'Hasil prep';
         x.formId = 'PREP';
         x.masuk = angka('Hasil');
+        var standar = bulat_(angka('Jumlah Resep') * angka('Hasil per 1 Resep'));
+        var adaAktual = angkaAtauNull_(nilai_(t, b, 'Hasil Aktual')) != null;
         x.ket = [angka('Jumlah Resep') ? teksAngka_(angka('Jumlah Resep')) + ' resep' : '',
+          adaAktual ? 'hasil aktual (standar ' + teksAngka_(standar) + ' ' + rapikanTeks_(nilai_(t, b, 'Satuan')) + ')' : '',
           rapikanTeks_(nilai_(t, b, 'Shift')) ? 'Shift ' + rapikanTeks_(nilai_(t, b, 'Shift')) : '']
           .filter(Boolean).join(' · ');
       } else if (s.tab === 'Data_PrepBahan') {
@@ -8875,7 +8924,10 @@ function isiPdfPrep_(tanggal) {
       '<td>' + escHtml_(b['Nama Staff']) + '</td>' +
       '<td>' + escHtml_(b['Shift']) + '</td>' +
       '<td class="angka">' + (beresep ? angkaId_(Number(b['Jumlah Resep']) || 0) : '') + '</td>' +
-      '<td class="angka">' + angkaId_(Number(beresep ? b['Hasil'] : b['Qty']) || 0) + '</td>' +
+      '<td class="angka">' + angkaId_(Number(beresep ? b['Hasil'] : b['Qty']) || 0) +
+        (beresep && b['Hasil Aktual'] !== '' && b['Hasil Aktual'] != null
+          ? '<br><span class="kecil">standar ' + angkaId_(bulat_((Number(b['Jumlah Resep']) || 0) * Number(b['Hasil per 1 Resep']))) + '</span>' : '') +
+        '</td>' +
       '<td>' + escHtml_(b['Satuan']) + '</td>' +
       '<td>' + (bs ? escHtml_(tanggalSedangId_(bs)) : '') + '</td>' +
       '<td>' + escHtml_(b['Keterangan']) + '</td>' +
@@ -8892,7 +8944,8 @@ function isiPdfPrep_(tanggal) {
     ada: baris.length > 0,
     info: [['Jumlah item', String(baris.length)]],
     tabel: tabel,
-    catatan: ['Hasil = Jumlah Resep × Hasil per 1 Resep. Item tanpa resep ditulis dengan Qty dan tidak menggerakkan stock.',
+    catatan: ['Hasil = hasil aktual jika dicatat (standar resep ditulis kecil di bawahnya), selain itu Jumlah Resep × Hasil per 1 Resep. ' +
+      'Item tanpa resep ditulis dengan Qty dan tidak menggerakkan stock.',
       'Bahan: yang terpakai menurut resep saat prep dibuat.']
   };
 }
@@ -9918,6 +9971,7 @@ function dataRekapBulan_(bulan) {
   /* ---------- Prep: total resep dan hasil per item ---------- */
   var itemPrep = {};
   var catatanPrep = 0;
+  var aktualPrep = { catatan: 0, aktual: 0, standar: 0 };
   var tP = tabel('Data_Prep');
   if (tP) {
     tP.baris.forEach(function (b) {
@@ -9928,13 +9982,27 @@ function dataRekapBulan_(bulan) {
       catatanPrep++;
       var beresep = nilai_(tP, b, 'Hasil per 1 Resep') !== '' && nilai_(tP, b, 'Hasil per 1 Resep') != null;
       var k = nama.toLowerCase();
-      var it = itemPrep[k] = itemPrep[k] || { item: nama, satuan: rapikanTeks_(nilai_(tP, b, 'Satuan')), catatan: 0, resep: null, hasil: 0 };
+      var it = itemPrep[k] = itemPrep[k] || { item: nama, satuan: rapikanTeks_(nilai_(tP, b, 'Satuan')), catatan: 0, resep: null, hasil: 0,
+        standar: null, aktual: 0 };
       it.catatan++;
-      if (beresep) it.resep = bulat_((it.resep || 0) + (Number(nilai_(tP, b, 'Jumlah Resep')) || 0));
+      if (beresep) {
+        var jr = Number(nilai_(tP, b, 'Jumlah Resep')) || 0;
+        it.resep = bulat_((it.resep || 0) + jr);
+        it.standar = bulat_((it.standar || 0) + jr * (Number(nilai_(tP, b, 'Hasil per 1 Resep')) || 0));
+        // Hasil aktual (Code.gs v0.24): dibandingkan dengan standar hanya pada catatan yang mengisinya.
+        var akt = angkaAtauNull_(nilai_(tP, b, 'Hasil Aktual'));
+        if (akt != null) {
+          it.aktual++;
+          aktualPrep.catatan++;
+          aktualPrep.aktual = bulat_(aktualPrep.aktual + akt);
+          aktualPrep.standar = bulat_(aktualPrep.standar + jr * (Number(nilai_(tP, b, 'Hasil per 1 Resep')) || 0));
+        }
+      }
       it.hasil = bulat_(it.hasil + (Number(nilai_(tP, b, beresep ? 'Hasil' : 'Qty')) || 0));
     });
   }
   hasil.prep = {
+    aktual: aktualPrep,
     catatan: catatanPrep,
     item: Object.keys(itemPrep).map(function (k) { return itemPrep[k]; }).sort(function (a, b) { return a.item.localeCompare(b.item, 'id'); })
   };
@@ -10297,13 +10365,21 @@ function isiPdfRekap_(d) {
 
   // Prep
   var p = d.prep;
+  // Kolom Hasil standar hanya jika bulan itu ada hasil aktual yang dicatat (Code.gs v0.24); bulan lama tetap seperti dulu.
+  var adaAktual = p.aktual && p.aktual.catatan > 0;
   html += '<h2>Prep</h2>' + tabelRekap_([
-    { judul: 'No', lebar: 6, angka: true }, { judul: 'Item / Menu Prep', lebar: 38 }, { judul: 'Catatan', lebar: 12, angka: true },
-    { judul: 'Jumlah resep', lebar: 14, angka: true }, { judul: 'Hasil atau Qty', lebar: 16, angka: true }, { judul: 'Satuan', lebar: 14 }
-  ], p.item.map(function (x, i) {
-    return [String(i + 1), e(x.item), String(x.catatan), x.resep == null ? '–' : angkaId_(x.resep), angkaId_(x.hasil), e(x.satuan)];
+    { judul: 'No', lebar: 6, angka: true }, { judul: 'Item / Menu Prep', lebar: adaAktual ? 30 : 38 }, { judul: 'Catatan', lebar: adaAktual ? 10 : 12, angka: true },
+    { judul: 'Jumlah resep', lebar: adaAktual ? 12 : 14, angka: true }]
+    .concat(adaAktual ? [{ judul: 'Hasil standar', lebar: 14, angka: true }] : [])
+    .concat([{ judul: 'Hasil atau Qty', lebar: adaAktual ? 14 : 16, angka: true }, { judul: 'Satuan', lebar: 14 }]),
+  p.item.map(function (x, i) {
+    return [String(i + 1), e(x.item), String(x.catatan), x.resep == null ? '–' : angkaId_(x.resep)]
+      .concat(adaAktual ? [x.standar == null ? '–' : angkaId_(x.standar)] : [])
+      .concat([angkaId_(x.hasil), e(x.satuan)]);
   }), null, 'Tidak ada prep tercatat pada bulan ini.');
-  if (p.item.length) html += catatan('Item tanpa resep ditulis dengan Qty-nya; jumlah resep "–".');
+  if (p.item.length) html += catatan('Item tanpa resep ditulis dengan Qty-nya; jumlah resep "–".' + (adaAktual
+    ? ' Hasil memakai hasil aktual jika dicatat. Pada ' + p.aktual.catatan + ' catatan dengan hasil aktual, hasilnya ' +
+      persenHasil_(p.aktual) + ' dari standar resep (' + angkaId_(p.aktual.aktual) + ' dari ' + angkaId_(p.aktual.standar) + ').' : ''));
 
   // Suhu
   var su = d.suhu;
@@ -10354,6 +10430,11 @@ function isiPdfRekap_(d) {
   html += isiPdfRekapHpp_(d.hpp);
   html += isiPdfRekapPembelian_(d.pembelian);
   return html;
+}
+
+/** "96%": hasil aktual dibanding standar resep (satu angka di belakang koma jika perlu). */
+function persenHasil_(a) {
+  return a.standar ? persenId_(Math.round(a.aktual / a.standar * 1000) / 10) : '–';
 }
 
 /** Bagian Pembelian rekap bulanan; kosong jika bulan itu tidak ada pemasok atau harga beli yang dicatat. */
@@ -10451,7 +10532,8 @@ function htmlEmailRekap_(d, x) {
     : 'Tidak ada waste tercatat pada bulan ini.']);
   html += bagian('Prep', [d.prep.catatan
     ? d.prep.catatan + ' catatan prep untuk ' + d.prep.item.length + ' item'
-    : 'Tidak ada prep tercatat pada bulan ini.']);
+    : 'Tidak ada prep tercatat pada bulan ini.'].concat(d.prep.aktual && d.prep.aktual.catatan
+    ? ['Hasil aktual ' + persenHasil_(d.prep.aktual) + ' dari standar resep (' + d.prep.aktual.catatan + ' catatan)'] : []));
   html += bagian('Suhu', [
     (d.suhu.luar ? '<b style="color:' + w.masalah + '">' + d.suhu.luar + ' pengecekan di luar standar</b>' : 'Tidak ada pengecekan di luar standar') +
       ' dari ' + d.suhu.cek + ' pengecekan',
@@ -11312,7 +11394,7 @@ var TAB_DATA = [
     kolom: [
       k_('Tanggal', 'tanggal'), k_('Shift'), k_('Nama Staff'), k_('Item / Menu Prep'),
       k_('Jumlah Resep', 'angka'), k_('Hasil per 1 Resep', 'angka'), k_('Hasil', 'angka'),
-      k_('Qty', 'angka'), k_('Satuan'), k_('Baik Sampai', 'tanggal'), k_('Keterangan')
+      k_('Qty', 'angka'), k_('Satuan'), k_('Baik Sampai', 'tanggal'), k_('Keterangan'), k_('Hasil Aktual', 'angka')
     ]
   },
   {

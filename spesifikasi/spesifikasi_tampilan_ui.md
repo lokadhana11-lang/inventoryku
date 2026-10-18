@@ -16,6 +16,8 @@
 > lebih tipis (Bagian 2, 4.2, 4.7, 6, 10, dan 11).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu stok di lembar riwayat per item, yaitu
 > pilihan "Rekap harian" / "Transaksi" (Bagian 5.4).
+> Tambahan 18 Oktober 2026 (permintaan pemilik): kolom "Hasil aktual" di Prep List dan Riwayat Prep
+> (Bagian 5.3 dan 5.4).
 > Tambahan 18 Oktober 2026 (keputusan pemilik): pemasok dan harga beli, yaitu pilihan Pemasok dan
 > kolom "Harga beli" di form Stock, Pengaturan → Pemasok, dan butir "harga beli berbeda" di Dashboard
 > (Bagian 5.3, 5.4, 5.6, 5.7).
@@ -663,6 +665,13 @@ Satu-satunya layar yang sepenuhnya navy.
   tebal, untuk disalin ke label wadah. Tulisan yang sama muncul lagi di pesan setelah terkirim.
 - Bahan yang stock-nya tidak cukup menurut catatan diberi tanda Perlu ditinjau:
   "Stock tomat tercatat 1 kg, resep ini butuh 1,5 kg." Prep tetap bisa dikirim.
+- **Hasil aktual** (18 Oktober 2026, item beresep, tidak wajib): baris Hasil menjadi "Hasil menurut
+  resep 10 liter", lalu kolom "Hasil aktual (tidak wajib)" dengan satuannya dan keterangan "Yang
+  benar-benar jadi. Kosongkan jika sama dengan hasil menurut resep." Setelah diisi, keterangannya
+  menjadi "92% dari hasil menurut resep. Stock bertambah 9,2 liter." Tabel laptop/desktop punya kolom
+  "Hasil aktual" (keterangan pendek "Kosong = hasil resep."). Galat: "Periksa hasil aktual Sauce
+  bolognese. Isi angka, misalnya 7,5, atau kosongkan." Baris "Tercatat" menulis "2 resep (9,2 liter,
+  resep 10)".
 
 **Waste:**
 
@@ -698,6 +707,9 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Riwayat Stock punya dua tampilan**, dipilih lewat dua tombol di atas daftar:
   "Catatan" (tiap kiriman: siapa, jam, item, masuk, keluar) dan "Rekap harian" (satu
   baris per item per hari, dikelompokkan per kategori).
+- **Hasil aktual di Riwayat Prep** (18 Oktober 2026): baris beresep punya "Hasil aktual" ("–" jika
+  kosong); Koreksi punya kolom "Hasil aktual (liter)" yang boleh dikosongkan. Baris tanpa resep tidak
+  punya kolom ini. Nilai yang dikosongkan lewat koreksi ditulis "–" (nilai lamanya dicoret).
 - **Pemasok dan harga beli di Riwayat Stock** (18 Oktober 2026): kepala kiriman "Sayur, dari
   Sumber Segar"; tiap baris punya "Harga beli Rp 16.000" (per satuan dasar). Lembar Koreksi
   Pengelola punya kolom "Harga beli (Rp per kg)" yang boleh dikosongkan. Kartu stok menulis

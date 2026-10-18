@@ -3712,6 +3712,21 @@ body.papan-ketik .bilah-kirim {
   min-width: 180px;
 }
 
+/* Hasil aktual (aplikasi 0.24.0): kolom angka dengan satuan dan persen dari hasil resep di bawahnya */
+.tabel-prep td.sel-aktual-prep {
+  min-width: 170px;
+  width: 190px;
+  font-size: 14px;
+}
+
+.tabel-prep td.sel-aktual-prep .baris-angka {
+  flex-wrap: nowrap;
+}
+
+.tabel-prep td.sel-aktual-prep .isian-angka {
+  width: 100px;
+}
+
 .tabel-prep td.sel-hasil-prep {
   min-width: 220px;
   width: 300px;

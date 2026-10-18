@@ -49,6 +49,9 @@
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
 > rekap bulanan (Bagian 5.1, 5.5, 9.2, 9.3).
+> Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur KIT-06): hasil prep aktual. Hasil
+> yang benar-benar jadi boleh dicatat (tidak wajib) dan dipakai untuk stock; hasil menurut resep
+> tetap terlihat sebagai pembanding (Bagian 5.3 dan 9.3).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -561,14 +564,16 @@ hanya ilustrasi; Pengelola mengisinya dari takaran dapur sendiri.
 | Nama Staff | Otomatis | Dari login PIN |
 | Item / Menu Prep | Dropdown | Per baris, dari `M_Item` |
 | Jumlah Resep | Number | Per baris, untuk item yang punya resep. Boleh pecahan: ½, 1, 1½, 2, dan seterusnya. |
-| Hasil | Otomatis | Jumlah Resep × Hasil per 1 Resep, dalam satuan item hasil |
+| Hasil | Otomatis | Hasil Aktual jika diisi; selain itu Jumlah Resep × Hasil per 1 Resep (hasil menurut resep), dalam satuan item hasil. Inilah yang menambah stock. |
+| Hasil Aktual | Number (opsional) | 18 Oktober 2026. Per baris beresep: yang benar-benar jadi, misalnya setelah ditimbang. 0 atau lebih; kosong berarti sama dengan hasil menurut resep. |
 | Baik Sampai | Otomatis | Tanggal prep + masa simpan. Kosong jika resep tidak punya masa simpan. |
 | Qty | Number | Hanya untuk item tanpa resep, dalam satuan item itu |
 | Keterangan | Text (opsional) | Per baris |
 
 **Yang terjadi saat Prep List dikirim (item yang punya resep):**
 
-1. Stock item hasil **bertambah** sebesar Hasil. Ini tampil di kolom Hasil Prep pada Stock Inventory.
+1. Stock item hasil **bertambah** sebesar Hasil (hasil aktual jika dicatat). Ini tampil di kolom Hasil
+   Prep pada Stock Inventory.
 2. Stock tiap bahan **berkurang** sebesar Jumlah Resep × Qty per 1 Resep. Ini tampil di
    kolom Dipakai Prep.
 3. Bahan yang terpakai dicatat per baris di `Data_PrepBahan`, memakai resep yang berlaku
@@ -580,8 +585,12 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
 - **Item tanpa resep** tetap bisa dicatat di Prep List dengan Qty biasa. Stock tidak bergerak.
 - **Stock bahan tidak cukup menurut catatan:** layar menampilkan peringatan, tetapi prep
   tetap bisa dikirim. Stock Akhir bahan itu menjadi minus dan ditandai di Riwayat.
-- Hasil selalu mengikuti resep. Jika hasil nyata sering berbeda, Pengelola memperbaiki
-  angka Hasil per 1 Resep di Master Resep.
+- **Hasil aktual** (18 Oktober 2026): bahan tetap berkurang menurut resep, tetapi stock barang
+  jadi bertambah sebesar hasil aktual jika diisi, sehingga susut atau lebih dari takaran tidak
+  menumpuk sebagai selisih opname. Layar, Riwayat, laporan PDF, dan kartu stok menampilkan hasil
+  menurut resep sebagai pembanding; rekap bulanan menulis persentase hasil aktual terhadap resep.
+  Pengelola bisa mengisi, mengubah, atau mengosongkan hasil aktual lewat koreksi Riwayat. Jika
+  hasil nyata selalu berbeda, Pengelola tetap sebaiknya memperbaiki Hasil per 1 Resep.
 
 **Masa simpan barang jadi:**
 
@@ -1374,7 +1383,7 @@ untuk tanggal di bulan itu.
 | Stock | Total masuk, bahan terpakai, dan penyesuaian per kategori; selisih karena perubahan harga per kategori; nilai stock akhir bulan |
 | Stock opname | Tanggal tiap opname dan nilai selisihnya; item yang paling sering berselisih |
 | Waste | Total jumlah dan nilai (Rp) per kategori waste; sepuluh item dengan nilai waste terbesar |
-| Prep | Total resep dan hasil per item |
+| Prep | Total resep dan hasil per item; jika ada hasil aktual yang dicatat: hasil standar per item dan persentase hasil aktual terhadap resep |
 | Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat |
 | Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan |
 | Pembelian (18 Oktober 2026) | Per pemasok: jumlah kiriman, item, nilai pembelian (stock masuk × harga beli), dan barang masuk tanpa harga beli; hanya jika bulan itu ada pemasok atau harga beli yang dicatat |
