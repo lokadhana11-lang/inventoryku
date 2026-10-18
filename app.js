@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.21.0';
+  var VERSI_APLIKASI = '0.22.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1864,6 +1864,12 @@
       var jam = d.pengingat.filter(function (p) { return p.jam; }).map(function (p) { return p.waktu + ' ' + p.jam.replace(':', '.'); });
       var daftar = [];
       if (d.pengelola) daftar.push('Suhu di luar standar', 'Permintaan reset PIN', 'Akun yang terkunci karena PIN salah');
+      // Pengingat stock pagi (Code.gs v0.22); server lama tidak mengirim pengingatStock.
+      if (d.pengelola && d.pengingatStock != null) {
+        daftar.push(d.pengingatStock
+          ? 'Pengingat stock (' + d.pengingatStock.replace(':', '.') + '), jika ada item di bawah minimum, minus, atau lewat masa simpan'
+          : 'Pengingat stock (sedang dimatikan)');
+      }
       daftar.push(jam.length ? 'Pengingat cek suhu (' + jam.join(', ') + '), jika belum lengkap' : 'Pengingat cek suhu (sedang dimatikan)');
       isi.appendChild(el('p', { class: 'kartu-teks', text: 'Yang dikirim ke HP ini, juga saat aplikasi tertutup:' }));
       isi.appendChild(el('ul', { class: 'notif-daftar' }, daftar.map(function (t) { return el('li', { text: t }); })));
@@ -9328,7 +9334,9 @@
         // Jam pengingat cek suhu (Code.gs v0.19); server lama tidak mengirimnya, jadi field tidak ikut dikirim.
         jamCekOpening: d.jamCekOpening == null ? null : d.jamCekOpening,
         jamCekMiddle: d.jamCekMiddle == null ? null : d.jamCekMiddle,
-        jamCekClosing: d.jamCekClosing == null ? null : d.jamCekClosing
+        jamCekClosing: d.jamCekClosing == null ? null : d.jamCekClosing,
+        // Jam pengingat stock (Code.gs v0.22); sama: server lama tidak mengirimnya.
+        jamPengingatStock: d.jamPengingatStock == null ? null : d.jamPengingatStock
       };
     }
 
@@ -9408,6 +9416,10 @@
         kk.input.addEventListener('input', function () { isi[x[0]] = kk.input.value; perbarui(); });
         return { field: x[0], k: kk };
       });
+      // Pengingat stock pagi ke HP Pengelola (aplikasi 0.22.0): kosong = mati.
+      var adaPengingatStock = data.jamPengingatStock != null;
+      var kStock = kolomIsian({ label: 'Jam pengingat stock', type: 'time', nilai: isi.jamPengingatStock || '' });
+      kStock.input.addEventListener('input', function () { isi.jamPengingatStock = kStock.input.value; perbarui(); });
 
       simpan.addEventListener('click', function () {
         if (simpan.disabled) return;
@@ -9420,7 +9432,9 @@
           kJeda.galat(/^\d{1,3}$/.test(isi.jedaLaporanMenit) && Number(isi.jedaLaporanMenit) <= 240 ? '' : 'Isi menit bulat, 0 sampai 240.')
         ].concat(adaPengingat ? kolomPengingat.map(function (x) {
           return x.k.galat(!isi[x.field] || /^\d{1,2}:\d{2}$/.test(isi[x.field]) ? '' : 'Isi jam, misalnya 08:00, atau kosongkan.');
-        }) : []);
+        }) : []).concat(adaPengingatStock ? [
+          kStock.galat(!isi.jamPengingatStock || /^\d{1,2}:\d{2}$/.test(isi.jamPengingatStock) ? '' : 'Isi jam, misalnya 07:00, atau kosongkan.')
+        ] : []);
         if (ok.indexOf(false) >= 0) {
           var salah = wadah.querySelector('[aria-invalid="true"]');
           if (salah) salah.focus();
@@ -9477,6 +9491,15 @@
         ].concat(kolomPengingat.map(function (x) { return x.k.wadah; }), [
           data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
         ])));
+      }
+      if (adaPengingatStock) {
+        wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+          el('h2', { class: 'kartu-judul', text: 'Pengingat stock' }),
+          el('p', { class: 'kartu-teks', text: 'Notifikasi pagi ke HP Head Kitchen dan Manager yang menyalakan notifikasi, hanya jika ada item ' +
+            'di bawah stok minimum, stock minus, atau barang jadi yang lewat masa simpan atau habis besok. Kosongkan jam untuk mematikannya.' }),
+          kStock.wadah,
+          data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
+        ]));
       }
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
     }

@@ -43,6 +43,8 @@
 > (Bagian 8.6, 12, dan 13).
 > Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur INV-04): kartu stok. Riwayat per
 > item menampilkan setiap transaksi yang menggerakkan stock beserta saldo sesudahnya (Bagian 6).
+> Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur SYS-07): pengingat stock pagi ke
+> HP Pengelola untuk item di bawah stok minimum, stock minus, dan masa simpan (Bagian 10.1).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -1423,12 +1425,17 @@ Apps Script tidak bisa mengirimnya.
 | "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif |
+| "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang jadi yang lewat masa simpan atau habis besok |
 
 - **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
   Middle 14.00, Closing 21.00 (nilai awal); jam yang dikosongkan mematikan pengingat itu. Tidak ada
   pengingat jika form Suhu disembunyikan atau tidak ada unit aktif.
+- **Jam pengingat stock** (18 Oktober 2026) juga diatur di Outlet dan jadwal: 07.00 (nilai awal);
+  dikosongkan berarti mati. Isinya dihitung sama dengan Dashboard pada hari itu (stock menurut
+  catatan, Bagian 5.8 dan 5.3); item yang minus tidak diulang di daftar di bawah minimum.
 - Hanya pengguna aktif yang punya PIN yang menerima; Pengelola menurut role saat notifikasi dikirim.
-- Mengetuk notifikasi membuka layar yang sesuai (form Suhu, atau reset PIN staff itu).
+- Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, atau Dashboard untuk
+  pengingat stock).
 - Notifikasi tidak menggantikan apa pun: pemberitahuan di Beranda, Dashboard, dan email harian tetap.
 - HP yang izinnya dicabut atau aplikasinya dihapus dibuang dari daftar saat layanan push menolaknya.
 

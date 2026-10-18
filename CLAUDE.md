@@ -241,6 +241,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Kartu stok (Code.gs v0.21, 18 Oktober 2026; bertoken, semua role): `riwayatItem` ditambah `transaksi: [{ tanggal, waktu, jenis:
   Stock|Hasil prep|Dipakai prep|Waste|Penyesuaian|Stock opname, formId (STOCK|PREP|WASTE|null), submissionId, rowId, oleh, dikoreksi,
   masuk, keluar, saldo, ket }]` untuk tanggal-tanggal di `rekap`, urut tanggal lalu waktu diterima server (lama ke baru).
+- Pengingat stock (Code.gs v0.22, 18 Oktober 2026): `bacaOutletJadwal`/`simpanOutletJadwal` ditambah `jamPengingatStock`
+  ('' = mati); `infoNotifikasi` ditambah `pengingatStock` (jam atau ''). Fungsi trigger `pengingatStock` (juga di `FUNGSI_JADWAL`
+  server.js); isi notifikasi `{ judul: 'Stock hari ini: …', isi, url: '#/dashboard', tag: 'pengingat-stock', ttl }`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -280,6 +283,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++ | Bacaan database lebih ringkas di Supabase (permintaan pemilik 17 Oktober 2026, saran 2 dari "memuat lebih cepat lagi"): bacaan awal tiap permintaan dan kunci tulis dalam satu kali bolak-balik, tab dimuat sekaligus, `aksi_tab` sekali per isolate, kunci notifikasi dimuat bersamaan | Kode selesai (hanya `supabase/src`; Code.gs tetap v0.20, aplikasi tetap 0.20.0), diuji dengan Postgres 16 lokal: 35 langkah jawaban dan isi database sama dengan sebelumnya, proksi jeda 25 ms per arah (login 1,24 → 0,39 detik, permintaan pertama isolate 1,93 → 0,34 detik), dua runtime menulis bersamaan, urutan kunci, dan file rakitan dijalankan utuh. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy (Code.gs di Apps Script tidak perlu ditempel ulang) |
 | 12++++++++++++ | Function di region database (permintaan pemilik 17 Oktober 2026, pilihan A): database pemilik di Sydney, `config.js` diberi `?forceFunctionRegion=ap-southeast-2` supaya Edge Function berjalan di samping database | Kode selesai (hanya `config.js` dan dokumen; Code.gs, aplikasi, dan rakitan tidak berubah), diuji di Chromium dengan API tiruan (POST ke alamat berparameter, hanya header Content-Type, Login tampil). Belum diuji di Supabase asli (jaringan sesi ini tidak menjangkau Supabase). Menunggu pemilik: gabungkan PR, periksa header `x-sb-edge-region` (PANDUAN), opsional ubah Script Property `SUPABASE_API` |
 | 12+++++++++++++ | Kartu stok per transaksi (permintaan pemilik 18 Oktober 2026, dari usulan fitur INV-04): lembar riwayat per item mendapat tampilan "Transaksi" (tiap catatan yang menggerakkan stock, siapa, jam, keterangan, dan saldo sesudahnya), ketuk tanggal di rekap untuk melompat ke transaksinya, ketuk transaksi Stock/Prep/Waste untuk membuka isiannya di Riwayat | Kode selesai (Code.gs v0.21, aplikasi 0.21.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (urutan, saldo cocok dengan rekap, koreksi, isian terlambat, Staff) dan Chromium (alur HP, Staff dari Riwayat, server lama, delapan ukuran, "kurangi gerak"). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
+| 12++++++++++++++ | Pengingat stock ke HP Pengelola (permintaan pemilik 18 Oktober 2026, dari usulan fitur SYS-07): notifikasi pagi (jam diatur di Outlet dan jadwal, awal 07.00) berisi item minus, di bawah stok minimum, lewat masa simpan, dan habis besok, hanya jika ada | Kode selesai (Code.gs v0.22, aplikasi 0.22.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (isi dan penerima, tanpa kiriman jika aman, jam diubah/dimatikan dan jadwalnya, tanpa kunci notifikasi, pengingat suhu tetap) dan Chromium (Outlet dan jadwal, lembar Notifikasi Pengelola dan Staff, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2075,3 +2079,27 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     membuka detail Riwayat dan lembar tertutup, Staff dari detail Riwayat tanpa Sesuaikan stock, server lama tanpa pilihan, delapan
     ukuran Bagian 4.6 (tanpa gulir samping, isi tidak melebar, sasaran ≥ 44 px, teks tidak terpotong) dan "kurangi gerak", tanpa
     galat konsol. Belum diuji di Supabase asli dan di HP.
+
+### Pengingat stock ke HP Pengelola (Code.gs v0.22, aplikasi 0.22.0, 18 Oktober 2026)
+
+281. **Asal dan keputusan pemilik:** butir kedua dari usulan fitur (SYS-07, notifikasi stok minimum dan kedaluwarsa). Pemilik
+    memilih: hanya ke HP Pengelola, sekali pagi pada jam yang diatur (bukan seketika saat kiriman). Spesifikasi sistem Bagian 10.1,
+    tampilan Bagian 5.7 dan 5.11.
+282. **Server:** `PENGINGAT_STOCK` (kunci `jam_pengingat_stock`, awal 07:00, field `jamPengingatStock`, keterangan sendiri) berbentuk
+    sama dengan `PENGINGAT_SUHU`; `PENGINGAT_JAM` = keduanya, dipakai pemeriksaan dan penulisan Outlet dan jadwal serta `pasangTrigger`
+    (hanya `DI_SUPABASE_`; log/`pasang_trigger` menyebut "pengingat stock 07:00"). `pengingatStock_` → `isiPengingatStock_(hari ini)`:
+    `ringkasStockHari_` (item aktif minus dan di bawah stok minimum, sama dengan Dashboard dan email) dan `masaSimpan_` (lewat dan habis
+    besok). Item minus tidak diulang di "di bawah minimum". Judul "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan,
+    1 habis besok" (bagian yang nol tidak ditulis), isi per bagian dengan `daftarNamaSingkat_`, ketuk membuka Dashboard, TTL 12 jam,
+    urgensi biasa. Tidak dikirim jika semuanya kosong. Penerima `kirimNotifikasi_('pengelola')`. Di server.js `pengingatStock` masuk
+    `FUNGSI_JADWAL` dan `JADWAL_RINGAN` (tab dimuat saat dibutuhkan). Jadwal baru baru terpasang setelah `pasangTrigger` dijalankan sekali
+    (atau jam pengingat apa pun diubah di Outlet dan jadwal).
+283. **Aplikasi:** Outlet dan jadwal punya kartu "Pengingat stock" (pemilih jam; kosong = mati) di bawah Pengingat cek suhu, hanya jika
+    server mengirim `jamPengingatStock`. Lembar Notifikasi untuk Pengelola menambah baris "Pengingat stock (07.00), jika ada item di bawah
+    minimum, minus, atau lewat masa simpan" atau "(sedang dimatikan)".
+284. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js` (NotifikasiHp tiruan menampung kiriman):
+    tanpa kiriman saat stock aman; isi dan judul untuk minus, di bawah minimum, lewat masa simpan (masa simpan 1 hari, prep 3 hari lalu),
+    dan habis besok (prep kemarin); hanya HP Head Kitchen dan Manager, Staff dan Pengelola nonaktif tidak; jam awal 07:00, "06.30"
+    tersimpan 06:30 dengan trigger 6:30, kosong menghapus trigger (tiga pengingat suhu tetap), jam salah ditolak, `infoNotifikasi`;
+    tanpa kunci notifikasi diam; pengingat suhu tetap. Chromium: kartu di Outlet dan jadwal (ubah, simpan, kosongkan), lembar Notifikasi
+    Pengelola dan Staff, server lama tanpa kartu, delapan ukuran, tanpa galat konsol. Belum diuji: layanan push asli dan pg_cron asli.
