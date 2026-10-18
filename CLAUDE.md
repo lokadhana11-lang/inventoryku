@@ -238,6 +238,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   yang sedang terkunci karena PIN salah); `daftarStaff.staff[]` (dan jawaban aksi staff lain) ditambah `terkunciSampai` dan
   `kunciPanjang`; `dashboard.perhatian[]` boleh berjenis `terkunci` (`data.nama`). `pasang`, `pulihkan`, `tambahStaff`, dan `aturPin`
   menolak PIN yang terlalu mudah ditebak; `login` tidak.
+- Kartu stok (Code.gs v0.21, 18 Oktober 2026; bertoken, semua role): `riwayatItem` ditambah `transaksi: [{ tanggal, waktu, jenis:
+  Stock|Hasil prep|Dipakai prep|Waste|Penyesuaian|Stock opname, formId (STOCK|PREP|WASTE|null), submissionId, rowId, oleh, dikoreksi,
+  masuk, keluar, saldo, ket }]` untuk tanggal-tanggal di `rekap`, urut tanggal lalu waktu diterima server (lama ke baru).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -276,6 +279,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++ | Arsip tahunan (keputusan pemilik 17 Oktober 2026): tab menyimpan tahun berjalan dan tahun lalu; baris lebih tua (tab Data, `Stock_Harian`, `Log_Perubahan`) pindah ke `Laporan Kitchen/<Outlet>/Arsip/<Tahun>/` sebagai JSON dan Google Sheets "Arsip InventoryKu <Tahun>", rekap terakhir tiap item tetap, trigger tiap jam, tanggal yang sudah diarsip ditolak | Kode selesai (Code.gs v0.20; aplikasi tetap 0.20.0), diuji: 10 uji server Code.gs (juga dengan batas 2 baris per jalan), arsip ke Google Sheets dengan tiruan, runtime asli di atas Postgres 16 lokal (69.250 baris per tab, paling lama 0,9 detik per jalan, stock tetap), jawaban aksi lama sama dengan v0.19. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali (setupSpreadsheet tidak perlu) |
 | 12+++++++++++ | Bacaan database lebih ringkas di Supabase (permintaan pemilik 17 Oktober 2026, saran 2 dari "memuat lebih cepat lagi"): bacaan awal tiap permintaan dan kunci tulis dalam satu kali bolak-balik, tab dimuat sekaligus, `aksi_tab` sekali per isolate, kunci notifikasi dimuat bersamaan | Kode selesai (hanya `supabase/src`; Code.gs tetap v0.20, aplikasi tetap 0.20.0), diuji dengan Postgres 16 lokal: 35 langkah jawaban dan isi database sama dengan sebelumnya, proksi jeda 25 ms per arah (login 1,24 → 0,39 detik, permintaan pertama isolate 1,93 → 0,34 detik), dua runtime menulis bersamaan, urutan kunci, dan file rakitan dijalankan utuh. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy (Code.gs di Apps Script tidak perlu ditempel ulang) |
 | 12++++++++++++ | Function di region database (permintaan pemilik 17 Oktober 2026, pilihan A): database pemilik di Sydney, `config.js` diberi `?forceFunctionRegion=ap-southeast-2` supaya Edge Function berjalan di samping database | Kode selesai (hanya `config.js` dan dokumen; Code.gs, aplikasi, dan rakitan tidak berubah), diuji di Chromium dengan API tiruan (POST ke alamat berparameter, hanya header Content-Type, Login tampil). Belum diuji di Supabase asli (jaringan sesi ini tidak menjangkau Supabase). Menunggu pemilik: gabungkan PR, periksa header `x-sb-edge-region` (PANDUAN), opsional ubah Script Property `SUPABASE_API` |
+| 12+++++++++++++ | Kartu stok per transaksi (permintaan pemilik 18 Oktober 2026, dari usulan fitur INV-04): lembar riwayat per item mendapat tampilan "Transaksi" (tiap catatan yang menggerakkan stock, siapa, jam, keterangan, dan saldo sesudahnya), ketuk tanggal di rekap untuk melompat ke transaksinya, ketuk transaksi Stock/Prep/Waste untuk membuka isiannya di Riwayat | Kode selesai (Code.gs v0.21, aplikasi 0.21.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (urutan, saldo cocok dengan rekap, koreksi, isian terlambat, Staff) dan Chromium (alur HP, Staff dari Riwayat, server lama, delapan ukuran, "kurangi gerak"). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2043,3 +2047,31 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     mengirim `POST` ke alamat berparameter dengan satu-satunya header `Content-Type: text/plain;charset=utf-8`, Login tampil
     dengan nama staff, tanpa galat konsol. Belum diuji di Supabase asli: apakah function benar berjalan di `ap-southeast-2`
     dan berapa waktu yang dihemat.
+
+### Kartu stok per transaksi (Code.gs v0.21, aplikasi 0.21.0, 18 Oktober 2026)
+
+277. **Asal:** pemilik membandingkan aplikasi dengan dokumen usulan fitur ("InventoryKu Usulan Fitur Perbandingan") dan memilih
+    INV-04 (kartu stok / riwayat mutasi) lebih dulu. Lembar riwayat per item sebelumnya hanya menampilkan rekap harian. Tidak ada
+    tab, kolom, atau aksi baru; spesifikasi sistem Bagian 6 dan tampilan Bagian 5.4.
+278. **Server** (`transaksiItem_`, dipanggil `dataRiwayatItem_`, jadi ikut di `riwayatItem` dan jawaban `sesuaikanStock`): membaca
+    `SUMBER_STOCK` (sumber yang sama dengan `hitungUlangStock_`) untuk tanggal-tanggal 7 rekap yang dikirim, urut tanggal lalu
+    `timestamp_server` (sama: urutan sumber dan baris). Saldo mulai dari Stock Awal rekap hari itu, jadi saldo terakhir tiap hari =
+    Stock Akhir rekap (diuji). Jenis: Stock (Masuk dan Keluar dalam satu baris, ket "Masuk diketik 2 dus"), Hasil prep (ket jumlah
+    resep dan shift), Dipakai prep (ket "Untuk Sauce bolognese (1,5 resep)"), Waste (kategori dan alasan), Penyesuaian (alasan dan
+    catatan; selisih plus = masuk), Stock opname (penyesuaian beralasan Stock opname). Baris yang tidak menggerakkan stock (angka nol
+    setelah koreksi, prep tanpa resep) dilewati. `oleh` = `submitted_by` (pengisi asli); `dikoreksi` = `updated_by` berisi.
+    `formId`/`submissionId` hanya untuk Stock, Prep (juga baris bahan, karena `submission_id`-nya sama), dan Waste.
+279. **Lembar** (`bukaRiwayatItem`): pilihan "Rekap harian" (bawaan, tabel lama) / "Transaksi" di atas isi, hanya jika jawaban punya
+    `transaksi` (server lama: seperti dulu). Tanggal di tabel rekap menjadi `tabel-tombol` yang memilih Transaksi dan menggulir ke
+    judul tanggal itu (fokus papan ketik ikut). Transaksi dikelompokkan per tanggal (lama ke baru, seperti tabel), judul berisi
+    "Awal 30 kg"; baris: "Jenis · Oleh, jam" (tanggal ikut jika jam diterima berbeda hari dengan tanggal isian), keterangan dan
+    "Pernah dikoreksi", lalu di kanan "+2 kg"/"−0,5 kg" dan "Saldo 31,5" (merah jika minus). Baris Stock/Prep/Waste berupa tautan
+    `#/riwayat/<form>/<sid>` (lembar tertutup oleh router); penyesuaian dan opname baris diam. Warna masuk/keluar tidak dipakai
+    (tanda + dan − saja), karena warna di aplikasi bermakna status.
+280. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js`: urutan jenis dan tanggal, saldo
+    per transaksi dihitung tangan, saldo akhir hari = rekap, koreksi Stock Masuk (dikoreksi, saldo baru), penyesuaian dan opname
+    sebelum koreksi, hasil prep dengan ket, Staff, jawaban `sesuaikanStock`, item tanpa rekap, isian terlambat untuk kemarin.
+    Chromium (zona Asia/Jakarta, API tiruan memanggil `doPost` asli): ketuk tanggal → Transaksi dan fokus, isi baris, tautan Waste
+    membuka detail Riwayat dan lembar tertutup, Staff dari detail Riwayat tanpa Sesuaikan stock, server lama tanpa pilihan, delapan
+    ukuran Bagian 4.6 (tanpa gulir samping, isi tidak melebar, sasaran ≥ 44 px, teks tidak terpotong) dan "kurangi gerak", tanpa
+    galat konsol. Belum diuji di Supabase asli dan di HP.

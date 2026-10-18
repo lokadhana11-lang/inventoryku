@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.20.0';
+  var VERSI_APLIKASI = '0.21.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -7453,7 +7453,8 @@
   }
 
   /**
-   * Riwayat per item (tampilan Bagian 5.4): 7 rekap terakhir dalam lembar.
+   * Riwayat per item (tampilan Bagian 5.4): 7 rekap terakhir dalam lembar, dan
+   * kartu stok (tiap transaksi pada hari-hari itu, dengan saldo sesudahnya).
    * Di HP tabelnya digeser ke samping di dalam lembar; kolom tanggal diam.
    * Pengelola: "Sesuaikan stock". data: jawaban riwayatItem (opsional).
    */
@@ -7495,28 +7496,125 @@
         wadah.appendChild(kotakKosong('Belum ada rekap untuk item ini.', 'riwayat'));
         return;
       }
-      var badan = el('tbody');
-      d.rekap.slice().reverse().forEach(function (r) {
-        function sel(n) {
-          return el('td', { class: 'angka' }, n ? angkaSatuan(n) : el('span', { class: 'otomatis', text: '–' }));
+      var adaTransaksi = Array.isArray(d.transaksi);
+      var isiTampilan = el('div', { class: 'riwayat-item-tampilan' });
+      var pilihTampilan = null;
+      // Server lama (tanpa transaksi): hanya rekap harian.
+      if (adaTransaksi) {
+        pilihTampilan = grupPilihan('Tampilan', ['Rekap harian', 'Transaksi'], 'Rekap harian');
+        pilihTampilan.wadah.classList.add('pilih-tampilan');
+        pilihTampilan.input.forEach(function (i) {
+          i.addEventListener('change', function () { gambarTampilan(); });
+        });
+        wadah.appendChild(pilihTampilan.wadah);
+      }
+      wadah.appendChild(isiTampilan);
+      gambarTampilan();
+
+      function gambarTampilan(fokusTanggal) {
+        kosongkan(isiTampilan);
+        if (pilihTampilan && pilihTampilan.nilai() === 'Transaksi') gambarTransaksi(fokusTanggal);
+        else gambarRekap();
+      }
+
+      /** Ketuk tanggal di rekap: pindah ke kartu stok pada tanggal itu. */
+      function bukaTanggal(tanggal) {
+        pilihTampilan.input[1].checked = true;
+        gambarTampilan(tanggal);
+      }
+
+      function gambarTransaksi(fokusTanggal) {
+        if (!d.transaksi.length) {
+          isiTampilan.appendChild(kotakKosong('Belum ada transaksi untuk item ini.', 'riwayat'));
+          return;
         }
-        badan.appendChild(el('tr', { class: r.akhir < 0 ? 'minus' : null }, [
-          el('th', { scope: 'row', text: tanggalPendek(r.tanggal) }),
-          sel(r.awal),
-          el('td', { class: 'angka' }, [r.masuk ? angkaSatuan(r.masuk) : el('span', { class: 'otomatis', text: '–' }),
-            r.masukAsli ? el('span', { class: 'nilai-asli blok', text: '(' + r.masukAsli + ')' }) : null]),
-          sel(r.hasilPrep), sel(r.keluar), sel(r.dipakaiPrep), sel(r.waste), sel(r.penyesuaian),
-          el('td', { class: 'angka stock-akhir-sel' + (r.akhir < 0 ? ' minus' : '') }, [angkaSatuan(r.akhir),
-            r.akhir < 0 ? el('span', { class: 'blok' }, tandaStatus('masalah', 'Minus')) : null])
-        ]));
-      });
-      wadah.appendChild(el('div', { class: 'tabel-bingkai' }, el('table', { class: 'tabel tabel-riwayat-item' }, [
-        el('caption', { class: 'sr', text: '7 rekap terakhir ' + it.nama + ', dalam ' + it.satuan }),
-        el('thead', {}, el('tr', {}, ['Tanggal', 'Awal', 'Masuk', 'Hasil Prep', 'Keluar', 'Dipakai Prep', 'Waste', 'Penyesuaian', 'Akhir']
-          .map(function (j, i) { return el('th', { scope: 'col', class: i ? 'angka' : null, text: j }); }))),
-        badan
-      ])));
-      wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'Angka dalam ' + it.satuan + '. Hari tanpa gerakan tidak punya rekap.' }));
+        var awal = {};
+        d.rekap.forEach(function (r) { awal[r.tanggal] = r.awal; });
+        var perTanggal = {};
+        var urutan = [];
+        d.transaksi.forEach(function (x) {
+          if (!perTanggal[x.tanggal]) {
+            perTanggal[x.tanggal] = [];
+            urutan.push(x.tanggal);
+          }
+          perTanggal[x.tanggal].push(x);
+        });
+        var fokus = null;
+        urutan.forEach(function (tg) {
+          var judul = el('h3', { class: 'kelompok-judul', tabindex: '-1' }, [
+            el('span', { text: tanggalJudul(tg) }),
+            el('span', { class: 'kartu-stok-awal' }, ['Awal ', angkaSatuan(awal[tg] || 0, it.satuan)])
+          ]);
+          if (tg === fokusTanggal) fokus = judul;
+          isiTampilan.appendChild(el('section', { class: 'kelompok kartu-stok' }, [
+            judul,
+            el('div', { class: 'daftar' }, perTanggal[tg].map(barisTransaksi))
+          ]));
+        });
+        isiTampilan.appendChild(el('p', { class: 'kolom-bantuan', text: 'Urut menurut jam diterima server. Saldo = stock sesudah transaksi itu, dalam ' + it.satuan + '.' }));
+        if (fokus) {
+          fokus.scrollIntoView({ block: 'start' });
+          fokus.focus({ preventScroll: true });
+        }
+      }
+
+      function barisTransaksi(x) {
+        var w = x.waktu ? (tanggalIso(new Date(x.waktu)) === x.tanggal ? jam(x.waktu) : waktuPendek(x.waktu)) : '';
+        var judul = x.jenis + (x.oleh ? ' · ' + x.oleh : '') + (w ? ', ' + w : '');
+        var ket = [x.ket, x.dikoreksi ? 'Pernah dikoreksi' : ''].filter(Boolean).join('. ');
+        var gerak = [];
+        if (x.masuk) gerak.push(el('span', { class: 'kartu-stok-masuk', text: '+' + formatAngka(x.masuk) + ' ' + it.satuan }));
+        if (x.keluar) gerak.push(el('span', { class: 'kartu-stok-keluar', text: '−' + formatAngka(x.keluar) + ' ' + it.satuan }));
+        var isi = [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: judul }),
+            ket ? el('span', { class: 'daftar-baris-ket', text: ket }) : null
+          ]),
+          el('span', { class: 'kartu-stok-angka' }, gerak.concat([
+            el('span', { class: 'kartu-stok-saldo' + (x.saldo < 0 ? ' minus' : '') }, ['Saldo ', angkaSatuan(x.saldo)])
+          ]))
+        ];
+        // Kiriman Stock, Prep, dan Waste membuka detailnya di Riwayat.
+        if (x.formId && x.submissionId) {
+          isi.push(ikon('kanan'));
+          return el('a', {
+            class: 'daftar-baris kartu-stok-baris',
+            href: '#/riwayat/' + x.formId + '/' + encodeURIComponent(x.submissionId),
+            'aria-label': judul + '. ' + gerak.map(function (g) { return g.textContent; }).join(', ') +
+              '. Saldo ' + formatAngka(x.saldo) + ' ' + it.satuan + '. Buka isian di Riwayat.'
+          }, isi);
+        }
+        return el('div', { class: 'daftar-baris kartu-stok-baris tetap' }, isi);
+      }
+
+      function gambarRekap() {
+        var badan = el('tbody');
+        d.rekap.slice().reverse().forEach(function (r) {
+          function sel(n) {
+            return el('td', { class: 'angka' }, n ? angkaSatuan(n) : el('span', { class: 'otomatis', text: '–' }));
+          }
+          badan.appendChild(el('tr', { class: r.akhir < 0 ? 'minus' : null }, [
+            el('th', { scope: 'row' }, adaTransaksi
+              ? el('button', { type: 'button', class: 'tabel-tombol', text: tanggalPendek(r.tanggal),
+                'aria-label': 'Transaksi ' + tanggalJudul(r.tanggal), onclick: function () { bukaTanggal(r.tanggal); } })
+              : tanggalPendek(r.tanggal)),
+            sel(r.awal),
+            el('td', { class: 'angka' }, [r.masuk ? angkaSatuan(r.masuk) : el('span', { class: 'otomatis', text: '–' }),
+              r.masukAsli ? el('span', { class: 'nilai-asli blok', text: '(' + r.masukAsli + ')' }) : null]),
+            sel(r.hasilPrep), sel(r.keluar), sel(r.dipakaiPrep), sel(r.waste), sel(r.penyesuaian),
+            el('td', { class: 'angka stock-akhir-sel' + (r.akhir < 0 ? ' minus' : '') }, [angkaSatuan(r.akhir),
+              r.akhir < 0 ? el('span', { class: 'blok' }, tandaStatus('masalah', 'Minus')) : null])
+          ]));
+        });
+        isiTampilan.appendChild(el('div', { class: 'tabel-bingkai' }, el('table', { class: 'tabel tabel-riwayat-item' }, [
+          el('caption', { class: 'sr', text: '7 rekap terakhir ' + it.nama + ', dalam ' + it.satuan }),
+          el('thead', {}, el('tr', {}, ['Tanggal', 'Awal', 'Masuk', 'Hasil Prep', 'Keluar', 'Dipakai Prep', 'Waste', 'Penyesuaian', 'Akhir']
+            .map(function (j, i) { return el('th', { scope: 'col', class: i ? 'angka' : null, text: j }); }))),
+          badan
+        ])));
+        isiTampilan.appendChild(el('p', { class: 'kolom-bantuan', text: 'Angka dalam ' + it.satuan + '. Hari tanpa gerakan tidak punya rekap.' +
+          (adaTransaksi ? ' Ketuk tanggal untuk melihat transaksinya.' : '') }));
+      }
     }
 
     if (data) {

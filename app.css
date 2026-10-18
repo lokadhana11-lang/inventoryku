@@ -3440,6 +3440,78 @@ body.papan-ketik .bilah-kirim {
   margin-top: 4px;
 }
 
+/* Kartu stok: transaksi per tanggal, angka dan saldo rata kanan */
+.riwayat-item-tampilan {
+  display: grid;
+  gap: 12px;
+  justify-self: stretch;
+}
+
+.riwayat-item .pilih-tampilan {
+  flex: none;
+  justify-self: stretch;
+}
+
+.kartu-stok .kelompok-judul {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-size: 16px;
+  scroll-margin-top: 8px;
+}
+
+.kartu-stok .kelompok-judul:focus {
+  outline: none;
+}
+
+.kartu-stok + .kartu-stok {
+  margin-top: 8px;
+}
+
+.kartu-stok-awal {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--tinta-redup);
+}
+
+.kartu-stok-baris {
+  align-items: flex-start;
+}
+
+.kartu-stok-baris.tetap {
+  cursor: default;
+}
+
+.kartu-stok-baris.tetap:active {
+  transform: none;
+  background: var(--kertas);
+}
+
+.kartu-stok-angka {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.kartu-stok-masuk,
+.kartu-stok-keluar {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kartu-stok-saldo {
+  font-size: 14px;
+  color: var(--tinta-redup);
+  white-space: nowrap;
+}
+
+.kartu-stok-saldo.minus {
+  color: var(--masalah-teks);
+  font-weight: 600;
+}
+
 @media (min-width: 1024px) {
   .lembar.lembar-lebar {
     max-width: 960px;

@@ -41,6 +41,8 @@
 > Diperbarui 17 Oktober 2026 (keputusan pemilik): arsip tahunan. Tab hanya menyimpan tahun berjalan
 > dan tahun lalu; data yang lebih tua dipindah otomatis ke berkas arsip per tahun di Drive
 > (Bagian 8.6, 12, dan 13).
+> Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur INV-04): kartu stok. Riwayat per
+> item menampilkan setiap transaksi yang menggerakkan stock beserta saldo sesudahnya (Bagian 6).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -945,6 +947,12 @@ menemukan kekeliruan pengisian inventory.
   - **Riwayat per item:** ketuk satu item untuk melihat tabel 7 rekap terakhir item itu
     (Awal, Masuk, Hasil Prep, Keluar, Dipakai Prep, Waste, Penyesuaian, Akhir), sehingga
     hari yang janggal langsung terlihat. Dari sini Pengelola bisa menekan "Sesuaikan stock".
+  - **Kartu stok** (18 Oktober 2026): di riwayat per item yang sama, setiap catatan yang
+    menggerakkan stock item itu pada hari-hari tersebut (Stock masuk/keluar, hasil prep, bahan
+    dipakai prep, waste, penyesuaian, stock opname), urut jam diterima server, dengan siapa yang
+    mencatat, keterangan, jumlah masuk atau keluar, dan saldo sesudah transaksi itu. Saldo
+    terakhir tiap hari sama dengan Stock Akhir rekapnya. Catatan Stock, Prep List, dan Waste bisa
+    dibuka untuk melihat isiannya di Riwayat. Tidak ada data baru: semuanya dibaca dari tab Data.
 - **Suhu:** suhu di luar standar tampil merah; waktu cek yang tidak diisi diberi tanda.
 - **Semua form:** baris yang pernah dikoreksi menampilkan nilai lama, siapa yang
   mengubah, dan kapan (diambil dari `Log_Perubahan`).
