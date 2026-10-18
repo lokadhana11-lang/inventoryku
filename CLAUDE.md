@@ -244,6 +244,14 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Pengingat stock (Code.gs v0.22, 18 Oktober 2026): `bacaOutletJadwal`/`simpanOutletJadwal` ditambah `jamPengingatStock`
   ('' = mati); `infoNotifikasi` ditambah `pengingatStock` (jam atau ''). Fungsi trigger `pengingatStock` (juga di `FUNGSI_JADWAL`
   server.js); isi notifikasi `{ judul: 'Stock hari ini: …', isi, url: '#/dashboard', tag: 'pengingat-stock', ttl }`.
+- Pemasok dan harga beli (Code.gs v0.23, 18 Oktober 2026): `formStock` ditambah `pembelianSiap` dan `pemasok: [nama aktif]`;
+  `kirimStock` menerima `pemasok` (satu per kiriman, tidak wajib) dan `baris[].hargaBeli` (per satuan yang diketik, tidak wajib).
+  Khusus Pengelola: `daftarPemasok` → `{ siap, hariIni, dari, pemasok: [{ nama, kontak, catatan, aktif, punyaCatatan, bulanIni: {
+  kiriman, item, nilai, tanpaHarga } | null }], tanpaPemasok }`; `simpanPemasok {baru, namaLama, nama, kontak, catatan}` (+ `disimpan`)
+  dan `aturPemasokAktif {nama, aktif}` (+ `diubah`) → jawaban `daftarPemasok`; `abaikanHargaBeli {nama}` → `{ diabaikan }`. `riwayat`/
+  `detailKiriman` Stock: `kepala[]` ditambah `pemasok`, `kolom[]` ditambah `hargaBeli` (jenis `rupiah`, koreksi, opsional, `bantuan`).
+  `dashboard.perhatian[]` boleh berjenis `hargaBeli` (`data.item: [{ nama, satuan, hargaBeli, harga, tanggal, pemasok, oleh }]`).
+  Rekap bulanan: `pembelian: { ada, pemasok: [{ nama, kiriman, item, baris, nilai, tanpaHarga }], total }`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -284,6 +292,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++ | Function di region database (permintaan pemilik 17 Oktober 2026, pilihan A): database pemilik di Sydney, `config.js` diberi `?forceFunctionRegion=ap-southeast-2` supaya Edge Function berjalan di samping database | Kode selesai (hanya `config.js` dan dokumen; Code.gs, aplikasi, dan rakitan tidak berubah), diuji di Chromium dengan API tiruan (POST ke alamat berparameter, hanya header Content-Type, Login tampil). Belum diuji di Supabase asli (jaringan sesi ini tidak menjangkau Supabase). Menunggu pemilik: gabungkan PR, periksa header `x-sb-edge-region` (PANDUAN), opsional ubah Script Property `SUPABASE_API` |
 | 12+++++++++++++ | Kartu stok per transaksi (permintaan pemilik 18 Oktober 2026, dari usulan fitur INV-04): lembar riwayat per item mendapat tampilan "Transaksi" (tiap catatan yang menggerakkan stock, siapa, jam, keterangan, dan saldo sesudahnya), ketuk tanggal di rekap untuk melompat ke transaksinya, ketuk transaksi Stock/Prep/Waste untuk membuka isiannya di Riwayat | Kode selesai (Code.gs v0.21, aplikasi 0.21.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (urutan, saldo cocok dengan rekap, koreksi, isian terlambat, Staff) dan Chromium (alur HP, Staff dari Riwayat, server lama, delapan ukuran, "kurangi gerak"). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12++++++++++++++ | Pengingat stock ke HP Pengelola (permintaan pemilik 18 Oktober 2026, dari usulan fitur SYS-07): notifikasi pagi (jam diatur di Outlet dan jadwal, awal 07.00) berisi item minus, di bawah stok minimum, lewat masa simpan, dan habis besok, hanya jika ada | Kode selesai (Code.gs v0.22, aplikasi 0.22.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (isi dan penerima, tanpa kiriman jika aman, jam diubah/dimatikan dan jadwalnya, tanpa kunci notifikasi, pengingat suhu tetap) dan Chromium (Outlet dan jadwal, lembar Notifikasi Pengelola dan Staff, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali |
+| 12+++++++++++++++ | Pemasok dan harga beli (keputusan pemilik 18 Oktober 2026, dari usulan fitur INV-07, INV-09, RPT-02): `M_Pemasok` dan Pengaturan → Pemasok, pilihan pemasok dan harga beli (tidak wajib, semua role) di form Stock, harga beli berbeda ditinjau Pengelola di Dashboard (Pakai / Abaikan), koreksi harga beli, kartu stok, bagian Pembelian di rekap bulanan | Kode selesai (Code.gs v0.23, aplikasi 0.23.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (server sebelum dan sesudah setupSpreadsheet) dan Chromium (Staff HP, desktop, antrean, server lama, Pengaturan → Pemasok, Dashboard, koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Pemasok`, dua kolom `Data_Stock`) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2103,3 +2112,43 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tersimpan 06:30 dengan trigger 6:30, kosong menghapus trigger (tiga pengingat suhu tetap), jam salah ditolak, `infoNotifikasi`;
     tanpa kunci notifikasi diam; pengingat suhu tetap. Chromium: kartu di Outlet dan jadwal (ubah, simpan, kosongkan), lembar Notifikasi
     Pengelola dan Staff, server lama tanpa kartu, delapan ukuran, tanpa galat konsol. Belum diuji: layanan push asli dan pg_cron asli.
+
+### Pemasok dan harga beli (Code.gs v0.23, aplikasi 0.23.0, 18 Oktober 2026)
+
+285. **Asal dan keputusan pemilik:** butir ketiga dari usulan fitur (INV-07 data pemasok, INV-09 penerimaan, RPT-02 laporan
+    pembelian). Spesifikasi Bagian 9.2 sebelumnya menulis "tidak mencatat pemasok"; kini diubah. Pemilik memilih: daftar
+    master pemasok; harga beli yang berbeda diputuskan Pengelola (tidak otomatis menjadi harga satuan); semua role boleh mengisi,
+    tidak wajib; laporan diserahkan ke saran (kartu stok, ringkasan bulan ini di Pengaturan → Pemasok, bagian Pembelian di rekap
+    bulanan). Tidak dibangun: PO dan persetujuan pembelian, batch, harga per pemasok per item (spesifikasi sistem Bagian 5.1, 5.5,
+    9.2, 9.3; tampilan Bagian 5.3, 5.4, 5.6, 5.7).
+286. **Data:** `M_Pemasok` (Nama Pemasok, Kontak, Catatan, Aktif; `TAB_MASTER`, `KUNCI_MASTER`) dan dua kolom baru di `Data_Stock`:
+    `Pemasok` (hanya di baris yang punya Stock Masuk) dan `Harga Beli (Rp)` (per satuan dasar, 2 angka di belakang koma; masuk dalam
+    satuan besar: harga per dus ÷ isi). Pemasok satu per kiriman, harga beli per baris. `pembelianSiap_()` = tab dan kedua kolom ada;
+    sebelum `setupSpreadsheet` dijalankan, form Stock dan Riwayat seperti dulu (kolom tidak dikirim), `kirimStock` dengan pemasok atau
+    harga beli dan `simpanPemasok` menolak dengan petunjuk. Pemasok dicari tanpa membedakan huruf besar/kecil dan ditulis dengan
+    ejaan master; pemasok nonaktif tetap diterima (antrean). Nama hanya bisa diganti (selain huruf besar/kecil) selama belum tercatat
+    di `Data_Stock`. Kontak dan catatan lewat `teksAman_` (nomor "+62…" tetap teks di Sheet).
+287. **Harga beli berbeda** (`hargaBeliBerbeda_`, Dashboard butir `hargaBeli`, Perlu ditinjau): pembelian terakhir tiap item aktif
+    dengan harga beli dalam 31 hari (`HARI_HARGA_BELI`) dibanding `hargaPada_` pada tanggal beli (item tanpa harga juga masuk; beda
+    < Rp 0,005 dianggap sama). "Pakai" memanggil `gantiHarga` (harga beli berlaku mulai tanggal beli; riwayat harga butir 166),
+    "Abaikan" menyimpan waktu di Script Property `HARGA_BELI_DITINJAU` `{ namaKecil: ms }` sehingga pembelian yang dicatat sebelum
+    waktu itu tidak ditandai lagi (item yang sudah tidak ada dibuang dari catatan). Tidak ada di Beranda atau email harian.
+288. **Riwayat dan koreksi:** kepala Stock ditambah Pemasok (aplikasi menulis "dari Sumber Segar", `teksKepalaKiriman`); kolom `hargaBeli`
+    memakai `ubah`/`normal` (jalur form kustom) sehingga kosong boleh; `periksaKoreksi` menolak harga beli pada baris tanpa Stock Masuk.
+    Di aplikasi kolom koreksi berjenis `rupiah` dibaca `bacaRupiah`. Pemasok kiriman tidak bisa dikoreksi. Kartu stok: "Dari … · Harga
+    beli Rp …/kg".
+289. **`bacaRupiah`** (keputusan tambahan): titik di antara kelompok tiga angka adalah pemisah ribuan ("16.000" = 16000, "1.250.000,5"),
+    selain itu sama dengan `bacaAngka`. Hanya untuk harga beli; Ganti harga dan isian lain tetap butir 35.
+290. **Rekap bulanan:** `ringkasPembelian_` per pemasok (kiriman, item, baris, nilai = Σ round(masuk × harga beli), tanpa harga), tanpa
+    pemasok paling bawah. Bagian PDF "Pembelian" (sesudah HPP) dan email hanya jika bulan itu ada pemasok atau harga beli yang dicatat,
+    jadi rekap bulan sebelum fitur ini sama seperti dulu. Catatan PDF menjelaskan bedanya dengan nilai Masuk di bagian Stock (harga
+    satuan).
+291. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js`: Pengaturan → Pemasok (validasi, ganda,
+    Staff ditolak), kiriman dengan pemasok huruf kecil, harga "16000", satuan besar 204.000/12 = 17.000, baris keluar tanpa pemasok,
+    pemasok tak dikenal dan harga minus ditolak, Riwayat dan koreksi (ubah, kosongkan, tolak tanpa masuk), Staff melihat harga beli,
+    kartu stok, Dashboard (dua item, Pakai, Abaikan, pembelian berikutnya muncul lagi, item tanpa harga), bulan ini per pemasok, ganti
+    nama ditolak dan huruf besar boleh, nonaktif dan antrean, rekap (nilai dihitung tangan) dan PDF, server tanpa tab/kolom lalu
+    `setupSpreadsheet`. Chromium: Staff HP (pilihan pemasok, kolom harga muncul setelah masuk, galat, draft setelah dimuat ulang, kirim,
+    tanpa sinyal lalu antrean), tabel desktop, server lama, Pengaturan → Pemasok (tambah, nonaktifkan, nama terkunci), Dashboard (Pakai,
+    Abaikan, lembar tertutup dan dimuat ulang), koreksi "15.500", delapan ukuran untuk tiga layar, tanpa galat konsol; uji kartu stok dan
+    pengingat stock tetap lulus. Belum diuji: Supabase asli, salinan kolom baru ke Sheets, HP asli.

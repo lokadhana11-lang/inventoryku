@@ -45,6 +45,10 @@
 > item menampilkan setiap transaksi yang menggerakkan stock beserta saldo sesudahnya (Bagian 6).
 > Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur SYS-07): pengingat stock pagi ke
 > HP Pengelola untuk item di bawah stok minimum, stock minus, dan masa simpan (Bagian 10.1).
+> Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
+> dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
+> masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
+> rekap bulanan (Bagian 5.1, 5.5, 9.2, 9.3).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -403,6 +407,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 |---|---|---|
 | `M_Outlet` | Nama Outlet, Email Penerima Laporan (bisa lebih dari satu) | Nama di form dan laporan, penerima email |
 | `M_Unit` | Nama Unit, Tipe (Chiller/Freezer), Aktif | Dropdown unit, validasi suhu |
+| `M_Pemasok` (18 Oktober 2026) | Nama Pemasok, Kontak, Catatan, Aktif | Pilihan pemasok saat barang masuk (Bagian 5.5); pembelian per pemasok |
 | `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
 | `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang |
 | `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
@@ -629,7 +634,16 @@ stock opname berkala (Bagian 5.7).
 | Nama Item | Otomatis | Semua item aktif di kategori itu tampil sebagai baris siap isi |
 | Stock Masuk | Number | Barang datang. Boleh diketik dalam satuan besar jika item punya (Bagian 5.1). |
 | Stock Keluar | Number | Pemakaian langsung saja, **di luar** prep dan waste |
+| Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. |
+| Harga Beli | Rupiah, tidak wajib | Per baris yang punya Stock Masuk (18 Oktober 2026): harga per satuan yang diketik (per dus jika masuk dalam satuan besar), disimpan per satuan dasar di kolom `Harga Beli (Rp)`. |
 
+- **Pemasok dan harga beli** (keputusan pemilik 18 Oktober 2026) boleh diisi semua role dan
+  tidak wajib. Harga beli **tidak** langsung mengubah harga satuan: Dashboard Pengelola
+  menandai item yang harga beli terakhirnya (31 hari terakhir) berbeda dari harga satuan yang
+  berlaku pada tanggal beli. Pengelola memilih "Pakai" (harga beli menjadi harga satuan mulai
+  tanggal beli, lewat riwayat harga Bagian 5.1) atau "Abaikan" (disembunyikan sampai pembelian
+  berikutnya). Pengelola bisa mengoreksi harga beli lewat Riwayat (Bagian 6.3); pemasok kiriman
+  tidak bisa dikoreksi. Nama pemasok hanya bisa diganti selama belum tercatat di barang masuk.
 - **Boleh dikirim berkali-kali sehari.** Tiap kiriman adalah catatan gerakan tersendiri dan
   **menambah**, tidak menimpa kiriman sebelumnya. Contoh: barang datang pagi 5 kg dan sore
   3 kg, lewat dua kiriman, menjadi Masuk 8 kg pada hari itu.
@@ -1342,7 +1356,8 @@ Unduh PDF tidak memakai link Drive, karena staff tidak punya akses ke folder Dri
 - Pengelola boleh mengubah jumlah di layar sebelum mengunduh. Perubahan itu hanya untuk
   cetakan dan tidak disimpan.
 - Bisa diunduh sebagai PDF dari menu Laporan. Ringkasannya ikut di email harian.
-- Daftar ini hanya saran. Aplikasi tidak memesan apa pun dan tidak mencatat pemasok.
+- Daftar ini hanya saran. Aplikasi tidak memesan apa pun. Pemasok dan harga beli dicatat saat
+  barang datang (Bagian 5.5), bukan saat memesan.
 
 ### 9.3 Rekap bulanan PDF (Pengelola)
 
@@ -1362,6 +1377,7 @@ untuk tanggal di bulan itu.
 | Prep | Total resep dan hasil per item |
 | Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat |
 | Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan |
+| Pembelian (18 Oktober 2026) | Per pemasok: jumlah kiriman, item, nilai pembelian (stock masuk × harga beli), dan barang masuk tanpa harga beli; hanya jika bulan itu ada pemasok atau harga beli yang dicatat |
 | HPP dan food cost | Pemakaian bahan dan rinciannya, penjualan, food cost dan target, pemakaian per kategori, pemakaian seharusnya (dari porsi terjual) vs nyata dengan 10 bahan berselisih terbesar (jika porsi per menu pernah dicatat), menu di atas target (HPP dengan harga hari terakhir bulan itu); Bagian 5.9 |
 
 ### 9.4 Cadangan otomatis mingguan
