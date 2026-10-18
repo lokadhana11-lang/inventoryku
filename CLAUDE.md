@@ -252,6 +252,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `detailKiriman` Stock: `kepala[]` ditambah `pemasok`, `kolom[]` ditambah `hargaBeli` (jenis `rupiah`, koreksi, opsional, `bantuan`).
   `dashboard.perhatian[]` boleh berjenis `hargaBeli` (`data.item: [{ nama, satuan, hargaBeli, harga, tanggal, pemasok, oleh }]`).
   Rekap bulanan: `pembelian: { ada, pemasok: [{ nama, kiriman, item, baris, nilai, tanpaHarga }], total }`.
+- Hasil prep aktual (Code.gs v0.24, 18 Oktober 2026): `kirimPrep.baris[].hasilAktual` (tidak wajib, item beresep); `formPrep` ditambah
+  `hasilAktualSiap` dan `kiriman.baris[].hasilAktual`, `hasilStandar`. `riwayat`/`detailKiriman` Prep: `kolom[]` ditambah `hasilAktual`
+  (koreksi, opsional, `jikaKolom: 'jumlahResep'` = hanya untuk baris yang kolom itu berisi). Rekap bulanan `prep.aktual: { catatan,
+  aktual, standar }` dan `prep.item[].standar`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -293,6 +297,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++ | Kartu stok per transaksi (permintaan pemilik 18 Oktober 2026, dari usulan fitur INV-04): lembar riwayat per item mendapat tampilan "Transaksi" (tiap catatan yang menggerakkan stock, siapa, jam, keterangan, dan saldo sesudahnya), ketuk tanggal di rekap untuk melompat ke transaksinya, ketuk transaksi Stock/Prep/Waste untuk membuka isiannya di Riwayat | Kode selesai (Code.gs v0.21, aplikasi 0.21.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (urutan, saldo cocok dengan rekap, koreksi, isian terlambat, Staff) dan Chromium (alur HP, Staff dari Riwayat, server lama, delapan ukuran, "kurangi gerak"). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, uji dari HP (setupSpreadsheet tidak perlu) |
 | 12++++++++++++++ | Pengingat stock ke HP Pengelola (permintaan pemilik 18 Oktober 2026, dari usulan fitur SYS-07): notifikasi pagi (jam diatur di Outlet dan jadwal, awal 07.00) berisi item minus, di bawah stok minimum, lewat masa simpan, dan habis besok, hanya jika ada | Kode selesai (Code.gs v0.22, aplikasi 0.22.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (isi dan penerima, tanpa kiriman jika aman, jam diubah/dimatikan dan jadwalnya, tanpa kunci notifikasi, pengingat suhu tetap) dan Chromium (Outlet dan jadwal, lembar Notifikasi Pengelola dan Staff, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali |
 | 12+++++++++++++++ | Pemasok dan harga beli (keputusan pemilik 18 Oktober 2026, dari usulan fitur INV-07, INV-09, RPT-02): `M_Pemasok` dan Pengaturan → Pemasok, pilihan pemasok dan harga beli (tidak wajib, semua role) di form Stock, harga beli berbeda ditinjau Pengelola di Dashboard (Pakai / Abaikan), koreksi harga beli, kartu stok, bagian Pembelian di rekap bulanan | Kode selesai (Code.gs v0.23, aplikasi 0.23.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (server sebelum dan sesudah setupSpreadsheet) dan Chromium (Staff HP, desktop, antrean, server lama, Pengaturan → Pemasok, Dashboard, koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Pemasok`, dua kolom `Data_Stock`) |
+| 12++++++++++++++++ | Hasil prep aktual (permintaan pemilik 18 Oktober 2026, dari usulan fitur KIT-06): kolom "Hasil aktual" (tidak wajib) di Prep List; stock memakai hasil aktual, hasil menurut resep tetap terlihat di layar, Riwayat, PDF, kartu stok, dan rekap bulanan; perbaikan kiriman Stock di Sheet yang belum menjalankan setupSpreadsheet sejak v0.23 | Kode selesai (Code.gs v0.24, aplikasi 0.24.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (stock, koreksi, PDF, rekap, Sheet lama) dan Chromium (Staff HP, desktop, server lama, Riwayat dan koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Hasil Aktual` di `Data_Prep`) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2152,3 +2157,32 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tanpa sinyal lalu antrean), tabel desktop, server lama, Pengaturan → Pemasok (tambah, nonaktifkan, nama terkunci), Dashboard (Pakai,
     Abaikan, lembar tertutup dan dimuat ulang), koreksi "15.500", delapan ukuran untuk tiga layar, tanpa galat konsol; uji kartu stok dan
     pengingat stock tetap lulus. Belum diuji: Supabase asli, salinan kolom baru ke Sheets, HP asli.
+
+### Hasil prep aktual (Code.gs v0.24, aplikasi 0.24.0, 18 Oktober 2026)
+
+292. **Asal:** butir keempat dari usulan fitur (KIT-06, perintah produksi dan hasil aktual). Pemilik meminta dilanjutkan tanpa pilihan
+    tambahan, jadi dipilih yang paling sederhana: satu kolom tidak wajib, semua role, tanpa batch produksi atau perintah produksi.
+    Kalimat lama spesifikasi "Hasil selalu mengikuti resep" diganti (sistem Bagian 5.3 dan 9.3, tampilan Bagian 5.3 dan 5.4).
+293. **Data:** kolom `Hasil Aktual` di `Data_Prep` (di akhir kolom isian, ditambahkan `setupSpreadsheet`). `Hasil` tetap kolom yang
+    menggerakkan stock (`SUMBER_STOCK`, masa simpan, tab Harian, HPP tidak berubah): `Hasil Aktual` jika diisi, selain itu Jumlah Resep ×
+    Hasil per 1 Resep. Hasil menurut resep tidak disimpan (dihitung dari dua kolom yang ada). Bahan tetap menurut resep, Baik Sampai
+    tidak berubah. Item tanpa resep: `hasilAktual` diabaikan saat kiriman (Qty sudah hasil nyatanya), ditolak saat koreksi.
+    `hasilAktualSiap_()` = kolom ada; sebelumnya layar tidak menampilkan kolom dan kiriman yang membawanya ditolak dengan petunjuk.
+294. **Koreksi:** kolom Riwayat `hasilAktual` memakai `ubah`/`normal` (kosong boleh) dan `turunan` Prep kini memilih hasil aktual. Mengoreksi
+    Jumlah Resep pada baris berhasil aktual tidak mengubah Hasil (bahan tetap dihitung ulang). Properti kolom baru `jikaKolom` (dikirim
+    `infoKolom_`): kolom hanya tampil dan bisa dikoreksi pada baris yang kolom acuannya berisi (`kolomBerlaku` di app.js). Perbaikan
+    bersama `nilaiKolom`: kolom `jikaAda`/`opsional` yang kosong ditulis "–" juga setelah dikoreksi (dulu "0"), dan nilai lama yang kosong
+    "(kosong)".
+295. **Tampilan hasil menurut resep:** kartu stok "2 resep · hasil aktual (standar 10 liter)", PDF Prep "9,2" dengan "standar 10" kecil di
+    bawahnya, baris Tercatat di layar "(9,2 liter, resep 10)". Rekap bulanan: kolom "Hasil standar" dan kalimat "Pada n catatan dengan
+    hasil aktual, hasilnya 92% dari standar resep (…)" serta satu baris email, hanya jika bulan itu ada hasil aktual (rekap lama tetap).
+296. **Perbaikan v0.23:** `susunBaris_` menolak kunci yang kolomnya belum ada, sehingga `kirimStock` (yang selalu mengisi Pemasok dan Harga
+    Beli) gagal di Sheet yang belum menjalankan `setupSpreadsheet` sejak v0.23. Kini kolom versi baru ditulis lewat `kolomAda_` (Stock) atau
+    hanya jika kolomnya ada (Prep). Pemilik sudah menjalankan `setupSpreadsheet`, jadi di produksi tidak terjadi; uji Sheet lama kini menamai
+    ulang judul kolom, bukan menghapus tab saja.
+297. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js`: kiriman dengan dan tanpa hasil aktual (stock
+    9,2 + 5, bahan 4 + 2 menurut resep), item tanpa resep, angka minus ditolak, Riwayat `jikaKolom`, koreksi kosongkan (kembali 10) dan isi
+    lagi, koreksi jumlah resep (hasil tetap, bahan dihitung ulang), tolak pada baris tanpa resep, PDF harian, rekap (56,7%) dan email,
+    Sheet tanpa kolom lalu `setupSpreadsheet`, kiriman Stock di Sheet tanpa kolom pemasok. Chromium: Staff HP (kolom hanya untuk item beresep,
+    persen, galat, kirim, Tercatat), tabel desktop, server lama, Riwayat kartu dan koreksi (kosongkan → "–"), delapan ukuran; semua uji
+    fitur 18 Oktober lain tetap lulus. Belum diuji di Supabase asli dan HP.
