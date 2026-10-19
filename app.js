@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.24.0';
+  var VERSI_APLIKASI = '0.25.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -3159,7 +3159,7 @@
    */
   function barisMasaSimpan(ms) {
     if (!ms || (!(ms.lewat || []).length && !(ms.habisBesok || []).length)) return null;
-    var daftar = el('ul', { class: 'daftar daftar-masa-simpan', 'aria-label': 'Masa simpan barang jadi' });
+    var daftar = el('ul', { class: 'daftar daftar-masa-simpan', 'aria-label': 'Masa simpan' });
     function baris(x, lewat) {
       daftar.appendChild(el('li', { class: 'baris-tetap' }, [
         el('span', { class: 'baris-tetap-teks daftar-baris-isi' }, [
@@ -3457,7 +3457,7 @@
     function isianItem(nama) {
       var kat = draft.kategori;
       draft.isian[kat] = draft.isian[kat] || {};
-      draft.isian[kat][nama] = draft.isian[kat][nama] || { masuk: '', keluar: '', besar: false, harga: '' };
+      draft.isian[kat][nama] = draft.isian[kat][nama] || { masuk: '', keluar: '', besar: false, harga: '', baik: '' };
       return draft.isian[kat][nama];
     }
 
@@ -3480,7 +3480,11 @@
       var harga = bacaRupiah(isian.harga);
       var besar = isian.besar && it.satuanBesar;
       var masukDasar = masuk > 0 ? (besar ? masuk * it.isiSatuanBesar : masuk) : 0;
+      // Baik sampai yang diubah (aplikasi 0.25.0): sejak tanggal masuk, paling lama 365 hari sesudahnya.
+      var baik = String(isian.baik || '');
       return {
+        baik: masukDasar > 0 && baik && it.masaSimpan != null ? baik : '',
+        baikSalah: masukDasar > 0 && it.masaSimpan != null && !!baik && (baik < tanggal || baik > geserHari(tanggal, 365)),
         masukSalah: masuk !== null && isNaN(masuk),
         keluarSalah: keluar !== null && isNaN(keluar),
         // Harga beli hanya dikirim untuk item yang masuk.
@@ -3525,6 +3529,8 @@
       return input;
     }
 
+    var kolomBaikTabel = false;
+
     /** Satu item: kartu (HP dan tablet) atau baris tabel (laptop dan desktop). */
     function buatItem(it, nomor, modeTabel) {
       var isian = isianItem(it.nama);
@@ -3552,6 +3558,15 @@
       function satuanHarga() {
         return isian.besar && it.satuanBesar ? it.satuanBesar : it.satuan;
       }
+      // Baik sampai (aplikasi 0.25.0): item bermasa simpan; terisi tanggal + masa simpan, boleh diubah.
+      var adaBaik = !!(data && data.masaSimpanSiap) && it.masaSimpan != null;
+      var baikAuto = adaBaik ? geserHari(tanggal, it.masaSimpan) : '';
+      var inBaik = adaBaik ? el('input', { class: 'isian isian-tanggal', type: 'date', 'data-kunci': it.nama + '|baik',
+        min: tanggal, max: geserHari(tanggal, 365), 'aria-label': 'Baik sampai ' + it.nama }) : null;
+      if (inBaik) inBaik.value = isian.baik || baikAuto;
+      var ketBaik = adaBaik ? el('p', { class: 'kolom-bantuan' }) : null;
+      var kolomBaik = adaBaik && !modeTabel ? el('div', { class: 'kolom kolom-baik-sampai' }, [
+        el('label', { class: 'kolom-label', text: 'Baik sampai' }), inBaik, ketBaik]) : null;
 
       function perbarui() {
         var h = hitung(it, isian);
@@ -3562,6 +3577,16 @@
           labelHarga.textContent = 'Harga beli per ' + satuanHarga() + ' (tidak wajib)';
           if (modeTabel) inHarga.setAttribute('aria-label', 'Harga beli per ' + satuanHarga() + ' ' + it.nama);
           if (kolomHarga && !modeTabel) kolomHarga.hidden = !(h.masukDasar > 0 || String(isian.harga || '').trim());
+        }
+        if (inBaik) {
+          inBaik.setAttribute('aria-invalid', h.baikSalah ? 'true' : 'false');
+          inBaik.hidden = !(h.masukDasar > 0);
+          ketBaik.hidden = !(h.masukDasar > 0);
+          if (kolomBaik) kolomBaik.hidden = !(h.masukDasar > 0);
+          ketBaik.textContent = h.baikSalah ? 'Pilih tanggal sejak ' + tanggalPendek(tanggal) + '.'
+            : (isian.baik && isian.baik !== baikAuto ? 'Diubah dari ' + tanggalPendek(baikAuto) + ' (masa simpan ' + it.masaSimpan + ' hari).'
+              : 'Masa simpan ' + it.masaSimpan + ' hari. Boleh diubah.');
+          ketBaik.classList.toggle('kolom-galat', h.baikSalah);
         }
         kosongkan(akhirTeks).appendChild(angkaSatuan(h.akhir, modeTabel ? '' : it.satuan));
         akhirTeks.classList.toggle('minus', h.akhir < 0);
@@ -3581,6 +3606,13 @@
       inMasuk.addEventListener('input', function () { ubah('masuk', inMasuk.value); });
       inKeluar.addEventListener('input', function () { ubah('keluar', inKeluar.value); });
       if (inHarga) inHarga.addEventListener('input', function () { ubah('harga', inHarga.value); });
+      if (inBaik) {
+        inBaik.addEventListener('change', function () {
+          // Kosong atau sama dengan hitungan otomatis: kembali ke tanggal + masa simpan.
+          if (!inBaik.value) inBaik.value = baikAuto;
+          ubah('baik', inBaik.value === baikAuto ? '' : inBaik.value);
+        });
+      }
       if (pilihSatuan) pilihSatuan.addEventListener('change', function () { ubah('besar', pilihSatuan.value === 'besar'); });
 
       var tercatat = teksTercatat(it);
@@ -3595,6 +3627,7 @@
           el('td', { class: 'otomatis tercatat', text: tercatat || '–' }),
           el('td', {}, el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan, konversi])),
           adaHarga ? el('td', {}, inHarga) : null,
+          kolomBaikTabel ? el('td', { class: 'sel-baik-sampai' }, inBaik ? [inBaik, ketBaik] : el('span', { class: 'otomatis', text: '–' })) : null,
           el('td', {}, inKeluar),
           el('td', { class: 'angka otomatis' }, [akhirTeks, el('br'), wadahPeringatan]),
           el('td', { class: 'otomatis', text: it.satuan })
@@ -3613,6 +3646,7 @@
             konversi
           ]),
           kolomHarga,
+          kolomBaik,
           el('div', { class: 'kolom' }, [
             el('label', { class: 'kolom-label', text: 'Tambah keluar' }),
             el('div', { class: 'baris-angka' }, [inKeluar, el('span', { class: 'satuan-tetap', text: it.satuan })])
@@ -3632,6 +3666,13 @@
           inHarga.id = 'harga-' + nomor;
           labelHarga.setAttribute('for', inHarga.id);
           inHarga.removeAttribute('aria-label');
+        }
+        if (inBaik) {
+          inBaik.id = 'baik-' + nomor;
+          ketBaik.id = 'ket-baik-' + nomor;
+          kolomBaik.querySelector('label').setAttribute('for', inBaik.id);
+          inBaik.setAttribute('aria-describedby', ketBaik.id);
+          inBaik.removeAttribute('aria-label');
         }
         hasil = kartu;
       }
@@ -3654,12 +3695,14 @@
         perbaruiPenghitung();
         return;
       }
+      // Kolom Baik Sampai di tabel hanya jika kategori ini punya item bermasa simpan (aplikasi 0.25.0).
+      kolomBaikTabel = !!data.masaSimpanSiap && semua.some(function (it) { return it.masaSimpan != null; });
       if (mediaDesktop.matches) {
         var badan = el('tbody');
         semua.forEach(function (it, i) { badan.appendChild(buatItem(it, i + 1, true)); });
         wadahItem.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian' }, [
           el('thead', {}, el('tr', {}, ['No', 'Nama Item', 'Stock Awal', 'Tercatat Hari Ini', 'Tambah Masuk']
-            .concat(data.pembelianSiap ? ['Harga Beli (Rp)'] : [], ['Tambah Keluar', 'Stock Akhir', 'Satuan'])
+            .concat(data.pembelianSiap ? ['Harga Beli (Rp)'] : [], kolomBaikTabel ? ['Baik Sampai'] : [], ['Tambah Keluar', 'Stock Akhir', 'Satuan'])
             .map(function (j) { return el('th', { scope: 'col', class: ['No', 'Stock Awal', 'Stock Akhir'].indexOf(j) >= 0 ? 'angka' : null, text: j }); }))),
           badan
         ])));
@@ -3771,8 +3814,9 @@
       itemKategori().forEach(function (it) {
         var isian = isianItem(it.nama);
         var h = hitung(it, isian);
-        if (h.masukSalah || h.keluarSalah || (data.pembelianSiap && h.hargaSalah)) {
-          if (!salah) salah = { it: it, jenis: h.masukSalah ? 'masuk' : (h.keluarSalah ? 'keluar' : 'harga') };
+        var hargaSalah = data.pembelianSiap && h.hargaSalah;
+        if (h.masukSalah || h.keluarSalah || hargaSalah || (data.masaSimpanSiap && h.baikSalah)) {
+          if (!salah) salah = { it: it, jenis: h.masukSalah ? 'masuk' : (h.keluarSalah ? 'keluar' : (hargaSalah ? 'harga' : 'baik')) };
           return;
         }
         var masuk = bacaAngka(isian.masuk) || 0;
@@ -3780,10 +3824,13 @@
         if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
         var b = { item: it.nama, masuk: masuk, keluar: keluar, satuanMasuk: isian.besar && it.satuanBesar ? 'besar' : 'dasar' };
         if (data.pembelianSiap && h.harga != null) b.hargaBeli = h.harga;
+        if (data.masaSimpanSiap && h.baik) b.baikSampai = h.baik;
         baris.push(b);
       });
       if (salah) {
-        tulisPesan(pesan, salah.jenis === 'harga'
+        tulisPesan(pesan, salah.jenis === 'baik'
+          ? 'Periksa baik sampai ' + salah.it.nama + '. Pilih tanggal sejak ' + tanggalPendek(tanggal) + '.'
+          : salah.jenis === 'harga'
           ? 'Periksa harga beli ' + salah.it.nama + '. Isi rupiah, misalnya 15000 atau 15.000.'
           : 'Periksa angka ' + (salah.jenis === 'masuk' ? 'Tambah masuk' : 'Tambah keluar') + ' ' +
           salah.it.nama + '. Isi angka, misalnya 2,5.', 'masalah');
@@ -6449,9 +6496,12 @@
     return tanda;
   }
 
-  /** Kolom dengan jikaKolom (hasil aktual prep) hanya berlaku untuk baris yang kolom itu berisi (baris beresep). */
+  /**
+   * Kolom dengan jikaKolom (hasil aktual prep) hanya berlaku untuk baris yang kolom itu berisi (baris beresep);
+   * jikaPositif (harga beli dan baik sampai Stock) hanya untuk baris yang kolom itu lebih dari 0 (barang masuk).
+   */
   function kolomBerlaku(k, b) {
-    return !k.jikaKolom || b.nilai[k.jikaKolom] != null;
+    return (!k.jikaKolom || b.nilai[k.jikaKolom] != null) && (!k.jikaPositif || b.nilai[k.jikaPositif] > 0);
   }
 
   /** Nilai satu kolom: nilai lama dicoret (jika pernah dikoreksi), nilai sekarang, angka asli. */
@@ -6465,7 +6515,8 @@
       isi.push(el('del', { class: 'nilai-lama' }, [
         el('span', { class: 'sr', text: 'Nilai lama ' }),
         kol.jenis === 'angka' ? (lama == null && (kol.jikaAda || kol.opsional) ? '(kosong)' : formatAngka(lama || 0) + (satuan ? ' ' + satuan : ''))
-          : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama === '' || kor.lama == null ? '(kosong)' : kor.lama))
+          : (kol.jenis === 'rupiah' ? formatRupiah(lama) : (kor.lama === '' || kor.lama == null ? '(kosong)'
+            : (kol.jenis === 'tanggal' ? tanggalPendek(kor.lama) : kor.lama)))
       ]));
       isi.push(' ');
     }
@@ -7504,14 +7555,16 @@
       var kI = kolomIsian({
         label: k.label + (rupiah ? ' (Rp' + (b.satuan ? ' per ' + b.satuan : '') + ')'
           : (k.satuan && b.satuan ? ' (' + b.satuan + ')' : (k.akhiran ? ' (' + k.akhiran + ')' : ''))),
-        type: k.waktu ? 'time' : 'text',
+        type: k.waktu ? 'time' : (k.jenis === 'tanggal' ? 'date' : 'text'),
         inputmode: rupiah ? 'numeric' : (k.jenis === 'angka' ? 'decimal' : null),
-        kelas: k.jenis === 'angka' || rupiah ? 'isian-angka' : (k.waktu ? 'isian-jam' : null),
+        kelas: k.jenis === 'angka' || rupiah ? 'isian-angka' : (k.waktu ? 'isian-jam' : (k.jenis === 'tanggal' ? 'isian-tanggal' : null)),
         nilai: rupiah ? (b.nilai[k.kunci] == null ? '' : String(b.nilai[k.kunci]).replace('.', ','))
           : k.jenis === 'angka' ? (kosongBoleh ? '' : String(b.nilai[k.kunci] || 0).replace('.', ',')) : (b.nilai[k.kunci] || ''),
         bantuan: b.asli && b.asli[k.kunci] ? 'Diketik ' + b.asli[k.kunci] + '. Koreksi ditulis dalam ' + b.satuan + '.'
           : (k.bantuan || (k.jenis === 'item' ? 'Tulis nama item persis seperti di daftar item.' : (k.opsional ? 'Tidak wajib; boleh dikosongkan.' : null)))
       });
+      // Baik sampai (aplikasi 0.25.0): tidak boleh sebelum tanggal isian.
+      if (k.jenis === 'tanggal' && info.kiriman && info.kiriman.tanggal) kI.input.min = info.kiriman.tanggal;
       if (k.minus) {
         // Papan angka iPhone tidak punya tanda minus: tombol ± di samping kolom.
         var tanda = el('button', { type: 'button', class: 'tombol-tanda', 'aria-label': 'Ganti tanda plus atau minus', text: '±' });
@@ -9723,7 +9776,7 @@
         wadah.appendChild(el('section', { class: 'kartu formulir' }, [
           el('h2', { class: 'kartu-judul', text: 'Pengingat stock' }),
           el('p', { class: 'kartu-teks', text: 'Notifikasi pagi ke HP Head Kitchen dan Manager yang menyalakan notifikasi, hanya jika ada item ' +
-            'di bawah stok minimum, stock minus, atau barang jadi yang lewat masa simpan atau habis besok. Kosongkan jam untuk mematikannya.' }),
+            'di bawah stok minimum, stock minus, atau barang yang lewat masa simpan atau habis besok. Kosongkan jam untuk mematikannya.' }),
           kStock.wadah,
           data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
         ]));
@@ -9921,7 +9974,8 @@
     function dariItem(it) {
       return {
         nama: it.nama, kategori: it.kategori, satuan: it.satuan, besar: !!it.satuanBesar, satuanBesar: it.satuanBesar || '',
-        isi: teksAngka(it.isiSatuanBesar), harga: teksAngka(it.harga), stokMin: teksAngka(it.stokMin), stokMaks: teksAngka(it.stokMaks)
+        isi: teksAngka(it.isiSatuanBesar), harga: teksAngka(it.harga), stokMin: teksAngka(it.stokMin), stokMaks: teksAngka(it.stokMaks),
+        masa: it.masaSimpan == null ? '' : String(it.masaSimpan)
       };
     }
 
@@ -9935,9 +9989,11 @@
         return;
       }
       if (!isi) {
-        isi = baru ? { nama: '', kategori: '', satuan: '', besar: false, satuanBesar: '', isi: '', harga: '', stokMin: '', stokMaks: '' }
+        isi = baru ? { nama: '', kategori: '', satuan: '', besar: false, satuanBesar: '', isi: '', harga: '', stokMin: '', stokMaks: '', masa: '' }
           : dariItem(itemKini);
       }
+      // Draft dari aplikasi sebelum 0.25.0 belum punya masa simpan.
+      if (isi.masa == null) isi.masa = !baru && itemKini.masaSimpan != null ? String(itemKini.masaSimpan) : '';
       gambarIsian();
       if (itemKini && ajakanStokPembuka && ajakanStokPembuka.toLowerCase() === itemKini.nama.toLowerCase()) {
         ajakanStokPembuka = '';
@@ -10044,6 +10100,12 @@
       kHarga.input.addEventListener('input', function () { isi.harga = kHarga.input.value; simpanDraft(); });
       kMin.input.addEventListener('input', function () { isi.stokMin = kMin.input.value; simpanDraft(); });
       kMaks.input.addEventListener('input', function () { isi.stokMaks = kMaks.input.value; simpanDraft(); });
+      // Masa simpan barang masuk (aplikasi 0.25.0): hanya jika server sudah punya kolomnya.
+      var siapMasa = !!data.masaSimpanSiap;
+      var kMasa = siapMasa ? kolomIsian({ label: 'Masa simpan (hari, tidak wajib)', inputmode: 'numeric', kelas: 'isian-angka', nilai: isi.masa,
+        maxlength: 3, bantuan: 'Berapa hari barang ini masih baik dipakai sejak datang, misalnya 3 untuk ayam. Baik sampai terisi otomatis saat Tambah masuk.' +
+          (!baru && it.resepAktif ? ' Hasil prep memakai masa simpan resepnya.' : '') }) : null;
+      if (kMasa) kMasa.input.addEventListener('input', function () { isi.masa = kMasa.input.value; simpanDraft(); });
 
       var simpan = tombol('Simpan item', 'utama');
       simpan.addEventListener('click', function () {
@@ -10065,6 +10127,8 @@
           kMaks.galat(maks !== null && isNaN(maks) ? salahAngka
             : (maks !== null && min !== null && !isNaN(min) && maks < min ? 'Stok maksimum harus sama dengan atau lebih besar dari stok minimum.' : ''))
         ];
+        var masa = String(isi.masa || '').trim();
+        if (kMasa) ok.push(kMasa.galat(masa && (!/^\d+$/.test(masa) || Number(masa) > 365) ? 'Isi hari bulat 0 sampai 365, atau kosongkan.' : ''));
         kosongkan(galatBesar);
         var pesanBesar = '';
         if (isi.besar) {
@@ -10083,7 +10147,7 @@
           return;
         }
         aturTombolProses(simpan, true, 'Menyimpan…');
-        panggilApi('simpanItem', {
+        var kirim = {
           baru: baru,
           namaLama: baru ? '' : itemKini.nama,
           nama: nama,
@@ -10094,7 +10158,9 @@
           harga: harga === null ? '' : harga,
           stokMin: min === null ? '' : min,
           stokMaks: maks === null ? '' : maks
-        }).then(function (hasil) {
+        };
+        if (kMasa) kirim.masaSimpan = masa === '' ? '' : Number(masa);
+        panggilApi('simpanItem', kirim).then(function (hasil) {
           Draft.hapus(kunciDraft);
           Cache.tulis('item', hasil);
           toast('Item ' + hasil.disimpan + ' tersimpan.');
@@ -10113,7 +10179,8 @@
 
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [kNama.wadah, kKat.wadah, kSat.wadah, bagianKemasan]));
       if (punyaHarga) wadah.appendChild(kartuHarga(it));
-      wadah.appendChild(el('section', { class: 'kartu formulir' }, punyaHarga ? [kMin.wadah, kMaks.wadah] : [kHarga.wadah, kMin.wadah, kMaks.wadah]));
+      wadah.appendChild(el('section', { class: 'kartu formulir' },
+        (punyaHarga ? [kMin.wadah, kMaks.wadah] : [kHarga.wadah, kMin.wadah, kMaks.wadah]).concat(kMasa ? [kMasa.wadah] : [])));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [pesan, el('div', {}, simpan)]));
 
       if (!baru) {
