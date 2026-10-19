@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.26.0';
+  var VERSI_APLIKASI = '0.26.1';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -21,12 +21,12 @@
   var PESAN = {
     configTidakTermuat: 'File config.js tidak termuat. Pastikan config.js ada di samping index.html.',
     alamatBelumDiisi: 'Alamat API belum diisi di config.js',
-    alamatBukanHttps: 'Alamat API di config.js harus diawali https://. Salin ulang alamat Web App dari Apps Script.',
+    alamatBukanHttps: 'Alamat API di config.js harus diawali https://. Salin ulang alamat server dengan lengkap.',
     tidakAdaSinyal: 'Tidak ada sinyal. Periksa sambungan internet, lalu coba lagi.',
-    tidakTerhubung: 'Server tidak bisa dihubungi. Periksa sinyal, alamat API di config.js, dan setelan deploy Web App (akses: Anyone), lalu coba lagi.',
+    tidakTerhubung: 'Server tidak bisa dihubungi. Periksa sinyal, lalu coba lagi. Jika terus terjadi, pemilik Sheet perlu memeriksa alamat API di config.js.',
     terlaluLama: 'Server tidak menjawab dalam 30 detik. Coba lagi.',
-    ditolak: 'Server menolak permintaan. Periksa alamat API di config.js: harus alamat Web App yang berakhiran /exec.',
-    jawabanTidakDikenal: 'Jawaban server tidak dikenali. Periksa alamat API di config.js: harus alamat Web App yang berakhiran /exec.',
+    ditolak: 'Server menolak permintaan. Coba lagi. Jika terus terjadi, pemilik Sheet perlu memeriksa alamat API di config.js.',
+    jawabanTidakDikenal: 'Jawaban server tidak dikenali. Coba lagi. Jika terus terjadi, pemilik Sheet perlu memeriksa alamat API di config.js.',
     gagalUmum: 'Server menolak permintaan. Coba lagi.',
     sesiBerakhir: 'Sesi berakhir. Masuk lagi dengan PIN.',
     formBelumDibangun: 'Form ini dibangun di tahap berikutnya.',
@@ -3531,8 +3531,6 @@
       return input;
     }
 
-    var kolomBaikTabel = false;
-
     /** Satu item: kartu (HP dan tablet) atau baris tabel (laptop dan desktop). */
     function buatItem(it, nomor, modeTabel) {
       var isian = isianItem(it.nama);
@@ -3553,8 +3551,12 @@
       // Harga beli (aplikasi 0.23.0): per satuan yang diketik di Tambah masuk; di kartu baru tampil setelah Tambah masuk diisi.
       var adaHarga = !!(data && data.pembelianSiap);
       var inHarga = adaHarga ? isianAngka(it, 'harga', 'Harga beli') : null;
-      if (inHarga) inHarga.setAttribute('inputmode', 'numeric');
       var labelHarga = el('label', { class: 'kolom-label' });
+      if (inHarga) {
+        inHarga.setAttribute('inputmode', 'numeric');
+        inHarga.id = 'harga-' + nomor;
+        labelHarga.setAttribute('for', inHarga.id);
+      }
       var kolomHarga = adaHarga ? el('div', { class: 'kolom kolom-harga-beli' }, [labelHarga,
         el('div', { class: 'baris-angka' }, [el('span', { class: 'satuan-tetap', text: 'Rp' }), inHarga])]) : null;
       function satuanHarga() {
@@ -3565,10 +3567,17 @@
       var baikAuto = adaBaik ? geserHari(tanggal, it.masaSimpan) : '';
       var inBaik = adaBaik ? el('input', { class: 'isian isian-tanggal', type: 'date', 'data-kunci': it.nama + '|baik',
         min: tanggal, max: geserHari(tanggal, 365), 'aria-label': 'Baik sampai ' + it.nama }) : null;
-      if (inBaik) inBaik.value = isian.baik || baikAuto;
       var ketBaik = adaBaik ? el('p', { class: 'kolom-bantuan' }) : null;
-      var kolomBaik = adaBaik && !modeTabel ? el('div', { class: 'kolom kolom-baik-sampai' }, [
-        el('label', { class: 'kolom-label', text: 'Baik sampai' }), inBaik, ketBaik]) : null;
+      var labelBaik = el('label', { class: 'kolom-label', text: 'Baik sampai' });
+      if (inBaik) {
+        inBaik.value = isian.baik || baikAuto;
+        inBaik.id = 'baik-' + nomor;
+        ketBaik.id = 'ket-baik-' + nomor;
+        labelBaik.setAttribute('for', inBaik.id);
+        inBaik.setAttribute('aria-describedby', ketBaik.id);
+      }
+      // Kartu dan tabel sama (aplikasi 0.26.1): harga beli dan baik sampai di bawah Tambah masuk, tampil setelah diisi.
+      var kolomBaik = adaBaik ? el('div', { class: 'kolom kolom-baik-sampai' }, [labelBaik, inBaik, ketBaik]) : null;
 
       function perbarui() {
         var h = hitung(it, isian);
@@ -3578,13 +3587,11 @@
           inHarga.setAttribute('aria-invalid', h.hargaSalah ? 'true' : 'false');
           labelHarga.textContent = 'Harga beli per ' + satuanHarga() + ' (tidak wajib)';
           if (modeTabel) inHarga.setAttribute('aria-label', 'Harga beli per ' + satuanHarga() + ' ' + it.nama);
-          if (kolomHarga && !modeTabel) kolomHarga.hidden = !(h.masukDasar > 0 || String(isian.harga || '').trim());
+          kolomHarga.hidden = !(h.masukDasar > 0 || String(isian.harga || '').trim());
         }
         if (inBaik) {
           inBaik.setAttribute('aria-invalid', h.baikSalah ? 'true' : 'false');
-          inBaik.hidden = !(h.masukDasar > 0);
-          ketBaik.hidden = !(h.masukDasar > 0);
-          if (kolomBaik) kolomBaik.hidden = !(h.masukDasar > 0);
+          kolomBaik.hidden = !(h.masukDasar > 0);
           ketBaik.textContent = h.baikSalah ? 'Pilih tanggal sejak ' + tanggalPendek(tanggal) + '.'
             : (isian.baik && isian.baik !== baikAuto ? 'Diubah dari ' + tanggalPendek(baikAuto) + ' (masa simpan ' + it.masaSimpan + ' hari).'
               : 'Masa simpan ' + it.masaSimpan + ' hari. Boleh diubah.');
@@ -3627,9 +3634,7 @@
           el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: it.nama })),
           el('td', { class: 'angka otomatis' }, angkaSatuan(it.awal)),
           el('td', { class: 'otomatis tercatat', text: tercatat || '–' }),
-          el('td', {}, el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan, konversi])),
-          adaHarga ? el('td', {}, inHarga) : null,
-          kolomBaikTabel ? el('td', { class: 'sel-baik-sampai' }, inBaik ? [inBaik, ketBaik] : el('span', { class: 'otomatis', text: '–' })) : null,
+          el('td', { class: 'sel-masuk' }, [el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan, konversi]), kolomHarga, kolomBaik]),
           el('td', {}, inKeluar),
           el('td', { class: 'angka otomatis' }, [akhirTeks, el('br'), wadahPeringatan]),
           el('td', { class: 'otomatis', text: it.satuan })
@@ -3664,18 +3669,8 @@
         label[label.length - 1].setAttribute('for', inKeluar.id);
         inMasuk.removeAttribute('aria-label');
         inKeluar.removeAttribute('aria-label');
-        if (inHarga) {
-          inHarga.id = 'harga-' + nomor;
-          labelHarga.setAttribute('for', inHarga.id);
-          inHarga.removeAttribute('aria-label');
-        }
-        if (inBaik) {
-          inBaik.id = 'baik-' + nomor;
-          ketBaik.id = 'ket-baik-' + nomor;
-          kolomBaik.querySelector('label').setAttribute('for', inBaik.id);
-          inBaik.setAttribute('aria-describedby', ketBaik.id);
-          inBaik.removeAttribute('aria-label');
-        }
+        if (inHarga) inHarga.removeAttribute('aria-label');
+        if (inBaik) inBaik.removeAttribute('aria-label');
         hasil = kartu;
       }
       perbarui();
@@ -3693,18 +3688,19 @@
       if (!semua.length) {
         wadahItem.appendChild(kotakKosong(data && data.item && data.item.length
           ? 'Belum ada item aktif di kategori ini.'
-          : 'Belum ada item. Pengelola mengisi daftar item dan kategori di tab M_Item dan M_Kategori.'));
+          : (pengelola ? 'Belum ada item. Tambah kategori di Pengaturan → Kategori dan satuan, lalu item di Pengaturan → Item.'
+            : 'Belum ada item. Head Kitchen atau Manager menambah item di Pengaturan.')));
         perbaruiPenghitung();
         return;
       }
-      // Kolom Baik Sampai di tabel hanya jika kategori ini punya item bermasa simpan (aplikasi 0.25.0).
-      kolomBaikTabel = !!data.masaSimpanSiap && semua.some(function (it) { return it.masaSimpan != null; });
       if (mediaDesktop.matches) {
         var badan = el('tbody');
         semua.forEach(function (it, i) { badan.appendChild(buatItem(it, i + 1, true)); });
-        wadahItem.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian' }, [
-          el('thead', {}, el('tr', {}, ['No', 'Nama Item', 'Stock Awal', 'Tercatat Hari Ini', 'Tambah Masuk']
-            .concat(data.pembelianSiap ? ['Harga Beli (Rp)'] : [], kolomBaikTabel ? ['Baik Sampai'] : [], ['Tambah Keluar', 'Stock Akhir', 'Satuan'])
+        // Sel Tambah Masuk diberi lebar tetap jika harga beli atau baik sampai bisa muncul di bawahnya, supaya kolom
+        // tidak melebar saat mengetik.
+        var adaTambahan = !!data.pembelianSiap || (!!data.masaSimpanSiap && semua.some(function (it) { return it.masaSimpan != null; }));
+        wadahItem.appendChild(el('div', { class: 'tabel-bingkai tabel-isian-bingkai' }, el('table', { class: 'tabel tabel-isian tabel-stock' + (adaTambahan ? ' ada-tambahan-masuk' : '') }, [
+          el('thead', {}, el('tr', {}, ['No', 'Nama Item', 'Stock Awal', 'Tercatat Hari Ini', 'Tambah Masuk', 'Tambah Keluar', 'Stock Akhir', 'Satuan']
             .map(function (j) { return el('th', { scope: 'col', class: ['No', 'Stock Awal', 'Stock Akhir'].indexOf(j) >= 0 ? 'angka' : null, text: j }); }))),
           badan
         ])));
@@ -5025,7 +5021,8 @@
       if (!data) return;
       tandaiWaktuCek();
       if (!data.unit.length) {
-        wadahUnit.appendChild(kotakKosong('Belum ada unit chiller atau freezer yang aktif. Minta Pengelola menambah unit di tab M_Unit.'));
+        wadahUnit.appendChild(kotakKosong(pengelola ? 'Belum ada unit chiller atau freezer yang aktif. Tambah unit di Pengaturan → Unit.'
+          : 'Belum ada unit chiller atau freezer yang aktif. Minta Head Kitchen atau Manager menambah unit di Pengaturan.'));
         perbaruiPenghitung();
         return;
       }
@@ -7370,7 +7367,7 @@
         isi.push(el('p', { class: 'kolom-bantuan foto-riwayat' }, [ikon('kamera'),
           el('span', { text: ' Ada foto bukti' + (b.fotoUrl ? '. ' : ' (dilihat Head Kitchen atau Manager).') }),
           b.fotoUrl ? el('a', { href: b.fotoUrl, target: '_blank', rel: 'noopener noreferrer', class: 'tautan-foto',
-            'aria-label': 'Lihat foto bukti ' + (nama ? b.nilai[nama.kunci] : '') + ' di Google Drive' }, 'Lihat foto') : null]));
+            'aria-label': 'Lihat foto bukti ' + (nama ? b.nilai[nama.kunci] : '') }, 'Lihat foto') : null]));
       }
       if (b.flag) {
         isi.push(el('p', { class: 'pesan-formulir tinjau catatan-flag' }, [ikon('bendera'),
@@ -9589,8 +9586,7 @@
     var j = /^\d{1,3}$/.test(String(jeda).trim()) ? Number(jeda) : NaN;
     if (!m || isNaN(j)) return 'Laporan harian dikirim setelah closing, ditambah jeda ini.';
     var menit = (Number(m[1]) * 60 + Number(m[2]) + j) % (24 * 60);
-    return 'Laporan harian dikirim sekitar pukul ' + duaAngka(Math.floor(menit / 60)) + '.' + duaAngka(menit % 60) +
-      ' (toleransi Google sekitar 15 menit).';
+    return 'Laporan harian dikirim sekitar pukul ' + duaAngka(Math.floor(menit / 60)) + '.' + duaAngka(menit % 60) + '.';
   }
 
   function layarOutletJadwal(k) {
@@ -9671,7 +9667,7 @@
       });
       var kHari = kolomPilih({ label: 'Hari cadangan mingguan', nilai: isi.hariCadangan,
         pilihan: NAMA_HARI.map(function (h) { return { value: h, text: h }; }),
-        bantuan: 'Salinan spreadsheet dibuat dini hari itu, sekitar pukul 03.00.' });
+        bantuan: 'Cadangan semua data dibuat dini hari itu, sekitar pukul 03.00, dan disimpan di Google Drive (Laporan Kitchen/Cadangan).' });
       kHari.input.addEventListener('change', function () { isi.hariCadangan = kHari.input.value; perbarui(); });
 
       var labelMenit = function (n) { return n + ' menit'; };
@@ -9737,8 +9733,9 @@
             if ($('#merek-outlet')) $('#merek-outlet').textContent = hasil.namaOutlet;
           }
           gambar(hasil);
-          toast(hasil.jadwalBerubah ? 'Tersimpan. Jalankan pasangTrigger supaya jadwal baru berlaku.' : 'Outlet dan jadwal tersimpan.',
-            hasil.jadwalBerubah ? 'info' : null);
+          // Di Supabase jadwal langsung dipasang ulang, jadi hanya perluPasangTrigger (Apps Script) yang meminta pasangTrigger.
+          toast(hasil.perluPasangTrigger ? 'Tersimpan. Jadwal baru berlaku setelah pemilik Sheet menjalankan pasangTrigger.' : 'Outlet dan jadwal tersimpan.',
+            hasil.perluPasangTrigger ? 'info' : null);
         }).catch(function (err) {
           aturTombolProses(simpan, false);
           if (tanganiSesiBerakhir(err)) return;
@@ -9754,7 +9751,7 @@
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
         el('h2', { class: 'kartu-judul', text: 'Jadwal' }),
         kJam.wadah, kJeda.wadah,
-        el('p', { class: 'kolom-bantuan', text: 'Jam closing, jeda, hari cadangan, dan zona waktu berlaku setelah pemilik Sheet menjalankan pasangTrigger.' }),
+        el('p', { class: 'kolom-bantuan', text: 'Laporan harian dan cadangan mengikuti jam closing, jeda, hari cadangan, dan zona waktu ini.' }),
         gOpname.wadah, kHari.wadah
       ]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [

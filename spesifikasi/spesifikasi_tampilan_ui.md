@@ -23,6 +23,9 @@
 > (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
+> Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): di tabel Stock laptop/desktop,
+> harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, supaya tabel muat
+> dan Stock Akhir selalu terlihat (Bagian 5.3).
 > Tambahan 19 Oktober 2026 (keputusan pemilik): masa simpan barang masuk, yaitu isian "Masa simpan
 > (hari, tidak wajib)" di Pengaturan → Item dan "Baik sampai" yang terisi otomatis di form Stock dan
 > bisa dikoreksi di Riwayat (Bagian 5.3, 5.4, 5.7).
@@ -625,17 +628,21 @@ Satu-satunya layar yang sepenuhnya navy.
   berikutnya. Jika daftarnya kosong: "Belum ada pemasok" (nonaktif) dan petunjuk ke Pengaturan →
   Pemasok. Di kartu HP/tablet, kolom "Harga beli per kg (tidak wajib)" dengan awalan "Rp" muncul di
   bawah Tambah masuk setelah Tambah masuk diisi; satuannya ikut pilihan satuan besar ("per dus").
-  Di tabel laptop/desktop kolom "Harga Beli (Rp)" di sebelah Tambah Masuk. Titik di antara
+  Di tabel laptop/desktop isian yang sama muncul di sel Tambah Masuk, di bawah angkanya, juga
+  setelah Tambah masuk diisi (sejak 19 Oktober 2026; sebelumnya kolom sendiri). Titik di antara
   kelompok tiga angka dibaca pemisah ribuan ("16.000" = 16000). Galat: "Periksa harga beli Tomat.
   Isi rupiah, misalnya 15000 atau 15.000."
 - **Baik sampai** (19 Oktober 2026, hanya item yang punya masa simpan): di kartu HP/tablet, kolom
   "Baik sampai" (pemilih tanggal bawaan browser) muncul di bawah harga beli setelah Tambah masuk
   diisi, sudah terisi tanggal + masa simpan, dengan keterangan "Masa simpan 3 hari. Boleh diubah."
-  atau, setelah diubah, "Diubah dari 22 Okt (masa simpan 3 hari)." Di tabel laptop/desktop kolom
-  "Baik Sampai" di sebelah Harga Beli, hanya jika kategori itu punya item bermasa simpan ("–" untuk
-  item lain). Tanggal sebelum tanggal isian: "Periksa baik sampai Ayam. Pilih tanggal sejak 19 Okt."
+  atau, setelah diubah, "Diubah dari 22 Okt (masa simpan 3 hari)." Di tabel laptop/desktop
+  "Baik sampai" muncul di sel Tambah Masuk di bawah harga beli, dengan aturan yang sama dengan kartu.
+  Tanggal sebelum tanggal isian: "Periksa baik sampai Ayam. Pilih tanggal sejak 19 Okt."
 - Di laptop/desktop: tabel dengan kolom No, Nama Item, Stock Awal, Tercatat Hari Ini,
-  Tambah Masuk, Tambah Keluar, Stock Akhir, Satuan. Kolom otomatis berlatar Baja.
+  Tambah Masuk, Tambah Keluar, Stock Akhir, Satuan. Kolom otomatis berlatar Baja. Tabel muat
+  tanpa digeser mulai 1.024 px, jadi Stock Akhir selalu terlihat: sel Tambah Masuk berlebar tetap
+  (184 px, 240 px mulai 1.280 px) supaya kolom tidak melebar saat harga beli dan baik sampai
+  muncul, dan tanda di kolom Stock Akhir boleh turun baris jika tabel sempit.
 - Di PDF dan tab Harian, item dikelompokkan di bawah baris judul kategorinya, dengan
   kolom lengkap: Awal, Masuk, Hasil Prep, Keluar, Dipakai Prep, Waste, Penyesuaian, Akhir.
 
