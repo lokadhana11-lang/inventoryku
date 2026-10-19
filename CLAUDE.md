@@ -313,6 +313,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++ | Hasil prep aktual (permintaan pemilik 18 Oktober 2026, dari usulan fitur KIT-06): kolom "Hasil aktual" (tidak wajib) di Prep List; stock memakai hasil aktual, hasil menurut resep tetap terlihat di layar, Riwayat, PDF, kartu stok, dan rekap bulanan; perbaikan kiriman Stock di Sheet yang belum menjalankan setupSpreadsheet sejak v0.23 | Kode selesai (Code.gs v0.24, aplikasi 0.24.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (stock, koreksi, PDF, rekap, Sheet lama) dan Chromium (Staff HP, desktop, server lama, Riwayat dan koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Hasil Aktual` di `Data_Prep`) |
 | 12+++++++++++++++++ | Masa simpan barang masuk (keputusan pemilik 19 Oktober 2026, dari usulan fitur): "Masa simpan (hari)" per item di Pengaturan → Item, "Baik sampai" otomatis (boleh diubah) saat Tambah masuk di form Stock, kolom `Baik Sampai` di `Data_Stock`, pengingat lewat masa simpan dan habis besok untuk barang masuk di Beranda, Dashboard, pengingat stock, dan email, koreksi di Riwayat, kartu stok | Kode selesai (Code.gs v0.25, aplikasi 0.25.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (pembagian stock, prep dan barang masuk bersama, koreksi, Sheet lama) dan Chromium (Pengaturan → Item, Staff HP, desktop, server lama, Riwayat, Beranda, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Masa Simpan (hari)` di `M_Item` dan `Baik Sampai` di `Data_Stock`) |
 | 12++++++++++++++++++ | Uji dan pemulihan cadangan (permintaan pemilik 19 Oktober 2026, dari usulan fitur SYS-04): `periksaCadangan`, `ujiPemulihanCadangan`, dan `pulihkanCadangan` dari editor Apps Script membaca cadangan JSON dari Drive dan memulihkannya ke Supabase; aplikasi ditutup selama pemulihan (isian masuk antrean HP), isi sebelum pemulihan selalu dicadangkan, jumlah baris dicocokkan, pemulihan setengah jalan tidak membuka aplikasi; cadangan format 2; langkah di PANDUAN | Kode selesai (Code.gs v0.26, aplikasi 0.26.0), diuji ujung ke ujung: runtime dan pelayan asli `supabase/src` di atas Postgres 16 lokal, Apps Script tiruan (Drive, curl ke server) dengan Code.gs asli (pulihkan, batalkan, uji, format 1, cadangan rusak, putus di tengah, jumlah tidak cocok, project baru), dan Chromium (isian masuk antrean saat server ditutup). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `ujiPemulihanCadangan` sekali pada jam sepi (setupSpreadsheet tidak perlu) |
+| 12+++++++++++++++++++ | Tabel Stock muat di laptop dan teks lama dari masa Apps Script (permintaan pemilik 19 Oktober 2026, butir 1 dari telaah aplikasi): harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, sehingga Stock Akhir selalu terlihat tanpa menggeser tabel mulai 1.024 px; teks yang keliru sesudah pindah ke Supabase (toleransi Google, salinan spreadsheet, perintah pasangTrigger yang tidak perlu, isi tab M_Item/M_Unit, alamat Web App /exec) diganti | Kode selesai (aplikasi 0.26.1; Code.gs tidak berubah), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` dan Chromium (lebar tabel di 1024, 1280, 1366, 1920 px untuk lima kategori sebelum dan sesudah Tambah masuk diisi, urutan Tab, draft, kartu HP dan tablet sama piksel per piksel dengan 0.26.0). Menunggu pemilik: gabungkan PR, uji dari laptop (tidak perlu tempel Code.gs atau Edge Function) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2278,3 +2279,36 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     pulihkan berhasil), project baru (data, zona, jadwal; PIN lama ditolak). Chromium: kirim Stock saat server ditutup masuk antrean
     (bukan "Gagal kirim"), terkirim sesudah dibuka. Uji fitur 18–19 Oktober lain tetap lulus. Belum diuji di Supabase dan Google asli
     (batas 6 menit Apps Script untuk data besar, ukuran berkas cadangan).
+
+### Tabel Stock muat di laptop dan teks lama (aplikasi 0.26.1, 19 Oktober 2026)
+
+312. **Asal:** telaah aplikasi oleh Claude (19 Oktober 2026), butir 1 yang dipilih pemilik. Sejak harga beli (0.23.0) dan baik sampai
+    (0.25.0) mendapat kolom sendiri, tabel isian Stock di laptop/desktop selebar 1.285 px di bingkai 1.152 px (976 px di 1.024 px) di
+    semua lebar layar, jadi kolom Stock Akhir dan tanda "Stock akhir minus" baru terlihat setelah tabel digeser. Spesifikasi tampilan
+    Bagian 5.3 diubah.
+313. **Tabel Stock** (`layarStock`, kelas `tabel-stock`): kolom kembali No, Nama Item, Stock Awal, Tercatat Hari Ini, Tambah Masuk,
+    Tambah Keluar, Stock Akhir, Satuan. Harga beli ("Harga beli per kg (tidak wajib)", awalan Rp) dan baik sampai (pemilih tanggal dan
+    keterangannya) memakai elemen kartu yang sama (`kolomHarga`, `kolomBaik`) di sel Tambah Masuk (`sel-masuk`) dengan aturan tampil
+    yang sama: harga beli setelah Tambah masuk diisi atau jika harganya sudah diketik, baik sampai setelah Tambah masuk diisi. Label
+    kini memakai `for` di kedua tampilan; di tabel `aria-label` dengan nama item tetap dipakai. Sel Tambah Masuk berlebar tetap jika
+    harga beli atau baik sampai bisa muncul (`ada-tambahan-masuk`: 184 px, 240 px mulai 1.280 px dengan kolom angka 104 px supaya
+    pilihan satuan besar seperti "jerigen" tetap sebaris), sehingga kolom tidak melebar saat mengetik; teks di sel itu boleh turun
+    baris (sel tabel memakai `nowrap`). Tanda di kolom Stock Akhir boleh turun baris (`white-space: normal`, sudut 12 px yang sama
+    bulatnya untuk satu baris), supaya tabel muat di 1.024 px walau ada item minus. Kartu HP/tablet tidak berubah.
+314. **Teks lama dari masa Apps Script** (benar di kedua mode): jam laporan di Outlet dan jadwal tanpa "(toleransi Google sekitar 15
+    menit)"; bantuan hari cadangan "Cadangan semua data dibuat dini hari itu, sekitar pukul 03.00, dan disimpan di Google Drive
+    (Laporan Kitchen/Cadangan)." (di Supabase cadangannya berkas JSON, bukan salinan spreadsheet); kalimat tetap "berlaku setelah
+    pemilik Sheet menjalankan pasangTrigger" di kartu Jadwal diganti "Laporan harian dan cadangan mengikuti jam closing, jeda, hari
+    cadangan, dan zona waktu ini."; pesan sesudah Simpan kini memakai `perluPasangTrigger` (dulu `jadwalBerubah`, yang juga bernilai
+    true di Supabase walau jadwal sudah dipasang ulang otomatis, sehingga pemilik disuruh menjalankan pasangTrigger tanpa perlu);
+    layar Stock dan Suhu tanpa item atau unit menunjuk ke Pengaturan (Pengelola) atau Head Kitchen/Manager (Staff), bukan ke tab
+    `M_Item`/`M_Kategori`/`M_Unit` yang kini tertimpa salinan; pesan sambungan (`PESAN.alamatBukanHttps`, `tidakTerhubung`, `ditolak`,
+    `jawabanTidakDikenal`) tanpa "Web App", "/exec", dan "akses: Anyone"; label pembaca layar "Lihat foto" tanpa "di Google Drive"
+    (di Supabase tautannya Storage bertanda tangan). `PESAN_PASANG_TRIGGER` dan petunjuk menjalankan fungsi di editor Apps Script
+    tetap, karena masih benar (hanya tampil jika `perluPasangTrigger`, dan editor meneruskan fungsi ke Supabase).
+315. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` di memori dengan data contoh 12 hari, Chromium
+    dengan API tiruan: lebar tabel di 1024, 1280, 1366, dan 1920 px untuk lima kategori (dengan harga beli, baik sampai, satuan besar,
+    item minus, di bawah minimum) sebelum dan sesudah Tambah masuk diisi semua baris (tabel = bingkai, Stock Akhir di dalam bingkai,
+    lebar sel Tambah Masuk tetap), urutan Tab, label satuan besar, aturan tampil, draft setelah dimuat ulang, tanpa galat konsol;
+    kartu Stock di 320, 390, dan 768 px sama piksel per piksel dengan 0.26.0 (tiga kategori, Tambah masuk diisi); `simpanOutletJadwal`
+    di mode Supabase menjawab `jadwalBerubah: true` dan `perluPasangTrigger: false`. Belum diuji di laptop pemilik.

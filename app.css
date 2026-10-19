@@ -4777,16 +4777,51 @@ body.papan-ketik .bilah-kirim {
   max-width: 220px;
 }
 
-.tabel-isian td.sel-baik-sampai {
-  min-width: 170px;
+/* Tabel Stock (aplikasi 0.26.1): harga beli dan baik sampai di bawah Tambah Masuk, seperti di kartu HP,
+   supaya Stock Akhir tetap terlihat tanpa menggeser tabel. Lebar tetap supaya kolom tidak melebar saat mengetik. */
+.tabel-stock.ada-tambahan-masuk td.sel-masuk {
+  width: 184px;
+  min-width: 184px;
 }
 
-.tabel-isian td.sel-baik-sampai .isian-tanggal {
-  width: 160px;
+/* Mulai 1.280 px masih ada ruang: angka dan pilihan satuan besar tetap sebaris. */
+@media (min-width: 1280px) {
+  .tabel-stock.ada-tambahan-masuk td.sel-masuk {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .tabel-stock.ada-tambahan-masuk td.sel-masuk > .baris-angka .isian-angka {
+    width: 104px;
+  }
 }
 
-.tabel-isian td.sel-baik-sampai .kolom-bantuan {
-  margin-top: 4px;
+/* Tanda di kolom Stock Akhir boleh turun baris jika tabel sempit (1.024 px), supaya tabel tetap muat. */
+.tabel-stock .wadah-peringatan .tanda-status {
+  white-space: normal;
+  border-radius: 12px;
+}
+
+.tabel-stock td.sel-masuk .kolom {
+  gap: 4px;
+  margin-top: 10px;
+  white-space: normal;
+}
+
+.tabel-stock td.sel-masuk .kolom-label {
+  font-size: 13px;
+}
+
+.tabel-stock td.sel-masuk .kolom-harga-beli .satuan-tetap {
+  min-width: 0;
+}
+
+.tabel-stock td.sel-masuk .isian-tanggal {
+  width: 100%;
+  max-width: 160px;
+}
+
+.tabel-stock td.sel-masuk .kolom-bantuan {
   font-size: 13px;
 }
 
