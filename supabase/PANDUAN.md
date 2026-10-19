@@ -73,7 +73,8 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
 
 - **Sheet hanya untuk dicek.** Ketikan langsung di Sheet tertimpa. Ubah data lewat aplikasi.
 - **Fungsi editor** `setupSpreadsheet`, `pasangTrigger`, `kirimLaporanSekarang`, `kirimRekapSekarang`, dan
-  `buatKodePemasangan` tetap dijalankan dari editor Apps Script; semuanya diteruskan ke Supabase.
+  `buatKodePemasangan` tetap dijalankan dari editor Apps Script; semuanya diteruskan ke Supabase. Cadangan dan
+  pemulihan: lihat "Cadangan dan pemulihan" di bawah.
 - **Jadwal** mengikuti Pengaturan → Outlet dan jadwal secara otomatis.
 - **Versi baru:** jika `Code.gs` berubah, tempel `Code.gs` ke Apps Script **dan** tempel ulang
   `supabase/functions/api/index.ts` ke function `api` lalu Deploy (file itu dirakit dari Code.gs dengan
@@ -98,6 +99,38 @@ menyeberang sekali per permintaan. Kode region: Sydney `ap-southeast-2`, Singapo
   `?forceFunctionRegion=...` dari `config.js` untuk sementara.
 - **Pindah project ke region lain** tidak bisa dilakukan di tempat; harus membuat project baru dan memindahkan
   data (lihat dokumentasi Supabase "Change Project Region").
+
+## Cadangan dan pemulihan
+
+Cadangan mingguan berupa satu berkas JSON berisi semua tab, disalin ke Drive di `Laporan Kitchen/Cadangan`
+(empat terbaru disimpan). Yang **tidak** ada di cadangan: Script Properties di Supabase (kunci PIN, sesi
+login, langganan notifikasi HP) dan isi berkas PDF/foto (salinannya sudah ada di Drive). Ketiga fungsi di bawah
+dijalankan dari editor Apps Script (pilih nama fungsi → **Run**), dan hasilnya dibaca di log eksekusi.
+
+- **Periksa cadangan** (`periksaCadangan`, tidak mengubah apa pun): membaca cadangan terbaru dari Drive dan
+  menulis jumlah baris tiap tab dibanding Sheet sekarang, lalu "Cadangan bisa dibaca dan dipulihkan".
+- **Uji pemulihan sebulan sekali** (`ujiPemulihanCadangan`, pada jam sepi, sekitar 1–3 menit): aplikasi ditutup
+  sebentar (isian dari HP menunggu di antrean HP), isi sekarang dicadangkan sebagai
+  "Cadangan sebelum pemulihan …", berkas itu dibaca lagi dari Drive dan dipulihkan, lalu jumlah baris tiap tab
+  dicocokkan. Tidak ada isian yang hilang. Berhasil jika log menulis "Uji pemulihan berhasil".
+- **Memulihkan** (misalnya data terhapus atau rusak):
+  1. Jalankan `periksaCadangan`. Log mendaftar semua cadangan di Drive; pilih yang akan dipulihkan.
+  2. Project Settings → Script Properties → tambahkan `PULIHKAN_CADANGAN` berisi nama berkasnya persis
+     (misalnya `Cadangan InventoryKu 2026-10-18 0300`). Jalankan `periksaCadangan` lagi untuk memeriksa berkas itu.
+  3. Jalankan `pulihkanCadangan`. **Semua isian sesudah cadangan itu dibuat hilang**; isi sebelum pemulihan
+     disimpan sebagai "Cadangan sebelum pemulihan …" (namanya ditulis di log). PIN, sesi, dan notifikasi tetap.
+  4. Untuk membatalkan: pulihkan berkas "Cadangan sebelum pemulihan …" dengan cara yang sama.
+  - Selama pemulihan, aplikasi di HP menulis "Server sedang dipulihkan…" dan isian masuk antrean HP. Peringatan
+    "Laporan harian belum terkirim" bisa tampil sampai laporan harian berikutnya.
+  - Jika pemulihan berhenti di tengah (misalnya waktu habis), aplikasi **tetap ditutup** supaya tidak ada isian
+    yang masuk ke data yang belum lengkap. Jalankan lagi fungsi yang sama sampai berhasil.
+- **Jika project Supabase hilang:** buat project baru (langkah 1–5), lalu di Apps Script ganti Script Property
+  `SUPABASE_API` dengan alamat function baru (dan `RAHASIA_SINKRON` jika secret-nya berbeda), isi
+  `PULIHKAN_CADANGAN`, dan jalankan `pulihkanCadangan`. Ganti `config.js` dengan alamat baru (langkah 9).
+  Karena kunci PIN tidak ada di cadangan, semua PIN lama tidak berlaku: jalankan `buatKodePemasangan`, masuk
+  lewat "Pulihkan akses Pengelola" di layar Login, lalu reset PIN staff lain dari Pengaturan → Staff dan PIN.
+  Notifikasi HP perlu dinyalakan lagi dari tiap HP. Tautan foto waste di Riwayat tidak terbuka; fotonya tetap
+  ada di Drive (`Laporan Kitchen/<Outlet>/Foto waste`).
 
 ## Kembali ke Apps Script (jika perlu)
 

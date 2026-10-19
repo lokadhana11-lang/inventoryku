@@ -22,19 +22,39 @@ const WAKTU_CEK = ['opening', 'middle', 'closing', 'cek ulang'];
  * langkah "mulai": { tab: [{ nama, urutan, meta }], properti: { kunci: nilai }, info: { ... } } → menghapus isi lama.
  * langkah "baris": { nama, dari, nilai: [[...]] } (tanggal { $d: ms }) → menambah baris (dipotong per bagian).
  * langkah "selesai": versi semua tab dinaikkan dan keadaan salinan = isi sekarang (Sheets sudah sama).
+ * Pemulihan cadangan (pemulihan: true, Code.gs v0.26): "mulai" tidak menghapus Script Properties dan info (PIN, sesi,
+ * kunci notifikasi, jadwal tetap), meta tab lama digabung dengan meta dari cadangan, dan versi tab dimulai di atas versi
+ * lama (supaya isolate lain tidak memakai isi lama dari simpanannya). "selesai" { harapan: { tab: jumlah baris } } menolak
+ * jika jumlah baris berbeda, tidak menyimpan keadaan salinan (Sheets berisi data lama, jadi disalin penuh), lalu membuka
+ * aplikasi lagi (info "pemulihan" dihapus).
  */
 export async function impor(sql, body, simpan) {
   return sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${KUNCI_TULIS})`;
     if (body.langkah === 'mulai') {
+      const pulih = !!body.pemulihan;
+      const lama = new Map();
+      let versiAwal = 1;
+      if (pulih) {
+        const rows = await tx`select nama, meta, versi from inventoryku.tab_meta`;
+        rows.forEach((r) => {
+          lama.set(r.nama, r.meta || {});
+          versiAwal = Math.max(versiAwal, Number(r.versi) + 1);
+        });
+      }
+      // Sejak di sini isi database belum lengkap sampai "selesai": tercatat di info pemulihan (lihat __pulihkan).
+      if (pulih) await tx`update inventoryku.info set nilai = nilai || ${tx.json({ impor: true })} where kunci = 'pemulihan'`;
       await tx`delete from inventoryku.tab_meta`;
       await tx`delete from inventoryku.sinkron`;
       await tx`delete from inventoryku.aksi_tab`;
-      await tx`delete from inventoryku.properti`;
-      await tx`delete from inventoryku.info where kunci not in ('rahasiaJadwal', 'jadwal', 'alamatApi')`;
+      if (!pulih) {
+        await tx`delete from inventoryku.properti`;
+        await tx`delete from inventoryku.info where kunci not in ('rahasiaJadwal', 'jadwal', 'alamatApi')`;
+      }
       for (const t of body.tab || []) {
+        const meta = Object.assign({}, lama.get(String(t.nama)) || {}, t.meta || {});
         await tx`insert into inventoryku.tab_meta (nama, urutan, meta, versi)
-          values (${String(t.nama)}, ${Number(t.urutan) || 0}, ${tx.json(t.meta || {})}, 1)`;
+          values (${String(t.nama)}, ${Number(t.urutan) || 0}, ${tx.json(meta)}, ${versiAwal})`;
       }
       const prop = body.properti || {};
       for (const k of Object.keys(prop)) {
@@ -64,6 +84,19 @@ export async function impor(sql, body, simpan) {
     if (body.langkah === 'selesai') {
       await tx`update inventoryku.tab_meta set versi = versi + 1, diubah = now()`;
       simpan.cacheTab.clear();
+      if (body.pemulihan) {
+        const n = await tx`select m.nama, (select count(*) from inventoryku.tab_baris b where b.tab = m.nama)::int as jumlah
+          from inventoryku.tab_meta m`;
+        const jumlah = {};
+        n.forEach((r) => { jumlah[r.nama] = r.jumlah; });
+        const harapan = body.harapan || {};
+        const beda = Object.keys(harapan).concat(Object.keys(jumlah)).filter((t, i, a) => a.indexOf(t) === i)
+          .filter((t) => Number(harapan[t] || 0) !== Number(jumlah[t] || 0))
+          .map((t) => t + ' ' + Number(jumlah[t] || 0) + ' dari ' + Number(harapan[t] || 0));
+        if (beda.length) throw new Error('Jumlah baris sesudah pemulihan tidak cocok: ' + beda.join(', ') + '. Jalankan ulang pemulihan.');
+        await tx`delete from inventoryku.info where kunci = 'pemulihan'`;
+        return { versi: {}, jumlah };
+      }
       const metas = await tx`select nama, meta, versi from inventoryku.tab_meta`;
       const zonaRow = await tx`select nilai from inventoryku.info where kunci = 'zona'`;
       const zona = zonaRow.length && zonaRow[0].nilai ? zonaRow[0].nilai : 'Asia/Jakarta';

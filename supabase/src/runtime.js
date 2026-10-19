@@ -84,6 +84,11 @@ export function buatRuntime(dep) {
       metas.forEach((m) => { versi[m.nama] = Number(m.versi); });
       const propsAwal = awal.props;
       const info = awal.info;
+      // Pemulihan cadangan sedang berjalan (__pulihkan "tutup"): aksi aplikasi dan jadwal ditolak sampai selesai.
+      if (info.pemulihan && !kerja.saatPulih) {
+        throw Object.assign(new Error('Server sedang dipulihkan dari cadangan oleh pemilik. Coba lagi beberapa menit lagi.'),
+          { pemulihan: true });
+      }
       const vapidPublik = await janjiVapid;
       // Fungsi dengan muat: 'master' (jadwal ringan, arsip tahunan) tidak memuat tab yang pernah dipelajari: tab lain dimuat saat
       // dibutuhkan, supaya jalan yang tidak mengerjakan apa-apa tetap murah.

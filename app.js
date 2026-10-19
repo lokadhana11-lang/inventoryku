@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.25.0';
+  var VERSI_APLIKASI = '0.26.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -329,6 +329,8 @@
           Simpan.tulis(KUNCI_PINDAH_API, { dari: alamatConfig(), ke: json.pindahKe });
           return panggilApi(aksi, isi, Object.assign({}, opsi || {}, { dialihkan: true }));
         }
+        // Server sementara ditutup (pemulihan cadangan, aplikasi 0.26.0): diperlakukan seperti tanpa sinyal, jadi isian masuk antrean.
+        if (!json.ok && json.cobaLagi) throw galatJaringan(typeof json.pesan === 'string' && json.pesan ? json.pesan : PESAN.gagalUmum);
         if (!json.ok) {
           var galat = new Error(typeof json.pesan === 'string' && json.pesan ? json.pesan : PESAN.gagalUmum);
           if (json.sesiBerakhir) galat.sesiBerakhir = true;
