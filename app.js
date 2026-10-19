@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.26.1';
+  var VERSI_APLIKASI = '0.27.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -6976,10 +6976,65 @@
         perTanggal[tg].sort(function (a, b) { return String(b.waktu || '').localeCompare(String(a.waktu || '')); })
           .forEach(function (x) { daftar.appendChild(x.kiriman ? barisKiriman(x.kiriman) : barisPeristiwa(x.peristiwa)); });
         wadahDaftar.appendChild(el('section', { class: 'kelompok' }, [
-          el('h2', { class: 'kelompok-judul', text: tanggalJudul(tg) }),
+          kepalaTanggal(tg, perTanggal[tg]),
           daftar
         ]));
       });
+    }
+
+    /**
+     * Judul kelompok tanggal. Pengelola (server v0.27): tombol "Tandai diperiksa (n)" untuk isian tanggal itu yang belum
+     * diperiksa dan tidak punya baris dilaporkan keliru (spesifikasi sistem Bagian 6.2).
+     */
+    function kepalaTanggal(tg, isi) {
+      var judul = el('h2', { class: 'kelompok-judul', text: tanggalJudul(tg) });
+      if (!pengelola || !data.periksaBanyak) return judul;
+      var belum = isi.filter(function (x) { return x.kiriman && x.kiriman.status !== 'Diperiksa'; })
+        .map(function (x) { return x.kiriman; });
+      var bisa = belum.filter(function (kr) { return !kr.dilaporkan; });
+      if (!bisa.length) return judul;
+      var t = tombol('Tandai diperiksa (' + bisa.length + ')', 'kedua', {
+        class: 'tombol-periksa-tanggal',
+        'aria-label': 'Tandai diperiksa (' + bisa.length + '), ' + tanggalJudul(tg)
+      });
+      t.addEventListener('click', function () { tandaiTanggal(tg, bisa, belum.length - bisa.length); });
+      return el('div', { class: 'kelompok-kepala' }, [judul, t]);
+    }
+
+    function tandaiTanggal(tg, bisa, dilaporkan) {
+      if (navigator.onLine === false) {
+        toast(PESAN.tidakAdaSinyal, 'masalah');
+        return;
+      }
+      var f = formTerpilih() || {};
+      var n = bisa.length;
+      konfirmasi({
+        judul: 'Tandai ' + n + ' isian diperiksa?',
+        teks: 'Isian ' + (f.nama || data.formId) + ' ' + tanggalJudul(tg) + ' yang belum diperiksa ditandai diperiksa atas nama ' +
+          k.sesi.pengguna.nama + ', lalu terkunci sampai dibuka lagi.' +
+          (dilaporkan ? ' ' + dilaporkan + ' isian yang punya baris dilaporkan keliru tidak ikut.' : ''),
+        teksYa: 'Tandai diperiksa',
+        jalankan: function () {
+          return panggilApi('tandaiDiperiksaBanyak', { formId: data.formId, submissionId: bisa.map(function (kr) { return kr.id; }) });
+        }
+      }).then(function (h) {
+        if (!h) return;
+        perbaruiKiriman(h.kiriman || []);
+        var lewat = (h.dilewati || []).length;
+        toast(teksHasilPeriksa(h), lewat ? 'info' : null);
+      });
+    }
+
+    function teksHasilPeriksa(h) {
+      var lewat = h.dilewati || [];
+      var lapor = lewat.filter(function (x) { return x.sebab === 'dilaporkan'; }).length;
+      var hilang = lewat.length - lapor;
+      var bagian = [];
+      if (h.diperiksa) bagian.push(h.diperiksa + ' isian ditandai diperiksa.');
+      if (h.sudah) bagian.push(h.sudah + ' isian sudah diperiksa sebelumnya.');
+      if (lapor) bagian.push(lapor + ' isian dilewati karena ada baris dilaporkan keliru.');
+      if (hilang) bagian.push(hilang + ' isian tidak ditemukan. Muat ulang Riwayat.');
+      return bagian.join(' ') || 'Tidak ada isian yang ditandai.';
     }
 
     /* ----- Tampilan Rekap harian (Stock_Harian), per tanggal lalu per kategori ----- */
@@ -7111,8 +7166,9 @@
       });
     }
 
+    /** Satu kiriman atau daftar kiriman (Tandai diperiksa sekaligus) yang baru dari server. */
     function perbaruiKiriman(kr) {
-      gantiKirimanTersimpan(data.formId, kr);
+      (Array.isArray(kr) ? kr : [kr]).forEach(function (x) { gantiKirimanTersimpan(data.formId, x); });
       var c = Cache.baca('riwayat');
       if (c && c.data && c.data.data && c.data.data.formId === data.formId) data = c.data.data;
       gambarIsi();

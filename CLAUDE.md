@@ -269,6 +269,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `buatCadanganSebelumPulih` (lewat `__fungsi`, satu-satunya yang boleh saat aplikasi ditutup). Cadangan JSON format 2 (`jenis`,
   `format`, `nama`, `tab[].meta`, tanggal `{ "$d": ms }`). Fungsi editor Apps Script: `periksaCadangan`, `ujiPemulihanCadangan`,
   `pulihkanCadangan` (Script Property `PULIHKAN_CADANGAN`).
+- Tandai diperiksa sekaligus (Code.gs v0.27, 19 Oktober 2026; khusus Pengelola): `tandaiDiperiksaBanyak {formId, submissionId: [id]}`
+  (paling banyak 300) → `{ diperiksa, sudah, dilewati: [{ id, sebab: dilaporkan|tidakAda }], kiriman: [kiriman lengkap seperti
+  `detailKiriman.kiriman`] }`. `riwayat` ditambah `periksaBanyak: true` (aplikasi menampilkan tombol per tanggal hanya jika ada).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -314,6 +317,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++++++ | Masa simpan barang masuk (keputusan pemilik 19 Oktober 2026, dari usulan fitur): "Masa simpan (hari)" per item di Pengaturan → Item, "Baik sampai" otomatis (boleh diubah) saat Tambah masuk di form Stock, kolom `Baik Sampai` di `Data_Stock`, pengingat lewat masa simpan dan habis besok untuk barang masuk di Beranda, Dashboard, pengingat stock, dan email, koreksi di Riwayat, kartu stok | Kode selesai (Code.gs v0.25, aplikasi 0.25.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (pembagian stock, prep dan barang masuk bersama, koreksi, Sheet lama) dan Chromium (Pengaturan → Item, Staff HP, desktop, server lama, Riwayat, Beranda, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Masa Simpan (hari)` di `M_Item` dan `Baik Sampai` di `Data_Stock`) |
 | 12++++++++++++++++++ | Uji dan pemulihan cadangan (permintaan pemilik 19 Oktober 2026, dari usulan fitur SYS-04): `periksaCadangan`, `ujiPemulihanCadangan`, dan `pulihkanCadangan` dari editor Apps Script membaca cadangan JSON dari Drive dan memulihkannya ke Supabase; aplikasi ditutup selama pemulihan (isian masuk antrean HP), isi sebelum pemulihan selalu dicadangkan, jumlah baris dicocokkan, pemulihan setengah jalan tidak membuka aplikasi; cadangan format 2; langkah di PANDUAN | Kode selesai (Code.gs v0.26, aplikasi 0.26.0), diuji ujung ke ujung: runtime dan pelayan asli `supabase/src` di atas Postgres 16 lokal, Apps Script tiruan (Drive, curl ke server) dengan Code.gs asli (pulihkan, batalkan, uji, format 1, cadangan rusak, putus di tengah, jumlah tidak cocok, project baru), dan Chromium (isian masuk antrean saat server ditutup). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `ujiPemulihanCadangan` sekali pada jam sepi (setupSpreadsheet tidak perlu) |
 | 12+++++++++++++++++++ | Tabel Stock muat di laptop dan teks lama dari masa Apps Script (permintaan pemilik 19 Oktober 2026, butir 1 dari telaah aplikasi): harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, sehingga Stock Akhir selalu terlihat tanpa menggeser tabel mulai 1.024 px; teks yang keliru sesudah pindah ke Supabase (toleransi Google, salinan spreadsheet, perintah pasangTrigger yang tidak perlu, isi tab M_Item/M_Unit, alamat Web App /exec) diganti | Kode selesai (aplikasi 0.26.1; Code.gs tidak berubah), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` dan Chromium (lebar tabel di 1024, 1280, 1366, 1920 px untuk lima kategori sebelum dan sesudah Tambah masuk diisi, urutan Tab, draft, kartu HP dan tablet sama piksel per piksel dengan 0.26.0). Menunggu pemilik: gabungkan PR, uji dari laptop (tidak perlu tempel Code.gs atau Edge Function) |
+| 12++++++++++++++++++++ | Tandai diperiksa sekaligus (permintaan pemilik 19 Oktober 2026, butir 2 dari telaah aplikasi): tombol "Tandai diperiksa (n)" di judul tiap tanggal di daftar Riwayat untuk Pengelola, konfirmasi, isian yang dilaporkan keliru tidak ikut | Kode selesai (Code.gs v0.27, aplikasi 0.27.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (30 uji server: dilaporkan, id ganda dan tak dikenal, ulang, Staff ditolak, batas, lima jenis form, Beranda; sel yang berubah sama dengan Tandai diperiksa satu per satu) dan Chromium (27 uji: HP, desktop dengan detail kanan, Staff, server lama, tanpa sinyal, galat server, delapan ukuran, gerak). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2312,3 +2316,39 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     lebar sel Tambah Masuk tetap), urutan Tab, label satuan besar, aturan tampil, draft setelah dimuat ulang, tanpa galat konsol;
     kartu Stock di 320, 390, dan 768 px sama piksel per piksel dengan 0.26.0 (tiga kategori, Tambah masuk diisi); `simpanOutletJadwal`
     di mode Supabase menjawab `jadwalBerubah: true` dan `perluPasangTrigger: false`. Belum diuji di laptop pemilik.
+
+### Tandai diperiksa sekaligus (Code.gs v0.27, aplikasi 0.27.0, 19 Oktober 2026)
+
+316. **Asal:** telaah aplikasi oleh Claude (19 Oktober 2026), butir 2 yang dipilih pemilik. Pemeriksaan hanya bisa per kiriman
+    (buka detail, Tandai diperiksa); data contoh 11 hari sudah berisi 64 isian belum diperiksa, dan dapur sungguhan (Stock per
+    kategori, Suhu tiga kali, Prep, Waste) bisa lebih dari 300 per bulan, sehingga angka "belum diperiksa" di Beranda, Dashboard,
+    dan email cenderung diabaikan. Spesifikasi sistem Bagian 6.2 butir 4; tampilan Bagian 5.4 dan 7.
+317. **Tempat dan cakupan** (keputusan tambahan; spesifikasi tidak mengatur): satu tombol per tanggal di daftar Catatan Riwayat, bukan
+    satu tombol untuk seluruh daftar, supaya Pengelola tetap membaca isian hari itu sebelum menandainya (makna "Diperiksa oleh" di
+    PDF). Hanya form yang sedang dipilih (Riwayat memang per form). Yang dikirim ke server adalah id kiriman yang tampil di daftar,
+    jadi isian yang masuk sesudah daftar dimuat tidak ikut tertandai tanpa terlihat. Dengan filter kategori atau item, kiriman yang
+    tampil ditandai utuh (semua barisnya), sama dengan Tandai diperiksa di detail.
+318. **Server** (`aksiTandaiDiperiksaBanyak_`): id dirapikan (ganda dibuang), kosong ditolak ("Tidak ada isian yang dipilih. Muat ulang
+    Riwayat."), lebih dari `BATAS_PERIKSA_BANYAK` (300) ditolak. Di dalam satu `denganKunci_`, tab dibaca sekali dan baris dikelompokkan
+    per `submission_id`; kiriman yang masih punya baris `flagged_by` dilewati (`dilaporkan`), yang tidak ada dilewati (`tidakAda`),
+    yang semua barisnya sudah Diperiksa dihitung `sudah`, sisanya ditulis seperti `aksiTandaiDiperiksa_` (status, checked_by,
+    checked_at lewat `tulisSel_`; `Log_Perubahan` tidak ditulis, sama seperti Tandai diperiksa satu per satu). Satu kiriman yang
+    dilewati tidak menggagalkan yang lain (berbeda dengan tombol satuan, yang menolak dengan pesan). `kiriman` di jawaban dibentuk
+    `susunKiriman_` dari baris yang sama (termasuk `rincian` Prep), sehingga sama dengan `detailKiriman`. Versi data diganti saat
+    keluar dari kunci, jadi Beranda dan Dashboard langsung ikut.
+319. **Aplikasi** (`kepalaTanggal`, `tandaiTanggal`, `teksHasilPeriksa` di `layarRiwayat`): `.kelompok-kepala` (flex, turun baris jika
+    sempit) berisi judul tanggal dan `.tombol-periksa-tanggal` (tombol kedua 44 px) dengan `aria-label` "Tandai diperiksa (3), Minggu,
+    18 Oktober". Jumlahnya = kiriman tanggal itu yang tidak berstatus Diperiksa dan `dilaporkan` 0; tanpa itu atau tanpa
+    `periksaBanyak` (server lama) atau untuk Staff, judul seperti dulu. Tanpa sinyal: pesan "Tidak ada sinyal…" tanpa lembar. Lembar
+    `konfirmasi` memanggil server; galat tampil di lembar. Sesudah berhasil, `perbaruiKiriman` (kini menerima daftar) mengganti kiriman
+    di simpanan Riwayat dan menggambar ulang daftar serta detail kanan desktop; pesan singkat `teksHasilPeriksa` (jenis info jika ada
+    yang dilewati).
+320. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` dengan data contoh 12 hari: 30 uji server
+    (riwayat `periksaBanyak`, Staff ditolak, satu kiriman dilaporkan keliru dilewati dan tetap Terkirim, id ganda dan tak dikenal,
+    `Log_Perubahan` tetap, Beranda turun satu, ulang = `sudah`, koreksi baris terkunci ditolak lalu Buka kunci, daftar kosong/bukan
+    larik/301 id/form tak dikenal, Suhu/Prep (dengan rincian)/Waste/form kustom), pembanding dengan `tandaiDiperiksa` (sel yang berubah
+    sama: `status`, `checked_by`, `checked_at`; bentuk kiriman sama; jawaban = `detailKiriman`). Chromium dengan API tiruan: 27 uji (HP:
+    tombol per tanggal, tanggal berlaporan "(1)" dan kalimatnya, Batal, Tandai, pesan, tanda, muat ulang, tanpa sinyal; desktop: detail
+    kanan berganti ke Buka kunci; Staff dan server lama tanpa tombol; galat server di lembar; delapan ukuran Bagian 4.6 tanpa gulir
+    samping, tombol ≥ 44 px di dalam layar, judul dan tombol tidak bertumpuk, teks tidak terpotong; dengan gerak), tanpa galat konsol.
+    Belum diuji di Supabase asli dan di HP.

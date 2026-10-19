@@ -1018,6 +1018,12 @@ Form kertas diakhiri dengan "Diperiksa oleh". Padanannya di web:
 2. Head Kitchen atau Manager membuka submit tersebut di menu Riwayat, memeriksa, lalu
    menekan "Tandai Diperiksa" → status **Diperiksa**, `checked_by` dan `checked_at` terisi.
 3. Nama pemeriksa dan waktunya tercetak di laporan PDF pada baris "Diperiksa oleh".
+4. **Tandai diperiksa sekaligus** (19 Oktober 2026): di daftar Riwayat, judul tiap tanggal punya
+   tombol "Tandai diperiksa (n)" untuk Head Kitchen atau Manager. Setelah konfirmasi, semua isian
+   form itu pada tanggal itu yang tampil dan belum diperiksa ditandai Diperiksa sekaligus, dengan
+   aturan yang sama dengan langkah 2. Isian yang masih punya baris dilaporkan keliru tidak ikut,
+   dan isian yang dikirim sesudah daftar dimuat juga tidak ikut. Tujuannya pemeriksaan harian:
+   Pengelola membaca daftar hari itu, lalu menandainya dalam satu ketukan.
 
 Satu hari bisa punya beberapa kiriman untuk form yang sama. Jika semuanya sudah diperiksa,
 PDF mencantumkan pemeriksa terakhir dan waktunya. Jika belum, PDF menulis jumlahnya,
