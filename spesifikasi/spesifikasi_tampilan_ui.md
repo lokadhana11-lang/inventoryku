@@ -23,6 +23,9 @@
 > (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
+> Tambahan 19 Oktober 2026 (keputusan pemilik): masa simpan barang masuk, yaitu isian "Masa simpan
+> (hari, tidak wajib)" di Pengaturan → Item dan "Baik sampai" yang terisi otomatis di form Stock dan
+> bisa dikoreksi di Riwayat (Bagian 5.3, 5.4, 5.7).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): tombol "Hapus" di layar ubah item untuk item
 > nonaktif yang belum punya catatan (Bagian 5.7, 7, dan 11).
 > Tambahan 17 Oktober 2026 (permintaan pemilik): notifikasi ke HP, yaitu pilihan "Notifikasi" di menu
@@ -550,7 +553,8 @@ Satu-satunya layar yang sepenuhnya navy.
   "Ganti pengguna".
 - **Masa simpan.** Di bawah tiket, untuk semua role: daftar "Lewat masa simpan" (tanda
   Masalah) dan "Habis besok" (tanda Perlu ditinjau), tiap baris dengan tombol "Catat
-  sebagai waste". Daftar tidak tampil jika kosong.
+  sebagai waste". Daftar tidak tampil jika kosong. Sejak 19 Oktober 2026 daftar ini memuat
+  barang jadi dan barang masuk yang punya "Baik sampai".
 - Di tablet tiket berjajar tiga per baris. Di laptop/desktop empat per baris.
 - **Form kustom** tampil sebagai tiket tambahan dengan bentuk yang sama, mengikuti urutan
   yang diatur Pengelola. Form yang disembunyikan tidak tampil. Jika tiket lebih dari empat,
@@ -624,6 +628,12 @@ Satu-satunya layar yang sepenuhnya navy.
   Di tabel laptop/desktop kolom "Harga Beli (Rp)" di sebelah Tambah Masuk. Titik di antara
   kelompok tiga angka dibaca pemisah ribuan ("16.000" = 16000). Galat: "Periksa harga beli Tomat.
   Isi rupiah, misalnya 15000 atau 15.000."
+- **Baik sampai** (19 Oktober 2026, hanya item yang punya masa simpan): di kartu HP/tablet, kolom
+  "Baik sampai" (pemilih tanggal bawaan browser) muncul di bawah harga beli setelah Tambah masuk
+  diisi, sudah terisi tanggal + masa simpan, dengan keterangan "Masa simpan 3 hari. Boleh diubah."
+  atau, setelah diubah, "Diubah dari 22 Okt (masa simpan 3 hari)." Di tabel laptop/desktop kolom
+  "Baik Sampai" di sebelah Harga Beli, hanya jika kategori itu punya item bermasa simpan ("–" untuk
+  item lain). Tanggal sebelum tanggal isian: "Periksa baik sampai Ayam. Pilih tanggal sejak 19 Okt."
 - Di laptop/desktop: tabel dengan kolom No, Nama Item, Stock Awal, Tercatat Hari Ini,
   Tambah Masuk, Tambah Keluar, Stock Akhir, Satuan. Kolom otomatis berlatar Baja.
 - Di PDF dan tab Harian, item dikelompokkan di bawah baris judul kategorinya, dengan
@@ -714,6 +724,10 @@ Satu-satunya layar yang sepenuhnya navy.
   Sumber Segar"; tiap baris punya "Harga beli Rp 16.000" (per satuan dasar). Lembar Koreksi
   Pengelola punya kolom "Harga beli (Rp per kg)" yang boleh dikosongkan. Kartu stok menulis
   "Dari Sumber Segar · Harga beli Rp 16.000/kg" di keterangan baris Stock.
+- **Baik sampai di Riwayat Stock** (19 Oktober 2026): baris yang punya Stock Masuk menulis "Baik
+  sampai 22 Okt" ("–" jika kosong); baris tanpa barang masuk tidak punya kolom ini, juga tidak
+  punya harga beli. Lembar Koreksi Pengelola punya pemilih tanggal "Baik sampai" yang boleh
+  dikosongkan. Kartu stok menambah "Baik sampai 22 Okt" di keterangan baris Stock.
 - **Riwayat per item** (Stock): ketuk nama item, muncul lembar dari bawah berisi tabel
   7 rekap terakhir item itu (Awal, Masuk, Hasil Prep, Keluar, Dipakai Prep, Waste,
   Penyesuaian, Akhir). Hari dengan Stock Akhir minus diberi tanda Masalah. Stock Masuk
@@ -899,7 +913,7 @@ Satu-satunya layar yang sepenuhnya navy.
   Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
 - Kartu "Pengingat stock" (18 Oktober 2026), di bawah Pengingat cek suhu: keterangan "Notifikasi pagi
   ke HP Head Kitchen dan Manager yang menyalakan notifikasi, hanya jika ada item di bawah stok
-  minimum, stock minus, atau barang jadi yang lewat masa simpan atau habis besok. Kosongkan jam untuk
+  minimum, stock minus, atau barang yang lewat masa simpan atau habis besok. Kosongkan jam untuk
   mematikannya.", lalu pemilih jam "Jam pengingat stock" (awal 07.00) dan kalimat yang sama jika
   server belum bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.
 
@@ -915,8 +929,11 @@ Satu-satunya layar yang sepenuhnya navy.
 
 **Pengaturan → Item:**
 
-- Isian: nama, kategori, satuan, harga satuan, stok minimum, dan stok maksimum (opsional,
-  dipakai untuk saran order). Item baru mengisi harga pertamanya di isian harga satuan.
+- Isian: nama, kategori, satuan, harga satuan, stok minimum, stok maksimum (opsional,
+  dipakai untuk saran order), dan "Masa simpan (hari, tidak wajib)" (19 Oktober 2026), dengan
+  keterangan "Berapa hari barang ini masih baik dipakai sejak datang, misalnya 3 untuk ayam. Baik
+  sampai terisi otomatis saat Tambah masuk." (ditambah "Hasil prep memakai masa simpan resepnya."
+  untuk item yang punya resep aktif). Item baru mengisi harga pertamanya di isian harga satuan.
 - **Harga satuan punya riwayat** (spesifikasi sistem Bagian 5.1). Setelah item punya harga,
   isian harga diganti dengan tulisan "Harga sekarang Rp 15.000 (sejak 7 Okt)" dan tombol
   "Ganti harga". Harga awal yang berlaku sejak awal ditulis "Harga sekarang Rp 15.000".

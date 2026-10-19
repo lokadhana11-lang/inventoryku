@@ -4772,6 +4772,24 @@ body.papan-ketik .bilah-kirim {
   max-width: 180px;
 }
 
+/* Baik sampai barang masuk (aplikasi 0.25.0): pemilih tanggal bawaan browser. */
+.isian-tanggal {
+  max-width: 220px;
+}
+
+.tabel-isian td.sel-baik-sampai {
+  min-width: 170px;
+}
+
+.tabel-isian td.sel-baik-sampai .isian-tanggal {
+  width: 160px;
+}
+
+.tabel-isian td.sel-baik-sampai .kolom-bantuan {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
 .kolom-item .deret-tombol {
   margin-top: 4px;
 }

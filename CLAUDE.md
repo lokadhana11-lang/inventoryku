@@ -256,6 +256,12 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `hasilAktualSiap` dan `kiriman.baris[].hasilAktual`, `hasilStandar`. `riwayat`/`detailKiriman` Prep: `kolom[]` ditambah `hasilAktual`
   (koreksi, opsional, `jikaKolom: 'jumlahResep'` = hanya untuk baris yang kolom itu berisi). Rekap bulanan `prep.aktual: { catatan,
   aktual, standar }` dan `prep.item[].standar`.
+- Masa simpan barang masuk (Code.gs v0.25, 19 Oktober 2026): `daftarItem` ditambah `masaSimpanSiap` dan `item[].masaSimpan` (hari atau
+  null); `simpanItem` menerima `masaSimpan` (hari bulat 0–365, '' = tanpa; tidak dikirim = tidak diubah). `formStock` ditambah
+  `masaSimpanSiap` dan `item[].masaSimpan`; `kirimStock.baris[].baikSampai` (yyyy-mm-dd, tidak wajib; kosong = tanggal + masa simpan
+  item). `riwayat`/`detailKiriman` Stock: `kolom[]` ditambah `baikSampai` (jenis `tanggal`, koreksi, opsional); properti kolom baru
+  `jikaPositif` (kolom hanya untuk baris yang kolom acuannya > 0; juga di `hargaBeli`). `beranda.masaSimpan`, Dashboard, pengingat
+  stock, dan email kini juga memuat barang masuk.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -298,6 +304,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++ | Pengingat stock ke HP Pengelola (permintaan pemilik 18 Oktober 2026, dari usulan fitur SYS-07): notifikasi pagi (jam diatur di Outlet dan jadwal, awal 07.00) berisi item minus, di bawah stok minimum, lewat masa simpan, dan habis besok, hanya jika ada | Kode selesai (Code.gs v0.22, aplikasi 0.22.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (isi dan penerima, tanpa kiriman jika aman, jam diubah/dimatikan dan jadwalnya, tanpa kunci notifikasi, pengingat suhu tetap) dan Chromium (Outlet dan jadwal, lembar Notifikasi Pengelola dan Staff, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali |
 | 12+++++++++++++++ | Pemasok dan harga beli (keputusan pemilik 18 Oktober 2026, dari usulan fitur INV-07, INV-09, RPT-02): `M_Pemasok` dan Pengaturan → Pemasok, pilihan pemasok dan harga beli (tidak wajib, semua role) di form Stock, harga beli berbeda ditinjau Pengelola di Dashboard (Pakai / Abaikan), koreksi harga beli, kartu stok, bagian Pembelian di rekap bulanan | Kode selesai (Code.gs v0.23, aplikasi 0.23.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (server sebelum dan sesudah setupSpreadsheet) dan Chromium (Staff HP, desktop, antrean, server lama, Pengaturan → Pemasok, Dashboard, koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Pemasok`, dua kolom `Data_Stock`) |
 | 12++++++++++++++++ | Hasil prep aktual (permintaan pemilik 18 Oktober 2026, dari usulan fitur KIT-06): kolom "Hasil aktual" (tidak wajib) di Prep List; stock memakai hasil aktual, hasil menurut resep tetap terlihat di layar, Riwayat, PDF, kartu stok, dan rekap bulanan; perbaikan kiriman Stock di Sheet yang belum menjalankan setupSpreadsheet sejak v0.23 | Kode selesai (Code.gs v0.24, aplikasi 0.24.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (stock, koreksi, PDF, rekap, Sheet lama) dan Chromium (Staff HP, desktop, server lama, Riwayat dan koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Hasil Aktual` di `Data_Prep`) |
+| 12+++++++++++++++++ | Masa simpan barang masuk (keputusan pemilik 19 Oktober 2026, dari usulan fitur): "Masa simpan (hari)" per item di Pengaturan → Item, "Baik sampai" otomatis (boleh diubah) saat Tambah masuk di form Stock, kolom `Baik Sampai` di `Data_Stock`, pengingat lewat masa simpan dan habis besok untuk barang masuk di Beranda, Dashboard, pengingat stock, dan email, koreksi di Riwayat, kartu stok | Kode selesai (Code.gs v0.25, aplikasi 0.25.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (pembagian stock, prep dan barang masuk bersama, koreksi, Sheet lama) dan Chromium (Pengaturan → Item, Staff HP, desktop, server lama, Riwayat, Beranda, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Masa Simpan (hari)` di `M_Item` dan `Baik Sampai` di `Data_Stock`) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2186,3 +2193,41 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Sheet tanpa kolom lalu `setupSpreadsheet`, kiriman Stock di Sheet tanpa kolom pemasok. Chromium: Staff HP (kolom hanya untuk item beresep,
     persen, galat, kirim, Tercatat), tabel desktop, server lama, Riwayat kartu dan koreksi (kosongkan → "–"), delapan ukuran; semua uji
     fitur 18 Oktober lain tetap lulus. Belum diuji di Supabase asli dan HP.
+
+### Masa simpan barang masuk (Code.gs v0.25, aplikasi 0.25.0, 19 Oktober 2026)
+
+298. **Asal dan keputusan pemilik:** butir kelima dari usulan fitur. Pemilik memilih masa simpan per item: Pengelola mengisi
+    "Masa simpan (hari)" di Pengaturan → Item, saat barang masuk "Baik sampai" terisi otomatis dan boleh diubah, Staff tidak perlu
+    mengetik tanggal. Tidak dibangun: nomor batch, tanggal kedaluwarsa per kemasan, atau pelacakan per kiriman. Spesifikasi sistem
+    Bagian 5.1, 5.3, 5.5; tampilan Bagian 5.2, 5.3, 5.4, 5.7.
+299. **Data:** kolom `Masa Simpan (hari)` (bulat) di akhir `M_Item` dan `Baik Sampai` (tanggal) di akhir `Data_Stock`, ditambahkan
+    `setupSpreadsheet`. `masaSimpanItemSiap_()` = kedua kolom ada; sebelumnya layar tidak menampilkan isian, `kirimStock` dengan
+    `baikSampai` dan `simpanItem` dengan masa simpan berisi ditolak dengan petunjuk, kiriman tanpa keduanya tetap jalan (kolom ditulis
+    lewat `kolomAda_`, butir 296). Masa simpan item: 0–365 seperti resep (`masaSimpanIsian_`); `simpanItem` tanpa field `masaSimpan`
+    (aplikasi lama) tidak mengubah kolomnya.
+300. **Baik sampai** (`baikSampaiMasuk_`): hanya baris yang punya Stock Masuk. Tanggal dari HP (Staff juga) jika ada; kosong = tanggal
+    isian + masa simpan item saat server menerima (item tanpa masa simpan: kosong). Tanggal sebelum tanggal isian atau lebih dari 365
+    hari sesudahnya ditolak. HP hanya mengirim tanggal yang diubah, jadi kiriman di antrean memakai masa simpan item saat diterima.
+    Barang jadi yang dibeli jadi memakai masa simpan item; hasil prep tetap memakai masa simpan resep.
+301. **Hitungan** (`masaSimpan_`): baris `Data_Prep` (Hasil) dan `Data_Stock` (Stock Masuk > 0) per item digabung, lalu stock tersisa
+    dibagikan mulai yang paling baru (tanggal, lalu waktu diterima), seperti butir 103. Jadi barang masuk dengan Baik Sampai lewat
+    hanya dihitung sebanyak bagian stock yang diperkirakan masih berasal darinya. Beranda, Dashboard (judul kini "n item lewat masa
+    simpan" / "n item habis besok"), pengingat stock, dan email harian ("Tidak ada barang yang lewat …") memakainya tanpa perubahan lain.
+302. **Riwayat:** kolom `baikSampai` (jenis `tanggal`, `ubah`/`normal` dengan teks yyyy-mm-dd; `aksiKoreksi_` menulis kolom berjenis
+    tanggal sebagai tanggal sel dan teks ke `Log_Perubahan`); `periksaKoreksi` menolak tanggal sebelum tanggal isian. Tidak ditolak saat
+    Stock Masuk dikoreksi menjadi 0 (baris itu tidak lagi dihitung). Properti kolom baru `jikaPositif: 'masuk'` (juga untuk harga beli):
+    `kolomBerlaku` di app.js menyembunyikan kolom pada baris tanpa barang masuk. Lembar Koreksi memakai `<input type=date>` dengan
+    `min` tanggal isian; nilai lama tanggal ditulis "22 Okt". Kartu stok: "Baik sampai 22 Okt".
+303. **Layar:** Pengaturan → Item: isian "Masa simpan (hari, tidak wajib)" di kartu stok minimum/maksimum (hanya jika `masaSimpanSiap`),
+    draft lama tanpa masa simpan diisi dari server. Form Stock: kolom "Baik sampai" (pemilih tanggal bawaan, `isian-tanggal`) muncul
+    setelah Tambah masuk diisi, nilai awal tanggal + masa simpan; draft menyimpan `isian.baik` hanya jika berbeda dari hitungan otomatis
+    (dikosongkan = kembali otomatis); tabel desktop punya kolom "Baik Sampai" hanya jika kategori itu punya item bermasa simpan, sehingga
+    tabel di 1366 px bisa bergeser di dalam bingkainya (halaman tidak). Kata "barang jadi" pada masa simpan di Dashboard, email, Outlet
+    dan jadwal diganti "item"/"barang".
+304. **Uji** (di luar repo): Code.gs asli di Node di atas `supabase/src/sheet.js` dan `layanan.js`: Pengaturan → Item (validasi, aplikasi
+    lama, kosongkan, Staff ditolak), kiriman otomatis/diubah/ditolak (sebelum tanggal masuk, > 365 hari, tidak terbaca), baris keluar
+    tanpa baik sampai, pembagian stock 3 + 4 + 1 (lewat 5 kg hari ini; kemarin lewat 1 dan habis besok 4), Beranda Staff, Dashboard,
+    pengingat stock, prep dan barang masuk bersama untuk satu item, Riwayat dan koreksi (ubah, tolak, kosongkan, Log_Perubahan), kartu
+    stok, Sheet tanpa kolom lalu `setupSpreadsheet`. Chromium: Pengaturan → Item, Staff HP (otomatis, galat, ubah, draft setelah dimuat
+    ulang, kirim), tabel desktop, server lama, koreksi tanggal di Riwayat, Beranda, delapan ukuran untuk tiga layar; uji fitur 18 Oktober
+    lain tetap lulus. Belum diuji di Supabase asli, salinan kolom baru ke Sheets, dan pemilih tanggal di HP asli.

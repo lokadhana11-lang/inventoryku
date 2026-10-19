@@ -52,6 +52,9 @@
 > Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur KIT-06): hasil prep aktual. Hasil
 > yang benar-benar jadi boleh dicatat (tidak wajib) dan dipakai untuk stock; hasil menurut resep
 > tetap terlihat sebagai pembanding (Bagian 5.3 dan 9.3).
+> Diperbarui 19 Oktober 2026 (keputusan pemilik): masa simpan barang masuk. Item boleh punya masa
+> simpan; saat barang masuk, tanggal "Baik sampai" terisi otomatis dan boleh diubah, lalu ikut
+> pengingat masa simpan bersama barang jadi (Bagian 5.1, 5.3, 5.5).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -136,7 +139,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Stock opname | Berkala, oleh Pengelola. Hasil hitung barang nyata meluruskan stock dan menghasilkan laporan selisih (Bagian 5.7). |
 | Daftar belanja | Otomatis dari item di bawah stok minimum, dengan saran jumlah order. Hanya Pengelola. |
 | Nilai stock | Nilai rupiah stock dan pemakaian bahan tampil di dashboard. Hanya Pengelola. Harga satuan punya riwayat: setiap nilai rupiah memakai harga yang berlaku pada tanggal gerakan atau tanggal yang dinilai (Bagian 8.5). |
-| Masa simpan | Tiap resep bisa punya masa simpan. Aplikasi mengingatkan barang jadi yang lewat masa simpan. |
+| Masa simpan | Tiap resep dan tiap item bisa punya masa simpan. Aplikasi mengingatkan barang jadi dan barang masuk yang lewat masa simpan (Bagian 5.3). |
 | Tanda nihil | Form yang memang kosong hari itu ditandai "Tidak ada hari ini", supaya tidak dilaporkan belum diisi (Bagian 5.8). |
 | Cadangan data | Salinan spreadsheet otomatis tiap minggu; empat salinan terakhir disimpan |
 | Rekap bulanan | PDF otomatis tiap awal bulan, dikirim lewat email. Hanya Pengelola. |
@@ -412,7 +415,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Unit` | Nama Unit, Tipe (Chiller/Freezer), Aktif | Dropdown unit, validasi suhu |
 | `M_Pemasok` (18 Oktober 2026) | Nama Pemasok, Kontak, Catatan, Aktif | Pilihan pemasok saat barang masuk (Bagian 5.5); pembelian per pemasok |
 | `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
-| `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang |
+| `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif, Masa Simpan dalam hari (opsional, 19 Oktober 2026) | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang, baik sampai barang masuk |
 | `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
 | `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
@@ -592,14 +595,21 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
   Pengelola bisa mengisi, mengubah, atau mengosongkan hasil aktual lewat koreksi Riwayat. Jika
   hasil nyata selalu berbeda, Pengelola tetap sebaiknya memperbaiki Hasil per 1 Resep.
 
-**Masa simpan barang jadi:**
+**Masa simpan barang jadi dan barang masuk:**
 
 - Saat prep dikirim, layar menampilkan tanggal "Baik sampai", untuk ditulis di label wadah.
-- Sistem tidak melacak tiap wadah. Ia memperkirakan dengan anggapan yang dibuat lebih dulu
-  dipakai lebih dulu: stock yang tersisa dianggap berasal dari prep paling baru.
-- Jika stock tersisa masih mencakup prep yang sudah lewat tanggal "Baik sampai", item itu
-  masuk daftar **Lewat masa simpan**, lengkap dengan perkiraan jumlahnya. Prep yang habis
-  masa simpannya besok masuk daftar **Habis besok**.
+- Barang masuk (keputusan pemilik 19 Oktober 2026): item boleh punya "Masa simpan (hari)" di
+  Pengaturan → Item (misalnya ayam 3 hari). Saat Stock Masuk diisi, "Baik sampai" terisi tanggal
+  masuk + masa simpan dan boleh diubah (misalnya mengikuti tanggal di kemasan). Staff tidak perlu
+  mengetik tanggal. Item tanpa masa simpan tidak punya kolom ini. Pengelola bisa mengoreksi atau
+  mengosongkan "Baik sampai" lewat Riwayat (Bagian 6.3). Barang jadi yang dibeli jadi (Stock
+  Masuk) memakai masa simpan item; hasil prep tetap memakai masa simpan resepnya.
+- Sistem tidak melacak tiap wadah atau tiap kiriman. Ia memperkirakan dengan anggapan yang datang
+  atau dibuat lebih dulu dipakai lebih dulu: stock yang tersisa dianggap berasal dari prep dan
+  barang masuk paling baru.
+- Jika stock tersisa masih mencakup prep atau barang masuk yang sudah lewat tanggal "Baik
+  sampai", item itu masuk daftar **Lewat masa simpan**, lengkap dengan perkiraan jumlahnya. Yang
+  habis masa simpannya besok masuk daftar **Habis besok**.
 - Kedua daftar tampil di Beranda untuk semua role dan di email harian. Dari daftar itu ada
   jalan pintas "Catat sebagai waste" dengan kategori Expired sudah terpilih.
 
@@ -645,6 +655,7 @@ stock opname berkala (Bagian 5.7).
 | Stock Keluar | Number | Pemakaian langsung saja, **di luar** prep dan waste |
 | Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. |
 | Harga Beli | Rupiah, tidak wajib | Per baris yang punya Stock Masuk (18 Oktober 2026): harga per satuan yang diketik (per dus jika masuk dalam satuan besar), disimpan per satuan dasar di kolom `Harga Beli (Rp)`. |
+| Baik Sampai | Tanggal, otomatis | Per baris yang punya Stock Masuk, hanya untuk item yang punya masa simpan (19 Oktober 2026): tanggal masuk + masa simpan item, boleh diubah (tidak sebelum tanggal masuk, paling lama 365 hari sesudahnya). |
 
 - **Pemasok dan harga beli** (keputusan pemilik 18 Oktober 2026) boleh diisi semua role dan
   tidak wajib. Harga beli **tidak** langsung mengubah harga satuan: Dashboard Pengelola
@@ -1418,7 +1429,7 @@ Keterangan di bawah ini untuk laporan harian.
   - Total waste hari itu (qty dan estimasi Rp)
   - Ringkasan daftar belanja: item di bawah stok minimum dan saran ordernya
   - Item dengan Stock Akhir minus
-  - Barang jadi yang lewat masa simpan atau habis besok
+  - Barang jadi dan barang masuk yang lewat masa simpan atau habis besok
   - Jumlah data yang belum diperiksa, baris yang dilaporkan keliru, dan permintaan reset PIN
   - Akun yang terkunci karena PIN salah dalam 24 jam terakhir
   - Pengingat stock opname jika sudah lewat jadwal
@@ -1450,7 +1461,7 @@ Apps Script tidak bisa mengirimnya.
 | "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif |
-| "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang jadi yang lewat masa simpan atau habis besok |
+| "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
 
 - **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
   Middle 14.00, Closing 21.00 (nilai awal); jam yang dikosongkan mematikan pengingat itu. Tidak ada
@@ -1509,10 +1520,10 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 
 - [ ] **Jadwal stock opname bawaan adalah mingguan.** Bisa diganti bulanan di Pengaturan.
 - [ ] **Saran order** = Stok Maksimum − Stock Akhir, dibulatkan ke satuan besar.
-- [ ] **Masa simpan diperkirakan**, bukan dilacak per wadah: yang dibuat lebih dulu
-      dianggap dipakai lebih dulu.
-- [ ] **Hasil prep selalu mengikuti resep.** Staff tidak mengetik hasil nyata; jika hasil
-      nyata sering berbeda, Pengelola memperbaiki angka di Master Resep.
+- [ ] **Masa simpan diperkirakan**, bukan dilacak per wadah atau per kiriman: yang datang atau
+      dibuat lebih dulu dianggap dipakai lebih dulu.
+- [ ] **Hasil prep mengikuti resep, kecuali hasil aktual diisi** (Bagian 5.3, 18 Oktober 2026);
+      jika hasil nyata sering berbeda, Pengelola memperbaiki angka di Master Resep.
 - [ ] **Harga barang jadi** yang dikosongkan dihitung dari harga bahan resepnya.
 - [x] **Harga item punya riwayat** (keputusan pemilik, 11 Oktober 2026). Nilai stock pada
       suatu tanggal memakai harga yang berlaku pada tanggal itu, bukan harga saat barang dibeli

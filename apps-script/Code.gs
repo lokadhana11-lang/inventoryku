@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.24 (hasil prep aktual)
+// InventoryKu Code.gs v0.25 (masa simpan barang masuk)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -87,7 +87,7 @@
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
  */
 
-var VERSI_KODE = 'v0.24';
+var VERSI_KODE = 'v0.25';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -1979,7 +1979,7 @@ function angkaAtauNull_(v) {
   return isFinite(n) ? n : null;
 }
 
-/** M_Item: { namaKecil: { nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, aktif } }. */
+/** M_Item: { namaKecil: { nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, aktif, masaSimpan } }. */
 function bacaItem_() {
   var t = wajibTabel_('M_Item');
   var peta = {};
@@ -1997,10 +1997,38 @@ function bacaItem_() {
       harga: angkaAtauNull_(nilai_(t, b, 'Harga Satuan (Rp)')),
       stokMin: angkaAtauNull_(nilai_(t, b, 'Stok Minimum')),
       stokMaks: angkaAtauNull_(nilai_(t, b, 'Stok Maksimum')),
-      aktif: benar_(nilai_(t, b, 'Aktif'))
+      aktif: benar_(nilai_(t, b, 'Aktif')),
+      // Masa simpan barang masuk (Code.gs v0.25); null = tanpa masa simpan.
+      masaSimpan: masaSimpanSel_(nilai_(t, b, 'Masa Simpan (hari)'))
     };
   });
   return peta;
+}
+
+/** Masa simpan dari sel (resep atau item): bilangan hari 0 atau lebih, selain itu null. */
+function masaSimpanSel_(nilai) {
+  var n = angkaAtauNull_(nilai);
+  return n == null || n < 0 ? null : Math.round(n);
+}
+
+/** Isian masa simpan dari Pengaturan: '' → null; selain itu bilangan bulat 0–MASA_SIMPAN_MAKS. */
+function masaSimpanIsian_(nilai) {
+  var masa = String(nilai == null ? '' : nilai).trim();
+  if (masa === '') return null;
+  if (!/^\d+$/.test(masa) || Number(masa) > MASA_SIMPAN_MAKS) {
+    throw galatPengguna_('Masa simpan diisi angka hari bulat, 0 sampai ' + MASA_SIMPAN_MAKS + ', atau dikosongkan.');
+  }
+  return Number(masa);
+}
+
+/**
+ * Masa simpan barang masuk bisa dicatat (Code.gs v0.25): kolom Masa Simpan
+ * (hari) di M_Item dan Baik Sampai di Data_Stock sudah dibuat setupSpreadsheet.
+ */
+function masaSimpanItemSiap_() {
+  var i = bacaTabel_('M_Item');
+  var s = bacaTabel_('Data_Stock');
+  return !!i && !!s && i.kol['Masa Simpan (hari)'] !== undefined && s.kol['Baik Sampai'] !== undefined;
 }
 
 /** Kategori aktif, urut menurut Urutan lalu nama. */
@@ -2514,7 +2542,8 @@ function dataFormStock_(tanggal) {
       satuan: m.satuan,
       satuanBesar: m.satuanBesar,
       isiSatuanBesar: m.isiSatuanBesar,
-      stokMin: m.stokMin
+      stokMin: m.stokMin,
+      masaSimpan: m.masaSimpan
     }, posisiStock_(rekap.item[k], tanggal)));
   });
   item.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
@@ -2534,7 +2563,9 @@ function dataFormStock_(tanggal) {
     kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman) },
     nihil: kiriman.length ? null : barisTerakhir_(nihil),
     pembelianSiap: siap,
-    pemasok: siap ? bacaPemasok_().filter(function (p) { return p.aktif; }).map(function (p) { return p.nama; }) : []
+    pemasok: siap ? bacaPemasok_().filter(function (p) { return p.aktif; }).map(function (p) { return p.nama; }) : [],
+    // Baik sampai barang masuk (Code.gs v0.25): hanya setelah setupSpreadsheet membuat kolomnya.
+    masaSimpanSiap: masaSimpanItemSiap_()
   };
 }
 
@@ -2567,6 +2598,11 @@ function aksiKirimStock_(body, pengguna) {
     if ((pemasok || adaHarga) && !pembelianSiap_()) {
       throw galatPengguna_('Pemasok dan harga beli belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
     }
+    var adaBaik = masukan.some(function (b) { return b && b.baikSampai !== '' && b.baikSampai != null; });
+    var baikSiap = masaSimpanItemSiap_();
+    if (adaBaik && !baikSiap) {
+      throw galatPengguna_('Baik sampai belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     if (pemasok) {
       // Pemasok yang sudah dinonaktifkan tetap diterima (kiriman dari antrean di HP).
       var p = bacaPemasok_().filter(function (x) { return x.nama.toLowerCase() === pemasok.toLowerCase(); })[0];
@@ -2590,6 +2626,8 @@ function aksiKirimStock_(body, pengguna) {
         masuk = bulat_(masuk * m.isiSatuanBesar);
         if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
+      // Baik sampai barang masuk (Bagian 5.1): yang diketik, atau tanggal + masa simpan item.
+      var baik = masuk && baikSiap ? baikSampaiMasuk_(b.baikSampai, tanggal, m) : '';
       baru.push(gabung_(gabung_({
         'Tanggal': tanggalSel_(tanggal),
         'Kategori': m.kategori,
@@ -2601,7 +2639,8 @@ function aksiKirimStock_(body, pengguna) {
       }, isiSistem_(konteks)), kolomAda_(tabel, {
         // Kolom Code.gs v0.23: hanya ditulis jika setupSpreadsheet sudah menambahkannya.
         'Pemasok': masuk ? pemasok : '',
-        'Harga Beli (Rp)': harga == null ? '' : harga
+        'Harga Beli (Rp)': harga == null ? '' : harga,
+        'Baik Sampai': baik ? tanggalSel_(baik) : ''
       })));
     });
     if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
@@ -2611,6 +2650,23 @@ function aksiKirimStock_(body, pengguna) {
     hitungUlangStock_(baru.map(function (b) { return { item: b['Nama Item'], dari: tanggal }; }));
     return { sudahTerkirim: false, jumlah: baru.length, form: dataFormStock_(tanggal) };
   });
+}
+
+/**
+ * Baik sampai satu barang masuk (Code.gs v0.25): tanggal yang dikirim HP
+ * (boleh diubah Staff), atau tanggal masuk + masa simpan item. Item tanpa
+ * masa simpan dan tanpa tanggal yang dikirim: ''. Tanggal sebelum tanggal
+ * masuk, atau lebih dari MASA_SIMPAN_MAKS hari sesudahnya, ditolak.
+ */
+function baikSampaiMasuk_(nilai, tanggal, m) {
+  var teks = rapikanTeks_(nilai);
+  if (!teks) return m.masaSimpan == null ? '' : geserTanggal_(tanggal, m.masaSimpan);
+  if (!tanggalSah_(teks)) throw galatPengguna_('Baik sampai ' + m.nama + ' tidak terbaca. Pilih tanggal lagi.');
+  if (teks < tanggal) throw galatPengguna_('Baik sampai ' + m.nama + ' tidak boleh sebelum tanggal barang masuk.');
+  if (teks > geserTanggal_(tanggal, MASA_SIMPAN_MAKS)) {
+    throw galatPengguna_('Baik sampai ' + m.nama + ' paling lama ' + MASA_SIMPAN_MAKS + ' hari sesudah tanggal barang masuk.');
+  }
+  return teks;
 }
 
 /**
@@ -3676,33 +3732,36 @@ function aksiKirimPrep_(body, pengguna) {
 }
 
 /**
- * Masa simpan barang jadi (Bagian 5.3). Sistem tidak melacak wadah: yang
- * dibuat lebih dulu dianggap dipakai lebih dulu, jadi stock tersisa pada
- * tanggal itu dianggap berasal dari prep paling baru. Bagian stock yang
- * berasal dari prep dengan Baik Sampai sebelum tanggal itu masuk "Lewat masa
+ * Masa simpan barang jadi (Bagian 5.3) dan barang masuk (Bagian 5.1, Code.gs
+ * v0.25). Sistem tidak melacak wadah: yang datang atau dibuat lebih dulu
+ * dianggap dipakai lebih dulu, jadi stock tersisa pada tanggal itu dianggap
+ * berasal dari prep dan barang masuk paling baru. Bagian stock yang berasal
+ * dari catatan dengan Baik Sampai sebelum tanggal itu masuk "Lewat masa
  * simpan"; yang Baik Sampai-nya tanggal itu (besok sudah tidak baik) masuk
- * "Habis besok". Prep tanpa Baik Sampai (resep tanpa masa simpan) ikut
- * dihitung sebagai stock tersisa. Per item satu baris: { item, satuan, qty,
- * baikSampai } (baikSampai: yang terbaru di antara bagian itu).
+ * "Habis besok". Catatan tanpa Baik Sampai (resep atau item tanpa masa
+ * simpan) ikut dihitung sebagai stock tersisa. Per item satu baris: { item,
+ * satuan, qty, baikSampai } (baikSampai: yang terbaru di antara bagian itu).
  */
 function masaSimpan_(tanggal) {
   var hasil = { lewat: [], habisBesok: [] };
-  var t = bacaTabel_('Data_Prep');
-  if (!t || t.kol['Baik Sampai'] === undefined) return hasil;
   var zona = zonaSheet_();
   var perItem = {};
   var adaMasa = {};
-  t.baris.forEach(function (b) {
-    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
-    var jumlah = Number(nilai_(t, b, 'Hasil')) || 0;
-    var nama = rapikanTeks_(nilai_(t, b, 'Item / Menu Prep'));
-    if (!tg || tg > tanggal || jumlah <= 0 || !nama) return;
-    var k = nama.toLowerCase();
-    var bs = teksTanggal_(nilai_(t, b, 'Baik Sampai'), zona);
-    if (bs) adaMasa[k] = true;
-    var w = nilai_(t, b, 'timestamp_server');
-    (perItem[k] = perItem[k] || []).push({ tanggal: tg, waktu: w instanceof Date ? w.getTime() : 0, hasil: jumlah, baikSampai: bs,
-      nama: nama, satuan: rapikanTeks_(nilai_(t, b, 'Satuan')) });
+  [['Data_Prep', 'Item / Menu Prep', 'Hasil'], ['Data_Stock', 'Nama Item', 'Stock Masuk']].forEach(function (s) {
+    var t = bacaTabel_(s[0]);
+    if (!t || t.kol['Baik Sampai'] === undefined) return;
+    t.baris.forEach(function (b) {
+      var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+      var jumlah = Number(nilai_(t, b, s[2])) || 0;
+      var nama = rapikanTeks_(nilai_(t, b, s[1]));
+      if (!tg || tg > tanggal || jumlah <= 0 || !nama) return;
+      var k = nama.toLowerCase();
+      var bs = teksTanggal_(nilai_(t, b, 'Baik Sampai'), zona);
+      if (bs) adaMasa[k] = true;
+      var w = nilai_(t, b, 'timestamp_server');
+      (perItem[k] = perItem[k] || []).push({ tanggal: tg, waktu: w instanceof Date ? w.getTime() : 0, hasil: jumlah, baikSampai: bs,
+        nama: nama, satuan: rapikanTeks_(nilai_(t, b, 'Satuan')) });
+    });
   });
   var kunci = Object.keys(adaMasa);
   if (!kunci.length) return hasil;
@@ -3977,6 +4036,7 @@ function dataItem_() {
       jumlahRiwayatHarga: h.jumlahRiwayatHarga,
       stokMin: m.stokMin,
       stokMaks: m.stokMaks,
+      masaSimpan: m.masaSimpan,
       aktif: m.aktif,
       stock: posisiStock_(rekap.item[k], hari).akhir,
       punyaCatatan: !!catatan[k],
@@ -3990,6 +4050,7 @@ function dataItem_() {
   return {
     hariIni: hari,
     riwayatHargaSiap: bacaRiwayatHarga_().ada,
+    masaSimpanSiap: masaSimpanItemSiap_(),
     item: item,
     kategori: bacaSemuaKategori_().map(function (k) { return { nama: k.nama, aktif: k.aktif }; }),
     satuan: bacaSatuan_()
@@ -4016,9 +4077,13 @@ function aksiDaftarItem_() {
  *   mengganti harganya lewat aksi gantiHarga; harga yang dikirim di sini
  *   diabaikan jika sama dengan harga sekarang atau kosong, dan ditolak jika
  *   berbeda. Mengganti nama ikut mengganti nama di M_HargaItem.
+ * - masaSimpan (Code.gs v0.25): hari, '' = tanpa masa simpan. Tidak dikirim
+ *   (aplikasi lama) → tidak diubah.
  */
 function aksiSimpanItem_(body, pengguna) {
   var nama = periksaNama_(body.nama, 'Nama item', PANJANG_ITEM_MAKS);
+  var adaMasa = Object.prototype.hasOwnProperty.call(body, 'masaSimpan');
+  var masa = adaMasa ? masaSimpanIsian_(body.masaSimpan) : null;
   var harga = angkaOpsional_(body.harga, 'Harga satuan', 2);
   var stokMin = angkaOpsional_(body.stokMin, 'Stok minimum', 3);
   var stokMaks = angkaOpsional_(body.stokMaks, 'Stok maksimum', 3);
@@ -4089,6 +4154,10 @@ function aksiSimpanItem_(body, pengguna) {
       'Stok Maksimum': stokMaks == null ? '' : stokMaks
     };
     if (!punyaHarga) nilai['Harga Satuan (Rp)'] = harga == null ? '' : harga;
+    if (adaMasa) {
+      if (t.kol['Masa Simpan (hari)'] !== undefined) nilai['Masa Simpan (hari)'] = masa == null ? '' : masa;
+      else if (masa != null) throw galatPengguna_('Masa simpan item belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     if (lama) {
       tulisBarisMaster_(t, barisMaster_(t, 'Nama Item', lama.nama), nilai);
       if (nama !== lama.nama && riwayatLama.length) gantiNamaRiwayatHarga_(lama.nama, nama);
@@ -4843,7 +4912,7 @@ function pengingatStock() { return pengingatStock_(); }
 /**
  * Pengingat stock (trigger harian pada jam di Outlet dan jadwal, bawaan 07:00): stock
  * hari ini menurut catatan (sama dengan Dashboard): item aktif yang minus, item di bawah
- * stok minimum, dan barang jadi yang lewat masa simpan atau habis besok. Dikirim ke HP
+ * stok minimum, dan barang yang lewat masa simpan atau habis besok. Dikirim ke HP
  * Pengelola hanya jika ada salah satunya. Mengembalikan isi notifikasi (atau null).
  */
 function pengingatStock_() {
@@ -5242,7 +5311,7 @@ function perhatianDashboard_(d) {
       { item: d.stock.minus.map(function (x) { return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan }; }) });
   }
   if (d.masaSimpan.lewat.length) {
-    tambah('lewatMasaSimpan', 'masalah', d.masaSimpan.lewat.length + ' barang jadi lewat masa simpan',
+    tambah('lewatMasaSimpan', 'masalah', d.masaSimpan.lewat.length + ' item lewat masa simpan',
       daftarNamaSingkat_(d.masaSimpan.lewat.map(function (x) { return x.item; })) + '.', { lewat: d.masaSimpan.lewat });
   }
   d.peringatan.forEach(function (p) {
@@ -5271,7 +5340,7 @@ function perhatianDashboard_(d) {
       daftarNamaSingkat_(d.hargaBeli.map(function (x) { return x.nama; })) + '. Pakai harga belinya atau abaikan.', { item: d.hargaBeli });
   }
   if (d.masaSimpan.habisBesok.length) {
-    tambah('habisBesok', 'tinjau', d.masaSimpan.habisBesok.length + ' barang jadi habis besok',
+    tambah('habisBesok', 'tinjau', d.masaSimpan.habisBesok.length + ' item habis besok',
       daftarNamaSingkat_(d.masaSimpan.habisBesok.map(function (x) { return x.item; })) + '.', { habisBesok: d.masaSimpan.habisBesok });
   }
   d.peringatan.forEach(function (p) {
@@ -7552,13 +7621,27 @@ var RIWAYAT_FORM = {
       { judul: 'Stock Keluar', kunci: 'keluar', label: 'Stock Keluar', singkat: 'keluar', jenis: 'angka', koreksi: true, satuan: true },
       // Harga beli per satuan dasar (Code.gs v0.23); tidak wajib, jadi boleh dikosongkan saat koreksi.
       { judul: 'Harga Beli (Rp)', kunci: 'hargaBeli', label: 'Harga beli', singkat: 'harga beli', jenis: 'rupiah', koreksi: true, opsional: true,
-        bantuan: 'Rupiah per satuan dasar (per kg, per botol). Kosongkan jika tidak ada.',
+        jikaPositif: 'masuk', bantuan: 'Rupiah per satuan dasar (per kg, per botol). Kosongkan jika tidak ada.',
         normal: function (v) { var n = angkaAtauNull_(v); return n == null ? '' : n; },
-        ubah: function (v, label) { var n = angkaOpsional_(v, label, 2); return n == null ? '' : n; } }
+        ubah: function (v, label) { var n = angkaOpsional_(v, label, 2); return n == null ? '' : n; } },
+      // Baik sampai barang masuk (Code.gs v0.25); hanya tampil pada baris yang punya Stock Masuk.
+      { judul: 'Baik Sampai', kunci: 'baikSampai', label: 'Baik sampai', singkat: 'baik sampai', jenis: 'tanggal', koreksi: true,
+        opsional: true, jikaPositif: 'masuk', bantuan: 'Tanggal terakhir barang ini baik dipakai. Kosongkan jika tidak ada.',
+        normal: function (v) { return teksTanggal_(v, zonaSheet_()); },
+        ubah: function (v, label) {
+          var t = rapikanTeks_(v);
+          if (t && !tanggalSah_(t)) throw galatPengguna_(label + ' tidak terbaca. Pilih tanggal lagi.');
+          return t;
+        } }
     ],
     periksaKoreksi: function (g) {
       if (g['Harga Beli (Rp)'] !== '' && g['Harga Beli (Rp)'] != null && !(Number(g['Stock Masuk']) > 0)) {
         throw galatPengguna_('Harga beli hanya untuk barang masuk. Kosongkan harga beli, atau isi Stock Masuk.');
+      }
+      var zona = zonaSheet_();
+      var baik = teksTanggal_(g['Baik Sampai'], zona);
+      if (baik && baik < teksTanggal_(g['Tanggal'], zona)) {
+        throw galatPengguna_('Baik sampai tidak boleh sebelum tanggal barang masuk.');
       }
     },
     satuan: 'Satuan',
@@ -7676,6 +7759,10 @@ function defRiwayat_(idForm) {
       kepala: def.kepala.filter(function (k) { return k.kunci !== 'pemasok'; }),
       kolom: def.kolom.filter(function (k) { return k.kunci !== 'hargaBeli'; })
     });
+  }
+  // Baik sampai barang masuk baru ada setelah setupSpreadsheet (Code.gs v0.25).
+  if (id === 'STOCK' && def && !masaSimpanItemSiap_()) {
+    def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.kunci !== 'baikSampai'; }) });
   }
   // Hasil aktual prep baru ada setelah setupSpreadsheet (Code.gs v0.24).
   if (id === 'PREP' && def && !hasilAktualSiap_()) {
@@ -8185,6 +8272,7 @@ function infoKolom_(def) {
     if (k.ringkas === false) info.ringkas = false;
     if (k.jikaAda) info.jikaAda = true;
     if (k.jikaKolom) info.jikaKolom = k.jikaKolom;
+    if (k.jikaPositif) info.jikaPositif = k.jikaPositif;
     if (k.bantuan) info.bantuan = k.bantuan;
     if (k.opsional) info.opsional = true;
     if (k.waktu) info.waktu = true;
@@ -8267,8 +8355,10 @@ function transaksiItem_(kecil, rekap) {
         var diketik = rapikanTeks_(nilai_(t, b, 'Masuk Diketik'));
         var dari = rapikanTeks_(nilai_(t, b, 'Pemasok'));
         var beli = x.masuk ? angkaAtauNull_(nilai_(t, b, 'Harga Beli (Rp)')) : null;
+        var baik = x.masuk ? teksTanggal_(nilai_(t, b, 'Baik Sampai'), zona) : '';
         x.ket = [diketik ? 'Masuk diketik ' + diketik : '', dari ? 'Dari ' + dari : '',
-          beli != null ? 'Harga beli ' + rupiahId_(beli) + '/' + rapikanTeks_(nilai_(t, b, 'Satuan')) : ''].filter(Boolean).join(' · ');
+          beli != null ? 'Harga beli ' + rupiahId_(beli) + '/' + rapikanTeks_(nilai_(t, b, 'Satuan')) : '',
+          baik ? 'Baik sampai ' + tanggalPendekId_(baik) : ''].filter(Boolean).join(' · ');
       } else if (s.tab === 'Data_Prep') {
         x.jenis = 'Hasil prep';
         x.formId = 'PREP';
@@ -8474,7 +8564,8 @@ function aksiKoreksi_(body, pengguna) {
         if (k.pilihan && k.pilihan.indexOf(nilaiBaru) < 0) throw galatPengguna_('Pilih ' + k.label.toLowerCase() + '.');
       }
       if (nilaiBaru === lama) return;
-      ubah[k.judul] = nilaiBaru;
+      // Kolom tanggal (baik sampai): log berisi yyyy-mm-dd, sel berisi tanggal.
+      ubah[k.judul] = k.jenis === 'tanggal' && nilaiBaru ? tanggalSel_(nilaiBaru) : nilaiBaru;
       perubahan.push([k.judul, lama, nilaiBaru]);
       if (k.asli) {
         var asli = rapikanTeks_(nilai_(c.t, c.b, k.asli));
@@ -9506,7 +9597,7 @@ function htmlEmailHarian_(d) {
   html += bagian('Masa simpan', simpan.length ? simpan.join('') +
     '<p style="margin:6px 0 0;color:' + w.tintaRedup + ';font-size:12px">Perkiraan: yang dibuat lebih dulu dianggap dipakai lebih dulu. ' +
     'Catat sebagai waste dari Beranda aplikasi.</p>'
-    : '<p style="margin:0">Tidak ada barang jadi yang lewat masa simpan atau habis besok.</p>');
+    : '<p style="margin:0">Tidak ada barang yang lewat masa simpan atau habis besok.</p>');
 
   var periksa = [];
   if (d.pemeriksaan.belumDiperiksa) periksa.push(d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa (31 hari terakhir)');
@@ -11379,7 +11470,7 @@ var TAB_DATA = [
     kolom: [
       k_('Tanggal', 'tanggal'), k_('Kategori'), k_('Nama Item'),
       k_('Stock Masuk', 'angka'), k_('Stock Keluar', 'angka'), k_('Satuan'),
-      k_('Masuk Diketik'), k_('Pemasok'), k_('Harga Beli (Rp)', 'rupiah')
+      k_('Masuk Diketik'), k_('Pemasok'), k_('Harga Beli (Rp)', 'rupiah'), k_('Baik Sampai', 'tanggal')
     ]
   },
   {
@@ -11487,7 +11578,8 @@ var TAB_MASTER = [
       k_('Harga Satuan (Rp)', 'rupiah'),
       k_('Stok Minimum', 'angka'),
       k_('Stok Maksimum', 'angka'),
-      k_('Aktif', null, { centang: true })
+      k_('Aktif', null, { centang: true }),
+      k_('Masa Simpan (hari)', 'bulat')
     ]
   },
   {
