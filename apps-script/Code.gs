@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.25 (masa simpan barang masuk)
+// InventoryKu Code.gs v0.26 (pemulihan cadangan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -85,9 +85,13 @@
  *                        dan tempel ulang supabase/functions/api/index.ts.
  * - pindahKeSupabase   : dijalankan sekali dari editor; memindahkan data.
  * - sinkronDariSupabase : trigger tiap 5 menit; salinan ke Sheet dan Drive.
+ * - 19 Oktober 2026    : masa simpan barang masuk (Masa Simpan di M_Item, Baik
+ *                        Sampai di Data_Stock).
+ * - 19 Oktober 2026    : pemulihan cadangan JSON (dari editor, sesudah pindah):
+ *                        periksaCadangan, ujiPemulihanCadangan, pulihkanCadangan.
  */
 
-var VERSI_KODE = 'v0.25';
+var VERSI_KODE = 'v0.26';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -9757,8 +9761,7 @@ function buatCadangan() {
   var ket = 'Diisi otomatis oleh cadangan mingguan. Baris yang diawali "Gagal" disebut di email harian dan Beranda Pengelola.';
   try {
     var ss = ss_();
-    var akar = cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN);
-    var folder = cariAtauBuatFolder_(akar, FOLDER_CADANGAN);
+    var folder = folderCadangan_();
     var awalan = 'Cadangan ' + ss.getName() + ' ';
     var nama = awalan + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmm');
     if (DI_SUPABASE_) {
@@ -9785,15 +9788,54 @@ function buatCadangan() {
   }
 }
 
-/** Cadangan di Supabase: { dibuat, tab: [{ nama, nilai: [[...]] }] }; tanggal ditulis ISO. */
+function folderCadangan_() {
+  return cariAtauBuatFolder_(cariAtauBuatFolder_(DriveApp.getRootFolder(), FOLDER_LAPORAN), FOLDER_CADANGAN);
+}
+
+var FORMAT_CADANGAN = 2;
+
+/**
+ * Cadangan di Supabase (format 2, Code.gs v0.26): { jenis, format, dibuat, versiKode, nama, tab: [{ nama, meta: { id, beku },
+ * nilai: [[...]] }] }, tanggal ditulis { $d: ms } seperti aksi pemilik. Format 1 (sebelum v0.26) tanpa jenis, format, dan
+ * meta, tanggal ditulis teks ISO; keduanya bisa dipulihkan (pulihkanCadangan).
+ */
 function isiCadanganJson_(ss) {
   return JSON.stringify({
+    jenis: 'cadangan-inventoryku',
+    format: FORMAT_CADANGAN,
     dibuat: new Date().toISOString(),
     versiKode: VERSI_KODE,
+    nama: ss.getName(),
     tab: ss.getSheets().map(function (sheet) {
-      return { nama: sheet.getName(), nilai: sheet.getLastRow() ? sheet.getDataRange().getValues() : [] };
+      var nilai = sheet.getLastRow() ? sheet.getDataRange().getValues() : [];
+      return {
+        nama: sheet.getName(),
+        meta: { id: sheet.getSheetId(), beku: sheet.getFrozenRows() },
+        nilai: nilai.map(function (b) { return b.map(nilaiKeSupabase_); })
+      };
     })
   });
+}
+
+var AWALAN_SEBELUM_PULIH = 'Cadangan sebelum pemulihan ';
+
+/**
+ * Di Supabase, dipanggil pulihkanCadangan dan ujiPemulihanCadangan (editor Apps Script) sesudah aplikasi ditutup dan
+ * sebelum isi database ditimpa: isi sekarang disimpan sebagai cadangan tersendiri (tidak ikut dibuang cadangan
+ * mingguan), supaya pemulihan bisa dibatalkan dengan memulihkan berkas ini.
+ */
+function buatCadanganSebelumPulih() {
+  if (!DI_SUPABASE_) throw new Error('buatCadanganSebelumPulih dijalankan di Supabase lewat pulihkanCadangan.');
+  var folder = folderCadangan_();
+  var ada = {};
+  var it = folder.getFiles();
+  while (it.hasNext()) ada[it.next().getName()] = true;
+  var dasar = AWALAN_SEBELUM_PULIH + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmmss');
+  var nama = dasar + '.json';
+  for (var n = 2; ada[nama]; n++) nama = dasar + ' (' + n + ').json'; // nama unik: berkas dipilih menurut namanya
+  folder.createFile(Utilities.newBlob(isiCadanganJson_(ss_()), 'application/json', nama));
+  console.log('Cadangan sebelum pemulihan dibuat: ' + nama + '.');
+  return { nama: nama };
 }
 
 /* =========================================================================
@@ -11165,6 +11207,271 @@ function pindahKeSupabase() {
   sinkronDariSupabase();
   console.log('Selesai. Ubah config.js ke alamat Supabase, lalu buka aplikasi dari HP. Sheet ini kini salinan yang ' +
     'diperbarui tiap ' + MENIT_SINKRON + ' menit; perubahan yang diketik langsung di Sheet akan tertimpa.');
+}
+
+/* ---------- Pemulihan cadangan (Code.gs v0.26; spesifikasi sistem Bagian 9.4) ----------
+ * Cadangan mingguan di Supabase berupa berkas JSON yang disalin ke Drive (Laporan Kitchen/Cadangan). Tiga fungsi editor:
+ * - periksaCadangan       : membaca cadangan terbaru (atau yang namanya di Script Property PULIHKAN_CADANGAN) dari Drive
+ *                           dan mencatat isinya per tab dibanding Sheet sekarang. Tidak mengubah apa pun.
+ * - ujiPemulihanCadangan  : uji lengkap tanpa kehilangan data: aplikasi ditutup sebentar, isi sekarang dicadangkan,
+ *                           berkas itu dibaca lagi dari Drive dan dipulihkan, lalu jumlah baris tiap tab dicocokkan.
+ * - pulihkanCadangan      : memulihkan berkas yang namanya diisi di PULIHKAN_CADANGAN (isian sesudah cadangan itu hilang;
+ *                           isi sebelum pemulihan tetap disimpan sebagai "Cadangan sebelum pemulihan …").
+ * Selama pemulihan, Supabase menolak aksi aplikasi dengan cobaLagi (isian di HP masuk antrean).
+ */
+
+var PROP_PULIHKAN_CADANGAN = 'PULIHKAN_CADANGAN';
+var TAB_WAJIB_CADANGAN = ['M_Staff', 'M_Konfigurasi', 'M_Item'];
+var POLA_ISO_CADANGAN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+
+/** Berkas cadangan JSON di Drive (Laporan Kitchen/Cadangan), terbaru dulu: [{ berkas, nama, dibuat, ukuran }]. */
+function daftarCadanganDrive_() {
+  var daftar = [];
+  var it = folderCadangan_().getFiles();
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.isTrashed && f.isTrashed()) continue;
+    if (!/^Cadangan .*\.json$/.test(f.getName())) continue;
+    daftar.push({ berkas: f, nama: f.getName(), dibuat: f.getDateCreated(), ukuran: f.getSize() });
+  }
+  return daftar.sort(function (a, b) { return b.dibuat.getTime() - a.dibuat.getTime(); });
+}
+
+function catatDaftarCadangan_(daftar) {
+  if (!daftar.length) return console.log('Belum ada cadangan JSON di Drive: ' + FOLDER_LAPORAN + '/' + FOLDER_CADANGAN + '.');
+  console.log('Cadangan di Drive (' + FOLDER_LAPORAN + '/' + FOLDER_CADANGAN + '), terbaru dulu:');
+  daftar.forEach(function (c) {
+    console.log('- ' + c.nama + ' (' + Math.max(1, Math.round(c.ukuran / 1024)) + ' KB)');
+  });
+}
+
+/** Membaca satu cadangan dari Drive (nama berkas, boleh tanpa .json; kosong = terbaru): { nama, data }. */
+function bacaCadanganDrive_(nama) {
+  var daftar = daftarCadanganDrive_();
+  var cari = String(nama || '').trim();
+  if (cari && !/\.json$/i.test(cari)) cari += '.json';
+  var c = cari ? daftar.filter(function (x) { return x.nama === cari; })[0] : daftar[0];
+  if (!c) {
+    catatDaftarCadangan_(daftar);
+    throw new Error(cari ? 'Cadangan ' + cari + ' tidak ada di ' + FOLDER_LAPORAN + '/' + FOLDER_CADANGAN + '. Salin namanya persis dari daftar di log.'
+      : 'Belum ada cadangan JSON di Drive.');
+  }
+  var data;
+  try {
+    data = JSON.parse(c.berkas.getBlob().getDataAsString('UTF-8'));
+  } catch (err) {
+    throw new Error('Cadangan ' + c.nama + ' tidak bisa dibaca sebagai JSON: ' + (err && err.message ? err.message : err));
+  }
+  return { nama: c.nama, data: data };
+}
+
+/**
+ * Memeriksa isi cadangan: { tab: [{ nama, baris }], baris, masalah: [teks], kurang: [nama tab] }. masalah = tidak bisa dipulihkan;
+ * kurang = tab yang ada di Code.gs ini tetapi tidak ada di cadangan (dibuat lagi oleh setupSpreadsheet sesudah pemulihan).
+ */
+function periksaIsiCadangan_(data) {
+  var hasil = { tab: [], baris: 0, masalah: [], kurang: [] };
+  if (!data || typeof data !== 'object' || !Array.isArray(data.tab)) {
+    hasil.masalah.push('Berkas ini bukan cadangan InventoryKu (tidak punya daftar tab).');
+    return hasil;
+  }
+  if (data.format && data.format > FORMAT_CADANGAN) {
+    hasil.masalah.push('Cadangan format ' + data.format + ' dibuat Code.gs yang lebih baru. Tempel Code.gs terbaru dulu.');
+  }
+  var ada = {};
+  data.tab.forEach(function (t) {
+    var nama = t && typeof t.nama === 'string' ? t.nama : '';
+    if (!nama || ada[nama]) {
+      hasil.masalah.push(nama ? 'Tab ' + nama + ' ada dua kali.' : 'Ada tab tanpa nama.');
+      return;
+    }
+    ada[nama] = true;
+    if (!Array.isArray(t.nilai) || t.nilai.some(function (b) { return !Array.isArray(b); })) {
+      hasil.masalah.push('Isi tab ' + nama + ' rusak.');
+      return;
+    }
+    hasil.tab.push({ nama: nama, baris: t.nilai.length });
+    hasil.baris += t.nilai.length;
+  });
+  TAB_WAJIB_CADANGAN.forEach(function (n) {
+    var t = data.tab.filter(function (x) { return x && x.nama === n; })[0];
+    if (!t || !Array.isArray(t.nilai) || !t.nilai.length) hasil.masalah.push('Tab ' + n + ' tidak ada atau kosong.');
+  });
+  TAB_MASTER.concat(TAB_DATA).forEach(function (d) { if (!ada[d.nama]) hasil.kurang.push(d.nama); });
+  return hasil;
+}
+
+/** Nilai sel cadangan untuk __impor: tanggal { $d } (format 2) tetap; teks ISO (format 1) menjadi { $d }. */
+function nilaiCadangan_(v, format) {
+  if (v && typeof v === 'object') return v.$d != null ? { $d: Number(v.$d) } : '';
+  if (format < 2 && typeof v === 'string' && POLA_ISO_CADANGAN.test(v)) return { $d: new Date(v).getTime() };
+  return v == null ? '' : v;
+}
+
+function keteranganCadangan_(c) {
+  var d = c.data || {};
+  return c.nama + (d.dibuat ? ', dibuat ' + Utilities.formatDate(new Date(d.dibuat), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : '') +
+    (d.versiKode ? ', Code.gs ' + d.versiKode : '') + ', format ' + (d.format || 1);
+}
+
+/**
+ * Editor: memeriksa cadangan tanpa mengubah apa pun. Yang diperiksa: berkas terbaru di Drive, atau yang namanya diisi di
+ * Script Property PULIHKAN_CADANGAN.
+ */
+function periksaCadangan() {
+  if (DI_SUPABASE_) throw new Error('periksaCadangan dijalankan dari editor Apps Script.');
+  var nama = String(PropertiesService.getScriptProperties().getProperty(PROP_PULIHKAN_CADANGAN) || '').trim();
+  catatDaftarCadangan_(daftarCadanganDrive_());
+  var c = bacaCadanganDrive_(nama);
+  var cek = periksaIsiCadangan_(c.data);
+  console.log('Diperiksa: ' + keteranganCadangan_(c) + '. ' + cek.tab.length + ' tab, ' + cek.baris + ' baris.');
+  var ss = SpreadsheetApp.getActiveSpreadsheet() || bukaSpreadsheet_();
+  cek.tab.forEach(function (t) {
+    var sh = ss.getSheetByName(t.nama);
+    console.log('- ' + t.nama + ': ' + t.baris + ' baris' + (sh && tabDisalin_(t.nama) ? ' (Sheet sekarang ' + sh.getLastRow() + ')' : ''));
+  });
+  if (cek.kurang.length) {
+    console.log('Tab yang tidak ada di cadangan ini (dibuat lagi kosong oleh setupSpreadsheet sesudah pemulihan): ' + cek.kurang.join(', ') + '.');
+  }
+  if (cek.masalah.length) {
+    console.error('Cadangan ini TIDAK bisa dipulihkan: ' + cek.masalah.join(' '));
+    return { bisa: false, masalah: cek.masalah };
+  }
+  console.log('Cadangan bisa dibaca dan dipulihkan. Untuk memulihkannya: isi Script Property ' + PROP_PULIHKAN_CADANGAN + ' dengan "' +
+    c.nama + '", lalu jalankan pulihkanCadangan. Isian sesudah cadangan ini dibuat akan hilang.');
+  return { bisa: true, nama: c.nama, tab: cek.tab.length, baris: cek.baris };
+}
+
+/** Tab berumus milik Sheets tidak disalin dari Supabase (sama dengan tabDisalin di sinkron.js). */
+function tabDisalin_(nama) {
+  return !/^Harian_/.test(nama) && nama !== 'Dashboard';
+}
+
+/**
+ * Editor: memulihkan cadangan yang namanya diisi di Script Property PULIHKAN_CADANGAN (salin dari log periksaCadangan).
+ * Isi database Supabase diganti isi cadangan; isian sesudah cadangan itu dibuat hilang. Sebelum menimpa, isi sekarang
+ * disimpan sebagai "Cadangan sebelum pemulihan …" (bisa dipulihkan dengan cara yang sama). PIN, sesi, dan notifikasi HP
+ * tetap (Script Properties di Supabase tidak ikut cadangan).
+ */
+function pulihkanCadangan() {
+  if (DI_SUPABASE_) throw new Error('pulihkanCadangan dijalankan dari editor Apps Script.');
+  if (!sudahPindah_()) {
+    throw new Error('Pemulihan ini untuk cadangan JSON dari Supabase. Sebelum pindah ke Supabase, cadangan berupa salinan ' +
+      'spreadsheet di ' + FOLDER_LAPORAN + '/' + FOLDER_CADANGAN + ' yang dibuka langsung di Google Sheets.');
+  }
+  var props = PropertiesService.getScriptProperties();
+  var nama = String(props.getProperty(PROP_PULIHKAN_CADANGAN) || '').trim();
+  if (!nama) {
+    catatDaftarCadangan_(daftarCadanganDrive_());
+    console.log('Belum ada cadangan yang dipilih. Jalankan periksaCadangan dulu, lalu isi Script Property ' + PROP_PULIHKAN_CADANGAN +
+      ' dengan nama berkas cadangan yang akan dipulihkan (misalnya dari daftar di atas), dan jalankan pulihkanCadangan lagi.');
+    return null;
+  }
+  var hasil = jalankanPemulihan_(nama);
+  props.deleteProperty(PROP_PULIHKAN_CADANGAN);
+  console.log('Pemulihan selesai: ' + hasil.nama + ' (' + hasil.tab + ' tab, ' + hasil.baris + ' baris). Isi sebelum pemulihan disimpan ' +
+    'sebagai ' + (hasil.sebelum || '(database kosong, tidak dicadangkan)') + '. Aplikasi sudah dibuka lagi.');
+  return hasil;
+}
+
+/**
+ * Editor: uji pemulihan tanpa kehilangan isian. Aplikasi ditutup sebentar (isian di HP masuk antrean), isi sekarang
+ * dicadangkan ke Drive, berkas itu dibaca lagi dari Drive dan dipulihkan, lalu jumlah baris tiap tab dicocokkan.
+ * Jalankan sebulan sekali, pada jam sepi.
+ */
+function ujiPemulihanCadangan() {
+  if (DI_SUPABASE_) throw new Error('ujiPemulihanCadangan dijalankan dari editor Apps Script.');
+  if (!sudahPindah_()) throw new Error('Uji pemulihan cadangan hanya untuk data di Supabase (sesudah pindahKeSupabase).');
+  var hasil = jalankanPemulihan_(null);
+  console.log('Uji pemulihan berhasil: ' + hasil.nama + ' dibaca dari Drive dan dipulihkan; ' + hasil.tab + ' tab, ' + hasil.baris +
+    ' baris, jumlah baris tiap tab cocok. Aplikasi sudah dibuka lagi.');
+  return hasil;
+}
+
+/**
+ * Pemulihan bersama. nama: berkas di Drive, atau null (uji: berkas "Cadangan sebelum pemulihan" yang baru dibuat).
+ * Langkah: tutup aplikasi → cadangan sebelum pemulihan (jika database berisi) → salin ke Drive → baca dan periksa →
+ * __impor mulai/baris/selesai (Supabase mencocokkan jumlah baris) → setupSpreadsheet dan pasangTrigger → salinan ke Sheet.
+ * Gagal sebelum isi database dihapus: aplikasi dibuka lagi. Gagal sesudahnya: aplikasi tetap ditutup sampai pemulihan
+ * berhasil dijalankan ulang.
+ */
+function jalankanPemulihan_(nama) {
+  var props = PropertiesService.getScriptProperties();
+  // Tanpa ping: aksi aplikasi ditolak selama aplikasi ditutup (pemulihan yang berhenti di tengah dijalankan ulang).
+  var kunci = LockService.getScriptLock();
+  kunci.waitLock(30000);
+  var mulai = false;
+  var c;
+  var sebelum = '';
+  var harapan = {};
+  try {
+    var tutup = panggilSupabase_('__pulihkan', { langkah: 'tutup', berkas: nama || '(uji pemulihan)' });
+    console.log('Aplikasi ditutup selama pemulihan. Isian dari HP menunggu di antrean HP.');
+    if (tutup.setengah) {
+      // Pemulihan sebelumnya berhenti di tengah: isi database belum lengkap, jadi tidak dicadangkan lagi.
+      mulai = true;
+      if (!nama) throw new Error('Pemulihan sebelumnya belum selesai. Jalankan pulihkanCadangan dulu, bukan uji.');
+      console.log('Pemulihan sebelumnya belum selesai; isi database sekarang tidak dicadangkan lagi.');
+    } else if (tutup.baris > 0) {
+      sebelum = teruskanKeSupabase_('buatCadanganSebelumPulih').nama;
+      salinBerkasKeDrive_();
+    } else if (!nama) {
+      throw new Error('Database Supabase masih kosong, jadi tidak ada yang bisa diuji.');
+    }
+    c = bacaCadanganDrive_(nama || sebelum);
+    var cek = periksaIsiCadangan_(c.data);
+    if (cek.masalah.length) throw new Error('Cadangan ' + c.nama + ' tidak bisa dipulihkan: ' + cek.masalah.join(' '));
+    console.log('Dipulihkan: ' + keteranganCadangan_(c) + '.');
+    var ss = SpreadsheetApp.getActiveSpreadsheet() || bukaSpreadsheet_();
+    var format = Number(c.data.format) || 1;
+    var tab = c.data.tab;
+    mulai = true;
+    panggilSupabase_('__impor', {
+      langkah: 'mulai',
+      timpa: true,
+      pemulihan: true,
+      tab: tab.map(function (t, i) { return { nama: t.nama, urutan: i + 1, meta: t.meta || {} }; }),
+      info: { namaSpreadsheet: ss.getName(), alamatSheet: ss.getUrl(), zona: ss.getSpreadsheetTimeZone(),
+        emailPemilik: Session.getEffectiveUser().getEmail() }
+    });
+    tab.forEach(function (t) {
+      harapan[t.nama] = t.nilai.length;
+      for (var dari = 0; dari < t.nilai.length; dari += BARIS_PER_KIRIMAN_IMPOR) {
+        var potong = t.nilai.slice(dari, dari + BARIS_PER_KIRIMAN_IMPOR).map(function (b) {
+          return b.map(function (v) { return nilaiCadangan_(v, format); });
+        });
+        panggilSupabase_('__impor', { langkah: 'baris', nama: t.nama, dari: dari + 1, nilai: potong });
+      }
+    });
+    // Supabase mencocokkan jumlah baris tiap tab, lalu membuka aplikasi lagi. Salinan ke Sheet berikutnya menyalin semua tab penuh.
+    panggilSupabase_('__impor', { langkah: 'selesai', pemulihan: true, harapan: harapan });
+    props.setProperty(PROP_SINKRON_VERSI, '{}');
+  } catch (err) {
+    if (!mulai) {
+      try {
+        if (!panggilSupabase_('__pulihkan', { langkah: 'buka' }).dibuka) throw new Error('pemulihan sebelumnya belum selesai');
+        console.error('Pemulihan dibatalkan sebelum isi database diubah; aplikasi dibuka lagi.');
+      } catch (err2) {
+        console.error('Aplikasi tidak bisa dibuka lagi: ' + err2 + '. Jalankan ulang fungsi ini.');
+      }
+    } else {
+      console.error('Pemulihan berhenti di tengah. Aplikasi tetap ditutup supaya tidak ada isian yang masuk ke data yang belum ' +
+        'lengkap. Jalankan ulang fungsi yang sama' + (sebelum ? ', atau pulihkan ' + sebelum + ' (isi sebelum pemulihan)' : '') + '.');
+    }
+    throw err;
+  } finally {
+    kunci.releaseLock();
+  }
+  // Kolom dan tab versi sekarang yang belum ada di cadangan lama, lalu jadwal (database di project baru belum punya jadwal).
+  teruskanKeSupabase_('setupSpreadsheet');
+  teruskanKeSupabase_('pasangTrigger');
+  try {
+    sinkronDariSupabase();
+  } catch (err) {
+    console.error('Salinan ke Sheet sesudah pemulihan belum selesai (dicoba lagi 5 menit kemudian): ' + err);
+  }
+  var baris = Object.keys(harapan).reduce(function (a, k) { return a + harapan[k]; }, 0);
+  return { nama: c.nama, sebelum: sebelum, tab: Object.keys(harapan).length, baris: baris };
 }
 
 /** Menghapus semua trigger Apps Script (laporan, cadangan, rekap kini di Supabase) dan memasang salinan tiap 5 menit. */

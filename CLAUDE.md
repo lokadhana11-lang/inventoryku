@@ -262,6 +262,13 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   item). `riwayat`/`detailKiriman` Stock: `kolom[]` ditambah `baikSampai` (jenis `tanggal`, koreksi, opsional); properti kolom baru
   `jikaPositif` (kolom hanya untuk baris yang kolom acuannya > 0; juga di `hargaBeli`). `beranda.masaSimpan`, Dashboard, pengingat
   stock, dan email kini juga memuat barang masuk.
+- Pemulihan cadangan (Code.gs v0.26, 19 Oktober 2026; aksi aplikasi tidak berubah): selama pemulihan semua aksi aplikasi dijawab
+  `{ ok: false, pesan, cobaLagi: true }` dan `panggilApi` melemparnya sebagai galat sambungan (`err.jaringan`, isian masuk antrean).
+  Aksi pemilik baru `__pulihkan {langkah: tutup|buka, berkas}` → `{ baris, setengah }` / `{ dibuka }`; `__impor` menerima `pemulihan:
+  true` (mulai: Script Properties dan info tetap; selesai `{ harapan: { tab: jumlah baris } }` → `{ versi: {}, jumlah }`). Fungsi
+  `buatCadanganSebelumPulih` (lewat `__fungsi`, satu-satunya yang boleh saat aplikasi ditutup). Cadangan JSON format 2 (`jenis`,
+  `format`, `nama`, `tab[].meta`, tanggal `{ "$d": ms }`). Fungsi editor Apps Script: `periksaCadangan`, `ujiPemulihanCadangan`,
+  `pulihkanCadangan` (Script Property `PULIHKAN_CADANGAN`).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -305,6 +312,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++++ | Pemasok dan harga beli (keputusan pemilik 18 Oktober 2026, dari usulan fitur INV-07, INV-09, RPT-02): `M_Pemasok` dan Pengaturan → Pemasok, pilihan pemasok dan harga beli (tidak wajib, semua role) di form Stock, harga beli berbeda ditinjau Pengelola di Dashboard (Pakai / Abaikan), koreksi harga beli, kartu stok, bagian Pembelian di rekap bulanan | Kode selesai (Code.gs v0.23, aplikasi 0.23.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (server sebelum dan sesudah setupSpreadsheet) dan Chromium (Staff HP, desktop, antrean, server lama, Pengaturan → Pemasok, Dashboard, koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_Pemasok`, dua kolom `Data_Stock`) |
 | 12++++++++++++++++ | Hasil prep aktual (permintaan pemilik 18 Oktober 2026, dari usulan fitur KIT-06): kolom "Hasil aktual" (tidak wajib) di Prep List; stock memakai hasil aktual, hasil menurut resep tetap terlihat di layar, Riwayat, PDF, kartu stok, dan rekap bulanan; perbaikan kiriman Stock di Sheet yang belum menjalankan setupSpreadsheet sejak v0.23 | Kode selesai (Code.gs v0.24, aplikasi 0.24.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (stock, koreksi, PDF, rekap, Sheet lama) dan Chromium (Staff HP, desktop, server lama, Riwayat dan koreksi, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Hasil Aktual` di `Data_Prep`) |
 | 12+++++++++++++++++ | Masa simpan barang masuk (keputusan pemilik 19 Oktober 2026, dari usulan fitur): "Masa simpan (hari)" per item di Pengaturan → Item, "Baik sampai" otomatis (boleh diubah) saat Tambah masuk di form Stock, kolom `Baik Sampai` di `Data_Stock`, pengingat lewat masa simpan dan habis besok untuk barang masuk di Beranda, Dashboard, pengingat stock, dan email, koreksi di Riwayat, kartu stok | Kode selesai (Code.gs v0.25, aplikasi 0.25.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (pembagian stock, prep dan barang masuk bersama, koreksi, Sheet lama) dan Chromium (Pengaturan → Item, Staff HP, desktop, server lama, Riwayat, Beranda, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Masa Simpan (hari)` di `M_Item` dan `Baik Sampai` di `Data_Stock`) |
+| 12++++++++++++++++++ | Uji dan pemulihan cadangan (permintaan pemilik 19 Oktober 2026, dari usulan fitur SYS-04): `periksaCadangan`, `ujiPemulihanCadangan`, dan `pulihkanCadangan` dari editor Apps Script membaca cadangan JSON dari Drive dan memulihkannya ke Supabase; aplikasi ditutup selama pemulihan (isian masuk antrean HP), isi sebelum pemulihan selalu dicadangkan, jumlah baris dicocokkan, pemulihan setengah jalan tidak membuka aplikasi; cadangan format 2; langkah di PANDUAN | Kode selesai (Code.gs v0.26, aplikasi 0.26.0), diuji ujung ke ujung: runtime dan pelayan asli `supabase/src` di atas Postgres 16 lokal, Apps Script tiruan (Drive, curl ke server) dengan Code.gs asli (pulihkan, batalkan, uji, format 1, cadangan rusak, putus di tengah, jumlah tidak cocok, project baru), dan Chromium (isian masuk antrean saat server ditutup). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `ujiPemulihanCadangan` sekali pada jam sepi (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2231,3 +2239,42 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     stok, Sheet tanpa kolom lalu `setupSpreadsheet`. Chromium: Pengaturan → Item, Staff HP (otomatis, galat, ubah, draft setelah dimuat
     ulang, kirim), tabel desktop, server lama, koreksi tanggal di Riwayat, Beranda, delapan ukuran untuk tiga layar; uji fitur 18 Oktober
     lain tetap lulus. Belum diuji di Supabase asli, salinan kolom baru ke Sheets, dan pemilih tanggal di HP asli.
+
+### Uji dan pemulihan cadangan (Code.gs v0.26, aplikasi 0.26.0, 19 Oktober 2026)
+
+305. **Asal:** butir terakhir dari usulan fitur (SYS-04). Sebelumnya cadangan JSON mingguan dibuat dan disalin ke Drive, tetapi tidak
+    ada cara memulihkannya ke Postgres ("dilakukan pemilik dengan tangan"). Spesifikasi sistem Bagian 9.4; `supabase/PANDUAN.md`
+    bagian "Cadangan dan pemulihan". Tidak ada layar baru; aplikasi hanya membaca `cobaLagi`.
+306. **Tiga fungsi editor** (Apps Script, sesudah pindah): `periksaCadangan` (baca dan periksa, mencatat jumlah baris per tab dibanding
+    Sheet, tanpa menulis), `pulihkanCadangan` (nama berkas di Script Property `PULIHKAN_CADANGAN` sebagai konfirmasi, karena fungsi
+    editor tidak menerima argumen; tanpa property hanya mendaftar cadangan; property dihapus sesudah berhasil), dan
+    `ujiPemulihanCadangan` (mencadangkan isi sekarang lalu memulihkan berkas itu dari Drive: menguji jalur nyata Drive → Apps Script →
+    Supabase tanpa kehilangan isian). Cadangan dibaca dari Drive, bukan dari Storage, supaya jalur yang sama berlaku saat project
+    Supabase hilang. Pemeriksaan isi (`periksaIsiCadangan_`): daftar tab, isi berupa larik, tab ganda, `M_Staff`/`M_Konfigurasi`/`M_Item`
+    berisi; tab versi sekarang yang tidak ada di cadangan lama hanya dicatat (setupSpreadsheet membuatnya lagi).
+307. **Urutan pemulihan** (`jalankanPemulihan_`, di dalam kunci script supaya salinan 5 menit tidak berjalan): `__pulihkan tutup` (info
+    `pemulihan`; runtime menolak aksi aplikasi dan jadwal sebelum menjalankan Code.gs, tanpa bacaan tambahan karena info sudah ikut bacaan
+    awal) → `buatCadanganSebelumPulih` di Supabase ("Cadangan sebelum pemulihan yyyy-MM-dd HHmmss.json", nama unik, tidak ikut dibuang
+    cadangan mingguan) dan disalin ke Drive → baca dan periksa → `__impor mulai` (pemulihan: properti dan info tetap, meta tab lama
+    digabung, versi tab dimulai di atas versi lama supaya isolate lain tidak memakai isi lama) → `baris` per 2.000 → `selesai` (jumlah
+    baris tiap tab harus sama dengan `harapan`, keadaan salinan tidak disimpan sehingga Sheet disalin penuh, info `pemulihan` dihapus) →
+    `setupSpreadsheet` dan `pasangTrigger` diteruskan → `sinkronDariSupabase`. Database kosong (project baru): tanpa cadangan sebelum
+    pemulihan.
+308. **Kegagalan:** sebelum `mulai`, aplikasi dibuka lagi (`buka`). Sesudah `mulai`, info `pemulihan` diberi `impor: true` di transaksi yang
+    sama: aplikasi tetap ditutup, `buka` ditolak (`dibuka: false`), dan pemulihan berikutnya tidak mencadangkan isi setengah itu
+    (`setengah`; uji ditolak). Pemulihan dijalankan tanpa `ping`, karena `ping` adalah aksi aplikasi yang ikut ditolak.
+309. **Format cadangan 2** (`isiCadanganJson_`): `jenis: 'cadangan-inventoryku'`, `format`, `nama`, `tab[].meta { id, beku }`, tanggal `{ $d }`
+    (`nilaiKeSupabase_`). Format 1 (teks ISO) tetap bisa dipulihkan: teks yang persis berbentuk `yyyy-mm-ddThh:mm:ss.sssZ` dibaca sebagai
+    tanggal (teks isian tidak pernah berbentuk begitu).
+310. **Yang tidak dipulihkan:** Script Properties Supabase (kunci PIN, sesi, langganan notifikasi; sengaja tidak ikut cadangan, karena hash
+    PIN dengan kuncinya bisa ditebak dari berkas cadangan), isi Storage, dan baris status yang ditulis sesudah cadangan dibuat. Pemulihan
+    di project yang sama: PIN dan sesi tetap. Project baru: PIN tidak berlaku, jalur `buatKodePemasangan` (butir 21).
+311. **Uji** (di luar repo): Postgres 16 lokal dengan `skema.sql`, `runtime.js`/`server.js`/`sinkron.js` asli sebagai server HTTP (Storage di
+    memori), Apps Script tiruan dengan Code.gs asli (Drive di memori, UrlFetchApp lewat curl, Sheet = Spreadsheet tiruan `supabase/src`):
+    salinan ke Sheet dan cadangan ke Drive, periksa tanpa menulis, aplikasi ditutup (`cobaLagi`, fungsi lain dan jadwal ditolak), pulihkan
+    (isi database sama dengan saat cadangan per tab, simpanan isolate tidak basi, PIN dan sesi tetap, Sheet disalin penuh, teks berawalan
+    `+`/`=` tetap teks), batalkan lewat cadangan sebelum pemulihan, uji (isi sama persis), format 1, cadangan rusak (dibatalkan, aplikasi
+    dibuka), nama tidak ada, putus di tengah (tetap ditutup, ulang berhasil), jumlah tidak cocok (ditolak, `buka` ditolak, uji ditolak,
+    pulihkan berhasil), project baru (data, zona, jadwal; PIN lama ditolak). Chromium: kirim Stock saat server ditutup masuk antrean
+    (bukan "Gagal kirim"), terkirim sesudah dibuka. Uji fitur 18–19 Oktober lain tetap lulus. Belum diuji di Supabase dan Google asli
+    (batas 6 menit Apps Script untuk data besar, ukuran berkas cadangan).

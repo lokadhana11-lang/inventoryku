@@ -55,6 +55,8 @@
 > Diperbarui 19 Oktober 2026 (keputusan pemilik): masa simpan barang masuk. Item boleh punya masa
 > simpan; saat barang masuk, tanggal "Baik sampai" terisi otomatis dan boleh diubah, lalu ikut
 > pengingat masa simpan bersama barang jadi (Bagian 5.1, 5.3, 5.5).
+> Diperbarui 19 Oktober 2026 (dari usulan fitur SYS-04): pemeriksaan, uji, dan pemulihan cadangan dari
+> editor Apps Script; selama pemulihan aplikasi ditutup dan isian menunggu di antrean HP (Bagian 9.4).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -1407,8 +1409,21 @@ untuk tanggal di bulan itu.
   (Bagian 4.5) salinannya berupa satu berkas JSON berisi semua tab.
 - Empat salinan terakhir disimpan; yang lebih lama dibuang ke tempat sampah Drive.
 - Salinan hanya bisa dibuka pemilik dan akun yang punya akses ke folder itu.
-- Memulihkan data dari cadangan dilakukan pemilik Sheet dengan tangan; aplikasi tidak
-  punya tombol pulihkan.
+- Memulihkan data dari cadangan dilakukan pemilik dari editor Apps Script, bukan dari aplikasi
+  (aplikasi tidak punya tombol pulihkan). Sejak 19 Oktober 2026 (permintaan pemilik, dari usulan
+  fitur SYS-04), untuk cadangan JSON di Supabase:
+  - **Periksa** (`periksaCadangan`): cadangan dibaca dari Drive dan isinya per tab dicatat, tanpa
+    mengubah apa pun.
+  - **Uji sebulan sekali** (`ujiPemulihanCadangan`): isi sekarang dicadangkan, berkas itu dibaca
+    lagi dari Drive dan dipulihkan, lalu jumlah baris tiap tab dicocokkan. Tidak ada isian yang hilang.
+  - **Pulihkan** (`pulihkanCadangan`, nama berkas di Script Property `PULIHKAN_CADANGAN`): isi database
+    diganti isi cadangan; isian sesudah cadangan itu dibuat hilang. Isi sebelum pemulihan selalu disimpan
+    dulu sebagai "Cadangan sebelum pemulihan …", jadi pemulihan bisa dibatalkan. PIN, sesi, dan notifikasi
+    HP tetap (tidak ikut cadangan).
+  - Selama pemulihan, aplikasi ditutup: server menolak aksi dengan pesan "Server sedang dipulihkan…" dan
+    HP memperlakukannya seperti tanpa sinyal (isian masuk antrean HP). Pemulihan yang berhenti di tengah
+    membiarkan aplikasi tetap ditutup sampai dijalankan ulang dan berhasil.
+  - Langkahnya, juga untuk project Supabase baru, ada di `supabase/PANDUAN.md`.
 - Jika pembuatan cadangan gagal, kegagalannya dicatat dan disebut di email harian berikutnya.
 
 ---

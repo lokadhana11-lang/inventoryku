@@ -13,7 +13,9 @@ const CORS = {
 
 // Fungsi Code.gs yang boleh dijalankan pemilik dari editor Apps Script (diteruskan) atau oleh jadwal.
 const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekarang', 'kirimRekapSekarang', 'buatKodePemasangan',
-  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan'];
+  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan', 'buatCadanganSebelumPulih'];
+// Satu-satunya fungsi yang boleh berjalan selama aplikasi ditutup untuk pemulihan cadangan.
+const FUNGSI_SAAT_PULIH = ['buatCadanganSebelumPulih'];
 const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
   'pengingatSuhuClosing', 'pengingatStock', 'arsipTahunan'];
 // Jadwal yang cukup memuat tab master; tab lain dimuat saat dibutuhkan.
@@ -71,6 +73,27 @@ export function buatPelayan(dep) {
           }
         }
         return impor(dep.sql, body, dep.runtime.simpan);
+      case '__pulihkan':
+        // Pemulihan cadangan (Code.gs v0.26): "tutup" menutup aplikasi (runtime menolak aksi dengan cobaLagi) dan menjawab
+        // jumlah baris sekarang; "buka" membukanya lagi jika pemulihan batal sebelum isi diubah.
+        // setengah: pemulihan sebelumnya berhenti sesudah isi database dihapus (impor "mulai"), jadi isinya belum lengkap:
+        // tidak dicadangkan lagi, dan "buka" ditolak sampai pemulihan berhasil.
+        if (body.langkah === 'tutup') {
+          const lama = await dep.sql`select nilai from inventoryku.info where kunci = 'pemulihan'`;
+          const setengah = !!(lama.length && lama[0].nilai && lama[0].nilai.impor);
+          const isi = { mulai: new KelasDate().toISOString(), berkas: String(body.berkas || ''), impor: setengah };
+          await dep.sql`insert into inventoryku.info (kunci, nilai) values ('pemulihan', ${dep.sql.json(isi)})
+            on conflict (kunci) do update set nilai = excluded.nilai`;
+          const n = await dep.sql`select count(*)::int as n from inventoryku.tab_baris`;
+          return { baris: n[0].n, setengah };
+        }
+        if (body.langkah === 'buka') {
+          const r = await dep.sql`delete from inventoryku.info where kunci = 'pemulihan' and not coalesce((nilai ->> 'impor')::boolean, false)
+            returning kunci`;
+          const sisa = await dep.sql`select 1 from inventoryku.info where kunci = 'pemulihan'`;
+          return { dibuka: r.length > 0 || !sisa.length };
+        }
+        throw new Error('Langkah pemulihan tidak dikenal.');
       case '__sinkron':
         return sinkron(dep.sql, body, dep.runtime.simpan);
       case '__sinkronSelesai':
@@ -89,7 +112,7 @@ export function buatPelayan(dep) {
       case '__fungsi': {
         if (FUNGSI_PEMILIK.indexOf(body.nama) < 0) throw new Error('Fungsi ' + body.nama + ' tidak bisa dijalankan dari sini.');
         const h = await dep.runtime.jalankan({ jenis: 'fungsi', nama: body.nama, argumen: body.argumen || [],
-          muat: JADWAL_RINGAN.test(body.nama) ? 'master' : undefined });
+          muat: JADWAL_RINGAN.test(body.nama) ? 'master' : undefined, saatPulih: FUNGSI_SAAT_PULIH.indexOf(body.nama) >= 0 });
         return { keluaran: h.keluaran === undefined ? null : h.keluaran, catatan: h.catatan };
       }
       default:
@@ -127,6 +150,8 @@ export function buatPelayan(dep) {
       const h = await dep.runtime.jalankan({ jenis: 'aksi', body });
       return jawab(await dep.runtime.gantiTautanBerkas(h.keluaran));
     } catch (err) {
+      // Aplikasi ditutup untuk pemulihan cadangan: HP memperlakukannya seperti tanpa sinyal (isian masuk antrean).
+      if (err && err.pemulihan) return jawab(JSON.stringify({ ok: false, pesan: err.message, cobaLagi: true }));
       log.error('Aksi ' + (nama || '?') + ' gagal: ' + (err && err.stack ? err.stack : err));
       return jawab(JSON.stringify({ ok: false, pesan: 'Terjadi kesalahan di server. Coba lagi beberapa saat lagi.' }));
     }
