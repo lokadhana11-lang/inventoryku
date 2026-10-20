@@ -57,6 +57,9 @@
 > pengingat masa simpan bersama barang jadi (Bagian 5.1, 5.3, 5.5).
 > Diperbarui 19 Oktober 2026 (dari usulan fitur SYS-04): pemeriksaan, uji, dan pemulihan cadangan dari
 > editor Apps Script; selama pemulihan aplikasi ditutup dan isian menunggu di antrean HP (Bagian 9.4).
+> Diperbarui 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tandai diperiksa sekaligus per
+> tanggal di daftar Riwayat untuk Head Kitchen atau Manager; isian yang dilaporkan keliru tidak ikut
+> (Bagian 6.2).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -1018,6 +1021,13 @@ Form kertas diakhiri dengan "Diperiksa oleh". Padanannya di web:
 2. Head Kitchen atau Manager membuka submit tersebut di menu Riwayat, memeriksa, lalu
    menekan "Tandai Diperiksa" → status **Diperiksa**, `checked_by` dan `checked_at` terisi.
 3. Nama pemeriksa dan waktunya tercetak di laporan PDF pada baris "Diperiksa oleh".
+4. **Tandai diperiksa sekaligus** (19 Oktober 2026): di daftar Riwayat, judul tiap tanggal punya
+   tombol "Tandai diperiksa (n)" untuk Head Kitchen atau Manager. Setelah konfirmasi, semua isian
+   form itu pada tanggal itu yang tampil dan belum diperiksa ditandai Diperiksa sekaligus, dengan
+   aturan yang sama dengan langkah 2. Isian yang masih punya baris dilaporkan keliru tidak ikut,
+   dan isian yang dikirim sesudah daftar dimuat juga tidak ikut. Tombol ini tidak ada selama daftar
+   disaring menurut kategori atau item, karena isian hanya tampil sebagian barisnya. Tujuannya
+   pemeriksaan harian: Pengelola membaca daftar hari itu, lalu menandainya dalam satu ketukan.
 
 Satu hari bisa punya beberapa kiriman untuk form yang sama. Jika semuanya sudah diperiksa,
 PDF mencantumkan pemeriksa terakhir dan waktunya. Jika belum, PDF menulis jumlahnya,

@@ -23,6 +23,8 @@
 > (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
+> Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tombol "Tandai diperiksa (n)" di
+> judul tiap tanggal di daftar Riwayat untuk Pengelola (Bagian 5.4 dan 7).
 > Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): di tabel Stock laptop/desktop,
 > harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, supaya tabel muat
 > dan Stock Akhir selalu terlihat (Bagian 5.3).
@@ -758,6 +760,16 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Laporkan kekeliruan:** ikon bendera di tiap baris. Ketuk, tulis catatan, kirim.
   Baris lalu bertanda Perlu ditinjau.
 - **Pengelola** melihat tombol tambahan di detail: "Koreksi" dan "Tandai diperiksa".
+- **Tandai diperiksa sekaligus** (Pengelola, 19 Oktober 2026): di kanan judul tanggal di daftar
+  Catatan ada tombol kedua "Tandai diperiksa (3)", hanya jika tanggal itu punya isian yang belum
+  diperiksa dan tidak dilaporkan keliru (angkanya jumlah isian itu), dan tidak ada selama filter
+  Kategori atau Item dipakai (isian hanya tampil sebagian barisnya). Di HP yang sempit tombol turun
+  ke bawah judul. Ketukan membuka konfirmasi "Tandai 3 isian diperiksa?" dengan kalimat "Isian Stock
+  Minggu, 18 Oktober yang belum diperiksa ditandai diperiksa atas nama Budi, lalu terkunci sampai
+  dibuka lagi." ("yang tampil dengan filter ini dan belum diperiksa" jika filter Pengisi atau Status
+  dipakai; ditambah "1 isian yang punya baris dilaporkan keliru tidak ikut." jika ada), tombol
+  "Batal" dan "Tandai diperiksa". Sesudahnya: "3 isian ditandai diperiksa.", tanda tiap isian menjadi
+  Diperiksa, dan tombol tanggal itu hilang. Butuh sinyal, seperti Tandai diperiksa satu per satu.
 - Isian yang masih di antrean offline tampil paling atas dengan tanda Menunggu.
 
 ### 5.5 Laporan
@@ -1235,6 +1247,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | iPhone tidak mendukung berbagi file | "iPhone ini belum bisa menyimpan file dari aplikasi. Buka alamat website di Safari, lalu unduh dari sana." |
 | Riwayat kosong | "Belum ada isian pada tanggal ini." |
 | Tanda diperiksa | "Diperiksa Budi, 3 Okt 21.50" |
+| Tandai diperiksa sekaligus | Tombol "Tandai diperiksa (3)", konfirmasi "Tandai 3 isian diperiksa?", lalu "3 isian ditandai diperiksa." (ditambah "1 isian dilewati karena ada baris dilaporkan keliru." jika ada) |
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
 | Menu tersimpan | "Menu tersimpan." |
 | Penjualan tersimpan | "Penjualan 16 Okt tersimpan." |

@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.26 (pemulihan cadangan)
+// InventoryKu Code.gs v0.27 (tandai diperiksa sekaligus)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -89,9 +89,11 @@
  *                        Sampai di Data_Stock).
  * - 19 Oktober 2026    : pemulihan cadangan JSON (dari editor, sesudah pindah):
  *                        periksaCadangan, ujiPemulihanCadangan, pulihkanCadangan.
+ * - 19 Oktober 2026    : tandai diperiksa sekaligus per tanggal di Riwayat
+ *                        (aksi tandaiDiperiksaBanyak, riwayat.periksaBanyak).
  */
 
-var VERSI_KODE = 'v0.26';
+var VERSI_KODE = 'v0.27';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -196,6 +198,8 @@ var AKSI_ = {
   riwayatItem: { jalankan: aksiRiwayatItem_, bacaSaja: true },
   laporkanKeliru: { jalankan: aksiLaporkanKeliru_ },
   tandaiDiperiksa: { jalankan: aksiTandaiDiperiksa_, pengelola: true,
+    pesan: 'Tandai diperiksa hanya bisa dilakukan Head Kitchen atau Manager.' },
+  tandaiDiperiksaBanyak: { jalankan: aksiTandaiDiperiksaBanyak_, pengelola: true,
     pesan: 'Tandai diperiksa hanya bisa dilakukan Head Kitchen atau Manager.' },
   bukaKunci: { jalankan: aksiBukaKunci_, pengelola: true,
     pesan: 'Buka kunci hanya bisa dilakukan Head Kitchen atau Manager.' },
@@ -8249,7 +8253,9 @@ function aksiRiwayat_(body) {
     kiriman: [],
     peristiwa: [],
     rekap: null,
-    pilihan: pilihanFilter_(def)
+    pilihan: pilihanFilter_(def),
+    // Aplikasi menampilkan "Tandai diperiksa (n)" per tanggal hanya jika server mengenal tandaiDiperiksaBanyak (v0.27).
+    periksaBanyak: true
   };
   if (!def) return hasil;
   hasil.kepala = infoKepala_(def);
@@ -8512,6 +8518,67 @@ function aksiTandaiDiperiksa_(body, pengguna) {
       tulisSel_(c, { status: STATUS_DIPERIKSA, checked_by: pengguna.nama, checked_at: kini });
     });
     return { kiriman: kirimanSatu_(def, sid) };
+  });
+}
+
+/** Paling banyak kiriman sekali Tandai diperiksa sekaligus (satu tanggal di Riwayat jauh di bawahnya). */
+var BATAS_PERIKSA_BANYAK = 300;
+
+/**
+ * Tandai diperiksa sekaligus (19 Oktober 2026, Bagian 6.2), khusus Pengelola: kiriman yang tampil pada satu tanggal di
+ * Riwayat ditandai Diperiksa dengan aturan yang sama dengan Tandai diperiksa satu per satu. Kiriman yang masih punya baris
+ * dilaporkan keliru, atau yang sudah tidak ada, dilewati tanpa menggagalkan yang lain; yang sudah Diperiksa tidak ditulis lagi.
+ * body.submissionId: [id]. Jawaban { diperiksa, sudah, dilewati: [{ id, sebab: dilaporkan|tidakAda }], kiriman: [lengkap] }.
+ */
+function aksiTandaiDiperiksaBanyak_(body, pengguna) {
+  var def = wajibDefRiwayat_(body.formId);
+  var sid = [];
+  var ada = {};
+  (Array.isArray(body.submissionId) ? body.submissionId : []).forEach(function (x) {
+    var s = String(x == null ? '' : x);
+    if (s && !Object.prototype.hasOwnProperty.call(ada, s)) {
+      ada[s] = true;
+      sid.push(s);
+    }
+  });
+  if (!sid.length) throw galatPengguna_('Tidak ada isian yang dipilih. Muat ulang Riwayat.');
+  if (sid.length > BATAS_PERIKSA_BANYAK) throw galatPengguna_('Terlalu banyak isian sekaligus. Tandai per tanggal.');
+  return denganKunci_(function () {
+    var t = wajibTabel_(def.tab);
+    var i = t.kol.submission_id;
+    var per = {};
+    sid.forEach(function (s) { per[s] = []; });
+    if (i !== undefined) {
+      t.baris.forEach(function (b, n) {
+        var s = String(b[i]);
+        if (Object.prototype.hasOwnProperty.call(per, s)) per[s].push({ t: t, b: b, nomor: n + 2 });
+      });
+    }
+    var kini = new Date();
+    var hasil = { diperiksa: 0, sudah: 0, dilewati: [], kiriman: [] };
+    var terpakai = [];
+    sid.forEach(function (s) {
+      var daftar = per[s];
+      if (!daftar.length) {
+        hasil.dilewati.push({ id: s, sebab: 'tidakAda' });
+        return;
+      }
+      daftar.forEach(function (c) { terpakai.push(c.b); });
+      if (daftar.some(function (c) { return rapikanTeks_(nilai_(c.t, c.b, 'flagged_by')); })) {
+        hasil.dilewati.push({ id: s, sebab: 'dilaporkan' });
+        return;
+      }
+      var ditulis = false;
+      daftar.forEach(function (c) {
+        if (rapikanTeks_(nilai_(c.t, c.b, 'status')) === STATUS_DIPERIKSA) return;
+        tulisSel_(c, { status: STATUS_DIPERIKSA, checked_by: pengguna.nama, checked_at: kini });
+        ditulis = true;
+      });
+      if (ditulis) hasil.diperiksa++;
+      else hasil.sudah++;
+    });
+    if (terpakai.length) hasil.kiriman = susunKiriman_(def, t, terpakai, bacaLogKoreksi_(def.tab), zonaSheet_());
+    return hasil;
   });
 }
 
