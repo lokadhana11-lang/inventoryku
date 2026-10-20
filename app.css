@@ -3158,9 +3158,7 @@ body.papan-ketik .bilah-kirim {
 }
 
 .tombol-periksa-tanggal {
-  min-height: 44px;
-  padding: 6px 14px;
-  font-size: 15px;
+  padding: 8px 14px;
 }
 
 .kelompok-subjudul {

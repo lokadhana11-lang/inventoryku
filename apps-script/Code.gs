@@ -89,6 +89,8 @@
  *                        Sampai di Data_Stock).
  * - 19 Oktober 2026    : pemulihan cadangan JSON (dari editor, sesudah pindah):
  *                        periksaCadangan, ujiPemulihanCadangan, pulihkanCadangan.
+ * - 19 Oktober 2026    : tandai diperiksa sekaligus per tanggal di Riwayat
+ *                        (aksi tandaiDiperiksaBanyak, riwayat.periksaBanyak).
  */
 
 var VERSI_KODE = 'v0.27';
@@ -8531,9 +8533,13 @@ var BATAS_PERIKSA_BANYAK = 300;
 function aksiTandaiDiperiksaBanyak_(body, pengguna) {
   var def = wajibDefRiwayat_(body.formId);
   var sid = [];
+  var ada = {};
   (Array.isArray(body.submissionId) ? body.submissionId : []).forEach(function (x) {
     var s = String(x == null ? '' : x);
-    if (s && sid.indexOf(s) < 0) sid.push(s);
+    if (s && !Object.prototype.hasOwnProperty.call(ada, s)) {
+      ada[s] = true;
+      sid.push(s);
+    }
   });
   if (!sid.length) throw galatPengguna_('Tidak ada isian yang dipilih. Muat ulang Riwayat.');
   if (sid.length > BATAS_PERIKSA_BANYAK) throw galatPengguna_('Terlalu banyak isian sekaligus. Tandai per tanggal.');

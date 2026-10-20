@@ -6459,19 +6459,26 @@
     return c.data.data;
   }
 
-  /** Setelah pemeriksaan atau koreksi: kiriman di data Riwayat yang tersimpan ikut diganti. */
-  function gantiKirimanTersimpan(formId, kiriman) {
-    var c = Cache.baca('riwayat');
-    if (!c || !c.data || !c.data.data || c.data.data.formId !== formId) return;
-    var d = c.data.data;
-    d.kiriman = (d.kiriman || []).map(function (k) {
-      if (k.id !== kiriman.id) return k;
+  /** Daftar kiriman Riwayat dengan kiriman-kiriman ini diganti versi baru dari server. */
+  function gantiKirimanDi(daftar, kiriman) {
+    var baru = {};
+    kiriman.forEach(function (x) { baru[x.id] = x; });
+    return (daftar || []).map(function (k) {
+      var kb = baru[k.id];
+      if (!kb) return k;
       // Kiriman di daftar bisa hanya memuat baris yang cocok dengan filter item.
       var ada = {};
       k.baris.forEach(function (b) { ada[b.rowId] = true; });
-      var baris = kiriman.baris.filter(function (b) { return ada[b.rowId]; });
-      return Object.assign({}, kiriman, { baris: baris.length ? baris : kiriman.baris });
+      var baris = kb.baris.filter(function (b) { return ada[b.rowId]; });
+      return Object.assign({}, kb, { baris: baris.length ? baris : kb.baris });
     });
+  }
+
+  /** Setelah pemeriksaan atau koreksi: kiriman (satu atau daftar) di data Riwayat yang tersimpan ikut diganti. */
+  function gantiKirimanTersimpan(formId, kiriman) {
+    var c = Cache.baca('riwayat');
+    if (!c || !c.data || !c.data.data || c.data.data.formId !== formId) return;
+    c.data.data.kiriman = gantiKirimanDi(c.data.data.kiriman, Array.isArray(kiriman) ? kiriman : [kiriman]);
     Cache.tulis('riwayat', c.data);
   }
 
@@ -6984,11 +6991,12 @@
 
     /**
      * Judul kelompok tanggal. Pengelola (server v0.27): tombol "Tandai diperiksa (n)" untuk isian tanggal itu yang belum
-     * diperiksa dan tidak punya baris dilaporkan keliru (spesifikasi sistem Bagian 6.2).
+     * diperiksa dan tidak punya baris dilaporkan keliru (spesifikasi sistem Bagian 6.2). Tidak ada selama filter kategori
+     * atau item dipakai: isian tampil tidak utuh, jadi baris yang tidak terlihat (juga yang dilaporkan keliru) tidak diketahui.
      */
     function kepalaTanggal(tg, isi) {
       var judul = el('h2', { class: 'kelompok-judul', text: tanggalJudul(tg) });
-      if (!pengelola || !data.periksaBanyak) return judul;
+      if (!pengelola || !data.periksaBanyak || pilih.kategori || pilih.item) return judul;
       var belum = isi.filter(function (x) { return x.kiriman && x.kiriman.status !== 'Diperiksa'; })
         .map(function (x) { return x.kiriman; });
       var bisa = belum.filter(function (kr) { return !kr.dilaporkan; });
@@ -7010,7 +7018,8 @@
       var n = bisa.length;
       konfirmasi({
         judul: 'Tandai ' + n + ' isian diperiksa?',
-        teks: 'Isian ' + (f.nama || data.formId) + ' ' + tanggalJudul(tg) + ' yang belum diperiksa ditandai diperiksa atas nama ' +
+        teks: 'Isian ' + (f.nama || data.formId) + ' ' + tanggalJudul(tg) +
+          (jumlahFilter(pilih) ? ' yang tampil dengan filter ini dan' : ' yang') + ' belum diperiksa ditandai diperiksa atas nama ' +
           k.sesi.pengguna.nama + ', lalu terkunci sampai dibuka lagi.' +
           (dilaporkan ? ' ' + dilaporkan + ' isian yang punya baris dilaporkan keliru tidak ikut.' : ''),
         teksYa: 'Tandai diperiksa',
@@ -7168,9 +7177,9 @@
 
     /** Satu kiriman atau daftar kiriman (Tandai diperiksa sekaligus) yang baru dari server. */
     function perbaruiKiriman(kr) {
-      (Array.isArray(kr) ? kr : [kr]).forEach(function (x) { gantiKirimanTersimpan(data.formId, x); });
-      var c = Cache.baca('riwayat');
-      if (c && c.data && c.data.data && c.data.data.formId === data.formId) data = c.data.data;
+      var daftar = Array.isArray(kr) ? kr : [kr];
+      data.kiriman = gantiKirimanDi(data.kiriman, daftar);
+      gantiKirimanTersimpan(data.formId, daftar);
       gambarIsi();
     }
 
