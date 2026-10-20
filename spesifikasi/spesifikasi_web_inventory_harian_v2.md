@@ -60,6 +60,9 @@
 > Diperbarui 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tandai diperiksa sekaligus per
 > tanggal di daftar Riwayat untuk Head Kitchen atau Manager; isian yang dilaporkan keliru tidak ikut
 > (Bagian 6.2).
+> Diperbarui 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock bisa diisi untuk
+> semua kategori sekaligus (tetap dikirim satu kiriman per kategori), punya kotak cari item, dan
+> pemakaian boleh dicatat dengan menghitung sisa; Stock Keluar dihitung server (Bagian 5.5).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -645,19 +648,21 @@ Dashboard, dan rekap bulanan tetap lengkap.
 
 ### 5.5 Form Stock Inventory Harian
 
-Stock tidak dihitung fisik setiap hari. Setiap gerakan barang dicatat sekali, di form
+Stock tidak wajib dihitung fisik setiap hari. Setiap gerakan barang dicatat sekali, di form
 asalnya, dan Stock Akhir dihitung sistem. Kecocokannya dengan barang nyata dijaga lewat
-stock opname berkala (Bagian 5.7).
+stock opname berkala (Bagian 5.7). Sejak 20 Oktober 2026 staff boleh mencatat pemakaian
+dengan menghitung sisa (lihat "Hitung sisa" di bawah).
 
 **Yang diisi staff (catatan gerakan, disimpan di `Data_Stock`):**
 
 | Field | Tipe | Keterangan |
 |---|---|---|
 | Tanggal | Date | Header. Hari ini atau kemarin (Bagian 5.0). |
-| Kategori | Dropdown | Header, dari `M_Kategori`. Form diisi satu kategori setiap kali, supaya daftar item pendek dan sesuai jenisnya. |
-| Nama Item | Otomatis | Semua item aktif di kategori itu tampil sebagai baris siap isi |
+| Kategori | Dropdown | Header, dari `M_Kategori`, atau "Semua kategori" (20 Oktober 2026): semua item aktif tampil dikelompokkan per kategori. Kiriman tetap satu per kategori (satu `submission_id` per kategori yang diisi), jadi Riwayat, pemeriksaan, dan PDF tetap per kategori. |
+| Nama Item | Otomatis | Semua item aktif di kategori itu tampil sebagai baris siap isi. Kotak cari item (20 Oktober 2026) hanya menyaring tampilan; isian item yang tidak tampil tetap ikut terkirim. |
 | Stock Masuk | Number | Barang datang. Boleh diketik dalam satuan besar jika item punya (Bagian 5.1). |
-| Stock Keluar | Number | Pemakaian langsung saja, **di luar** prep dan waste |
+| Stock Keluar | Number | Pemakaian langsung saja, **di luar** prep dan waste. Diketik, atau dihitung dari Sisa. |
+| Sisa | Number, pilihan | Hitung sisa (20 Oktober 2026): jumlah yang ada sekarang, menggantikan Stock Keluar untuk baris itu. Tidak disimpan sebagai kolom; yang tercatat adalah Stock Keluar hasil hitungnya. |
 | Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. |
 | Harga Beli | Rupiah, tidak wajib | Per baris yang punya Stock Masuk (18 Oktober 2026): harga per satuan yang diketik (per dus jika masuk dalam satuan besar), disimpan per satuan dasar di kolom `Harga Beli (Rp)`. |
 | Baik Sampai | Tanggal, otomatis | Per baris yang punya Stock Masuk, hanya untuk item yang punya masa simpan (19 Oktober 2026): tanggal masuk + masa simpan item, boleh diubah (tidak sebelum tanggal masuk, paling lama 365 hari sesudahnya). |
@@ -669,6 +674,14 @@ stock opname berkala (Bagian 5.7).
   tanggal beli, lewat riwayat harga Bagian 5.1) atau "Abaikan" (disembunyikan sampai pembelian
   berikutnya). Pengelola bisa mengoreksi harga beli lewat Riwayat (Bagian 6.3); pemasok kiriman
   tidak bisa dikoreksi. Nama pemasok hanya bisa diganti selama belum tercatat di barang masuk.
+- **Hitung sisa** (20 Oktober 2026, semua role, pilihan per pengguna "Catat pemakaian: Tambah
+  keluar / Hitung sisa"): staff mengetik jumlah yang ada sekarang. Server menghitung Stock Keluar =
+  Stock Akhir tercatat pada tanggal itu **saat kiriman diterima** + Stock Masuk baris itu − Sisa,
+  sehingga Stock Akhir tanggal itu sama dengan sisa yang dihitung, walau ada kiriman lain sesudah
+  form dibuka. Sisa yang lebih banyak dari stock tercatat + masuk ditolak (meluruskan stock tetap
+  lewat penyesuaian atau opname Pengelola, Bagian 5.7). Sisa yang sama dengan stock tercatat tidak
+  dikirim. Selisih karena barang hilang atau waste yang tidak dicatat ikut tercatat sebagai Stock
+  Keluar. Kiriman yang menunggu di antrean HP dihitung dari stock saat sampai di server.
 - **Boleh dikirim berkali-kali sehari.** Tiap kiriman adalah catatan gerakan tersendiri dan
   **menambah**, tidak menimpa kiriman sebelumnya. Contoh: barang datang pagi 5 kg dan sore
   3 kg, lewat dua kiriman, menjadi Masuk 8 kg pada hari itu.
@@ -699,8 +712,9 @@ stock opname berkala (Bagian 5.7).
   dari Stock Akhir pada tanggal terakhir item itu punya rekap.
 - **Item yang tidak bergerak** pada suatu hari tidak punya rekap untuk hari itu; stock-nya
   tetap sama dengan rekap terakhir.
-- **Tersusun per kategori.** Di form, staff memilih satu kategori. Di tab Harian dan PDF,
-  item dikelompokkan di bawah judul kategorinya. Kategori dikelola Pengelola.
+- **Tersusun per kategori.** Di form, staff memilih satu kategori atau Semua kategori. Di form
+  Semua kategori, tab Harian, dan PDF, item dikelompokkan di bawah judul kategorinya. Kategori
+  dikelola Pengelola.
 - **Yang tampil di layar isi** untuk tiap item: Stock Awal, yang sudah tercatat hari ini
   (Masuk, Keluar, Hasil Prep, Dipakai Prep, Waste), dan Stock Akhir sementara yang berubah
   saat staff mengetik.

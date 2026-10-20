@@ -272,6 +272,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Tandai diperiksa sekaligus (Code.gs v0.27, 19 Oktober 2026; khusus Pengelola): `tandaiDiperiksaBanyak {formId, submissionId: [id]}`
   (paling banyak 300) → `{ diperiksa, sudah, dilewati: [{ id, sebab: dilaporkan|tidakAda }], kiriman: [kiriman lengkap seperti
   `detailKiriman.kiriman`] }`. `riwayat` ditambah `periksaBanyak: true` (aplikasi menampilkan tombol per tanggal hanya jika ada).
+- Hitung sisa (Code.gs v0.28, 20 Oktober 2026; bertoken, semua role): `kirimStock.baris[]` boleh membawa `sisa` menggantikan `keluar`
+  (keduanya ditolak); server menulis Stock Keluar = Stock Akhir tercatat pada `tanggal` saat diterima + masuk (satuan dasar) − sisa;
+  sisa lebih banyak ditolak, sama dengan stock dilewati. `formStock` ditambah `sisaSiap: true`. Form Stock "Semua kategori" tetap
+  memakai `kirimStock` satu kiriman per kategori (aplikasi).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -318,6 +322,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++ | Uji dan pemulihan cadangan (permintaan pemilik 19 Oktober 2026, dari usulan fitur SYS-04): `periksaCadangan`, `ujiPemulihanCadangan`, dan `pulihkanCadangan` dari editor Apps Script membaca cadangan JSON dari Drive dan memulihkannya ke Supabase; aplikasi ditutup selama pemulihan (isian masuk antrean HP), isi sebelum pemulihan selalu dicadangkan, jumlah baris dicocokkan, pemulihan setengah jalan tidak membuka aplikasi; cadangan format 2; langkah di PANDUAN | Kode selesai (Code.gs v0.26, aplikasi 0.26.0), diuji ujung ke ujung: runtime dan pelayan asli `supabase/src` di atas Postgres 16 lokal, Apps Script tiruan (Drive, curl ke server) dengan Code.gs asli (pulihkan, batalkan, uji, format 1, cadangan rusak, putus di tengah, jumlah tidak cocok, project baru), dan Chromium (isian masuk antrean saat server ditutup). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `ujiPemulihanCadangan` sekali pada jam sepi (setupSpreadsheet tidak perlu) |
 | 12+++++++++++++++++++ | Tabel Stock muat di laptop dan teks lama dari masa Apps Script (permintaan pemilik 19 Oktober 2026, butir 1 dari telaah aplikasi): harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, sehingga Stock Akhir selalu terlihat tanpa menggeser tabel mulai 1.024 px; teks yang keliru sesudah pindah ke Supabase (toleransi Google, salinan spreadsheet, perintah pasangTrigger yang tidak perlu, isi tab M_Item/M_Unit, alamat Web App /exec) diganti | Kode selesai (aplikasi 0.26.1; Code.gs tidak berubah), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` dan Chromium (lebar tabel di 1024, 1280, 1366, 1920 px untuk lima kategori sebelum dan sesudah Tambah masuk diisi, urutan Tab, draft, kartu HP dan tablet sama piksel per piksel dengan 0.26.0). Menunggu pemilik: gabungkan PR, uji dari laptop (tidak perlu tempel Code.gs atau Edge Function) |
 | 12++++++++++++++++++++ | Tandai diperiksa sekaligus (permintaan pemilik 19 Oktober 2026, butir 2 dari telaah aplikasi): tombol "Tandai diperiksa (n)" di judul tiap tanggal di daftar Riwayat untuk Pengelola, konfirmasi, isian yang dilaporkan keliru tidak ikut | Kode selesai (Code.gs v0.27, aplikasi 0.27.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (30 uji server: dilaporkan, id ganda dan tak dikenal, ulang, Staff ditolak, batas, lima jenis form, Beranda; sel yang berubah sama dengan Tandai diperiksa satu per satu) dan Chromium (27 uji: HP, desktop dengan detail kanan, Staff, server lama, tanpa sinyal, galat server, delapan ukuran, gerak; 30 uji perbaikan sesudah telaah: tanpa tombol selama filter kategori/item, kalimat filter pengisi, simpanan penuh, tombol 48 px). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
+| 12+++++++++++++++++++++ | Isi form Stock lebih cepat (permintaan pemilik 20 Oktober 2026, butir 3 dari telaah aplikasi): "Semua kategori" di form Stock (satu kiriman per kategori), kotak "Cari item" di form Stock dan Stock opname, "Catat pemakaian: Hitung sisa" (Stock Keluar dihitung server dari sisa) | Kode selesai (Code.gs v0.28, aplikasi 0.28.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (25 uji server; jawaban jalur Tambah keluar sama persis dengan v0.27) dan Chromium (73 uji: HP, desktop 1024/1366, antrean, satu kategori ditolak, server lama, pencarian, opname, delapan ukuran). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2364,3 +2369,52 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Tandai diperiksa dan Buka kunci di detail kanan desktop tetap memperbarui hitungan; 11 di antaranya gagal pada versi sebelum
     perbaikan. Temuan yang tidak diubah: penghapusan id ganda kuadratik (bukan bug pemakaian; tetap diganti peta objek) dan fokus
     sesudah daftar digambar ulang (butir 319). Belum diuji di Supabase asli dan di HP.
+
+### Isi form Stock lebih cepat (Code.gs v0.28, aplikasi 0.28.0, 20 Oktober 2026)
+
+321. **Asal:** telaah aplikasi oleh Claude (19 Oktober 2026), butir 3 yang dipilih pemilik: "Isi sisa", cari item, dan semua
+    kategori di form Stock (juga cari item di Stock opname). Sebelumnya satu kiriman hanya untuk satu kategori tanpa kotak cari
+    (5 kategori = 5 kali pilih dan kirim), dan pemakaian hanya bisa diketik sebagai Tambah keluar. Spesifikasi sistem Bagian 5.5;
+    tampilan Bagian 5.3, 5.8, dan 7.
+322. **Semua kategori** (keputusan tambahan): pilihan pertama di `<select>` Kategori (nilai ''), bawaan untuk draft tanpa kategori;
+    draft lama yang sudah memilih kategori tetap di kategorinya. Item urut kategori (`data.kategori`) lalu nama, dikelompokkan di
+    `section.stock-kelompok` dengan h2 nama kategori dan nama item h3 (pola Stock opname); di laptop/desktop satu tabel per kategori,
+    nomor berlanjut. Satu kategori tetap seperti dulu (tanpa judul kategori, nama item h2). Draft tetap per kategori
+    (`draft.isian[kategori][nama]`, `draft.sid[kategori]`), jadi kirim membuat satu kiriman per kategori yang diisi dengan
+    `submissionId` sendiri: Riwayat (kepala Kategori), pemeriksaan, Diisi oleh di PDF per kategori, dan antrean tidak berubah,
+    dan server tidak perlu aksi baru. Kiriman dikirim satu per satu (`kirimDari`); galat sambungan atau sesi habis: kategori itu
+    dan sesudahnya masuk antrean; galat server: dicatat dengan nama kategori dan kategori berikutnya tetap dicoba. Pemasok kiriman
+    berlaku untuk tiap kiriman kategori.
+323. **Cari item:** `<input type=search>` di kotak info, hanya menyaring tampilan (tidak disimpan di draft). Penghitung, validasi, dan
+    kirim memakai semua item di cakupan (kategori atau semua), jadi isian yang tersembunyi tetap terkirim dan keterangan di bawah
+    kotak cari menyebut jumlahnya. Galat pada item tersembunyi mengosongkan pencarian lalu memfokuskan kolomnya. Stock opname memakai
+    cara yang sama (hitungan tersembunyi tetap ikut Lanjut dan disimpan). `.kolom-cari` diberi `align-content: start` karena baris
+    grid kotak info meninggikan kotak cari (55 px) di samping "Catat pemakaian".
+324. **Hitung sisa** (server): `sisa` per baris; `angkaIsian_` (0 atau lebih, 3 desimal); keluar = `posisiStock_(rekap, tanggal).akhir`
+    + masuk (satuan dasar, sesudah dus dikonversi) − sisa, dibaca di dalam kunci tulis sebelum kiriman ditulis. Keputusan: dihitung
+    server, bukan HP, supaya kiriman lain yang masuk sesudah form dibuka (Staff lain, antrean) tidak terhitung dua kali dan Stock
+    Akhir tanggal itu sama dengan sisa yang dihitung. Sisa > stock + masuk ditolak seluruh kiriman (pesan menyebut angkanya;
+    meluruskan stock = penyesuaian Pengelola); sisa sama: baris dilewati, dan jika tidak ada baris tersisa "Sisa sama dengan stock
+    tercatat, jadi tidak ada pemakaian yang perlu dikirim."; `keluar` dan `sisa` sekaligus ditolak; item yang sama dua kali dalam
+    satu kiriman ditolak jika salah satunya membawa sisa (sisa dihitung dari stock sebelum kiriman). Sisa tidak disimpan sebagai
+    kolom (tanpa setupSpreadsheet): yang tercatat Stock Keluar biasa, jadi Riwayat, koreksi, kartu stok, HPP, dan rekap tidak
+    berubah, dan Stock Akhir di rekap sudah menunjukkan hitungannya. `formStock.sisaSiap` = server mengenal `sisa`.
+325. **Hitung sisa** (aplikasi): `grupPilihan` "Catat pemakaian" (Tambah keluar / Hitung sisa) tampil hanya jika `sisaSiap`;
+    pilihannya `draft.cara` (per pengguna, tetap antar hari). `hitung()` memberi `sisa`, `keluar` (perkiraan HP dari stock yang
+    dimuat), `tersedia`, `sisaSalah`, `sisaLebih`; Stock akhir = sisa. Kartu: label "Sisa sekarang", keterangan `.ket-keluar`
+    (`aria-describedby`); tabel: kolom "Sisa Sekarang" dengan keterangan pendek (`td.sel-sisa`, 13 px, paling lebar 120 px, jadi tabel
+    tetap muat mulai 1.024 px). Baris dengan sisa dikirim `{ sisa }` tanpa `keluar`; sisa yang sama dengan stock tanpa masuk tidak
+    dikirim. Mengganti cara mengubah angka yang sudah diketik di semua kategori draft dengan rumus yang sama (`gantiCara`; angka
+    salah dipindah apa adanya, hasil minus menjadi angka salah yang harus dibetulkan), supaya tidak ada isian yang diam-diam tidak
+    terkirim. Server lama: pilihan tidak tampil dan form memakai Tambah keluar. `dataStockDariHp` kini juga membawa `masaSimpanSiap`
+    (dulu terlewat) dan `sisaSiap`.
+326. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js`: 25 uji server (sisa saja, sisa + masuk
+    dus, lebih ditolak tanpa menulis, sama dilewati dan pesan khusus, keluar + sisa, minus dan huruf, item ganda, kiriman lain di
+    antaranya, kemarin dan hari ini ikut turun, kiriman ulang, koreksi baris sisa) dan jawaban jalur Tambah keluar (formStock,
+    empat kiriman termasuk dus, pemasok, galat, Riwayat, rekap, kartu stok) sama persis dengan Code.gs v0.27. Chromium dengan API
+    tiruan: 73 uji (Semua kategori bawaan dan urutan judul, cari dan fokus, isian tersembunyi ikut terkirim sebagai dua kiriman
+    berbeda id, Hitung sisa dengan konversi dua arah, keterangan, sisa lebih ditolak di HP dengan fokus, sisa sama, kiriman membawa
+    sisa dan Stock Akhir server = sisa, pilihan tersimpan, antrean dua kategori lalu terkirim, satu kategori ditolak server, tabel
+    per kategori muat di 1024 dan 1366 px, server lama, galat pada item tersembunyi, draft satu kategori seperti dulu, cari di
+    opname, delapan ukuran untuk Stock dan opname), uji Tandai diperiksa sekaligus, tabel Stock butir 312, dan sapuan 55 layar
+    tetap lulus. Belum diuji di Supabase asli dan di HP.

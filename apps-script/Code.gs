@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.27 (tandai diperiksa sekaligus)
+// InventoryKu Code.gs v0.28 (hitung sisa di form Stock)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -91,9 +91,11 @@
  *                        periksaCadangan, ujiPemulihanCadangan, pulihkanCadangan.
  * - 19 Oktober 2026    : tandai diperiksa sekaligus per tanggal di Riwayat
  *                        (aksi tandaiDiperiksaBanyak, riwayat.periksaBanyak).
+ * - 20 Oktober 2026    : hitung sisa di form Stock (kirimStock.baris[].sisa;
+ *                        keluar = stock tercatat + masuk - sisa, dihitung server).
  */
 
-var VERSI_KODE = 'v0.27';
+var VERSI_KODE = 'v0.28';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -2573,7 +2575,9 @@ function dataFormStock_(tanggal) {
     pembelianSiap: siap,
     pemasok: siap ? bacaPemasok_().filter(function (p) { return p.aktif; }).map(function (p) { return p.nama; }) : [],
     // Baik sampai barang masuk (Code.gs v0.25): hanya setelah setupSpreadsheet membuat kolomnya.
-    masaSimpanSiap: masaSimpanItemSiap_()
+    masaSimpanSiap: masaSimpanItemSiap_(),
+    // Hitung sisa (Code.gs v0.28): kirimStock menerima baris[].sisa. Tanpa kolom baru, jadi selalu siap.
+    sisaSiap: true
   };
 }
 
@@ -2587,6 +2591,13 @@ function aksiFormStock_(body) {
  * kiriman menambah, tidak menimpa. submission_id yang sudah pernah masuk
  * tidak ditulis lagi (jawabannya sudahTerkirim: true, supaya antrean di HP
  * yang mengirim ulang menganggapnya selesai).
+ *
+ * Hitung sisa (Code.gs v0.28, spesifikasi sistem Bagian 5.5): baris boleh
+ * membawa `sisa` (jumlah yang ada sekarang) menggantikan `keluar`. Stock
+ * Keluar = stock tercatat pada tanggal itu saat kiriman diterima + masuk -
+ * sisa, jadi kiriman lain yang masuk sesudah HP memuat form ikut dihitung dan
+ * Stock Akhir tanggal itu sama dengan sisa. Sisa yang lebih banyak dari stock
+ * tercatat + masuk ditolak (meluruskan stock = penyesuaian Pengelola).
  */
 function aksiKirimStock_(body, pengguna) {
   var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
@@ -2618,12 +2629,21 @@ function aksiKirimStock_(body, pengguna) {
       pemasok = p.nama;
     }
     var baru = [];
+    var adaSisa = false;
+    var rekap = null;
+    var dilihat = {};
     masukan.forEach(function (b) {
       var m = master[rapikanTeks_(b && b.item).toLowerCase()];
       if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
+      var kunci = m.nama.toLowerCase();
+      var pakaiSisa = b.sisa !== '' && b.sisa != null;
+      // Sisa dihitung dari stock sebelum kiriman ini, jadi item yang sama dua kali tidak bisa dihitung benar.
+      if (dilihat[kunci] && (pakaiSisa || dilihat[kunci] === 'sisa')) {
+        throw galatPengguna_(m.nama + ' ada dua kali di kiriman ini. Muat ulang form.');
+      }
+      dilihat[kunci] = pakaiSisa ? 'sisa' : 'keluar';
       var masuk = angkaIsian_(b.masuk, 'Tambah masuk ' + m.nama);
       var keluar = angkaIsian_(b.keluar, 'Tambah keluar ' + m.nama);
-      if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
       var diketik = '';
       var besar = b.satuanMasuk === 'besar' && masuk;
       // Harga beli per satuan yang diketik (per dus jika masuk dalam satuan besar); disimpan per satuan dasar.
@@ -2634,6 +2654,20 @@ function aksiKirimStock_(body, pengguna) {
         masuk = bulat_(masuk * m.isiSatuanBesar);
         if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
+      if (pakaiSisa) {
+        if (keluar) throw galatPengguna_('Isi Tambah keluar atau sisa ' + m.nama + ', tidak keduanya.');
+        var sisa = angkaIsian_(b.sisa, 'Sisa ' + m.nama);
+        adaSisa = true;
+        rekap = rekap || bacaRekap_();
+        var tercatat = posisiStock_(rekap.item[kunci], tanggal).akhir;
+        keluar = bulat_(tercatat + masuk - sisa);
+        if (keluar < 0) {
+          throw galatPengguna_('Sisa ' + m.nama + ' ' + teksAngka_(sisa) + ' ' + m.satuan + ' lebih banyak dari stock tercatat ' +
+            (masuk ? 'ditambah masuk ' : '') + teksAngka_(bulat_(tercatat + masuk)) + ' ' + m.satuan +
+            '. Periksa angkanya, isi Tambah masuk jika ada barang datang, atau minta Head Kitchen atau Manager meluruskan stock.');
+        }
+      }
+      if (!masuk && !keluar) return; // item yang kedua kolomnya kosong (atau sisanya sama dengan stock) tidak ikut terkirim
       // Baik sampai barang masuk (Bagian 5.1): yang diketik, atau tanggal + masa simpan item.
       var baik = masuk && baikSiap ? baikSampaiMasuk_(b.baikSampai, tanggal, m) : '';
       baru.push(gabung_(gabung_({
@@ -2651,7 +2685,10 @@ function aksiKirimStock_(body, pengguna) {
         'Baik Sampai': baik ? tanggalSel_(baik) : ''
       })));
     });
-    if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
+    if (!baru.length) {
+      throw galatPengguna_(adaSisa ? 'Sisa sama dengan stock tercatat, jadi tidak ada pemakaian yang perlu dikirim.'
+        : 'Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
+    }
 
     tambahBarisTabel_(tabel, baru);
     urutkanTabel_(tabel, URUTAN_DATA);
