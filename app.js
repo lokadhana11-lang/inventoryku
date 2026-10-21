@@ -3038,6 +3038,18 @@
     return bagian.join(' ');
   }
 
+  /**
+   * Hitung sisa (Code.gs v0.28): sisa yang server tidak catat karena lebih banyak dari stock tercatat saat kiriman
+   * diterima. Barang masuk di baris itu tetap tercatat.
+   */
+  function teksSisaLebih(daftar) {
+    if (!daftar || !daftar.length) return '';
+    return daftar.map(function (x) {
+      return 'Sisa ' + x.item + ' ' + formatAngka(x.sisa) + ' ' + x.satuan + ' tidak dicatat: lebih banyak dari stock tercatat ' +
+        (x.masuk ? 'ditambah masuk ' : '') + formatAngka(bulat3(x.tercatat + (x.masuk || 0))) + ' ' + x.satuan + '.';
+    }).join(' ') + ' Periksa hitungannya, atau minta Pengelola meluruskan stock.';
+  }
+
   /** "Tomat", "Tomat dan Selada", "Tomat, Selada, dan Wortel". */
   function daftarNama(nama) {
     if (nama.length < 3) return nama.join(' dan ');
@@ -3131,6 +3143,8 @@
           terkirim++;
           var pf = pesanFotoKiriman(hasil);
           if (pf) pesanFoto.push(pf);
+          var ps = teksSisaLebih(hasil && hasil.sisaLebih);
+          if (ps) pesanFoto.push(ps);
         }, function (err) {
           if (err && (err.jaringan || err.sesiBerakhir)) {
             berhenti = err;
@@ -3337,6 +3351,7 @@
       sid: data.sid || {},
       pemasok: data.pemasok || '',
       cara: data.cara === 'sisa' ? 'sisa' : 'keluar',
+      sisaHari: data.sisaHari || '',
       waktu: d ? d.waktu : null
     };
   }
@@ -3404,8 +3419,8 @@
     var pilihKategori = el('select', { class: 'isian', id: 'pilih-kategori' });
     // Cari item (aplikasi 0.28.0): hanya menyaring tampilan; isian yang tidak tampil tetap ikut terkirim.
     var cari = '';
-    var inCari = el('input', { type: 'search', class: 'isian', id: 'cari-item-stock', autocomplete: 'off', enterkeyhint: 'search',
-      'aria-describedby': 'info-cari-stock' });
+    var inCari = el('input', { type: 'search', class: 'isian', id: 'cari-item-stock', autocomplete: 'off', autocapitalize: 'none',
+      spellcheck: 'false', enterkeyhint: 'search', 'aria-describedby': 'info-cari-stock' });
     var infoCari = el('p', { class: 'kolom-bantuan', id: 'info-cari-stock', 'aria-live': 'polite' });
     // Hitung sisa (aplikasi 0.28.0): tampil jika server sudah menerima sisa (Code.gs v0.28).
     var gCara = grupPilihan('Catat pemakaian', ['Tambah keluar', 'Hitung sisa'], draft.cara === 'sisa' ? 'Hitung sisa' : 'Tambah keluar');
@@ -3461,7 +3476,7 @@
 
     function simpanDraft() {
       var waktu = Draft.simpan('stock', { tanggal: tanggal, kategori: draft.kategori, isian: draft.isian, sid: draft.sid, pemasok: draft.pemasok,
-        cara: draft.cara });
+        cara: draft.cara, sisaHari: draft.sisaHari });
       var adaIsian = Object.keys(draft.isian).some(function (kat) {
         return Object.keys(draft.isian[kat]).some(function (n) {
           var x = draft.isian[kat][n];
@@ -3471,6 +3486,24 @@
       catatanDraft.textContent = adaIsian && waktu ? 'Draft tersimpan ' + jam(new Date(waktu).toISOString()) : '';
     }
     if (draft.waktu) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
+
+    // Sisa hanya berlaku saat dihitung: sisa yang diketik pada hari lain dibuang dari draft (angka lain tetap).
+    var pesanAwal = '';
+    if (draft.sisaHari && draft.sisaHari !== hariIni) {
+      var adaSisaLama = false;
+      Object.keys(draft.isian).forEach(function (kat) {
+        Object.keys(draft.isian[kat]).forEach(function (n) {
+          if (String(draft.isian[kat][n].sisa || '').trim()) adaSisaLama = true;
+          draft.isian[kat][n].sisa = '';
+        });
+      });
+      if (adaSisaLama) {
+        pesanAwal = 'Sisa yang diketik ' + tanggalPendek(draft.sisaHari) + ' sudah dikosongkan, karena sisa hanya berlaku saat dihitung. ' +
+          'Hitung lagi untuk hari ini.';
+      }
+      draft.sisaHari = '';
+      simpanDraft();
+    }
 
     /** Isian satu item di draft; disimpan per kategori item itu (satu kiriman per kategori). */
     function isianItem(it) {
@@ -3504,9 +3537,9 @@
       return !q || it.nama.toLowerCase().indexOf(q) >= 0;
     }
 
-    /** Hitung sisa: hanya jika server menerimanya. */
+    /** Hitung sisa: hanya jika server menerimanya, dan hanya untuk hari ini (sisa = jumlah yang ada sekarang). */
     function modeSisa() {
-      return !!(data && data.sisaSiap) && draft.cara === 'sisa';
+      return !!(data && data.sisaSiap) && draft.cara === 'sisa' && tanggal === hariIni;
     }
 
     function masukDasarItem(it, isian) {
@@ -3637,12 +3670,15 @@
       function perbarui() {
         var h = hitung(it, isian);
         inMasuk.setAttribute('aria-invalid', h.masukSalah ? 'true' : 'false');
-        inKeluar.setAttribute('aria-invalid', h.keluarSalah || h.sisaSalah || h.sisaLebih ? 'true' : 'false');
+        inKeluar.setAttribute('aria-invalid', h.keluarSalah || h.sisaSalah ? 'true' : 'false');
         if (ketKeluar) {
+          // Sisa lebih banyak hanya peringatan: stock di HP bisa sudah basi, server menghitung lagi saat menerima.
           ketKeluar.textContent = h.sisaSalah ? 'Isi angka 0 atau lebih, misalnya 2,5.'
-            : h.sisaLebih ? (modeTabel ? 'Lebih dari stock ' + formatAngka(h.tersedia)
-              : 'Sisa lebih banyak dari stock tercatat ' + formatAngka(h.tersedia) + ' ' + it.satuan +
-                '. Isi Tambah masuk jika ada barang datang, atau minta Pengelola meluruskan stock.')
+            : h.sisaLebih ? (modeTabel ? 'Lebih dari stock' + (h.masukDasar > 0 ? ' + masuk ' : ' ') + formatAngka(h.tersedia)
+              : 'Sisa lebih banyak dari stock tercatat ' + (h.masukDasar > 0 ? 'ditambah masuk ' : '') + formatAngka(h.tersedia) + ' ' +
+                it.satuan + '. Jika tetap dikirim, keluarnya tidak dicatat. ' +
+                (h.masukDasar > 0 ? '' : 'Isi Tambah masuk jika ada barang datang, atau ') +
+                (h.masukDasar > 0 ? 'Periksa hitungannya, atau minta' : 'minta') + ' Pengelola meluruskan stock.')
             : h.sisa == null ? (modeTabel ? '' : 'Jumlah yang ada sekarang.')
             : h.keluar > 0 ? (modeTabel ? 'keluar ' + formatAngka(h.keluar) : 'Keluar ' + formatAngka(h.keluar) + ' ' + it.satuan + '.')
             : (modeTabel ? 'tidak ada keluar' : 'Sama dengan stock tercatat, tidak ada yang keluar.');
@@ -3675,6 +3711,7 @@
       }
       function ubah(jenis, nilai) {
         isian[jenis] = nilai;
+        if (jenis === 'sisa') draft.sisaHari = hariIni;
         simpanDraft();
         perbarui();
       }
@@ -3776,13 +3813,13 @@
       return grid;
     }
 
-    /** Menggambar ulang daftar item; kolom yang sedang diketik tetap aktif. */
-    function gambarItem() {
+    /** Menggambar ulang daftar item; kolom yang sedang diketik tetap aktif. Pencarian tidak menghapus pesan kiriman. */
+    function gambarItem(opsi) {
       var aktif = document.activeElement;
       var kunciAktif = aktif && aktif.getAttribute ? aktif.getAttribute('data-kunci') : null;
       var posisi = kunciAktif && typeof aktif.selectionStart === 'number' ? aktif.selectionStart : null;
       kosongkan(wadahItem);
-      tulisPesan(pesan, '');
+      if (!(opsi && opsi.simpanPesan)) tulisPesan(pesan, '');
       perbaruiInfoCari();
       var semua = itemCakupan();
       if (!semua.length) {
@@ -3795,7 +3832,7 @@
       }
       var tampil = semua.filter(cocokCari);
       if (!tampil.length) {
-        wadahItem.appendChild(kotakKosong('Tidak ada item yang cocok dengan "' + cari.trim() + '".'));
+        wadahItem.appendChild(kotakKosong('Tidak ada item dengan nama itu.'));
         perbaruiPenghitung();
         return;
       }
@@ -3866,34 +3903,52 @@
       gambarPemasok();
       gambarStatus();
       gambarItem();
+      if (pesanAwal) {
+        tulisPesan(pesan, pesanAwal, 'info');
+        pesanAwal = '';
+      }
+    }
+
+    /** Banyak item di draft (semua kategori) yang kolom pemakaiannya (keluar atau sisa) berisi. */
+    function jumlahIsianCara(jenis) {
+      var n = 0;
+      Object.keys(draft.isian).forEach(function (kat) {
+        Object.keys(draft.isian[kat]).forEach(function (nama) {
+          if (String(draft.isian[kat][nama][jenis] || '').trim()) n++;
+        });
+      });
+      return n;
     }
 
     function gambarCara() {
       gCara.wadah.hidden = !data.sisaSiap;
-      bantuanCara.textContent = modeSisa()
-        ? 'Ketik jumlah yang ada sekarang. Keluar dihitung dari stock tercatat + masuk − sisa.'
-        : 'Ketik yang dipakai langsung, di luar prep dan waste.';
+      var hariLain = tanggal !== hariIni;
+      var sisaMode = modeSisa();
+      gCara.input[0].checked = !sisaMode;
+      gCara.input[1].checked = sisaMode;
+      gCara.nonaktif(hariLain);
+      var sisaTunda = hariLain ? jumlahIsianCara('sisa') : 0;
+      bantuanCara.textContent = sisaMode
+        ? 'Catat prep dan waste lebih dulu. Ketik jumlah yang ada sekarang; keluar dihitung dari stock tercatat + masuk − sisa.'
+        : 'Ketik yang dipakai langsung, di luar prep dan waste.' +
+          (hariLain ? ' Hitung sisa hanya untuk hari ini.' : '') +
+          (sisaTunda ? ' ' + sisaTunda + ' sisa yang diketik untuk hari ini tidak ikut dikirim untuk tanggal ini.' : '');
     }
 
     /**
-     * Ganti cara mencatat pemakaian. Angka yang sudah diketik diubah ke cara baru dengan rumus yang sama
-     * (sisa = stock tercatat + masuk − keluar), supaya tidak ada isian yang diam-diam tidak terkirim.
+     * Ganti cara mencatat pemakaian. Angka yang sudah diketik tidak diubah ke cara lain (stock di HP bisa sudah basi),
+     * jadi pilihan baru bisa dipilih setelah angka itu dikirim atau dikosongkan.
      */
     function gantiCara(baru) {
-      var dari = baru === 'sisa' ? 'keluar' : 'sisa';
-      var item = {};
-      (data && data.item || []).forEach(function (it) { item[it.kategori + '|' + it.nama] = it; });
-      Object.keys(draft.isian).forEach(function (kat) {
-        Object.keys(draft.isian[kat]).forEach(function (nama) {
-          var x = draft.isian[kat][nama];
-          var teks = String(x[dari] || '').trim();
-          if (!teks) return;
-          var it = item[kat + '|' + nama];
-          var n = bacaAngka(teks);
-          x[baru] = it && n !== null && !isNaN(n) ? teksIsianAngka(bulat3(it.akhir + masukDasarItem(it, x) - n)) : teks;
-          x[dari] = '';
-        });
-      });
+      var dari = draft.cara === 'sisa' ? 'sisa' : 'keluar';
+      var n = jumlahIsianCara(dari);
+      if (n) {
+        gambarCara();
+        gCara.galat('Kirim atau kosongkan dulu angka ' + (dari === 'sisa' ? 'Sisa sekarang' : 'Tambah keluar') + ' yang sudah diketik (' +
+          n + ' item).');
+        return;
+      }
+      gCara.galat('');
       draft.cara = baru;
       simpanDraft();
       gambarCara();
@@ -3909,7 +3964,7 @@
 
     inCari.addEventListener('input', function () {
       cari = inCari.value;
-      if (data) gambarItem();
+      if (data) gambarItem({ simpanPesan: true });
     });
 
     /** Pilihan pemasok: pemasok aktif dari server, ditambah pilihan di draft yang sudah tidak aktif. */
@@ -3961,10 +4016,6 @@
       var nama = salah.it.nama;
       if (salah.jenis === 'baik') return 'Periksa baik sampai ' + nama + '. Pilih tanggal sejak ' + tanggalPendek(tanggal) + '.';
       if (salah.jenis === 'harga') return 'Periksa harga beli ' + nama + '. Isi rupiah, misalnya 15000 atau 15.000.';
-      if (salah.jenis === 'lebih') {
-        return 'Sisa ' + nama + ' lebih banyak dari stock tercatat ' + formatAngka(salah.h.tersedia) + ' ' + salah.it.satuan +
-          '. Isi Tambah masuk jika ada barang datang, atau minta Pengelola meluruskan stock.';
-      }
       var label = salah.jenis === 'masuk' ? 'Tambah masuk' : (salah.jenis === 'sisa' ? 'Sisa sekarang' : 'Tambah keluar');
       return 'Periksa angka ' + label + ' ' + nama + '. Isi angka, misalnya 2,5.';
     }
@@ -3976,13 +4027,12 @@
       var perKategori = {};
       var urutan = [];
       var salah = null;
-      var sisaSama = false;
       itemCakupan().forEach(function (it) {
         var isian = isianItem(it);
         var h = hitung(it, isian);
         var hargaSalah = data.pembelianSiap && h.hargaSalah;
         var jenis = h.masukSalah ? 'masuk' : h.keluarSalah ? 'keluar' : h.sisaSalah ? 'sisa' : hargaSalah ? 'harga'
-          : (data.masaSimpanSiap && h.baikSalah) ? 'baik' : h.sisaLebih ? 'lebih' : '';
+          : (data.masaSimpanSiap && h.baikSalah) ? 'baik' : '';
         if (jenis) {
           if (!salah) salah = { it: it, h: h, jenis: jenis };
           return;
@@ -3990,9 +4040,9 @@
         var masuk = bacaAngka(isian.masuk) || 0;
         var b = { item: it.nama, masuk: masuk, satuanMasuk: isian.besar && it.satuanBesar ? 'besar' : 'dasar' };
         if (sisaMode) {
-          // Sisa sama dengan stock tercatat dan tanpa masuk: tidak ada pemakaian, tidak dikirim.
-          if (h.sisa != null && !masuk && !h.keluar) sisaSama = true;
-          if (!masuk && !h.keluar) return;
+          // Semua sisa yang diketik dikirim, juga yang sama atau lebih dari stock di HP: server menghitungnya lagi
+          // dari stock saat kiriman diterima (stock di HP bisa sudah basi).
+          if (h.sisa == null && !masuk) return;
           if (h.sisa != null) b.sisa = h.sisa;
           else b.keluar = 0;
         } else {
@@ -4015,15 +4065,13 @@
           gambarItem();
         }
         tulisPesan(pesan, pesanSalahStock(salah), 'masalah');
-        var jenisKolom = salah.jenis === 'lebih' ? 'sisa' : salah.jenis;
-        var kolom = wadahItem.querySelector('[data-kunci="' + (salah.it.nama + '|' + jenisKolom).replace(/"/g, '\\"') + '"]');
+        var kolom = wadahItem.querySelector('[data-kunci="' + (salah.it.nama + '|' + salah.jenis).replace(/"/g, '\\"') + '"]');
         if (kolom) kolom.focus();
         return;
       }
       if (!urutan.length) {
-        tulisPesan(pesan, sisaSama ? 'Sisa sama dengan stock tercatat, jadi tidak ada pemakaian yang perlu dikirim.'
-          : (sisaMode ? 'Isi Tambah masuk atau Sisa sekarang minimal untuk satu item.' : 'Isi Tambah masuk atau Tambah keluar minimal untuk satu item.'),
-          'masalah');
+        tulisPesan(pesan, sisaMode ? 'Isi Tambah masuk atau Sisa sekarang minimal untuk satu item.'
+          : 'Isi Tambah masuk atau Tambah keluar minimal untuk satu item.', 'masalah');
         return;
       }
       // Satu kiriman per kategori, seperti mengisi kategori satu per satu (Riwayat dan PDF tetap per kategori).
@@ -4043,13 +4091,14 @@
         toast('Tersimpan di HP. Dikirim saat ada sinyal.');
         return;
       }
-      var hasil = { terkirim: 0, antre: 0, gagal: [], form: null, sesi: null };
+      var hasil = { terkirim: 0, antre: 0, gagal: [], sisaLebih: [], form: null, sesi: null };
       function kirimDari(i) {
         if (i >= entri.length) return Promise.resolve();
         var e = entri[i];
         return panggilApi('kirimStock', e.entri.isi).then(function (h) {
           kosongkanKategori(e.kat);
-          hasil.terkirim++;
+          if (h.jumlah || h.sudahTerkirim) hasil.terkirim++;
+          hasil.sisaLebih = hasil.sisaLebih.concat(h.sisaLebih || []);
           hasil.form = h.form;
           return kirimDari(i + 1);
         }, function (err) {
@@ -4064,8 +4113,14 @@
           return kirimDari(i + 1);
         });
       }
+      // Selama kiriman per kategori berjalan, isian tidak bisa diubah: angka yang diketik sesudah Kirim tidak ikut terkirim
+      // dan akan terhapus bersama kategorinya.
       aturTombolProses(tombolKirim, true, 'Mengirim…');
+      wadahItem.inert = true;
+      kotakInfo.inert = true;
       jagaProses(kirimDari(0)).then(function () {
+        wadahItem.inert = false;
+        kotakInfo.inert = false;
         aturTombolProses(tombolKirim, false);
         if (hasil.sesi) {
           tanganiSesiBerakhir(hasil.sesi);
@@ -4080,9 +4135,9 @@
         if (hasil.terkirim) bagian.push(entri.length > 1 ? hasil.terkirim + ' kategori terkirim.' : 'Stock terkirim.');
         if (hasil.antre) bagian.push((entri.length > 1 ? hasil.antre + ' kategori tersimpan' : 'Tersimpan') + ' di HP. Dikirim saat ada sinyal.');
         if (bagian.length) toast(bagian.join(' '));
-        if (hasil.gagal.length) {
-          tulisPesan(pesan, hasil.gagal.map(function (g) { return (entri.length > 1 ? g.kat + ': ' : '') + g.pesan; }).join(' '), 'masalah');
-        }
+        var galat = hasil.gagal.map(function (g) { return (entri.length > 1 ? g.kat + ': ' : '') + g.pesan; });
+        if (hasil.sisaLebih.length) galat.push(teksSisaLebih(hasil.sisaLebih));
+        if (galat.length) tulisPesan(pesan, galat.join(' '), 'masalah');
       });
     });
 
@@ -9216,8 +9271,8 @@
     var pilihKategori = el('select', { class: 'isian', id: 'opname-kategori' });
     // Cari item (aplikasi 0.28.0): hanya menyaring tampilan; hitungan item yang tidak tampil tetap ikut disimpan.
     var cari = '';
-    var inCari = el('input', { type: 'search', class: 'isian', id: 'cari-item-opname', autocomplete: 'off', enterkeyhint: 'search',
-      'aria-describedby': 'info-cari-opname' });
+    var inCari = el('input', { type: 'search', class: 'isian', id: 'cari-item-opname', autocomplete: 'off', autocapitalize: 'none',
+      spellcheck: 'false', enterkeyhint: 'search', 'aria-describedby': 'info-cari-opname' });
     var infoCari = el('p', { class: 'kolom-bantuan', id: 'info-cari-opname', 'aria-live': 'polite' });
     var wadahItem = el('div');
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
@@ -9387,7 +9442,7 @@
       }
       var cocok = semua.filter(cocokCari);
       if (!cocok.length) {
-        wadahItem.appendChild(kotakKosong('Tidak ada item yang cocok dengan "' + cari.trim() + '".'));
+        wadahItem.appendChild(kotakKosong('Tidak ada item dengan nama itu.'));
         perbaruiPenghitung();
         return;
       }

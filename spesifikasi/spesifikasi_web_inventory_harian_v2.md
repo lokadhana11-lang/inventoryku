@@ -143,7 +143,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Email alert instan | Tidak ada, baik untuk suhu maupun waste |
 | Pengingat pengisian form | Bagian "belum diisi" di email laporan harian sekitar 22:15. Tidak ada email pengingat lain. |
 | Penerima email | Ditambahkan dari halaman Pengaturan di website |
-| Stock Inventory | Tanpa hitung fisik harian. Stock Akhir dihitung otomatis: Awal + Masuk + Hasil Prep − Keluar − Dipakai Prep − Waste + Penyesuaian. Form boleh dikirim berkali-kali sehari; tiap kiriman menambah, tidak menimpa. |
+| Stock Inventory | Tidak wajib hitung fisik harian; pemakaian boleh dicatat dengan menghitung sisa (Bagian 5.5). Stock Akhir dihitung otomatis: Awal + Masuk + Hasil Prep − Keluar − Dipakai Prep − Waste + Penyesuaian. Form boleh dikirim berkali-kali sehari; tiap kiriman menambah, tidak menimpa. |
 | Stock opname | Berkala, oleh Pengelola. Hasil hitung barang nyata meluruskan stock dan menghasilkan laporan selisih (Bagian 5.7). |
 | Daftar belanja | Otomatis dari item di bawah stok minimum, dengan saran jumlah order. Hanya Pengelola. |
 | Nilai stock | Nilai rupiah stock dan pemakaian bahan tampil di dashboard. Hanya Pengelola. Harga satuan punya riwayat: setiap nilai rupiah memakai harga yang berlaku pada tanggal gerakan atau tanggal yang dinilai (Bagian 8.5). |
@@ -661,8 +661,8 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
 | Kategori | Dropdown | Header, dari `M_Kategori`, atau "Semua kategori" (20 Oktober 2026): semua item aktif tampil dikelompokkan per kategori. Kiriman tetap satu per kategori (satu `submission_id` per kategori yang diisi), jadi Riwayat, pemeriksaan, dan PDF tetap per kategori. |
 | Nama Item | Otomatis | Semua item aktif di kategori itu tampil sebagai baris siap isi. Kotak cari item (20 Oktober 2026) hanya menyaring tampilan; isian item yang tidak tampil tetap ikut terkirim. |
 | Stock Masuk | Number | Barang datang. Boleh diketik dalam satuan besar jika item punya (Bagian 5.1). |
-| Stock Keluar | Number | Pemakaian langsung saja, **di luar** prep dan waste. Diketik, atau dihitung dari Sisa. |
-| Sisa | Number, pilihan | Hitung sisa (20 Oktober 2026): jumlah yang ada sekarang, menggantikan Stock Keluar untuk baris itu. Tidak disimpan sebagai kolom; yang tercatat adalah Stock Keluar hasil hitungnya. |
+| Stock Keluar | Number | Pemakaian langsung yang diketik, **di luar** prep dan waste; atau (Hitung sisa) semua yang berkurang selain prep dan waste yang sudah tercatat, termasuk susut dan barang hilang. |
+| Sisa | Number, pilihan | Hitung sisa (20 Oktober 2026): jumlah yang ada sekarang, menggantikan Stock Keluar untuk baris itu. Disimpan di kolom `Sisa Dihitung`; Stock Keluar baris itu dihitung darinya. |
 | Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. |
 | Harga Beli | Rupiah, tidak wajib | Per baris yang punya Stock Masuk (18 Oktober 2026): harga per satuan yang diketik (per dus jika masuk dalam satuan besar), disimpan per satuan dasar di kolom `Harga Beli (Rp)`. |
 | Baik Sampai | Tanggal, otomatis | Per baris yang punya Stock Masuk, hanya untuk item yang punya masa simpan (19 Oktober 2026): tanggal masuk + masa simpan item, boleh diubah (tidak sebelum tanggal masuk, paling lama 365 hari sesudahnya). |
@@ -675,17 +675,31 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
   berikutnya). Pengelola bisa mengoreksi harga beli lewat Riwayat (Bagian 6.3); pemasok kiriman
   tidak bisa dikoreksi. Nama pemasok hanya bisa diganti selama belum tercatat di barang masuk.
 - **Hitung sisa** (20 Oktober 2026, semua role, pilihan per pengguna "Catat pemakaian: Tambah
-  keluar / Hitung sisa"): staff mengetik jumlah yang ada sekarang. Server menghitung Stock Keluar =
-  Stock Akhir tercatat pada tanggal itu **saat kiriman diterima** + Stock Masuk baris itu − Sisa,
-  sehingga Stock Akhir tanggal itu sama dengan sisa yang dihitung, walau ada kiriman lain sesudah
-  form dibuka. Sisa yang lebih banyak dari stock tercatat + masuk ditolak (meluruskan stock tetap
-  lewat penyesuaian atau opname Pengelola, Bagian 5.7). Sisa yang sama dengan stock tercatat tidak
-  dikirim. Selisih karena barang hilang atau waste yang tidak dicatat ikut tercatat sebagai Stock
-  Keluar. Kiriman yang menunggu di antrean HP dihitung dari stock saat sampai di server.
+  keluar / Hitung sisa", **hanya untuk tanggal hari ini**): staff mengetik jumlah yang ada
+  sekarang. Server menghitung Stock Keluar = Stock Akhir tercatat pada tanggal itu **saat kiriman
+  diterima** + Stock Masuk baris itu − Sisa, dan menyimpan sisanya di `Sisa Dihitung`. Jadi Stock
+  Akhir saat kiriman diterima sama dengan sisa, walau ada kiriman lain sesudah form dibuka. Prep,
+  waste, dan isian tanggal sebelumnya yang dicatat **sesudahnya** tetap mengurangi stock lagi
+  (seperti stock opname, Bagian 5.7), jadi catat prep dan waste yang sudah terjadi lebih dulu.
+  - Sisa yang sama dengan stock tercatat tetap dicatat (Stock Keluar 0), sebagai tanda sudah dihitung.
+  - Sisa yang lebih banyak dari stock tercatat + masuk saat diterima **tidak menolak kiriman**
+    (kiriman dari antrean tidak boleh macet dan barang masuknya hilang): Stock Keluar baris itu 0,
+    sisanya tidak disimpan, barang masuk di baris itu tetap tercatat, dan HP menulis bahwa sisa itu
+    tidak dicatat. Meluruskan stock tetap lewat penyesuaian atau opname Pengelola (Bagian 5.7).
+  - Di HP, sisa yang tampak lebih banyak dari stock yang dimuat hanya peringatan, karena stock di
+    HP bisa sudah basi; server yang memutuskan.
+  - Susut, tumpah, dan barang hilang yang tertangkap Hitung sisa tercatat sebagai Stock Keluar,
+    jadi tidak muncul lagi sebagai penyesuaian, selisih opname, atau selisih stock di HPP (masuk
+    ke "terpakai", Bagian 5.9).
+  - Koreksi Stock Masuk baris hitung sisa (Bagian 6.3) menggeser Stock Keluar sebesar selisihnya,
+    supaya Stock Akhir tetap sama dengan sisa; jika Stock Keluar menjadi minus, Stock Keluar 0 dan
+    sisanya dikosongkan. Koreksi Stock Keluar langsung mengosongkan sisanya (bukan hasil hitung lagi).
+  - Kiriman yang menunggu di antrean HP dihitung dari stock saat sampai di server. Sisa yang diketik
+    dan belum dikirim sampai esok hari dibuang dari draft di HP, karena sisa hanya berlaku saat dihitung.
 - **Boleh dikirim berkali-kali sehari.** Tiap kiriman adalah catatan gerakan tersendiri dan
   **menambah**, tidak menimpa kiriman sebelumnya. Contoh: barang datang pagi 5 kg dan sore
   3 kg, lewat dua kiriman, menjadi Masuk 8 kg pada hari itu.
-- Item yang Masuk dan Keluar-nya dikosongkan tidak ikut terkirim.
+- Item yang Masuk dan Keluar-nya (atau Sisa-nya) dikosongkan tidak ikut terkirim.
 - Jika salah ketik, staff melaporkannya lewat Riwayat; Pengelola mengoreksi catatan
   gerakan itu (Bagian 6.3). Staff tidak mengirim angka minus untuk membatalkan.
 
@@ -793,7 +807,9 @@ sewaktu-waktu. Jadwal menentukan kapan form ditagih di Beranda dan email harian
 
 Stock dihitung dari catatan, jadi angkanya bisa menyimpang dari barang nyata: pemakaian
 yang lupa dicatat, takaran yang tidak pas, tumpah, atau susut. Dua alat berikut
-meluruskannya. Keduanya hanya untuk Pengelola.
+meluruskannya. Keduanya hanya untuk Pengelola. (Hitung sisa di form Stock, Bagian 5.5, juga
+menyamakan stock dengan barang nyata, tetapi selisihnya tercatat sebagai Stock Keluar, bukan
+penyesuaian.)
 
 **Penyesuaian stock (satu item):**
 
