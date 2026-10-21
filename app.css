@@ -2396,6 +2396,15 @@ body.papan-ketik .lembar-aksi {
   gap: 8px;
 }
 
+/* Cari item (aplikasi 0.28.0): kotak cari tidak ikut meninggi saat kolom di sebelahnya lebih tinggi */
+.kotak-info .kolom-cari {
+  align-content: start;
+}
+
+.kotak-info .kolom-cari .kolom-bantuan:empty {
+  display: none;
+}
+
 .kotak-info .lebar-penuh:empty {
   display: none;
 }
@@ -4595,15 +4604,18 @@ body.papan-ketik .bilah-kirim {
   font-weight: 500;
 }
 
-.opname-kelompok {
+.opname-kelompok,
+.stock-kelompok {
   margin-top: 16px;
 }
 
-.opname-kelompok .grid-item {
+.opname-kelompok .grid-item,
+.stock-kelompok .grid-item {
   margin-top: 0;
 }
 
-.opname-kelompok .tabel-isian-bingkai {
+.opname-kelompok .tabel-isian-bingkai,
+.stock-kelompok .tabel-isian-bingkai {
   margin-top: 0;
 }
 
@@ -4841,6 +4853,21 @@ body.papan-ketik .bilah-kirim {
 
 .tabel-stock td.sel-masuk .kolom-bantuan {
   font-size: 13px;
+}
+
+/* Hitung sisa (aplikasi 0.28.0): keluar hasil hitung di bawah kolom Sisa, tanpa melebarkan kolom */
+.tabel-stock td.sel-sisa {
+  white-space: normal;
+}
+
+.tabel-stock td.sel-sisa .ket-keluar {
+  max-width: 120px;
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.ket-keluar:empty {
+  display: none;
 }
 
 .kolom-item .deret-tombol {

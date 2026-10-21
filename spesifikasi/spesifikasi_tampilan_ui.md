@@ -23,6 +23,9 @@
 > (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
+> Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
+> kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
+> opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
 > Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tombol "Tandai diperiksa (n)" di
 > judul tiap tanggal di daftar Riwayat untuk Pengelola (Bagian 5.4 dan 7).
 > Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): di tabel Stock laptop/desktop,
@@ -607,8 +610,8 @@ Satu-satunya layar yang sepenuhnya navy.
 └──────────────────────────────┘
 ```
 
-- Staff hanya mengisi dua angka per item: barang datang dan pemakaian langsung. Tidak ada
-  hitung fisik di form ini.
+- Staff hanya mengisi dua angka per item: barang datang dan pemakaian langsung (atau, dengan
+  Hitung sisa, jumlah yang ada sekarang).
 - **Form boleh dikirim berkali-kali sehari.** Karena itu kolomnya bernama "Tambah masuk"
   dan "Tambah keluar": angka yang diketik menambah yang sudah tercatat, tidak menggantinya.
 - Baris "Hari ini" merangkum semua yang sudah tercatat pada tanggal itu: masuk, keluar,
@@ -617,8 +620,47 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Satuan besar:** jika item punya satuan besar, di samping kolom Tambah masuk ada pilihan
   satuan (misalnya botol atau dus). Saat staff mengetik 2 dus, di bawahnya tampil
   "= 24 botol".
-- Pilih kategori di kotak info; kartu item kategori itu langsung tampil. Satu kategori
-  diisi dan dikirim setiap kali.
+- Pilih kategori di kotak info; kartu item kategori itu langsung tampil. **Semua kategori**
+  (20 Oktober 2026, pilihan pertama; bawaan jika HP belum menyimpan kategori, pengguna lama tetap di
+  kategori terakhirnya) menampilkan
+  semua item di bawah judul kategorinya (h2, nama item h3; di laptop/desktop satu tabel per
+  kategori, nomor berlanjut). "Kirim stock" mengirim satu kiriman per kategori yang diisi, satu per
+  satu; sesudahnya "3 kategori terkirim." Jika satu kategori ditolak server, yang lain tetap
+  terkirim dan galatnya diawali nama kategori ("Bumbu: …"); isian kategori itu tetap di layar.
+  Tanpa sinyal, tiap kategori menjadi satu isian di antrean ("Stock · Protein"). Selama kiriman
+  berjalan, kotak info dan daftar item tidak bisa diubah.
+- **Cari item** (20 Oktober 2026): kotak cari di kotak info menyaring kartu atau baris menurut nama
+  (huruf besar/kecil tidak dibedakan) sambil mengetik. Di bawahnya "3 dari 11 item tampil." dan,
+  jika ada isian yang tersembunyi, "2 item terisi yang tidak tampil tetap ikut dikirim." Tanpa
+  hasil: "Tidak ada item dengan nama itu." Jika item yang angkanya salah sedang tersembunyi saat
+  Kirim, pencarian dikosongkan supaya kolomnya bisa difokuskan. Mengetik di kotak cari tidak
+  menghapus pesan kiriman.
+- **Catat pemakaian** (20 Oktober 2026, tampil jika server sudah mendukung): tombol berjajar
+  "Tambah keluar" (bawaan) dan "Hitung sisa", dengan keterangan "Ketik yang dipakai langsung, di
+  luar prep dan waste." atau "Catat prep dan waste lebih dulu. Ketik jumlah yang ada sekarang; keluar
+  dihitung dari stock tercatat + masuk − sisa." Pilihannya tersimpan di HP per pengguna.
+  - Hanya untuk Hari ini: untuk Kemarin atau tanggal lain pilihannya nonaktif, form memakai Tambah
+    keluar, dan keterangannya ditambah "Hitung sisa hanya untuk hari ini." (dan "1 sisa yang diketik
+    untuk hari ini tidak ikut dikirim untuk tanggal ini." jika ada; sisa itu tetap di draft).
+  - Pilihan hanya bisa diganti selama belum ada angka di kolom cara lama; jika ada: "Kirim atau
+    kosongkan dulu angka Tambah keluar yang sudah diketik (3 item)." (angka tidak diubah ke cara
+    lain, karena stock di HP bisa sudah basi).
+  - Dengan Hitung sisa, kolom kedua kartu menjadi "Sisa sekarang" dengan keterangan di bawahnya:
+    "Keluar 9 kg.", "Sama dengan stock tercatat, tidak ada yang keluar.", atau peringatan (kartu
+    bertanda Masalah, tetap bisa dikirim) "Sisa lebih banyak dari stock tercatat 10 kg. Jika tetap
+    dikirim, keluarnya tidak dicatat. Isi Tambah masuk jika ada barang datang, atau minta Pengelola
+    meluruskan stock." (dengan Tambah masuk: "… stock tercatat ditambah masuk 12 kg. … Periksa
+    hitungannya, atau minta Pengelola meluruskan stock."); Stock akhir = sisa. Di tabel kolomnya
+    "Sisa Sekarang" dengan keterangan pendek "keluar 9" / "Lebih dari stock 10" / "Lebih dari stock
+    + masuk 12".
+  - Sesudah dikirim, sisa yang server tidak catat ditulis di pesan: "Sisa Ayam fillet 12 kg tidak
+    dicatat: lebih banyak dari stock tercatat 10 kg. Periksa hitungannya, atau minta Pengelola
+    meluruskan stock." (juga di pesan "1 isian terkirim." untuk antrean).
+  - Sisa yang diketik pada hari lain dan belum dikirim dikosongkan saat form dibuka: "Sisa yang
+    diketik 20 Okt sudah dikosongkan, karena sisa hanya berlaku saat dihitung. Hitung lagi untuk
+    hari ini."
+  - Riwayat menampilkan kolom "Sisa dihitung" pada baris itu ("keluar 9 kg, sisa dihitung 7,5 kg"),
+    dan kartu stok menulis "Keluar dihitung dari sisa 7,5 kg".
 - Stock akhir ditulis lebih besar dari angka otomatis lain (18 px, tebal), karena itulah
   hasil yang dicari.
 - Stock akhir minus: angka dan kartu diberi tanda Masalah dengan tulisan
@@ -1058,6 +1100,8 @@ Satu-satunya layar yang sepenuhnya navy.
 
 - Satu baris per item: stock tercatat sebagai teks, lalu kolom "Hitung". Selisih muncul
   begitu angka diketik; selisih bukan nol memakai tanda Perlu ditinjau.
+- **Cari item** (20 Oktober 2026): kotak cari di kotak info, sama seperti form Stock. Hitungan item
+  yang tidak tampil tetap ikut disimpan ("1 item terhitung yang tidak tampil tetap ikut disimpan.").
 - Item yang dikosongkan tidak dihitung dan tidak diubah.
 - "Lanjut" membuka ringkasan: jumlah item berselisih, daftar selisihnya, dan total nilai
   (Rp). Tombol utamanya "Simpan opname".
@@ -1248,6 +1292,9 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Riwayat kosong | "Belum ada isian pada tanggal ini." |
 | Tanda diperiksa | "Diperiksa Budi, 3 Okt 21.50" |
 | Tandai diperiksa sekaligus | Tombol "Tandai diperiksa (3)", konfirmasi "Tandai 3 isian diperiksa?", lalu "3 isian ditandai diperiksa." (ditambah "1 isian dilewati karena ada baris dilaporkan keliru." jika ada) |
+| Stock semua kategori | "3 kategori terkirim.", "1 kategori tersimpan di HP. Dikirim saat ada sinyal.", galat "Bumbu: …" |
+| Hitung sisa | "Sisa sekarang", "Keluar 9 kg.", "Sisa Ayam fillet 12 kg tidak dicatat: lebih banyak dari stock tercatat 10 kg. Periksa hitungannya, atau minta Pengelola meluruskan stock.", "Hitung sisa hanya untuk hari ini." |
+| Cari item | "3 dari 11 item tampil.", "Tidak ada item dengan nama itu." |
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
 | Menu tersimpan | "Menu tersimpan." |
 | Penjualan tersimpan | "Penjualan 16 Okt tersimpan." |

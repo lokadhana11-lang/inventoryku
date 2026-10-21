@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.27 (tandai diperiksa sekaligus)
+// InventoryKu Code.gs v0.28 (hitung sisa di form Stock)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -91,9 +91,11 @@
  *                        periksaCadangan, ujiPemulihanCadangan, pulihkanCadangan.
  * - 19 Oktober 2026    : tandai diperiksa sekaligus per tanggal di Riwayat
  *                        (aksi tandaiDiperiksaBanyak, riwayat.periksaBanyak).
+ * - 20 Oktober 2026    : hitung sisa di form Stock (kirimStock.baris[].sisa;
+ *                        keluar = stock tercatat + masuk - sisa, dihitung server).
  */
 
-var VERSI_KODE = 'v0.27';
+var VERSI_KODE = 'v0.28';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -2039,6 +2041,12 @@ function masaSimpanItemSiap_() {
   return !!i && !!s && i.kol['Masa Simpan (hari)'] !== undefined && s.kol['Baik Sampai'] !== undefined;
 }
 
+/** Hitung sisa (Code.gs v0.28): sisa yang diketik disimpan di Data_Stock kolom Sisa Dihitung (setupSpreadsheet). */
+function sisaStockSiap_() {
+  var s = bacaTabel_('Data_Stock');
+  return !!s && s.kol['Sisa Dihitung'] !== undefined;
+}
+
 /** Kategori aktif, urut menurut Urutan lalu nama. */
 function bacaKategori_() {
   var t = wajibTabel_('M_Kategori');
@@ -2573,7 +2581,9 @@ function dataFormStock_(tanggal) {
     pembelianSiap: siap,
     pemasok: siap ? bacaPemasok_().filter(function (p) { return p.aktif; }).map(function (p) { return p.nama; }) : [],
     // Baik sampai barang masuk (Code.gs v0.25): hanya setelah setupSpreadsheet membuat kolomnya.
-    masaSimpanSiap: masaSimpanItemSiap_()
+    masaSimpanSiap: masaSimpanItemSiap_(),
+    // Hitung sisa (Code.gs v0.28): hanya setelah setupSpreadsheet membuat kolom Sisa Dihitung.
+    sisaSiap: sisaStockSiap_()
   };
 }
 
@@ -2587,6 +2597,17 @@ function aksiFormStock_(body) {
  * kiriman menambah, tidak menimpa. submission_id yang sudah pernah masuk
  * tidak ditulis lagi (jawabannya sudahTerkirim: true, supaya antrean di HP
  * yang mengirim ulang menganggapnya selesai).
+ *
+ * Hitung sisa (Code.gs v0.28, spesifikasi sistem Bagian 5.5): baris boleh
+ * membawa `sisa` (jumlah yang ada sekarang) menggantikan `keluar`. Stock
+ * Keluar = stock tercatat pada tanggal itu saat kiriman diterima + masuk -
+ * sisa, jadi kiriman lain yang masuk sebelumnya ikut dihitung dan Stock Akhir
+ * saat itu sama dengan sisa; sisanya disimpan di Sisa Dihitung. Sisa yang sama
+ * dengan stock tetap dicatat (keluar 0, tanda sudah dihitung). Sisa yang lebih
+ * banyak dari stock tercatat + masuk tidak menolak kiriman (kiriman dari
+ * antrean tidak boleh macet dan barang masuknya hilang): keluarnya tidak
+ * dicatat dan itemnya dikembalikan di `sisaLebih`. Meluruskan stock tetap
+ * lewat penyesuaian Pengelola.
  */
 function aksiKirimStock_(body, pengguna) {
   var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
@@ -2618,12 +2639,25 @@ function aksiKirimStock_(body, pengguna) {
       pemasok = p.nama;
     }
     var baru = [];
+    var adaSisa = false;
+    var sisaLebih = [];
+    var rekap = null;
+    var dilihat = {};
+    if (masukan.some(function (b) { return b && b.sisa !== '' && b.sisa != null; }) && !sisaStockSiap_()) {
+      throw galatPengguna_('Hitung sisa belum bisa dipakai. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     masukan.forEach(function (b) {
       var m = master[rapikanTeks_(b && b.item).toLowerCase()];
       if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
+      var kunci = m.nama.toLowerCase();
+      var pakaiSisa = b.sisa !== '' && b.sisa != null;
+      // Sisa dihitung dari stock sebelum kiriman ini, jadi item yang sama dua kali tidak bisa dihitung benar.
+      if (dilihat[kunci] && (pakaiSisa || dilihat[kunci] === 'sisa')) {
+        throw galatPengguna_(m.nama + ' ada dua kali di kiriman ini. Muat ulang form.');
+      }
+      dilihat[kunci] = pakaiSisa ? 'sisa' : 'keluar';
       var masuk = angkaIsian_(b.masuk, 'Tambah masuk ' + m.nama);
       var keluar = angkaIsian_(b.keluar, 'Tambah keluar ' + m.nama);
-      if (!masuk && !keluar) return; // item yang kedua kolomnya kosong tidak ikut terkirim
       var diketik = '';
       var besar = b.satuanMasuk === 'besar' && masuk;
       // Harga beli per satuan yang diketik (per dus jika masuk dalam satuan besar); disimpan per satuan dasar.
@@ -2634,6 +2668,23 @@ function aksiKirimStock_(body, pengguna) {
         masuk = bulat_(masuk * m.isiSatuanBesar);
         if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
+      var sisaDicatat = '';
+      if (pakaiSisa) {
+        if (keluar) throw galatPengguna_('Isi Tambah keluar atau sisa ' + m.nama + ', tidak keduanya.');
+        var sisa = angkaIsian_(b.sisa, 'Sisa ' + m.nama);
+        adaSisa = true;
+        rekap = rekap || bacaRekap_();
+        var tercatat = posisiStock_(rekap.item[kunci], tanggal).akhir;
+        keluar = bulat_(tercatat + masuk - sisa);
+        if (keluar < 0) {
+          sisaLebih.push({ item: m.nama, sisa: sisa, tercatat: tercatat, masuk: masuk, satuan: m.satuan });
+          keluar = 0;
+        } else {
+          sisaDicatat = sisa;
+        }
+      }
+      // Item yang kedua kolomnya kosong tidak ikut terkirim; sisa yang sama dengan stock tetap dicatat.
+      if (!masuk && !keluar && sisaDicatat === '') return;
       // Baik sampai barang masuk (Bagian 5.1): yang diketik, atau tanggal + masa simpan item.
       var baik = masuk && baikSiap ? baikSampaiMasuk_(b.baikSampai, tanggal, m) : '';
       baru.push(gabung_(gabung_({
@@ -2648,15 +2699,22 @@ function aksiKirimStock_(body, pengguna) {
         // Kolom Code.gs v0.23: hanya ditulis jika setupSpreadsheet sudah menambahkannya.
         'Pemasok': masuk ? pemasok : '',
         'Harga Beli (Rp)': harga == null ? '' : harga,
-        'Baik Sampai': baik ? tanggalSel_(baik) : ''
+        'Baik Sampai': baik ? tanggalSel_(baik) : '',
+        'Sisa Dihitung': sisaDicatat
       })));
     });
-    if (!baru.length) throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
+    if (!baru.length) {
+      // Hanya sisa yang lebih banyak dari stock: tidak ada yang dicatat, tetapi kiriman tidak gagal.
+      if (adaSisa) return { sudahTerkirim: false, jumlah: 0, sisaLebih: sisaLebih, form: dataFormStock_(tanggal) };
+      throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
+    }
 
     tambahBarisTabel_(tabel, baru);
     urutkanTabel_(tabel, URUTAN_DATA);
     hitungUlangStock_(baru.map(function (b) { return { item: b['Nama Item'], dari: tanggal }; }));
-    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormStock_(tanggal) };
+    var hasil = { sudahTerkirim: false, jumlah: baru.length, form: dataFormStock_(tanggal) };
+    if (adaSisa) hasil.sisaLebih = sisaLebih;
+    return hasil;
   });
 }
 
@@ -7640,8 +7698,21 @@ var RIWAYAT_FORM = {
           var t = rapikanTeks_(v);
           if (t && !tanggalSah_(t)) throw galatPengguna_(label + ' tidak terbaca. Pilih tanggal lagi.');
           return t;
-        } }
+        } },
+      // Hitung sisa (Code.gs v0.28): sisa yang diketik; Stock Keluar baris ini dihitung darinya. Tidak dikoreksi langsung.
+      { judul: 'Sisa Dihitung', kunci: 'sisa', label: 'Sisa dihitung', singkat: 'sisa dihitung', jenis: 'angka', satuan: true, jikaAda: true }
     ],
+    // Baris hitung sisa: koreksi Stock Masuk menggeser Stock Keluar sebesar selisihnya, supaya Stock Akhir tetap sama
+    // dengan sisa yang dihitung. Koreksi Stock Keluar langsung membuat baris itu bukan hasil hitung lagi (sisa dikosongkan).
+    turunan: function (n, lama) {
+      if (!lama || n['Sisa Dihitung'] === '' || n['Sisa Dihitung'] == null) return {};
+      var keluarLama = Number(lama['Stock Keluar']) || 0;
+      if ((Number(n['Stock Keluar']) || 0) !== keluarLama) return { 'Sisa Dihitung': '' };
+      var beda = bulat_((Number(n['Stock Masuk']) || 0) - (Number(lama['Stock Masuk']) || 0));
+      if (!beda) return {};
+      var keluar = bulat_(keluarLama + beda);
+      return keluar < 0 ? { 'Stock Keluar': 0, 'Sisa Dihitung': '' } : { 'Stock Keluar': keluar };
+    },
     periksaKoreksi: function (g) {
       if (g['Harga Beli (Rp)'] !== '' && g['Harga Beli (Rp)'] != null && !(Number(g['Stock Masuk']) > 0)) {
         throw galatPengguna_('Harga beli hanya untuk barang masuk. Kosongkan harga beli, atau isi Stock Masuk.');
@@ -7771,6 +7842,10 @@ function defRiwayat_(idForm) {
   // Baik sampai barang masuk baru ada setelah setupSpreadsheet (Code.gs v0.25).
   if (id === 'STOCK' && def && !masaSimpanItemSiap_()) {
     def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.kunci !== 'baikSampai'; }) });
+  }
+  // Sisa dihitung baru ada setelah setupSpreadsheet (Code.gs v0.28).
+  if (id === 'STOCK' && def && !sisaStockSiap_()) {
+    def = gabung_(def, { kolom: def.kolom.filter(function (k) { return k.kunci !== 'sisa'; }) });
   }
   // Hasil aktual prep baru ada setelah setupSpreadsheet (Code.gs v0.24).
   if (id === 'PREP' && def && !hasilAktualSiap_()) {
@@ -8366,9 +8441,12 @@ function transaksiItem_(kecil, rekap) {
         var dari = rapikanTeks_(nilai_(t, b, 'Pemasok'));
         var beli = x.masuk ? angkaAtauNull_(nilai_(t, b, 'Harga Beli (Rp)')) : null;
         var baik = x.masuk ? teksTanggal_(nilai_(t, b, 'Baik Sampai'), zona) : '';
+        var sisaH = angkaAtauNull_(nilai_(t, b, 'Sisa Dihitung'));
         x.ket = [diketik ? 'Masuk diketik ' + diketik : '', dari ? 'Dari ' + dari : '',
           beli != null ? 'Harga beli ' + rupiahId_(beli) + '/' + rapikanTeks_(nilai_(t, b, 'Satuan')) : '',
-          baik ? 'Baik sampai ' + tanggalPendekId_(baik) : ''].filter(Boolean).join(' · ');
+          baik ? 'Baik sampai ' + tanggalPendekId_(baik) : '',
+          sisaH != null ? 'Keluar dihitung dari sisa ' + teksAngka_(sisaH) + ' ' + rapikanTeks_(nilai_(t, b, 'Satuan')) : '']
+          .filter(Boolean).join(' · ');
       } else if (s.tab === 'Data_Prep') {
         x.jenis = 'Hasil prep';
         x.formId = 'PREP';
@@ -8650,9 +8728,10 @@ function aksiKoreksi_(body, pengguna) {
     // Kolom turunan (estimasi kerugian, status suhu) dan pemeriksaan hasil koreksi (Tahap 5).
     var gabungan = {};
     c.t.judul.forEach(function (j, i) { if (j) gabungan[j] = c.b[i]; });
+    var sebelum = gabung_({}, gabungan);
     Object.keys(ubah).forEach(function (j) { gabungan[j] = ubah[j]; });
     if (def.turunan) {
-      var turun = def.turunan(gabungan);
+      var turun = def.turunan(gabungan, sebelum);
       Object.keys(turun).forEach(function (j) {
         var lamaT = nilai_(c.t, c.b, j);
         gabungan[j] = turun[j];
@@ -11844,7 +11923,8 @@ var TAB_DATA = [
     kolom: [
       k_('Tanggal', 'tanggal'), k_('Kategori'), k_('Nama Item'),
       k_('Stock Masuk', 'angka'), k_('Stock Keluar', 'angka'), k_('Satuan'),
-      k_('Masuk Diketik'), k_('Pemasok'), k_('Harga Beli (Rp)', 'rupiah'), k_('Baik Sampai', 'tanggal')
+      k_('Masuk Diketik'), k_('Pemasok'), k_('Harga Beli (Rp)', 'rupiah'), k_('Baik Sampai', 'tanggal'),
+      k_('Sisa Dihitung', 'angka')
     ]
   },
   {
