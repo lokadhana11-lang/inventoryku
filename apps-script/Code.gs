@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.28 (hitung sisa di form Stock)
+// InventoryKu Code.gs v0.29 (daftar belanja per pemasok dan pesanan)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -93,9 +93,12 @@
  *                        (aksi tandaiDiperiksaBanyak, riwayat.periksaBanyak).
  * - 20 Oktober 2026    : hitung sisa di form Stock (kirimStock.baris[].sisa;
  *                        keluar = stock tercatat + masuk - sisa, dihitung server).
+ * - 21 Oktober 2026    : daftar belanja per pemasok dan pesanan ke pemasok
+ *                        (Data_Pesanan; aksi catatPesanan, tutupPesanan;
+ *                        formStock.pesanan; kirimStock menyelesaikan pesanan).
  */
 
-var VERSI_KODE = 'v0.28';
+var VERSI_KODE = 'v0.29';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -225,6 +228,10 @@ var AKSI_ = {
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
   unduhPdfBelanja: { jalankan: aksiUnduhPdfBelanja_, bacaSaja: true, pengelola: true,
     pesan: 'Daftar belanja hanya untuk Head Kitchen dan Manager.' },
+  catatPesanan: { jalankan: aksiCatatPesanan_, pengelola: true,
+    pesan: 'Pesanan ke pemasok hanya dicatat Head Kitchen atau Manager.' },
+  tutupPesanan: { jalankan: aksiTutupPesanan_, pengelola: true,
+    pesan: 'Pesanan hanya bisa ditutup Head Kitchen atau Manager.' },
   unduhPdfRekap: { jalankan: aksiUnduhPdfRekap_, bacaSaja: true, pengelola: true,
     pesan: 'Rekap bulanan hanya untuk Head Kitchen dan Manager.' },
   formKustom: { jalankan: aksiFormKustom_, bacaSaja: true },
@@ -2583,7 +2590,10 @@ function dataFormStock_(tanggal) {
     // Baik sampai barang masuk (Code.gs v0.25): hanya setelah setupSpreadsheet membuat kolomnya.
     masaSimpanSiap: masaSimpanItemSiap_(),
     // Hitung sisa (Code.gs v0.28): hanya setelah setupSpreadsheet membuat kolom Sisa Dihitung.
-    sisaSiap: sisaStockSiap_()
+    sisaSiap: sisaStockSiap_(),
+    // Pesanan ke pemasok yang belum datang (Code.gs v0.29): hanya setelah setupSpreadsheet membuat Data_Pesanan.
+    pesananSiap: pesananSiap_(),
+    pesanan: pesananForm_(tanggal)
   };
 }
 
@@ -2608,6 +2618,12 @@ function aksiFormStock_(body) {
  * antrean tidak boleh macet dan barang masuknya hilang): keluarnya tidak
  * dicatat dan itemnya dikembalikan di `sisaLebih`. Meluruskan stock tetap
  * lewat penyesuaian Pengelola.
+ *
+ * Pesanan ke pemasok (Code.gs v0.29): baris boleh membawa `pesanan` (id, dari
+ * "Isi dari pesanan"). Barang masuk menyelesaikan pesanan menunggunya
+ * (`pesananDatang`); Tambah masuk dari pesanan yang sudah dicatat datang tidak
+ * dicatat lagi (`pesananSudahDatang`). Kiriman tidak pernah ditolak karena
+ * pesanannya (barisPesananTertaut_).
  */
 function aksiKirimStock_(body, pengguna) {
   var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
@@ -2643,6 +2659,10 @@ function aksiKirimStock_(body, pengguna) {
     var sisaLebih = [];
     var rekap = null;
     var dilihat = {};
+    // Pesanan ke pemasok (Code.gs v0.29): barang masuk menyelesaikan pesanan yang menunggu.
+    var pes = bacaPesanan_();
+    var masukPesanan = [];
+    var sudahDatang = [];
     if (masukan.some(function (b) { return b && b.sisa !== '' && b.sisa != null; }) && !sisaStockSiap_()) {
       throw galatPengguna_('Hitung sisa belum bisa dipakai. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
     }
@@ -2668,6 +2688,15 @@ function aksiKirimStock_(body, pengguna) {
         masuk = bulat_(masuk * m.isiSatuanBesar);
         if (harga != null) harga = Math.round(harga / m.isiSatuanBesar * 100) / 100;
       }
+      // Barang masuk yang diisi dari pesanan yang sudah dicatat datang tidak dicatat lagi (keluar atau sisanya tetap).
+      var tautan = masuk ? barisPesananTertaut_(pes, rapikanTeks_(b.pesanan), m.nama) : null;
+      if (tautan && tautan.datang) {
+        var dt = tautan.datang;
+        sudahDatang.push({ item: m.nama, pemasok: dt.pemasok, oleh: dt.selesaiOleh, waktu: dt.selesaiMs ? new Date(dt.selesaiMs).toISOString() : '' });
+        masuk = 0;
+        diketik = '';
+        harga = null;
+      }
       var sisaDicatat = '';
       if (pakaiSisa) {
         if (keluar) throw galatPengguna_('Isi Tambah keluar atau sisa ' + m.nama + ', tidak keduanya.');
@@ -2687,6 +2716,7 @@ function aksiKirimStock_(body, pengguna) {
       if (!masuk && !keluar && sisaDicatat === '') return;
       // Baik sampai barang masuk (Bagian 5.1): yang diketik, atau tanggal + masa simpan item.
       var baik = masuk && baikSiap ? baikSampaiMasuk_(b.baikSampai, tanggal, m) : '';
+      if (masuk) masukPesanan.push({ item: m.nama, tertaut: tautan ? tautan.r : null });
       baru.push(gabung_(gabung_({
         'Tanggal': tanggalSel_(tanggal),
         'Kategori': m.kategori,
@@ -2704,16 +2734,26 @@ function aksiKirimStock_(body, pengguna) {
       })));
     });
     if (!baru.length) {
-      // Hanya sisa yang lebih banyak dari stock: tidak ada yang dicatat, tetapi kiriman tidak gagal.
-      if (adaSisa) return { sudahTerkirim: false, jumlah: 0, sisaLebih: sisaLebih, form: dataFormStock_(tanggal) };
+      // Hanya sisa yang lebih banyak dari stock, atau barang masuk dari pesanan yang sudah datang: tidak ada yang dicatat,
+      // tetapi kiriman tidak gagal (kiriman dari antrean tidak boleh macet).
+      if (adaSisa || sudahDatang.length) {
+        var kosong = { sudahTerkirim: false, jumlah: 0 };
+        if (adaSisa) kosong.sisaLebih = sisaLebih;
+        if (sudahDatang.length) kosong.pesananSudahDatang = sudahDatang;
+        kosong.form = dataFormStock_(tanggal);
+        return kosong;
+      }
       throw galatPengguna_('Isi Tambah masuk atau Tambah keluar minimal untuk satu item.');
     }
 
     tambahBarisTabel_(tabel, baru);
     urutkanTabel_(tabel, URUTAN_DATA);
     hitungUlangStock_(baru.map(function (b) { return { item: b['Nama Item'], dari: tanggal }; }));
+    var datang = selesaikanPesanan_(pes, masukPesanan, pemasok, tanggal, konteks);
     var hasil = { sudahTerkirim: false, jumlah: baru.length, form: dataFormStock_(tanggal) };
     if (adaSisa) hasil.sisaLebih = sisaLebih;
+    if (datang.length) hasil.pesananDatang = datang;
+    if (sudahDatang.length) hasil.pesananSudahDatang = sudahDatang;
     return hasil;
   });
 }
@@ -4227,6 +4267,7 @@ function aksiSimpanItem_(body, pengguna) {
     if (lama) {
       tulisBarisMaster_(t, barisMaster_(t, 'Nama Item', lama.nama), nilai);
       if (nama !== lama.nama && riwayatLama.length) gantiNamaRiwayatHarga_(lama.nama, nama);
+      if (nama !== lama.nama) gantiNamaPesanan_('Nama Item', lama.nama, nama);
     } else {
       nilai['Aktif'] = true;
       tambahBarisMaster_('M_Item', nilai);
@@ -4342,6 +4383,11 @@ function aksiHapusItem_(body, pengguna) {
         .forEach(function (n) { th.sheet.deleteRow(n); });
       MEMO_HARGA_ = null;
     }
+    // Pesanan yang masih menunggu untuk item ini ditutup (Code.gs v0.29); riwayat pesanannya tetap.
+    var pes = bacaPesanan_();
+    pes.baris.forEach(function (r) {
+      if (r.keadaan === KEADAAN_MENUNGGU && r.item.toLowerCase() === kecil) tandaiPesanan_(pes, r, 'Ditutup', pengguna.nama, new Date(), '');
+    });
     t.sheet.deleteRow(nomor);
     catatLog_('M_Item', m.nama, pengguna, new Date(), [['Nama Item', m.nama, '(dihapus)']]);
     var data = dataItem_();
@@ -4589,6 +4635,16 @@ function bacaPemasok_() {
   return hasil;
 }
 
+/**
+ * Waktu sebuah catatan dibuat di HP (ms): timestamp_device, tetapi tidak sesudah waktu diterima server (jam HP yang
+ * terlalu cepat); tanpa timestamp_device: waktu diterima server.
+ */
+function waktuHp_(perangkat, ms) {
+  var w = perangkat instanceof Date && !isNaN(perangkat.getTime()) ? perangkat.getTime() : 0;
+  if (!w) return ms;
+  return ms ? Math.min(w, ms) : w;
+}
+
 /** Pemasok dan harga beli bisa dicatat: tab M_Pemasok dan kolom Pemasok/Harga Beli di Data_Stock sudah dibuat setupSpreadsheet. */
 function pembelianSiap_() {
   var t = bacaTabel_('Data_Stock');
@@ -4598,7 +4654,7 @@ function pembelianSiap_() {
 /**
  * Pembelian = baris Data_Stock dengan Stock Masuk > 0, dari dari sampai sampai: [{ tanggal, item, satuan,
  * masuk, hargaBeli (per satuan dasar, atau null), nilai (masuk × harga beli, dibulatkan; null tanpa harga),
- * pemasok, sid, ms, oleh }].
+ * pemasok, sid, ms (diterima server), tw (dicatat di HP, atau ms), oleh }].
  */
 function bacaPembelian_(dari, sampai) {
   var t = bacaTabel_('Data_Stock');
@@ -4611,10 +4667,13 @@ function bacaPembelian_(dari, sampai) {
     if (!tg || tg < dari || tg > sampai || masuk <= 0) return;
     var harga = angkaAtauNull_(nilai_(t, b, 'Harga Beli (Rp)'));
     var w = nilai_(t, b, 'timestamp_server');
+    var wp = nilai_(t, b, 'timestamp_device');
+    var ms = w instanceof Date && !isNaN(w.getTime()) ? w.getTime() : 0;
     hasil.push({
       tanggal: tg, item: rapikanTeks_(nilai_(t, b, 'Nama Item')), satuan: rapikanTeks_(nilai_(t, b, 'Satuan')), masuk: masuk,
       hargaBeli: harga, nilai: harga == null ? null : Math.round(masuk * harga), pemasok: rapikanTeks_(nilai_(t, b, 'Pemasok')),
-      sid: String(nilai_(t, b, 'submission_id') || ''), ms: w instanceof Date && !isNaN(w.getTime()) ? w.getTime() : 0,
+      sid: String(nilai_(t, b, 'submission_id') || ''), ms: ms,
+      tw: waktuHp_(wp, ms),
       oleh: rapikanTeks_(nilai_(t, b, 'submitted_by'))
     });
   });
@@ -4718,6 +4777,7 @@ function aksiSimpanPemasok_(body) {
         throw galatPengguna_('Nama ' + lama.nama + ' tidak bisa diganti karena pemasok ini sudah tercatat di barang masuk.');
       }
       tulisBarisMaster_(t, barisMaster_(t, 'Nama Pemasok', lama.nama), isi);
+      if (nama !== lama.nama) gantiNamaPesanan_('Pemasok', lama.nama, nama);
     } else {
       tambahBarisMaster_(TAB_PEMASOK, gabung_(isi, { 'Aktif': true }));
     }
@@ -6698,29 +6758,44 @@ function teksOrder_(m, jumlah) {
   return angkaId_(jumlah) + ' ' + m.satuan;
 }
 
+/** Satu item daftar belanja: { nama, satuan, satuanBesar, isiSatuanBesar, stock, stokMin, stokMaks, saran | null }. */
+function itemBelanja_(m, akhir) {
+  var s = saranOrderAngka_(m, akhir);
+  return {
+    nama: m.nama, satuan: m.satuan, satuanBesar: m.satuanBesar, isiSatuanBesar: m.isiSatuanBesar,
+    stock: akhir, stokMin: m.stokMin, stokMaks: m.stokMaks,
+    saran: s ? { jumlah: s.jumlah, satuan: s.satuan, dasar: s.dasar, teks: teksOrder_(m, s.jumlah) } : null
+  };
+}
+
 /**
  * Daftar belanja hari ini: item aktif yang Stock Akhir-nya di bawah Stok
- * Minimum, dikelompokkan per kategori (urutan M_Kategori), dengan saran order.
- * { tanggal, jumlah, kategori: [{ nama, item: [{ nama, satuan, satuanBesar,
- * isiSatuanBesar, stock, stokMin, stokMaks, saran: { jumlah, satuan, dasar, teks } | null }] }] }.
+ * Minimum, dengan saran order.
+ * - kategori: [{ nama, item: [item belanja] }] per kategori (urutan M_Kategori); dipakai aplikasi sebelum 0.29.
+ * - pemasok (Code.gs v0.29): [{ nama ('' = belum ada pemasok), kontak, wa, item: [item belanja + kategori,
+ *   terakhir: { pemasok, tanggal, nonaktif } | null, dipesan: pesanan menunggu item itu | null] }]. Item masuk
+ *   kelompok pemasok pesanan yang masih menunggu, lalu pemasok barang masuk terakhirnya; pemasok yang nonaktif
+ *   tidak punya kelompok. Kelompok urut nama, "belum ada pemasok" paling bawah; item urut kategori lalu nama.
+ * - pilihanPemasok: [{ nama, wa }] pemasok aktif; menunggu: semua pesanan yang masih menunggu (umur berapa pun).
  */
 function dataBelanja_() {
   var hari = hariIni_();
   var stock = ringkasStockHari_(hari);
   var urut = {};
   bacaSemuaKategori_().forEach(function (k, i) { urut[k.nama.toLowerCase()] = { i: i, nama: k.nama }; });
+  var namaKategori = function (m) {
+    var u = urut[m.kategori.toLowerCase()];
+    return u ? u.nama : (m.kategori || 'Tanpa kategori');
+  };
+  var indeksKategori = function (nama) {
+    var u = urut[nama.toLowerCase()];
+    return u ? u.i : 1e6;
+  };
   var grup = {};
   stock.belanja.forEach(function (x) {
-    var m = x.m;
-    var u = urut[m.kategori.toLowerCase()];
-    var nama = u ? u.nama : (m.kategori || 'Tanpa kategori');
-    var g = grup[nama.toLowerCase()] = grup[nama.toLowerCase()] || { nama: nama, i: u ? u.i : 1e6, item: [] };
-    var s = saranOrderAngka_(m, x.akhir);
-    g.item.push({
-      nama: m.nama, satuan: m.satuan, satuanBesar: m.satuanBesar, isiSatuanBesar: m.isiSatuanBesar,
-      stock: x.akhir, stokMin: m.stokMin, stokMaks: m.stokMaks,
-      saran: s ? { jumlah: s.jumlah, satuan: s.satuan, dasar: s.dasar, teks: teksOrder_(m, s.jumlah) } : null
-    });
+    var nama = namaKategori(x.m);
+    var g = grup[nama.toLowerCase()] = grup[nama.toLowerCase()] || { nama: nama, i: indeksKategori(nama), item: [] };
+    g.item.push(itemBelanja_(x.m, x.akhir));
   });
   var kategori = Object.keys(grup).map(function (k) { return grup[k]; }).sort(function (a, b) {
     return a.i - b.i || a.nama.localeCompare(b.nama, 'id');
@@ -6729,7 +6804,54 @@ function dataBelanja_() {
     delete g.i;
     g.item.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
   });
-  return { tanggal: hari, jumlah: stock.belanja.length, kategori: kategori };
+
+  // Per pemasok (Code.gs v0.29): pesanan yang masih menunggu, lalu pemasok barang masuk terakhir.
+  var daftarPemasok = pembelianSiap_() ? bacaPemasok_() : [];
+  var aktif = {};
+  daftarPemasok.forEach(function (p) { if (p.aktif) aktif[p.nama.toLowerCase()] = p; });
+  var terakhir = pemasokTerakhir_();
+  var siap = pesananSiap_();
+  var pes = siap ? bacaPesanan_() : { baris: [] };
+  var dipesan = {};
+  pes.baris.forEach(function (r) {
+    if (r.keadaan !== KEADAAN_MENUNGGU) return;
+    var k = r.item.toLowerCase();
+    if (!dipesan[k] || r.ms > dipesan[k].ms) dipesan[k] = r;
+  });
+  var kelompok = {};
+  stock.belanja.forEach(function (x) {
+    var m = x.m;
+    var k = m.nama.toLowerCase();
+    var d = dipesan[k];
+    var t = terakhir[k];
+    var p = (d && aktif[d.pemasok.toLowerCase()]) || (t && aktif[t.pemasok.toLowerCase()]) || null;
+    var kunci = p ? p.nama.toLowerCase() : '';
+    var g = kelompok[kunci] = kelompok[kunci] || { nama: p ? p.nama : '', kontak: p ? p.kontak : '', wa: p ? nomorWa_(p.kontak) : '', item: [] };
+    g.item.push(gabung_(itemBelanja_(m, x.akhir), {
+      kategori: namaKategori(m),
+      terakhir: t ? { pemasok: t.pemasok, tanggal: t.tanggal, nonaktif: !aktif[t.pemasok.toLowerCase()] } : null,
+      dipesan: d ? bentukBarisPesanan_(d, true) : null
+    }));
+  });
+  var pemasok = Object.keys(kelompok).map(function (k) { return kelompok[k]; }).sort(function (a, b) {
+    if (!a.nama !== !b.nama) return a.nama ? -1 : 1;
+    return a.nama.localeCompare(b.nama, 'id');
+  });
+  pemasok.forEach(function (g) {
+    g.item.sort(function (a, b) {
+      return indeksKategori(a.kategori) - indeksKategori(b.kategori) || a.kategori.localeCompare(b.kategori, 'id') ||
+        a.nama.localeCompare(b.nama, 'id');
+    });
+  });
+  return {
+    tanggal: hari, jumlah: stock.belanja.length, kategori: kategori,
+    outlet: namaOutlet_(),
+    pembelianSiap: pembelianSiap_(),
+    pesananSiap: siap,
+    pemasok: pemasok,
+    pilihanPemasok: daftarPemasok.filter(function (p) { return p.aktif; }).map(function (p) { return { nama: p.nama, wa: nomorWa_(p.kontak) }; }),
+    menunggu: pesananMenunggu_(pes).map(bentukPesanan_)
+  };
 }
 
 function aksiDaftarBelanja_() {
@@ -6737,10 +6859,9 @@ function aksiDaftarBelanja_() {
 }
 
 /**
- * PDF daftar belanja (Bagian 9.2). body.order: { namaItem: teks } berisi
- * jumlah order yang diubah Pengelola di layar (dalam satuan order: satuan
- * besar jika ada); hanya untuk cetakan, tidak disimpan. Item yang tidak ada di
- * body.order memakai saran; teks kosong dicetak "–".
+ * PDF daftar belanja (Bagian 9.2), dikelompokkan per pemasok seperti di layar. body.order: { namaItem: teks }
+ * berisi jumlah Order di layar (dalam satuan order: satuan besar jika ada); aplikasi 0.29 mengirim semua item,
+ * aplikasi lama hanya yang diubah. Item yang tidak ada di body.order memakai saran; teks kosong dicetak "–".
  */
 function aksiUnduhPdfBelanja_(body, pengguna) {
   var d = dataBelanja_();
@@ -6750,37 +6871,48 @@ function aksiUnduhPdfBelanja_(body, pengguna) {
   Object.keys(order).forEach(function (k) { orderKecil[rapikanTeks_(k).toLowerCase()] = order[k]; });
   var master = bacaItem_();
   var diubah = 0;
-  var tabel = '<table class="data"><tr><th style="width:6%">No</th><th style="width:36%">Nama Item</th>' +
-    '<th style="width:16%">Stock Sekarang</th><th style="width:16%">Stok Minimum</th><th style="width:26%">Order</th></tr>';
-  d.kategori.forEach(function (g) {
-    tabel += '<tr class="kategori"><td colspan="5">' + escHtml_(g.nama) + '</td></tr>';
+  var adaDipesan = false;
+  var tabel = '<table class="data"><tr><th style="width:5%">No</th><th style="width:29%">Nama Item</th>' +
+    '<th style="width:14%">Kategori</th><th style="width:14%">Stock Sekarang</th><th style="width:14%">Stok Minimum</th>' +
+    '<th style="width:24%">Order</th></tr>';
+  d.pemasok.forEach(function (g) {
+    tabel += '<tr class="kategori"><td colspan="6">' + escHtml_(g.nama || 'Belum ada pemasok') +
+      (g.kontak ? ' · ' + escHtml_(g.kontak) : '') + '</td></tr>';
     g.item.forEach(function (it, i) {
       var kecil = it.nama.toLowerCase();
-      var teks = it.saran ? it.saran.teks : '–';
-      if (Object.prototype.hasOwnProperty.call(orderKecil, kecil)) {
-        var v = String(orderKecil[kecil] == null ? '' : orderKecil[kecil]).trim();
-        var asli = it.saran ? String(it.saran.jumlah) : '';
-        if (v === '') teks = '–';
-        else {
-          var n = angkaIsian_(v, 'Order ' + it.nama);
-          teks = teksOrder_(master[kecil] || it, n);
-        }
-        if (v.replace(',', '.') !== asli) diubah++;
+      // Di layar, Order kosong untuk item yang sudah dipesan dan item yang belum punya pemasok.
+      var bawaan = it.dipesan || !g.nama ? '' : (it.saran ? String(it.saran.jumlah) : '');
+      // Item yang tidak dikirim (aplikasi 0.28 hanya mengirim yang diubah): saran, seperti dulu.
+      var dikirim = Object.prototype.hasOwnProperty.call(orderKecil, kecil);
+      var v = dikirim ? String(orderKecil[kecil] == null ? '' : orderKecil[kecil]).trim() : (it.saran ? String(it.saran.jumlah) : '');
+      var teks = v === '' ? '–' : escHtml_(teksOrder_(master[kecil] || it, angkaIsian_(v, 'Order ' + it.nama)));
+      if (dikirim && v.replace(',', '.') !== bawaan) diubah++;
+      // Order kosong: sebabnya dan saran tetap tertulis kecil, supaya "–" tidak dibaca sebagai "tanpa saran".
+      if (v === '') {
+        var sebab = it.dipesan ? 'sudah dipesan' : !g.nama ? 'belum ada pemasok' : '';
+        var saranKecil = it.saran ? 'saran ' + it.saran.teks : 'tanpa saran';
+        teks += '<br><span class="kecil">' + escHtml_(sebab ? sebab + ' · ' + saranKecil : saranKecil) + '</span>';
       }
-      tabel += '<tr><td class="angka">' + (i + 1) + '</td><td>' + escHtml_(it.nama) + '</td>' +
+      if (it.dipesan) adaDipesan = true;
+      tabel += '<tr><td class="angka">' + (i + 1) + '</td><td>' + escHtml_(it.nama) +
+        (it.dipesan ? '<br><span class="kecil">dipesan ' + escHtml_(teksJumlahPesanan_(it.dipesan)) + ', ' +
+          escHtml_(tanggalPendekId_(it.dipesan.tanggal)) + '</span>' : '') + '</td>' +
+        '<td>' + escHtml_(it.kategori) + '</td>' +
         '<td class="angka' + (it.stock < 0 ? ' masalah' : '') + '">' + angkaId_(it.stock) + ' ' + escHtml_(it.satuan) + '</td>' +
         '<td class="angka">' + angkaId_(it.stokMin) + ' ' + escHtml_(it.satuan) + '</td>' +
-        '<td class="akhir">' + escHtml_(teks) + '</td></tr>';
+        '<td class="akhir">' + teks + '</td></tr>';
     });
   });
   tabel += '</table>';
   var catatan = ['Saran order = stok maksimum dikurangi stock akhir, dibulatkan ke atas ke satuan besar jika item punya. ' +
-    'Item tanpa stok maksimum tidak diberi saran (–).'];
-  if (diubah) catatan.push(diubah + ' jumlah order diubah sebelum dicetak. Perubahan itu hanya untuk cetakan ini.');
-  catatan.push('Daftar ini hanya saran. Aplikasi tidak memesan apa pun.');
+    'Item tanpa stok maksimum tidak diberi saran. Order "–" berarti tidak ada jumlah yang diisi; sebab dan sarannya tertulis kecil di bawahnya.',
+    'Item dikelompokkan menurut pemasok pesanan yang belum datang, atau pemasok barang masuk terakhirnya.'];
+  if (adaDipesan) catatan.push('Item bertanda "dipesan" sudah dipesan dan belum dicatat datang.');
+  if (diubah) catatan.push(diubah + ' jumlah order diubah di layar sebelum dicetak.');
   var html = htmlLaporan_('', d.tanggal, {
     judul: 'Daftar Belanja',
-    info: [['Item di bawah stok minimum', String(d.jumlah)]],
+    info: [['Item di bawah stok minimum', String(d.jumlah)],
+      ['Pemasok', String(d.pemasok.filter(function (g) { return g.nama; }).length)]],
     tabel: tabel,
     catatan: catatan,
     bawah: [['Dicetak oleh', pengguna.nama + ', ' + waktuPendekId_(new Date())]]
@@ -6788,6 +6920,354 @@ function aksiUnduhPdfBelanja_(body, pengguna) {
   var namaFile = d.tanggal + '_Daftar_belanja.pdf';
   var blob = Utilities.newBlob(html, 'text/html', namaFile + '.html').getAs('application/pdf').setName(namaFile);
   return { namaFile: namaFile, mime: 'application/pdf', data: Utilities.base64Encode(blob.getBytes()) };
+}
+
+/* ---------- Pesanan ke pemasok (Code.gs v0.29, spesifikasi sistem Bagian 9.2) ---------- */
+
+var TAB_PESANAN = 'Data_Pesanan';
+var URUTAN_PESANAN = [['Tanggal', false], ['Pemasok', true], ['Nama Item', true], ['timestamp_server', true]];
+var KEADAAN_MENUNGGU = 'Menunggu';
+/** Pesanan yang tampil di form Stock: paling lama sekian hari sebelum tanggal form. */
+var HARI_PESANAN_FORM = 14;
+var BARIS_PESANAN_MAKS = 200;
+/** Pesanan dari antrean HP: barang masuk yang dicatat sejak pesanan diketuk (paling lama sekian hari) dianggap sudah datang. */
+var HARI_PESANAN_TERLAMBAT = 7;
+
+/** Pesanan bisa dicatat: tab Data_Pesanan sudah dibuat setupSpreadsheet. */
+function pesananSiap_() {
+  return !!bacaTabel_(TAB_PESANAN);
+}
+
+/**
+ * Data_Pesanan: { ada, tabel, baris: [{ nomor, b, id, tanggal, pemasok, item, kategori, jumlah, satuanOrder, dasar,
+ * satuan, keadaan, oleh, ms, tw, selesaiOleh, selesaiMs, kiriman }] }. nomor = nomor baris di Sheet saat dibaca; ms = waktu
+ * diterima server, tw = waktu diketuk di HP (timestamp_device, atau ms jika kosong); kiriman = Kiriman Stock.
+ */
+function bacaPesanan_() {
+  var t = bacaTabel_(TAB_PESANAN);
+  var hasil = { ada: !!t, tabel: t, baris: [] };
+  if (!t) return hasil;
+  var zona = zonaSheet_();
+  var ms = function (w) { return w instanceof Date && !isNaN(w.getTime()) ? w.getTime() : 0; };
+  t.baris.forEach(function (b, i) {
+    var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+    var item = rapikanTeks_(nilai_(t, b, 'Nama Item'));
+    var id = String(nilai_(t, b, 'submission_id') || '');
+    if (!tg || !item || !id) return;
+    hasil.baris.push({
+      nomor: i + 2, b: b, id: id, tanggal: tg, pemasok: rapikanTeks_(nilai_(t, b, 'Pemasok')), item: item,
+      kategori: rapikanTeks_(nilai_(t, b, 'Kategori')), jumlah: Number(nilai_(t, b, 'Jumlah')) || 0,
+      satuanOrder: rapikanTeks_(nilai_(t, b, 'Satuan Order')), dasar: Number(nilai_(t, b, 'Jumlah Dasar')) || 0,
+      satuan: rapikanTeks_(nilai_(t, b, 'Satuan')), keadaan: rapikanTeks_(nilai_(t, b, 'Keadaan')),
+      oleh: rapikanTeks_(nilai_(t, b, 'submitted_by')), ms: ms(nilai_(t, b, 'timestamp_server')),
+      tw: waktuHp_(nilai_(t, b, 'timestamp_device'), ms(nilai_(t, b, 'timestamp_server'))),
+      selesaiOleh: rapikanTeks_(nilai_(t, b, 'Selesai Oleh')), selesaiMs: ms(nilai_(t, b, 'Selesai Pada')),
+      kiriman: String(nilai_(t, b, 'Kiriman Stock') || '')
+    });
+  });
+  return hasil;
+}
+
+/** Pesanan yang masih menunggu, per id: [{ id, pemasok, tanggal, oleh, ms, item: [baris] }], terbaru dulu. */
+function pesananMenunggu_(p) {
+  var peta = {};
+  var daftar = [];
+  p.baris.forEach(function (r) {
+    if (r.keadaan !== KEADAAN_MENUNGGU) return;
+    var g = peta[r.id];
+    if (!g) {
+      g = peta[r.id] = { id: r.id, pemasok: r.pemasok, tanggal: r.tanggal, oleh: r.oleh, ms: r.ms, item: [] };
+      daftar.push(g);
+    }
+    g.item.push(r);
+  });
+  daftar.forEach(function (g) { g.item.sort(function (a, b) { return a.item.localeCompare(b.item, 'id'); }); });
+  return daftar.sort(function (a, b) { return b.ms - a.ms || b.tanggal.localeCompare(a.tanggal); });
+}
+
+/** Satu item pesanan untuk aplikasi: { nama, kategori, jumlah, satuanOrder, dasar, satuan } (+ id, pemasok, tanggal, oleh). */
+function bentukBarisPesanan_(r, lengkap) {
+  var x = { nama: r.item, kategori: r.kategori, jumlah: r.jumlah, satuanOrder: r.satuanOrder, dasar: r.dasar, satuan: r.satuan };
+  if (lengkap) {
+    x.id = r.id;
+    x.pemasok = r.pemasok;
+    x.tanggal = r.tanggal;
+    x.oleh = r.oleh;
+  }
+  return x;
+}
+
+/** Satu pesanan untuk aplikasi: { id, pemasok, tanggal, oleh, waktu (ISO), item: [...] }. */
+function bentukPesanan_(g) {
+  return {
+    id: g.id, pemasok: g.pemasok, tanggal: g.tanggal, oleh: g.oleh, waktu: g.ms ? new Date(g.ms).toISOString() : '',
+    item: g.item.map(function (r) { return bentukBarisPesanan_(r, false); })
+  };
+}
+
+/** "5 kg" atau "2 dus" (jumlah dalam satuan order). */
+function teksJumlahPesanan_(x) {
+  return angkaId_(x.jumlah) + ' ' + x.satuanOrder;
+}
+
+/**
+ * Nomor WhatsApp dari Kontak pemasok (teks bebas): deret angka yang cukup panjang (boleh berisi spasi, -, titik,
+ * kurung, dan + di depan). 0 di depan diganti 62 (Indonesia); 8xx dianggap nomor Indonesia tanpa 0. 10–15 angka.
+ * Nomor HP Indonesia (628…) didahulukan, supaya telepon kantor yang ditulis lebih dulu tidak dipakai; tanpa nomor HP,
+ * nomor pertama yang sah; selain itu ''.
+ */
+function nomorWa_(kontak) {
+  var semua = String(kontak || '').match(/\+?\d[\d\s().-]{7,}\d/g) || [];
+  var sah = semua.map(function (c) {
+    var angka = c.replace(/\D/g, '');
+    if (angka.charAt(0) === '0') angka = '62' + angka.replace(/^0+/, '');
+    else if (angka.charAt(0) === '8') angka = '62' + angka;
+    return angka.length >= 10 && angka.length <= 15 ? angka : '';
+  }).filter(Boolean);
+  return sah.filter(function (a) { return a.indexOf('628') === 0; })[0] || sah[0] || '';
+}
+
+/** Pemasok barang masuk terakhir tiap item (Data_Stock, Stock Masuk > 0, Pemasok berisi): { itemKecil: { pemasok, tanggal, ms } }. */
+function pemasokTerakhir_() {
+  var hasil = {};
+  if (!pembelianSiap_()) return hasil;
+  bacaPembelian_('0000-01-01', '9999-12-31').forEach(function (p) {
+    if (!p.pemasok) return;
+    var k = p.item.toLowerCase();
+    var x = hasil[k];
+    if (!x || p.tanggal > x.tanggal || (p.tanggal === x.tanggal && p.ms >= x.ms)) hasil[k] = { pemasok: p.pemasok, tanggal: p.tanggal, ms: p.ms };
+  });
+  return hasil;
+}
+
+/** Mengubah keadaan satu baris pesanan (di dalam kunci, sebelum tab diurutkan). */
+function tandaiPesanan_(p, r, keadaan, oleh, waktu, kiriman) {
+  var t = p.tabel;
+  var isi = { 'Keadaan': keadaan, 'Selesai Oleh': oleh, 'Selesai Pada': waktu, 'Kiriman Stock': kiriman || '' };
+  Object.keys(isi).forEach(function (judul) {
+    var i = t.kol[judul];
+    if (i === undefined) return;
+    var v = isi[judul];
+    t.sheet.getRange(r.nomor, i + 1).setValue(typeof v === 'string' ? teksAman_(v) : v);
+    r.b[i] = v;
+  });
+  r.keadaan = keadaan;
+  r.selesaiOleh = oleh;
+  r.selesaiMs = waktu instanceof Date ? waktu.getTime() : 0;
+  r.kiriman = kiriman || '';
+}
+
+/**
+ * Catat pesanan (khusus Pengelola), dikirim saat "Kirim ke WhatsApp" diketuk:
+ * { submissionId, tanggal, waktuPerangkat, pemasok, baris: [{ item, jumlah, satuanOrder: 'besar'|'dasar' }] }.
+ * Satu baris Data_Pesanan per item, Keadaan Menunggu. Item yang masih punya pesanan menunggu (pemasok mana pun)
+ * diganti pesanan ini (Diganti), supaya tiap item paling banyak punya satu pesanan menunggu. Waktu yang dibandingkan
+ * adalah waktu diketuk di HP: pesanan dari antrean HP yang barangnya sudah dicatat masuk di HP sejak tombol diketuk
+ * (pemasok sama atau tanpa pemasok, barang masuk yang belum menyelesaikan pesanan lain) langsung Datang (`sudahDatang`);
+ * yang sudah didahului pesanan menunggu yang diketuk sesudahnya langsung Diganti (`lebihBaru`).
+ */
+function aksiCatatPesanan_(body, pengguna) {
+  var tanggal = periksaTanggalIsian_(body.tanggal, pengguna);
+  var konteks = konteksKiriman_(body, pengguna);
+  var masukan = Array.isArray(body.baris) ? body.baris : [];
+  if (masukan.length > BARIS_PESANAN_MAKS) throw galatPengguna_('Pesanan terlalu banyak untuk sekali kirim.');
+
+  return denganKunci_(function () {
+    var p = bacaPesanan_();
+    if (!p.ada) throw galatPengguna_('Tab ' + TAB_PESANAN + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    if (adaSubmission_(p.tabel, konteks.sid)) {
+      return { sudahTerkirim: true, id: konteks.sid, jumlah: 0, diganti: [], sudahDatang: [], belanja: dataBelanja_() };
+    }
+    var nama = rapikanTeks_(body.pemasok);
+    if (!nama) throw galatPengguna_('Pilih pemasok untuk pesanan ini.');
+    // Pemasok yang sudah dinonaktifkan tetap diterima (pesanan dari antrean di HP).
+    var pemasok = bacaPemasok_().filter(function (x) { return x.nama.toLowerCase() === nama.toLowerCase(); })[0];
+    if (!pemasok) throw galatPengguna_('Pemasok ' + nama + ' tidak ada di daftar pemasok. Muat ulang Daftar belanja.');
+    if (!masukan.length) throw galatPengguna_('Isi Order minimal untuk satu item.');
+    var master = bacaItem_();
+    var sudah = {};
+    var baris = masukan.map(function (b) {
+      var m = master[rapikanTeks_(b && b.item).toLowerCase()];
+      if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang Daftar belanja.');
+      if (sudah[m.nama.toLowerCase()]) throw galatPengguna_(m.nama + ' tertulis dua kali di pesanan ini.');
+      sudah[m.nama.toLowerCase()] = true;
+      var jumlah = angkaIsian_(b.jumlah, 'Order ' + m.nama);
+      if (!(jumlah > 0)) throw galatPengguna_('Order ' + m.nama + ' harus lebih dari 0.');
+      var besar = b.satuanOrder === 'besar';
+      if (besar && !(m.satuanBesar && m.isiSatuanBesar > 0)) {
+        throw galatPengguna_(m.nama + ' tidak punya satuan besar. Muat ulang Daftar belanja.');
+      }
+      return { m: m, jumlah: jumlah, satuanOrder: besar ? m.satuanBesar : m.satuan, dasar: besar ? bulat_(jumlah * m.isiSatuanBesar) : jumlah };
+    });
+
+    // Waktu tombol diketuk di HP; pesanan dari antrean bisa sampai jauh sesudahnya.
+    var tw = waktuHp_(konteks.waktuPerangkat, konteks.kini.getTime());
+    // Barang masuk yang sudah dicatat di HP sejak tombol diketuk (pesanan yang terlambat sampai dari antrean), dengan
+    // pemasok yang sama atau tanpa pemasok, dan belum menyelesaikan pesanan lain.
+    var datangSejak = {};
+    if (tw < konteks.kini.getTime() && pembelianSiap_()) {
+      var dipakai = {};
+      p.baris.forEach(function (r) { if (r.keadaan === 'Datang' && r.kiriman) dipakai[r.kiriman + '|' + r.item.toLowerCase()] = true; });
+      var batas = konteks.kini.getTime() - HARI_PESANAN_TERLAMBAT * 864e5;
+      bacaPembelian_(tanggal, '9999-12-31').forEach(function (x) {
+        if (x.tw < tw || x.ms < batas || (x.pemasok && x.pemasok.toLowerCase() !== pemasok.nama.toLowerCase())) return;
+        var k = x.item.toLowerCase();
+        if (dipakai[x.sid + '|' + k]) return;
+        if (!datangSejak[k] || x.tw < datangSejak[k].tw) datangSejak[k] = x;
+      });
+    }
+
+    // Pesanan menunggu untuk item yang sama: yang diketuk lebih dulu diganti pesanan ini; yang diketuk sesudahnya (pesanan ini
+    // terlambat dari antrean) tetap, dan item pesanan ini langsung Diganti olehnya.
+    var diganti = [];
+    var lebihBaru = {};
+    p.baris.forEach(function (r) {
+      if (r.keadaan !== KEADAAN_MENUNGGU || !sudah[r.item.toLowerCase()]) return;
+      if (r.tw > tw) {
+        lebihBaru[r.item.toLowerCase()] = r;
+        return;
+      }
+      tandaiPesanan_(p, r, 'Diganti', pengguna.nama, konteks.kini, '');
+      diganti.push({ item: r.item, pemasok: r.pemasok, tanggal: r.tanggal, oleh: r.oleh });
+    });
+
+    var sudahDatang = [];
+    var kalah = [];
+    tambahBarisTabel_(p.tabel, baris.map(function (x) {
+      var dt = datangSejak[x.m.nama.toLowerCase()];
+      var lb = dt ? null : lebihBaru[x.m.nama.toLowerCase()];
+      if (dt) sudahDatang.push(x.m.nama);
+      if (lb) kalah.push({ item: lb.item, pemasok: lb.pemasok, tanggal: lb.tanggal, oleh: lb.oleh });
+      return gabung_({
+        'Tanggal': tanggalSel_(tanggal),
+        'Pemasok': pemasok.nama,
+        'Nama Item': x.m.nama,
+        'Kategori': x.m.kategori,
+        'Jumlah': x.jumlah,
+        'Satuan Order': x.satuanOrder,
+        'Jumlah Dasar': x.dasar,
+        'Satuan': x.m.satuan,
+        'Keadaan': dt ? 'Datang' : lb ? 'Diganti' : KEADAAN_MENUNGGU,
+        'Selesai Oleh': dt ? dt.oleh : lb ? lb.oleh : '',
+        'Selesai Pada': dt && dt.ms ? new Date(dt.ms) : lb ? konteks.kini : '',
+        'Kiriman Stock': dt ? dt.sid : ''
+      }, isiSistem_(konteks));
+    }));
+    urutkanTabel_(p.tabel, URUTAN_PESANAN);
+    var hasil = {
+      sudahTerkirim: false, id: konteks.sid, pemasok: pemasok.nama, jumlah: baris.length,
+      diganti: diganti, sudahDatang: sudahDatang, belanja: dataBelanja_()
+    };
+    if (kalah.length) hasil.lebihBaru = kalah;
+    return hasil;
+  });
+}
+
+/**
+ * Tutup pesanan (khusus Pengelola): item pesanan itu yang masih menunggu menjadi Ditutup (misalnya pemasok tidak
+ * mengirim, atau barangnya dicatat tanpa pesanan). { id, tanggal? } → { ditutup, belanja, form? } (form = formStock
+ * tanggal itu, jika dikirim dari form Stock).
+ */
+function aksiTutupPesanan_(body, pengguna) {
+  var id = rapikanTeks_(body.id);
+  return denganKunci_(function () {
+    var p = bacaPesanan_();
+    if (!p.ada) throw galatPengguna_('Tab ' + TAB_PESANAN + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var kini = new Date();
+    var n = 0;
+    p.baris.forEach(function (r) {
+      if (r.id !== id || r.keadaan !== KEADAAN_MENUNGGU) return;
+      tandaiPesanan_(p, r, 'Ditutup', pengguna.nama, kini, '');
+      n++;
+    });
+    var hasil = { ditutup: n, belanja: dataBelanja_() };
+    if (tanggalSah_(body.tanggal)) hasil.form = dataFormStock_(body.tanggal);
+    return hasil;
+  });
+}
+
+/**
+ * Pesanan menunggu untuk form Stock (semua role): pemasok aktif, tanggal pesanan sampai tanggal form dan paling lama
+ * HARI_PESANAN_FORM hari sebelumnya; terbaru dulu.
+ */
+function pesananForm_(tanggal) {
+  if (!pesananSiap_()) return [];
+  var aktif = {};
+  bacaPemasok_().forEach(function (x) { if (x.aktif) aktif[x.nama.toLowerCase()] = true; });
+  var dari = geserTanggal_(tanggal, -(HARI_PESANAN_FORM - 1));
+  return pesananMenunggu_(bacaPesanan_()).filter(function (g) {
+    return aktif[g.pemasok.toLowerCase()] && g.tanggal <= tanggal && g.tanggal >= dari;
+  }).map(bentukPesanan_);
+}
+
+/**
+ * Tautan baris kirimStock ke pesanan ("Isi dari pesanan" di form Stock): { r, datang }. Kiriman tidak pernah ditolak
+ * karena tautannya, supaya kiriman dari antrean HP tidak macet ("Kirim ulang" mengirim isi yang sama).
+ * - Pesanan itu masih menunggu untuk item itu: r = barisnya.
+ * - Diganti: pesanan terbaru untuk item itu dari pemasok yang sama yang dibuat sesudahnya dipakai (masih menunggu: r;
+ *   sudah datang: datang); diganti pesanan ke pemasok lain: tanpa tautan.
+ * - Sudah dicatat datang (misalnya diisi juga dari HP lain): datang = barisnya. Tambah masuk baris kiriman ini tidak
+ *   dicatat, supaya barang yang sama tidak masuk dua kali; itemnya dikembalikan di `pesananSudahDatang`.
+ * - Ditutup atau id tidak dikenal: tanpa tautan (barang masuk dicatat seperti biasa; menutup pesanan berarti tidak
+ *   ditunggu lagi, bukan barangnya tidak boleh dicatat).
+ */
+function barisPesananTertaut_(p, id, item) {
+  var tanpa = { r: null, datang: null };
+  if (!id || !p.ada) return tanpa;
+  var kecil = item.toLowerCase();
+  var asal = p.baris.filter(function (r) { return r.id === id && r.item.toLowerCase() === kecil; })[0];
+  if (!asal) return tanpa;
+  if (asal.keadaan === 'Diganti') {
+    var pengganti = null;
+    p.baris.forEach(function (r) {
+      if (r.id === asal.id || r.item.toLowerCase() !== kecil || r.pemasok.toLowerCase() !== asal.pemasok.toLowerCase()) return;
+      if (r.tw < asal.tw || r.keadaan === 'Diganti') return;
+      if (!pengganti || r.tw > pengganti.tw) pengganti = r;
+    });
+    if (!pengganti) return tanpa;
+    asal = pengganti;
+  }
+  if (asal.keadaan === KEADAAN_MENUNGGU) return { r: asal, datang: null };
+  if (asal.keadaan === 'Datang') return { r: null, datang: asal };
+  return tanpa;
+}
+
+/**
+ * Sesudah kirimStock menulis baris (di dalam kunci): item dengan Stock Masuk > 0 menyelesaikan pesanan menunggunya
+ * (Datang). Baris yang bertautan ke pesanan menyelesaikan pesanan itu; selain itu pesanan menunggu yang paling lama
+ * untuk item itu dengan pemasok yang sama, atau pemasok mana pun jika kiriman tanpa pemasok, dengan tanggal pesanan
+ * sampai tanggal kiriman dan diketuk sebelum barang itu dicatat di HP. Mengembalikan [{ pemasok, item }].
+ */
+function selesaikanPesanan_(p, masuk, pemasok, tanggal, konteks) {
+  var hasil = [];
+  if (!p.ada) return hasil;
+  // Pesanan yang diketuk sesudah barang ini dicatat di HP (kiriman dari antrean) bukan pesanan untuk barang ini.
+  var dicatat = waktuHp_(konteks.waktuPerangkat, konteks.kini.getTime());
+  masuk.forEach(function (x) {
+    var r = x.tertaut;
+    if (!r) {
+      var kecil = x.item.toLowerCase();
+      p.baris.forEach(function (c) {
+        if (c.keadaan !== KEADAAN_MENUNGGU || c.item.toLowerCase() !== kecil || c.tanggal > tanggal || c.tw > dicatat) return;
+        if (pemasok && c.pemasok.toLowerCase() !== pemasok.toLowerCase()) return;
+        if (!r || c.ms < r.ms) r = c;
+      });
+    }
+    if (!r || r.keadaan !== KEADAAN_MENUNGGU) return;
+    tandaiPesanan_(p, r, 'Datang', konteks.pengguna.nama, konteks.kini, konteks.sid);
+    hasil.push({ pemasok: r.pemasok, item: r.item });
+  });
+  return hasil;
+}
+
+/** Mengganti nama item atau pemasok di semua baris Data_Pesanan (di dalam kunci). */
+function gantiNamaPesanan_(judul, namaLama, namaBaru) {
+  var t = bacaTabel_(TAB_PESANAN);
+  if (!t || t.kol[judul] === undefined) return;
+  var c = t.kol[judul];
+  t.baris.forEach(function (b, i) {
+    if (rapikanTeks_(b[c]).toLowerCase() === namaLama.toLowerCase()) t.sheet.getRange(i + 2, c + 1).setValue(teksAman_(namaBaru));
+  });
 }
 
 /* =========================================================================
@@ -9698,7 +10178,17 @@ function htmlEmailHarian_(d) {
       })) +
       '<p style="margin:4px 0 0;color:' + w.tintaRedup + ';font-size:12px">Daftar lengkap dan PDF-nya ada di menu Laporan aplikasi.</p>');
   }
-  html += bagian('Stock', stock.length ? stock.join('') : '<p style="margin:0">Tidak ada Stock Akhir minus dan semua stock di atas batas minimum.</p>');
+  if (!stock.length) stock.push('<p style="margin:0">Tidak ada Stock Akhir minus dan semua stock di atas batas minimum.</p>');
+  if (d.pesanan && d.pesanan.length) {
+    // Pesanan ke pemasok yang belum dicatat datang (Code.gs v0.29).
+    stock.push('<p style="margin:6px 0 2px"><b>Pesanan belum datang (' + d.pesanan.length + ')</b></p>' +
+      daftar(d.pesanan.map(function (g) {
+        var umur = Math.max(0, selisihHari_(g.tanggal, d.tanggal));
+        return '<b>' + escHtml_(g.pemasok) + '</b>: ' + escHtml_(g.item.map(function (r) { return r.item + ' ' + teksJumlahPesanan_(r); }).join(', ')) +
+          ' (dipesan ' + escHtml_(g.oleh) + ' lewat WhatsApp, ' + escHtml_(tanggalPendekId_(g.tanggal)) + (umur ? ', ' + umur + ' hari lalu' : '') + ')';
+      })));
+  }
+  html += bagian('Stock', stock.join(''));
 
   // Suhu di luar standar beserta tindakan korektif dan cek ulangnya (Bagian 10).
   var merah = 'color:' + w.masalah + ';font-weight:bold';
@@ -9836,6 +10326,7 @@ function jalankanLaporanHarian_(opsi) {
       reset: bacaStaff_().daftar.filter(function (s) { return s.aktif && s.reset; }).map(function (s) { return s.nama; }),
       terkunci: akunTerkunci_(),
       opname: statusOpname_(),
+      pesanan: pesananSiap_() ? pesananMenunggu_(bacaPesanan_()) : [],
       pdf: hasil.pdf,
       masalah: masalah,
       cadanganGagal: /^Gagal/.test(cadangan) ? cadangan : '',
@@ -11986,6 +12477,16 @@ var TAB_DATA = [
   {
     nama: 'Data_PenjualanMenu',
     kolom: [k_('Tanggal', 'tanggal'), k_('Nama Menu'), k_('Porsi', 'bulat'), k_('Harga Jual (Rp)', 'rupiah')]
+  },
+  {
+    // Pesanan ke pemasok (Code.gs v0.29): satu baris per item per pesanan; submission_id = id pesanan.
+    nama: 'Data_Pesanan',
+    kolom: [
+      k_('Tanggal', 'tanggal'), k_('Pemasok'), k_('Nama Item'), k_('Kategori'),
+      k_('Jumlah', 'angka'), k_('Satuan Order'), k_('Jumlah Dasar', 'angka'), k_('Satuan'),
+      k_('Keadaan'),
+      k_('Selesai Oleh'), k_('Selesai Pada', 'waktu'), k_('Kiriman Stock')
+    ]
   }
 ];
 

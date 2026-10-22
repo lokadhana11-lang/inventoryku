@@ -751,7 +751,8 @@ body.papan-ketik .layar {
   cursor: default;
 }
 
-.tombol:disabled:not(.sedang-proses) {
+.tombol:disabled:not(.sedang-proses),
+.tombol[aria-disabled="true"] {
   opacity: 0.55;
 }
 
@@ -4758,6 +4759,72 @@ body.papan-ketik .bilah-kirim {
 
 .belanja-order .konversi:empty {
   display: none;
+}
+
+/* Per pemasok (aplikasi 0.29.0): tiap kelompok diakhiri Kirim ke WhatsApp; pesanan yang belum datang di atas */
+.belanja-kelompok,
+.belanja-menunggu {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.belanja-kelompok + .belanja-kelompok,
+.belanja-menunggu + .belanja-kelompok {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--garis-halus);
+}
+
+.belanja-menunggu .baris-tetap {
+  flex-wrap: wrap;
+}
+
+.belanja-menunggu .daftar-baris-isi {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.belanja-pesan-ke {
+  max-width: 360px;
+}
+
+.belanja-wa-deret {
+  margin-top: 8px;
+}
+
+.belanja-kelompok .pesan-formulir:empty,
+.kartu > .pesan-formulir:empty {
+  display: none;
+}
+
+/* Form Stock: pesanan yang belum datang, dengan Isi dari pesanan */
+.pesanan-stock {
+  display: grid;
+  gap: 8px;
+}
+
+.pesanan-stock .baris-tetap {
+  flex-wrap: wrap;
+}
+
+.pesanan-stock .daftar-baris-isi {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.pesanan-stock .deret-tombol {
+  flex: 0 1 auto;
+}
+
+/* Nama pemasok bisa satu kata panjang (paling panjang 40 huruf): boleh dipatah supaya tidak keluar kartu di 320 px */
+.belanja .daftar-baris-judul,
+.belanja .daftar-baris-ket,
+.belanja .judul-sub,
+.belanja .kolom-bantuan,
+.pesanan-stock .daftar-baris-judul,
+.pesanan-stock .daftar-baris-ket {
+  overflow-wrap: anywhere;
 }
 
 /* Kurangi gerak: semua geser, skala, goyang, pudar, dan denyut dimatikan.

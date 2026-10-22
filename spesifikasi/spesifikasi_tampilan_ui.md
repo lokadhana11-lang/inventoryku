@@ -28,6 +28,9 @@
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
 > Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tombol "Tandai diperiksa (n)" di
 > judul tiap tanggal di daftar Riwayat untuk Pengelola (Bagian 5.4 dan 7).
+> Tambahan 21 Oktober 2026 (keputusan pemilik, dari telaah aplikasi): Daftar belanja per pemasok dengan
+> "Kirim ke WhatsApp", "Pesan ke", dan "Pesanan belum datang"; kartu "Pesanan menunggu" dengan "Isi dari
+> pesanan" di form Stock (Bagian 5.3, 5.9, dan 7).
 > Tambahan 19 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): di tabel Stock laptop/desktop,
 > harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, supaya tabel muat
 > dan Stock Akhir selalu terlihat (Bagian 5.3).
@@ -668,14 +671,36 @@ Satu-satunya layar yang sepenuhnya navy.
 - Stock akhir di bawah stok minimum: tanda Perlu ditinjau "Perlu reorder".
 - **Pemasok dan harga beli** (18 Oktober 2026, tidak wajib, semua role): kotak info punya
   `<select>` "Pemasok (tidak wajib)" berisi "Tanpa pemasok" dan pemasok aktif, dengan keterangan
-  "Berlaku untuk semua item yang masuk di kiriman ini."; pilihannya tetap untuk kiriman
-  berikutnya. Jika daftarnya kosong: "Belum ada pemasok" (nonaktif) dan petunjuk ke Pengaturan →
+  "Berlaku untuk semua item yang masuk di kiriman ini."; sejak 21 Oktober 2026 pilihannya kembali
+  "Tanpa pemasok" sesudah kiriman jika tidak ada lagi Tambah masuk di form. Jika daftarnya kosong: "Belum ada pemasok" (nonaktif) dan petunjuk ke Pengaturan →
   Pemasok. Di kartu HP/tablet, kolom "Harga beli per kg (tidak wajib)" dengan awalan "Rp" muncul di
   bawah Tambah masuk setelah Tambah masuk diisi; satuannya ikut pilihan satuan besar ("per dus").
   Di tabel laptop/desktop isian yang sama muncul di sel Tambah Masuk, di bawah angkanya, juga
   setelah Tambah masuk diisi (sejak 19 Oktober 2026; sebelumnya kolom sendiri). Titik di antara
   kelompok tiga angka dibaca pemisah ribuan ("16.000" = 16000). Galat: "Periksa harga beli Tomat.
   Isi rupiah, misalnya 15000 atau 15.000."
+- **Pesanan menunggu** (21 Oktober 2026, semua role, hanya untuk tanggal hari ini): kartu di bawah
+  kotak info, berjudul "Pesanan menunggu", dengan keterangan "Barang dari pesanan ini belum dicatat
+  datang. Saat barangnya datang, ketuk Isi dari pesanan, periksa jumlahnya, lalu Kirim stock." Tiap
+  pesanan: nama pemasok, item dan jumlahnya ("Tomat 5 kg, Air mineral 3 dus"), "Dipesan Budi lewat
+  WhatsApp, 21 Okt" (ditambah "(kemarin)" atau "(3 hari lalu)"), tanda Menunggu kirim jika itemnya
+  sudah ada di isian yang menunggu kirim, lalu tombol kedua "Isi dari pesanan" dan, untuk Pengelola,
+  "Tutup pesanan" (konfirmasi). Nama tombol untuk pembaca layar memuat pemasok, tanggal, dan itemnya
+  ("Isi dari pesanan Sumber Segar, 21 Okt: Tomat 5 kg"). Sesudah diisi, form pindah ke Semua kategori
+  jika ada item pesanan di kategori lain, pencarian dikosongkan, pemasok terpilih, kolom pertama yang
+  diisi mendapat fokus, dan kartu menulis "Tambah masuk Tomat dan Air mineral diisi dari pesanan Sumber
+  Segar. Periksa jumlah yang datang, lalu Kirim stock." (ditambah "Dilewati: …" untuk item yang sudah
+  diisi, menunggu kirim, tidak ada di form, atau berubah satuan). Form yang sudah berisi Tambah masuk
+  dari pemasok lain: form pindah ke Semua kategori dengan pencarian kosong, dan kartu menulis "Form ini
+  sudah berisi Tambah masuk Telur (Protein) tanpa pemasok. Kirim atau kosongkan dulu, supaya barang itu
+  tidak tercatat dari Sumber Segar." (atau "… dari Toko Ayam Jaya. Kirim atau kosongkan dulu, supaya
+  barang dari Sumber Segar tidak tercatat dari Toko Ayam Jaya."). Sesudah kiriman: "Pesanan Tomat dan
+  Air mineral dari Sumber Segar tercatat datang." Barang dari pesanan yang ternyata sudah dicatat datang
+  (misalnya dari HP lain): "Tambah masuk Tomat tidak dicatat: pesanan Sumber Segar sudah dicatat datang
+  oleh Rina, 22 Okt 07.10. Jika ini kiriman lain, catat lagi Tambah masuk-nya tanpa Isi dari pesanan."
+  (juga di pesan antrean). Tutup pesanan dari kartu ini mengosongkan Tambah masuk yang diisi dari
+  pesanan itu (konfirmasi dan pesan singkat menyebutnya: "Pesanan Sumber Segar ditutup. Tambah masuk
+  Tomat dikosongkan.").
 - **Baik sampai** (19 Oktober 2026, hanya item yang punya masa simpan): di kartu HP/tablet, kolom
   "Baik sampai" (pemilih tanggal bawaan browser) muncul di bawah harga beli setelah Tambah masuk
   diisi, sudah terisi tanggal + masa simpan, dengan keterangan "Masa simpan 3 hari. Boleh diubah."
@@ -1110,13 +1135,44 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.9 Daftar belanja (Pengelola)
 
-- Daftar item di bawah stok minimum, dikelompokkan per kategori. Tiap baris: nama item,
-  stock sekarang, stok minimum, dan kolom "Order" yang sudah terisi saran.
+- Daftar item di bawah stok minimum, dikelompokkan **per pemasok** (21 Oktober 2026; spesifikasi
+  sistem Bagian 9.2). Tiap kelompok berjudul nama pemasok (h3) dengan "Kontak …" di bawahnya;
+  kelompok "Belum ada pemasok" paling bawah, dengan keterangan "Item yang belum punya pemasok aktif
+  dari barang masuk. Isi Order untuk yang dipesan, lalu pilih pemasoknya." dan `<select>` "Pesan ke"
+  ("Tanpa pemasok (tidak dicatat)" dan pemasok aktif). Tiap baris: nama item, stock sekarang, stok
+  minimum, saran, dan kolom "Order". Item yang sudah dipesan memakai tanda Menunggu "Dipesan 5 kg"
+  ditambah "dari Sumber Segar, 21 Okt"; item yang pemasok terakhirnya nonaktif ditulis "Terakhir
+  dari Toko Lama (nonaktif)".
+- Order terisi saran, kecuali untuk item yang sudah dipesan dan item di "Belum ada pemasok" (kosong).
+  Keterangan Order kosong: "Kosong: tidak ikut dipesan." atau "Kosong: sudah dipesan, tidak ikut
+  dipesan lagi."
 - Saran yang dibulatkan ke satuan besar ditulis lengkap: "2 dus (24 botol)".
-- Angka Order bisa diubah sebelum diunduh. Di bawah daftar: "Perubahan di sini hanya untuk
-  cetakan."
-- Tombol utama "Unduh PDF". Jika tidak ada item di bawah minimum: "Semua stock di atas
-  batas minimum."
+- Di bawah tiap kelompok: tombol kedua **"Kirim ke WhatsApp"** (tautan yang membuka WhatsApp di tab
+  atau aplikasi baru) dan keterangan "Pesan berisi 2 item." ditambah, bila perlu, "Kontak Toko Ayam
+  Jaya belum berisi nomor HP, jadi WhatsApp meminta memilih kontak." atau "Tanpa pemasok, pesanannya
+  tidak dicatat dan WhatsApp meminta memilih kontak." Tanpa Order yang berisi, tombol tampak nonaktif
+  dan ketukannya menulis "Isi Order minimal untuk satu item." Isi pesan: "Halo Sumber Segar, kami dari
+  Dapur Lokadhana mau pesan:" lalu satu baris "- Tomat 5 kg" per item, lalu "Terima kasih."
+- Ketukan dan klik tengah (tab baru di laptop) sama-sama mencatat. Sesudahnya: "Mencatat pesanan…", lalu
+  di atas kartu (yang mendapat fokus) "Pesanan ke Sumber Segar dicatat (2 item)." (ditambah "Pesanan
+  Tomat sebelumnya (Toko Ayam Jaya, 20 Okt) diganti.", "Tomat sudah tercatat datang.", dan "Tomat tidak
+  dicatat sebagai pesanan menunggu: sudah ada pesanan lebih baru ke Toko Ayam Jaya (Sari, 22 Okt)."
+  bila ada). Tanpa sinyal: "Pesanan tersimpan di HP dan dicatat saat ada sinyal."; sesudah terkirim
+  dari antrean, kartu diperbarui sendiri (juga saat aplikasi dibuka lagi, misalnya kembali dari
+  WhatsApp). Ditolak server: "WhatsApp dibuka, tetapi pesanan tidak dicatat: …".
+- Di atas kelompok, jika ada: "Pesanan belum datang" (h3), satu baris per pesanan (pemasok, item dan
+  jumlahnya, "Dipesan Budi lewat WhatsApp, 21 Okt (kemarin)") dengan tombol kedua "Tutup pesanan"
+  (konfirmasi "Tutup pesanan Sumber Segar, 21 Okt?"; lalu "Pesanan Sumber Segar, 21 Okt ditutup.", atau
+  jika barangnya sudah dicatat datang di HP lain "Pesanan Sumber Segar sudah tidak menunggu: barangnya
+  sudah dicatat datang, atau pesanannya sudah ditutup."). Nama tombol untuk pembaca layar memuat
+  tanggal dan itemnya.
+- Di bawah daftar: "Angka Order dipakai untuk pesan WhatsApp dan PDF, dan tidak disimpan. Ketukan
+  Kirim ke WhatsApp mencatat pesanan ke pemasok itu; jika pesannya tidak jadi dikirim, ketuk Tutup
+  pesanan."
+- Tombol utama tetap satu: "Unduh PDF". Jika tidak ada item di bawah minimum: "Semua stock di atas
+  batas minimum." (pesanan yang belum datang tetap tampil di bawahnya).
+- Server lama (sebelum Code.gs v0.29): per kategori seperti dulu, tanpa WhatsApp, dengan "Perubahan
+  di sini hanya untuk cetakan."
 
 ### 5.10 HPP dan food cost (Pengelola)
 
@@ -1295,6 +1351,8 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Stock semua kategori | "3 kategori terkirim.", "1 kategori tersimpan di HP. Dikirim saat ada sinyal.", galat "Bumbu: …" |
 | Hitung sisa | "Sisa sekarang", "Keluar 9 kg.", "Sisa Ayam fillet 12 kg tidak dicatat: lebih banyak dari stock tercatat 10 kg. Periksa hitungannya, atau minta Pengelola meluruskan stock.", "Hitung sisa hanya untuk hari ini." |
 | Cari item | "3 dari 11 item tampil.", "Tidak ada item dengan nama itu." |
+| Pesanan ke pemasok | "Kirim ke WhatsApp", "Pesanan ke Sumber Segar dicatat (2 item).", "Pesanan tersimpan di HP dan dicatat saat ada sinyal.", "Dipesan Budi lewat WhatsApp, 21 Okt", "Tutup pesanan", "Pesanan Sumber Segar, 21 Okt ditutup.", "Pesanan Sumber Segar sudah tidak menunggu: barangnya sudah dicatat datang, atau pesanannya sudah ditutup." |
+| Isi dari pesanan | "Isi dari pesanan", "Tambah masuk Tomat diisi dari pesanan Sumber Segar. Periksa jumlah yang datang, lalu Kirim stock.", "Pesanan Tomat dari Sumber Segar tercatat datang.", "Tambah masuk Tomat tidak dicatat: pesanan Sumber Segar sudah dicatat datang oleh Rina, 22 Okt 07.10. Jika ini kiriman lain, catat lagi Tambah masuk-nya tanpa Isi dari pesanan." |
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
 | Menu tersimpan | "Menu tersimpan." |
 | Penjualan tersimpan | "Penjualan 16 Okt tersimpan." |

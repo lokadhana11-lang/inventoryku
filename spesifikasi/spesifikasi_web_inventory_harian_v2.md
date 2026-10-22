@@ -63,6 +63,10 @@
 > Diperbarui 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock bisa diisi untuk
 > semua kategori sekaligus (tetap dikirim satu kiriman per kategori), punya kotak cari item, dan
 > pemakaian boleh dicatat dengan menghitung sisa; Stock Keluar dihitung server (Bagian 5.5).
+> Diperbarui 21 Oktober 2026 (keputusan pemilik, dari telaah aplikasi): daftar belanja per pemasok
+> dengan "Kirim ke WhatsApp". Pesanan yang dikirim lewat WhatsApp tercatat (`Data_Pesanan`), dan form
+> Stock semua orang menampilkan pesanan yang belum datang untuk mengisi Tambah masuk (Bagian 5.0, 5.5,
+> 7.1, 8.2, 9.2, 10, 11, 12).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -388,8 +392,9 @@ Apps Script (menempel di Google Sheet yang sama)
 - **Satu sheet data per form:** `Data_Suhu`, `Data_Prep`, `Data_Waste`, `Data_Stock`,
   dan satu sheet untuk tiap form kustom (Bagian 5.6).
 - **Sheet pendukung:** `Data_PrepBahan` (bahan yang terpakai tiap prep), `Stock_Harian`
-  (rekap stock per tanggal dan item), `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, dan
-  `Data_Penjualan` (penjualan harian, Bagian 5.9).
+  (rekap stock per tanggal dan item), `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`,
+  `Data_Penjualan` dan `Data_PenjualanMenu` (penjualan harian, Bagian 5.9), dan `Data_Pesanan`
+  (pesanan ke pemasok, Bagian 9.2).
 - **Outlet terisi otomatis.** Karena hanya ada satu outlet, staff tidak memilihnya. Nama
   outlet tetap tampil di form dan laporan, dan tetap disimpan di setiap baris data.
 - **Semua pilihan memakai dropdown dari master data.** Teks bebas membuat "Ayam Fillet" dan
@@ -663,7 +668,7 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
 | Stock Masuk | Number | Barang datang. Boleh diketik dalam satuan besar jika item punya (Bagian 5.1). |
 | Stock Keluar | Number | Pemakaian langsung yang diketik, **di luar** prep dan waste; atau (Hitung sisa) semua yang berkurang selain prep dan waste yang sudah tercatat, termasuk susut dan barang hilang. |
 | Sisa | Number, pilihan | Hitung sisa (20 Oktober 2026): jumlah yang ada sekarang, menggantikan Stock Keluar untuk baris itu. Disimpan di kolom `Sisa Dihitung`; Stock Keluar baris itu dihitung darinya. |
-| Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. |
+| Pemasok | Dropdown, tidak wajib | Header (18 Oktober 2026), dari `M_Pemasok` yang aktif. Disimpan di baris yang punya Stock Masuk. Sejak 21 Oktober 2026 pilihannya kembali kosong sesudah kiriman, jika tidak ada lagi Tambah masuk di form. |
 | Harga Beli | Rupiah, tidak wajib | Per baris yang punya Stock Masuk (18 Oktober 2026): harga per satuan yang diketik (per dus jika masuk dalam satuan besar), disimpan per satuan dasar di kolom `Harga Beli (Rp)`. |
 | Baik Sampai | Tanggal, otomatis | Per baris yang punya Stock Masuk, hanya untuk item yang punya masa simpan (19 Oktober 2026): tanggal masuk + masa simpan item, boleh diubah (tidak sebelum tanggal masuk, paling lama 365 hari sesudahnya). |
 
@@ -674,6 +679,28 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
   tanggal beli, lewat riwayat harga Bagian 5.1) atau "Abaikan" (disembunyikan sampai pembelian
   berikutnya). Pengelola bisa mengoreksi harga beli lewat Riwayat (Bagian 6.3); pemasok kiriman
   tidak bisa dikoreksi. Nama pemasok hanya bisa diganti selama belum tercatat di barang masuk.
+- **Pesanan menunggu** (21 Oktober 2026, semua role, hanya untuk tanggal hari ini): pesanan ke
+  pemasok yang dicatat dari Daftar belanja (Bagian 9.2) dan belum datang tampil di form Stock (pemasok
+  aktif, paling lama 14 hari). "Isi dari pesanan" mengisi Tambah masuk dengan jumlah pesanan (satuan
+  besar jika dipesan dalam satuan besar) dan memilih pemasoknya; staff lalu membetulkan jumlah yang
+  benar-benar datang. Item yang Tambah masuk-nya sudah diketik, sudah menunggu kirim di HP itu, sudah
+  tidak aktif, atau satuannya berubah dilewati. Ditolak jika form sudah berisi Tambah masuk dari
+  pemasok lain atau tanpa pemasok; pesannya menyebut item itu, dan form pindah ke Semua kategori
+  supaya item itu terlihat. Pengelola juga bisa menutup pesanan dari kartu ini; Tambah masuk yang
+  diisi dari pesanan itu ikut dikosongkan.
+  - Barang masuk menyelesaikan pesanan menunggu item itu ("Datang"): yang diisi dari pesanan
+    menyelesaikan pesanan itu; selain itu pesanan menunggu paling lama dengan pemasok yang sama, atau
+    pemasok mana pun jika kiriman tanpa pemasok, dengan tanggal pesanan tidak sesudah tanggal kiriman
+    dan diketuk sebelum barang itu dicatat di HP (kiriman dari antrean bisa sampai jauh sesudahnya).
+    Jumlah yang datang tidak dibandingkan dengan jumlah pesanan. Koreksi kiriman sesudahnya tidak
+    membuka pesanan lagi.
+  - Kiriman tidak pernah ditolak karena pesanannya, supaya kiriman yang menunggu di antrean HP selalu
+    bisa terkirim. Barang yang diisi dari pesanan yang ternyata sudah dicatat datang (misalnya dari
+    HP lain): Tambah masuk baris itu tidak dicatat, supaya tidak masuk dua kali, dan aplikasi
+    menyebutnya; baris lain kiriman itu tetap tercatat. Pesanan yang sudah ditutup, atau diganti
+    pesanan ke pemasok lain: barangnya dicatat masuk seperti biasa. Pesanan yang diganti pesanan baru
+    dari pemasok yang sama: pesanan baru itu yang dipakai. Mengosongkan Tambah masuk lalu meninggalkan
+    kolomnya melepas tautannya (diketik lagi = kiriman lain); membetulkan angkanya tidak.
 - **Hitung sisa** (20 Oktober 2026, semua role, pilihan per pengguna "Catat pemakaian: Tambah
   keluar / Hitung sisa", **hanya untuk tanggal hari ini**): staff mengetik jumlah yang ada
   sekarang. Server menghitung Stock Keluar = Stock Akhir tercatat pada tanggal itu **saat kiriman
@@ -1099,9 +1126,11 @@ misalnya "2 dari 3 isian diperiksa".
 | Memeriksa/mengesahkan data ("Diperiksa oleh") | Tidak | Ya |
 | Menandai form "Tidak ada hari ini" (nihil) | Ya | Ya |
 | Melihat daftar lewat masa simpan dan mencatatnya sebagai waste | Ya | Ya |
+| Melihat pesanan ke pemasok yang belum datang dan mengisi Tambah masuk darinya (form Stock) | Ya | Ya |
 | Mengoreksi data | Tidak | Ya |
 | Penyesuaian stock dan stock opname | Tidak | Ya |
-| Melihat daftar belanja, nilai rupiah stock, dan rekap bulanan | Tidak | Ya |
+| Melihat daftar belanja, mengirim pesanan ke pemasok lewat WhatsApp, dan menutup pesanan | Tidak | Ya |
+| Melihat nilai rupiah stock dan rekap bulanan | Tidak | Ya |
 | Melihat dashboard di aplikasi dan membuka dashboard di Google Sheets | Tidak | Ya |
 | Membuat, mengubah, menyembunyikan, dan menghapus form (Pengaturan → Form) | Tidak | Ya |
 | Mengganti nama outlet | Tidak | Ya |
@@ -1215,7 +1244,7 @@ ke file ini (Bagian 7.3).
 | 1 | `Dashboard` | Ringkasan dan grafik | Rumus |
 | 2 | `Harian_Stock`, `Harian_Suhu`, `Harian_Prep`, `Harian_Waste` | Tampilan satu hari, tata letaknya sama dengan form | Rumus |
 | 3 | `Stock_Harian` | Rekap stock, satu baris per tanggal dan item | Aplikasi (dihitung server) |
-| 3 | `Data_Stock`, `Data_Suhu`, `Data_Prep`, `Data_PrepBahan`, `Data_Waste`, `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, `Data_Penjualan`, dan `Data_K_...` untuk tiap form kustom | Data lengkap, satu baris per item | Aplikasi |
+| 3 | `Data_Stock`, `Data_Suhu`, `Data_Prep`, `Data_PrepBahan`, `Data_Waste`, `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, `Data_Penjualan`, `Data_PenjualanMenu`, `Data_Pesanan`, dan `Data_K_...` untuk tiap form kustom | Data lengkap, satu baris per item | Aplikasi |
 | 4 | `M_Outlet`, `M_Unit`, `M_Staff`, `M_Item`, `M_HargaItem`, `M_Resep`, `M_ResepBahan`, `M_Menu`, `M_MenuBahan`, `M_Kategori`, `M_Satuan`, `M_Form`, `M_FormKolom`, `M_Konfigurasi` | Master data dan definisi form | Aplikasi (Pengaturan) |
 | 5 | `Log_Perubahan` | Jejak koreksi | Aplikasi |
 
@@ -1410,16 +1439,42 @@ Unduh PDF tidak memakai link Drive, karena staff tidak punya akses ke folder Dri
 
 ### 9.2 Daftar belanja (Pengelola)
 
-- Berisi semua item aktif yang Stock Akhir-nya di bawah Stok Minimum, dikelompokkan per kategori.
+- Berisi semua item aktif yang Stock Akhir-nya di bawah Stok Minimum, dikelompokkan **per pemasok**
+  (21 Oktober 2026, keputusan pemilik): pemasok pesanan item itu yang masih menunggu, lalu pemasok
+  barang masuk terakhirnya (Bagian 5.5). Item tanpa keduanya, atau yang pemasoknya sudah nonaktif,
+  masuk kelompok "Belum ada pemasok". Di tiap kelompok item urut kategori, lalu nama.
 - Tiap baris: nama item, stock sekarang, stok minimum, dan **saran order**.
 - Saran order = Stok Maksimum − Stock Akhir. Jika item punya satuan besar, saran
   dibulatkan ke atas ke satuan besar, misalnya butuh 20 botol menjadi 2 dus.
 - Jika Stok Maksimum kosong, item tetap masuk daftar tanpa saran jumlah.
-- Pengelola boleh mengubah jumlah di layar sebelum mengunduh. Perubahan itu hanya untuk
-  cetakan dan tidak disimpan.
-- Bisa diunduh sebagai PDF dari menu Laporan. Ringkasannya ikut di email harian.
-- Daftar ini hanya saran. Aplikasi tidak memesan apa pun. Pemasok dan harga beli dicatat saat
-  barang datang (Bagian 5.5), bukan saat memesan.
+- Kolom Order terisi saran, **kecuali** untuk item yang sudah dipesan dan belum datang, dan untuk
+  item di kelompok "Belum ada pemasok": keduanya kosong sampai diisi, supaya tidak terpesan dua kali
+  atau ke pemasok yang salah. Pengelola boleh mengubah jumlah di layar; perubahan itu tidak disimpan.
+- **Kirim ke WhatsApp** per kelompok: membuka chat WhatsApp ke nomor di Kontak pemasok (atau WhatsApp
+  meminta memilih kontak jika Kontak tidak berisi nomor HP) dengan pesan berisi item yang Order-nya
+  diisi. Kelompok "Belum ada pemasok" memilih pemasok di "Pesan ke"; tanpa pilihan, pesan tetap
+  dibuka tetapi pesanannya tidak dicatat.
+- **Pesanan tercatat:** ketukan itu juga mencatat pesanan di `Data_Pesanan` (satu baris per item:
+  Tanggal, Pemasok, Nama Item, Kategori, Jumlah dan Satuan Order, Jumlah Dasar dan Satuan, Keadaan
+  Menunggu/Datang/Diganti/Ditutup, Selesai Oleh, Selesai Pada, Kiriman Stock, dan kolom sistem). Tiap
+  item paling banyak punya satu pesanan menunggu: memesan lagi item yang masih menunggu mengganti
+  pesanan lamanya (Diganti). Pesanan dicatat di antrean HP lebih dulu, jadi tetap tercatat walau
+  sinyal putus atau aplikasi tertutup saat WhatsApp terbuka. Yang dibandingkan adalah waktu tombol
+  diketuk di HP: barang yang dicatat masuk di HP sejak tombol diketuk (dan belum menyelesaikan
+  pesanan lain) langsung dianggap datang, dan pesanan yang sudah didahului pesanan menunggu yang
+  diketuk sesudahnya tidak menggantikannya. Aplikasi tidak memeriksa apakah pesan WhatsApp benar
+  terkirim: ketukan itulah yang mencatat, jadi pesanan yang tidak jadi dikirim ditutup lewat "Tutup
+  pesanan".
+- **Pesanan belum datang:** daftar semua pesanan yang masih menunggu (umur berapa pun), dengan "Tutup
+  pesanan" untuk pesanan yang tidak dikirim pemasok atau sudah dicatat tanpa pesanan. Pesanan selesai
+  sendiri saat barangnya dicatat masuk (Bagian 5.5). Ganti nama item atau pemasok ikut mengganti nama
+  di `Data_Pesanan`; menghapus item menutup pesanannya yang masih menunggu.
+- Bisa diunduh sebagai PDF dari menu Laporan, dikelompokkan per pemasok dengan Order seperti di layar;
+  Order yang kosong dicetak "–" dengan sebabnya (sudah dipesan, belum ada pemasok) dan sarannya.
+  Ringkasannya dan pesanan yang belum datang ikut di email harian.
+- Nomor WhatsApp diambil dari Kontak pemasok; jika Kontak berisi beberapa nomor, nomor HP didahulukan.
+- Daftar ini hanya saran; tidak ada persetujuan pembelian atau PO. Harga beli dicatat saat barang
+  datang (Bagian 5.5), bukan saat memesan.
 
 ### 9.3 Rekap bulanan PDF (Pengelola)
 
@@ -1483,6 +1538,7 @@ Keterangan di bawah ini untuk laporan harian.
   - Kejadian suhu di luar standar hari itu, beserta tindakan korektifnya
   - Total waste hari itu (qty dan estimasi Rp)
   - Ringkasan daftar belanja: item di bawah stok minimum dan saran ordernya
+  - Pesanan ke pemasok yang belum datang (21 Oktober 2026)
   - Item dengan Stock Akhir minus
   - Barang jadi dan barang masuk yang lewat masa simpan atau habis besok
   - Jumlah data yang belum diperiksa, baris yang dilaporkan keliru, dan permintaan reset PIN
@@ -1561,8 +1617,9 @@ Tampilan (warna, huruf, tata letak per perangkat, layar, teks antarmuka) diatur 
 - **Unduh PDF di iPhone dan iPad** memakai lembar bagikan, bukan unduhan biasa
   (Bagian 9.1).
 
-**Yang tetap butuh sinyal:** login, Lupa PIN, Riwayat, unduh PDF, dashboard, daftar
-belanja, menyimpan stock opname, halaman Pengaturan, dan pemeriksaan data.
+**Yang tetap butuh sinyal:** login, Lupa PIN, Riwayat, unduh PDF, dashboard, membuka daftar
+belanja dan menutup pesanan, menyimpan stock opname, halaman Pengaturan, dan pemeriksaan data.
+Pesanan yang dikirim lewat WhatsApp tanpa sinyal menunggu di antrean HP seperti isian lain.
 
 ---
 
@@ -1580,6 +1637,9 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 - [ ] **Hasil prep mengikuti resep, kecuali hasil aktual diisi** (Bagian 5.3, 18 Oktober 2026);
       jika hasil nyata sering berbeda, Pengelola memperbaiki angka di Master Resep.
 - [ ] **Harga barang jadi** yang dikosongkan dihitung dari harga bahan resepnya.
+- [ ] **Pesanan selesai saat barang dicatat masuk** dengan pemasok yang sama atau tanpa pemasok
+      (21 Oktober 2026), berapa pun jumlah yang datang. Barang dari pemasok lain tidak
+      menyelesaikannya. Pesanan yang tidak datang ditutup Pengelola.
 - [x] **Harga item punya riwayat** (keputusan pemilik, 11 Oktober 2026). Nilai stock pada
       suatu tanggal memakai harga yang berlaku pada tanggal itu, bukan harga saat barang dibeli
       (tanpa FIFO atau rata-rata). Gerakan dinilai dengan harga hari gerakannya, dan selisih

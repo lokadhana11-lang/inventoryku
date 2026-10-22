@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.28.0';
+  var VERSI_APLIKASI = '0.29.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -3050,6 +3050,47 @@
     }).join(' ') + ' Periksa hitungannya, atau minta Pengelola meluruskan stock.';
   }
 
+  /** Pesanan yang selesai karena kiriman Stock (Code.gs v0.29): "Pesanan Tomat dan Selada dari Sumber Segar tercatat datang." */
+  function teksPesananDatang(daftar) {
+    if (!daftar || !daftar.length) return '';
+    var per = {};
+    var urut = [];
+    daftar.forEach(function (x) {
+      if (!per[x.pemasok]) {
+        per[x.pemasok] = [];
+        urut.push(x.pemasok);
+      }
+      per[x.pemasok].push(x.item);
+    });
+    return urut.map(function (p) { return 'Pesanan ' + daftarNama(per[p]) + ' dari ' + p + ' tercatat datang.'; }).join(' ');
+  }
+
+  /**
+   * Barang masuk dari pesanan yang sudah dicatat datang (Code.gs v0.29): server tidak mencatat Tambah masuk-nya lagi,
+   * supaya barang yang sama (diisi dari dua HP) tidak masuk dua kali. Baris lain kiriman itu tetap tercatat.
+   */
+  function teksPesananSudahDatang(daftar) {
+    if (!daftar || !daftar.length) return '';
+    return daftar.map(function (x) {
+      return 'Tambah masuk ' + x.item + ' tidak dicatat: pesanan ' + x.pemasok + ' sudah dicatat datang' +
+        (x.oleh ? ' oleh ' + x.oleh : '') + (x.waktu ? ', ' + waktuPendek(x.waktu) : '') + '.';
+    }).join(' ') + ' Jika ini kiriman lain, catat lagi Tambah masuk-nya tanpa Isi dari pesanan.';
+  }
+
+  /** Keterangan jawaban catatPesanan: pesanan yang diganti, yang barangnya sudah datang, dan yang kalah dari pesanan lebih baru. */
+  function teksCatatPesanan(h) {
+    var bagian = [];
+    ((h && h.diganti) || []).forEach(function (x) {
+      bagian.push('Pesanan ' + x.item + ' sebelumnya (' + x.pemasok + ', ' + tanggalPendek(x.tanggal) + ') diganti.');
+    });
+    if (h && h.sudahDatang && h.sudahDatang.length) bagian.push(daftarNama(h.sudahDatang) + ' sudah tercatat datang.');
+    ((h && h.lebihBaru) || []).forEach(function (x) {
+      bagian.push(x.item + ' tidak dicatat sebagai pesanan menunggu: sudah ada pesanan lebih baru ke ' + x.pemasok + ' (' + x.oleh +
+        ', ' + tanggalPendek(x.tanggal) + ').');
+    });
+    return bagian.join(' ');
+  }
+
   /** "Tomat", "Tomat dan Selada", "Tomat, Selada, dan Wortel". */
   function daftarNama(nama) {
     if (nama.length < 3) return nama.join(' dan ');
@@ -3145,6 +3186,14 @@
           if (pf) pesanFoto.push(pf);
           var ps = teksSisaLebih(hasil && hasil.sisaLebih);
           if (ps) pesanFoto.push(ps);
+          var pd = teksPesananDatang(hasil && hasil.pesananDatang);
+          if (pd) pesanFoto.push(pd);
+          var psd = teksPesananSudahDatang(hasil && hasil.pesananSudahDatang);
+          if (psd) pesanFoto.push(psd);
+          if (e.aksi === 'catatPesanan') {
+            var pc = teksCatatPesanan(hasil);
+            if (pc) pesanFoto.push(pc);
+          }
         }, function (err) {
           if (err && (err.jaringan || err.sesiBerakhir)) {
             berhenti = err;
@@ -3375,6 +3424,9 @@
       pemasok: d.pemasok,
       masaSimpanSiap: d.masaSimpanSiap,
       sisaSiap: d.sisaSiap,
+      // Pesanan dari data tanggal lain tidak dipakai (bisa sudah datang).
+      pesananSiap: d.pesananSiap,
+      pesanan: [],
       turunan: true
     };
   }
@@ -3433,6 +3485,9 @@
     var kolomPemasok = el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'pilih-pemasok', text: 'Pemasok (tidak wajib)' }),
       pilihPemasok, bantuanPemasok]);
     kolomPemasok.hidden = true;
+    // Pesanan ke pemasok yang belum datang (aplikasi 0.29.0): hanya untuk hari ini.
+    var wadahPesanan = el('div');
+    var pesanPesanan = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite' });
 
     // Tanggal: Hari ini / Kemarin, Pengelola punya "Tanggal lain".
     var pilihan = ['Hari ini', 'Kemarin'].concat(pengelola ? ['Tanggal lain'] : []);
@@ -3469,6 +3524,7 @@
       el('h1', { class: 'judul-layar', text: 'Stock Inventory' }),
       catatanDraft,
       kotakInfo,
+      wadahPesanan,
       wadahItem,
       pesan,
       el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
@@ -3716,6 +3772,14 @@
         perbarui();
       }
       inMasuk.addEventListener('input', function () { ubah('masuk', inMasuk.value); });
+      // Tambah masuk yang ditinggalkan kosong tidak lagi bertautan ke pesanan (diketik lagi = kiriman lain). Saat angkanya
+      // dibetulkan (dihapus lalu diketik lagi tanpa meninggalkan kolom), tautannya tetap.
+      inMasuk.addEventListener('change', function () {
+        if (!String(inMasuk.value || '').trim() && isian.pesanan) {
+          delete isian.pesanan;
+          simpanDraft();
+        }
+      });
       inKeluar.addEventListener('input', function () { ubah(sisaMode ? 'sisa' : 'keluar', inKeluar.value); });
       if (inHarga) inHarga.addEventListener('input', function () { ubah('harga', inHarga.value); });
       if (inBaik) {
@@ -3902,6 +3966,7 @@
       gambarCara();
       gambarPemasok();
       gambarStatus();
+      gambarPesanan();
       gambarItem();
       if (pesanAwal) {
         tulisPesan(pesan, pesanAwal, 'info');
@@ -3987,6 +4052,177 @@
       simpanDraft();
     });
 
+    /** Id pesanan per item yang sudah ada di kiriman Stock yang menunggu kirim di HP ini: { 'id|item': true }. */
+    function pesananDiAntrean() {
+      var hasil = {};
+      antreanForm('STOCK').forEach(function (e) {
+        ((e.isi && e.isi.baris) || []).forEach(function (b) {
+          if (b.pesanan) hasil[b.pesanan + '|' + String(b.item).toLowerCase()] = true;
+        });
+      });
+      return hasil;
+    }
+
+    function adaMasukDiDraft() {
+      return Object.keys(draft.isian).some(function (kat) {
+        return Object.keys(draft.isian[kat]).some(function (n) { return String(draft.isian[kat][n].masuk || '').trim() !== ''; });
+      });
+    }
+
+    /** Kartu "Pesanan menunggu": hanya untuk hari ini, dari server yang sudah mengirim `pesanan` (Code.gs v0.29). */
+    function gambarPesanan() {
+      kosongkan(wadahPesanan);
+      tulisPesan(pesanPesanan, '');
+      if (!data || tanggal !== hariIni || !data.pembelianSiap || !Array.isArray(data.pesanan) || !data.pesanan.length) return;
+      var antre = pesananDiAntrean();
+      wadahPesanan.appendChild(el('section', { class: 'kartu pesanan-stock', 'aria-labelledby': 'judul-pesanan-stock' }, [
+        el('h2', { class: 'kartu-judul', id: 'judul-pesanan-stock', text: 'Pesanan menunggu' }),
+        el('p', { class: 'kolom-bantuan', text: 'Barang dari pesanan ini belum dicatat datang. Saat barangnya datang, ketuk Isi dari pesanan, ' +
+          'periksa jumlahnya, lalu Kirim stock.' }),
+        el('ul', { class: 'daftar' }, data.pesanan.map(function (p) {
+          var menungguKirim = p.item.filter(function (x) { return antre[p.id + '|' + x.nama.toLowerCase()]; }).length;
+          return el('li', { class: 'baris-tetap' }, [
+            el('span', { class: 'baris-tetap-teks daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: p.pemasok }),
+              el('span', { class: 'daftar-baris-ket', text: teksItemPesanan(p.item) }),
+              el('span', { class: 'daftar-baris-ket', text: teksDipesan(p) }),
+              menungguKirim ? el('span', { class: 'daftar-baris-ket' }, tandaStatus('menunggu', menungguKirim + ' item sudah di isian yang menunggu kirim')) : null
+            ]),
+            el('span', { class: 'deret-tombol' }, [
+              tombol('Isi dari pesanan', 'kedua', { 'aria-label': 'Isi dari pesanan ' + namaPesanan(p), onclick: function () { isiDariPesanan(p); } }),
+              pengelola ? tombol('Tutup pesanan', 'kedua', { 'aria-label': 'Tutup pesanan ' + namaPesanan(p), onclick: function () { tutupPesanan(p); } }) : null
+            ])
+          ]);
+        })),
+        pesanPesanan
+      ]));
+    }
+
+    /**
+     * Isi Tambah masuk dari pesanan: jumlah pesanan (dalam satuan besar jika satuan ordernya satuan besar item sekarang),
+     * pemasok kiriman = pemasok pesanan, dan tautan ke pesanan (jika pesanan itu sudah dicatat datang, server tidak
+     * mencatat Tambah masuk-nya lagi dan menyebutnya di `pesananSudahDatang`).
+     * Item yang Tambah masuk-nya sudah diketik, sudah menunggu kirim, tidak ada di form, atau satuannya berubah dilewati.
+     */
+    /** Item yang Tambah masuk-nya sudah diketik di draft (semua kategori): [{ nama, kategori }]. */
+    function itemBermasuk() {
+      var hasil = [];
+      Object.keys(draft.isian).forEach(function (kat) {
+        Object.keys(draft.isian[kat]).forEach(function (n) {
+          if (String(draft.isian[kat][n].masuk || '').trim() !== '') hasil.push({ nama: n, kategori: kat });
+        });
+      });
+      return hasil;
+    }
+
+    function isiDariPesanan(p) {
+      tulisPesan(pesanPesanan, '');
+      var lain = itemBermasuk();
+      if (lain.length && draft.pemasok !== p.pemasok) {
+        // Tampilkan item yang menghalangi (semua kategori, tanpa pencarian), supaya bisa dikirim atau dikosongkan.
+        if (draft.kategori && lain.some(function (x) { return x.kategori !== draft.kategori; })) draft.kategori = '';
+        cari = '';
+        inCari.value = '';
+        simpanDraft();
+        pilihKategori.value = draft.kategori;
+        gambarItem();
+        var nama = daftarNama(lain.map(function (x) { return x.nama + (draft.kategori ? '' : ' (' + x.kategori + ')'); }));
+        tulisPesan(pesanPesanan, 'Form ini sudah berisi Tambah masuk ' + nama + (draft.pemasok ? ' dari ' + draft.pemasok : ' tanpa pemasok') +
+          '. Kirim atau kosongkan dulu, supaya ' + (draft.pemasok ? 'barang dari ' + p.pemasok + ' tidak tercatat dari ' + draft.pemasok
+            : 'barang itu tidak tercatat dari ' + p.pemasok) + '.', 'masalah');
+        return;
+      }
+      var antre = pesananDiAntrean();
+      var diisi = [];
+      var dilewati = [];
+      p.item.forEach(function (x) {
+        var it = (data.item || []).filter(function (i) { return i.nama.toLowerCase() === x.nama.toLowerCase(); })[0];
+        if (!it) {
+          dilewati.push(x.nama + ' (tidak ada di form)');
+          return;
+        }
+        if (antre[p.id + '|' + it.nama.toLowerCase()]) {
+          dilewati.push(it.nama + ' (sudah menunggu kirim)');
+          return;
+        }
+        var isian = isianItem(it);
+        if (String(isian.masuk || '').trim()) {
+          dilewati.push(it.nama + ' (sudah diisi)');
+          return;
+        }
+        var besar = !!(it.satuanBesar && it.isiSatuanBesar > 0) && x.satuanOrder === it.satuanBesar;
+        var jumlah = besar ? x.jumlah : (x.satuan === it.satuan ? x.dasar : null);
+        if (jumlah == null || !(jumlah > 0)) {
+          dilewati.push(it.nama + ' (satuannya sudah berubah)');
+          return;
+        }
+        isian.masuk = teksIsianAngka(jumlah);
+        isian.besar = besar;
+        isian.pesanan = p.id;
+        diisi.push(it);
+      });
+      if (!diisi.length) {
+        tulisPesan(pesanPesanan, 'Tidak ada item yang bisa diisi dari pesanan ini: ' + dilewati.join(', ') + '.', 'masalah');
+        return;
+      }
+      draft.pemasok = p.pemasok;
+      if (draft.kategori && diisi.some(function (it) { return it.kategori !== draft.kategori; })) draft.kategori = '';
+      cari = '';
+      inCari.value = '';
+      simpanDraft();
+      pilihKategori.value = draft.kategori;
+      gambarPemasok();
+      gambarItem();
+      tulisPesan(pesanPesanan, 'Tambah masuk ' + daftarNama(diisi.map(function (it) { return it.nama; })) + ' diisi dari pesanan ' + p.pemasok +
+        '. Periksa jumlah yang datang, lalu Kirim stock.' + (dilewati.length ? ' Dilewati: ' + dilewati.join(', ') + '.' : ''), 'info');
+      var kolom = wadahItem.querySelector('[data-kunci="' + (diisi[0].nama + '|masuk').replace(/"/g, '\\"') + '"]');
+      if (kolom) kolom.focus();
+    }
+
+    function tutupPesanan(p) {
+      if (navigator.onLine === false) {
+        tulisPesan(pesanPesanan, 'Tidak ada sinyal. Tutup pesanan saat ada sinyal.', 'masalah');
+        return;
+      }
+      var tertaut = [];
+      Object.keys(draft.isian).forEach(function (kat) {
+        Object.keys(draft.isian[kat]).forEach(function (n) { if (draft.isian[kat][n].pesanan === p.id) tertaut.push(n); });
+      });
+      konfirmasi({
+        judul: 'Tutup pesanan ' + p.pemasok + ', ' + tanggalPendek(p.tanggal) + '?',
+        teks: teksItemPesanan(p.item) + ' tidak ditunggu lagi.' +
+          (tertaut.length ? ' Tambah masuk ' + daftarNama(tertaut) + ' yang diisi dari pesanan ini dikosongkan.' : '') +
+          ' Barang yang datang tetap bisa dicatat seperti biasa.',
+        teksYa: 'Tutup pesanan',
+        teksProses: 'Menutup…',
+        jalankan: function () { return panggilApi('tutupPesanan', { id: p.id, tanggal: tanggal }); }
+      }).then(function (h) {
+        if (!h) return;
+        // Tambah masuk yang diisi dari pesanan ini dikosongkan: barangnya tidak ditunggu lagi.
+        Object.keys(draft.isian).forEach(function (kat) {
+          Object.keys(draft.isian[kat]).forEach(function (n) {
+            var x = draft.isian[kat][n];
+            if (x.pesanan !== p.id) return;
+            delete x.pesanan;
+            x.masuk = '';
+            x.besar = false;
+            x.harga = '';
+            x.baik = '';
+          });
+        });
+        if (tertaut.length && !adaMasukDiDraft()) draft.pemasok = '';
+        simpanDraft();
+        if (h.form) terapkanJawaban(h.form);
+        else gambarItem();
+        Cache.tulis('belanja', h.belanja);
+        toast(h.ditutup === 0
+          ? 'Pesanan ' + p.pemasok + ' sudah tidak menunggu (barangnya sudah dicatat datang, atau pesanannya sudah ditutup).'
+          : 'Pesanan ' + p.pemasok + ' ditutup.' + (tertaut.length ? ' Tambah masuk ' + daftarNama(tertaut) + ' dikosongkan.' : ''));
+        var berikut = wadahPesanan.querySelector('button') || pilihKategori;
+        if (berikut && document.activeElement === document.body) berikut.focus();
+      });
+    }
+
     function terapkanJawaban(form) {
       Cache.tulis('stock', form);
       if (form.tanggal === tanggal) gambar(form);
@@ -4051,6 +4287,8 @@
         }
         if (data.pembelianSiap && h.harga != null) b.hargaBeli = h.harga;
         if (data.masaSimpanSiap && h.baik) b.baikSampai = h.baik;
+        // Diisi dari pesanan (aplikasi 0.29.0): jika pesanan itu sudah dicatat datang dari HP lain, server tidak mencatat masuknya lagi.
+        if (masuk > 0 && isian.pesanan) b.pesanan = isian.pesanan;
         if (!perKategori[it.kategori]) {
           perKategori[it.kategori] = [];
           urutan.push(it.kategori);
@@ -4086,12 +4324,18 @@
       }
       if (navigator.onLine === false) {
         entri.forEach(keAntrean);
+        if (draft.pemasok && !adaMasukDiDraft()) {
+          draft.pemasok = '';
+          simpanDraft();
+        }
+        gambarPemasok();
         gambarStatus();
+        gambarPesanan();
         gambarItem();
         toast('Tersimpan di HP. Dikirim saat ada sinyal.');
         return;
       }
-      var hasil = { terkirim: 0, antre: 0, gagal: [], sisaLebih: [], form: null, sesi: null };
+      var hasil = { terkirim: 0, antre: 0, gagal: [], sisaLebih: [], datang: [], sudahDatang: [], form: null, sesi: null };
       function kirimDari(i) {
         if (i >= entri.length) return Promise.resolve();
         var e = entri[i];
@@ -4099,6 +4343,8 @@
           kosongkanKategori(e.kat);
           if (h.jumlah || h.sudahTerkirim) hasil.terkirim++;
           hasil.sisaLebih = hasil.sisaLebih.concat(h.sisaLebih || []);
+          hasil.datang = hasil.datang.concat(h.pesananDatang || []);
+          hasil.sudahDatang = hasil.sudahDatang.concat(h.pesananSudahDatang || []);
           hasil.form = h.form;
           return kirimDari(i + 1);
         }, function (err) {
@@ -4126,9 +4372,17 @@
           tanganiSesiBerakhir(hasil.sesi);
           return;
         }
+        // Pemasok berlaku per kiriman: setelah semua Tambah masuk terkirim atau masuk antrean, pilihannya kembali kosong
+        // supaya barang yang datang berikutnya tidak tercatat dari pemasok ini tanpa sengaja.
+        if (draft.pemasok && !adaMasukDiDraft()) {
+          draft.pemasok = '';
+          simpanDraft();
+        }
         if (hasil.form) terapkanJawaban(hasil.form);
         else {
+          gambarPemasok();
           gambarStatus();
+          gambarPesanan();
           gambarItem();
         }
         var bagian = [];
@@ -4137,7 +4391,9 @@
         if (bagian.length) toast(bagian.join(' '));
         var galat = hasil.gagal.map(function (g) { return (entri.length > 1 ? g.kat + ': ' : '') + g.pesan; });
         if (hasil.sisaLebih.length) galat.push(teksSisaLebih(hasil.sisaLebih));
-        if (galat.length) tulisPesan(pesan, galat.join(' '), 'masalah');
+        if (hasil.sudahDatang.length) galat.push(teksPesananSudahDatang(hasil.sudahDatang));
+        if (galat.length) tulisPesan(pesan, galat.concat(hasil.datang.length ? [teksPesananDatang(hasil.datang)] : []).join(' '), 'masalah');
+        else if (hasil.datang.length) tulisPesan(pesan, teksPesananDatang(hasil.datang), 'baik');
       });
     });
 
@@ -9668,27 +9924,93 @@
     return n == null ? '' : String(bulat3(n)).replace('.', ',');
   }
 
+  /** Selisih hari kalender dari a ke b ("yyyy-mm-dd"). */
+  function selisihHari(a, b) {
+    var pa = String(a).split('-');
+    var pb = String(b).split('-');
+    return Math.round((Date.UTC(Number(pb[0]), Number(pb[1]) - 1, Number(pb[2])) -
+      Date.UTC(Number(pa[0]), Number(pa[1]) - 1, Number(pa[2]))) / 864e5);
+  }
+
+  /** "Dipesan Budi lewat WhatsApp, 21 Okt", ditambah umurnya jika bukan hari ini. */
+  function teksDipesan(p) {
+    var lalu = selisihHari(p.tanggal, tanggalIso(new Date()));
+    return 'Dipesan ' + p.oleh + ' lewat WhatsApp, ' + tanggalPendek(p.tanggal) +
+      (lalu === 1 ? ' (kemarin)' : (lalu > 1 ? ' (' + lalu + ' hari lalu)' : ''));
+  }
+
+  /** Nama pesanan untuk pembaca layar: "Sumber Segar, 21 Okt: Tomat 5 kg, Air mineral 3 dus". */
+  function namaPesanan(p) {
+    return p.pemasok + ', ' + tanggalPendek(p.tanggal) + ': ' + teksItemPesanan(p.item);
+  }
+
+  /** "Tomat 5 kg, Air mineral 3 dus". */
+  function teksItemPesanan(item) {
+    return item.map(function (x) { return x.nama + ' ' + formatAngka(x.jumlah) + ' ' + x.satuanOrder; }).join(', ');
+  }
+
+  /** Isi pesan WhatsApp ke pemasok (tampilan Bagian 5.9). */
+  function pesanWhatsApp(pemasok, outlet, baris) {
+    return 'Halo' + (pemasok ? ' ' + pemasok : '') + ', kami' + (outlet ? ' dari ' + outlet : '') + ' mau pesan:\n' +
+      baris.map(function (b) { return '- ' + b.nama + ' ' + formatAngka(b.jumlah) + ' ' + b.satuanOrder; }).join('\n') +
+      '\nTerima kasih.';
+  }
+
+  /** Tautan klik-untuk-chat WhatsApp; tanpa nomor, WhatsApp meminta memilih kontak. */
+  function tautanWhatsApp(nomor, teks) {
+    return 'https://wa.me/' + (nomor || '') + '?text=' + encodeURIComponent(teks);
+  }
+
   /**
    * Kartu Daftar belanja di menu Laporan (Pengelola; tampilan Bagian 5.9):
-   * item di bawah stok minimum per kategori, kolom Order terisi saran (dalam
-   * satuan besar jika item punya), bisa diubah sebelum diunduh. Perubahan hanya
-   * untuk cetakan: disimpan di memori layar saja dan dikirim bersama permintaan PDF.
+   * item di bawah stok minimum, kolom Order terisi saran (dalam satuan besar
+   * jika item punya), bisa diubah di layar (hanya di memori). Sejak aplikasi
+   * 0.29.0 dikelompokkan per pemasok, dengan "Kirim ke WhatsApp" per kelompok
+   * (yang juga mencatat pesanan) dan daftar pesanan yang belum datang. Server
+   * lama (tanpa `pemasok`): per kategori seperti dulu.
    */
   function kartuDaftarBelanja() {
     var order = {};
+    // Isi pesanan → submissionId, supaya ketukan berulang dengan isi yang sama tidak mencatat dua pesanan.
+    var sidPesanan = {};
+    // Pesanan yang menunggu di antrean HP: id → nama item, supaya Order-nya kembali kosong setelah terkirim.
+    var diAntrean = {};
+    var pesanKe = '';
     var data = null;
     var wadah = el('div', { class: 'belanja' });
-    var catatan = el('p', { class: 'kolom-bantuan', text: 'Perubahan di sini hanya untuk cetakan.' });
-    var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: order }; } });
+    var pesanKartu = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite', tabindex: '-1' });
+    var catatan = el('p', { class: 'kolom-bantuan' });
+    var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: orderCetak() }; } });
     var kartu = el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-belanja' }, [
       el('h2', { class: 'kartu-judul', id: 'judul-belanja', text: 'Daftar belanja' }),
+      pesanKartu,
       wadah,
       catatan,
       el('div', { class: 'deret-tombol laporan-aksi' }, [unduh.tombol]),
       unduh.pesan
     ]);
+    var perKelompok = function () { return data && Array.isArray(data.pemasok); };
 
-    function barisItem(it, nomor) {
+    /** Order awal di layar: saran; kosong untuk item yang sudah dipesan dan item yang belum punya pemasok. */
+    function orderBawaan(it, g) {
+      if (!it.saran) return '';
+      if (g && (it.dipesan || !g.nama)) return '';
+      return teksIsianAngka(it.saran.jumlah);
+    }
+
+    function nilaiOrder(it, g) {
+      return Object.prototype.hasOwnProperty.call(order, it.nama) ? order[it.nama] : orderBawaan(it, g);
+    }
+
+    /** Order untuk PDF: semua item (yang tidak diubah memakai nilai awal di layar). */
+    function orderCetak() {
+      if (!perKelompok()) return order;
+      var hasil = {};
+      data.pemasok.forEach(function (g) { g.item.forEach(function (it) { hasil[it.nama] = nilaiOrder(it, g); }); });
+      return hasil;
+    }
+
+    function barisItem(it, nomor, g, gantiOrder) {
       var satuanOrder = it.satuanBesar && it.isiSatuanBesar > 0 ? it.satuanBesar : it.satuan;
       var input = el('input', {
         class: 'isian isian-angka',
@@ -9698,20 +10020,22 @@
         id: 'order-' + nomor,
         'aria-describedby': 'order-ket-' + nomor
       });
-      input.value = Object.prototype.hasOwnProperty.call(order, it.nama) ? order[it.nama] : (it.saran ? teksIsianAngka(it.saran.jumlah) : '');
+      input.value = nilaiOrder(it, g);
       var ket = el('span', { class: 'konversi', id: 'order-ket-' + nomor });
       function perbarui() {
         var n = bacaAngka(input.value);
         input.setAttribute('aria-invalid', n !== null && isNaN(n) ? 'true' : 'false');
         if (n !== null && isNaN(n)) ket.textContent = 'Isi angka, misalnya 2.';
         else if (n !== null && satuanOrder !== it.satuan) ket.textContent = '= ' + formatAngka(n * it.isiSatuanBesar) + ' ' + it.satuan;
-        else if (n === null) ket.textContent = it.saran ? 'Kosong: dicetak tanpa jumlah.' : 'Tanpa saran: stok maksimum kosong.';
+        else if (n === null && !g) ket.textContent = it.saran ? 'Kosong: dicetak tanpa jumlah.' : 'Tanpa saran: stok maksimum kosong.';
+        else if (n === null) ket.textContent = it.dipesan ? 'Kosong: sudah dipesan, tidak ikut dipesan lagi.' : 'Kosong: tidak ikut dipesan.';
         else ket.textContent = '';
       }
       input.addEventListener('input', function () {
         order[it.nama] = input.value;
         unduh.reset();
         perbarui();
+        if (gantiOrder) gantiOrder();
       });
       perbarui();
       var info = 'Stock ' + formatAngka(it.stock) + ' ' + it.satuan + ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan;
@@ -9719,7 +10043,11 @@
         el('span', { class: 'daftar-baris-isi' }, [
           el('span', { class: 'daftar-baris-judul', text: it.nama }),
           el('span', { class: 'daftar-baris-ket' + (it.stock < 0 ? ' nilai-masalah' : ''), text: info }),
-          el('span', { class: 'daftar-baris-ket', text: it.saran ? 'Saran ' + it.saran.teks : 'Tanpa saran: stok maksimum kosong' })
+          el('span', { class: 'daftar-baris-ket', text: it.saran ? 'Saran ' + it.saran.teks : 'Tanpa saran: stok maksimum kosong' }),
+          it.dipesan ? el('span', { class: 'daftar-baris-ket' }, [tandaStatus('menunggu', 'Dipesan ' + formatAngka(it.dipesan.jumlah) + ' ' +
+            it.dipesan.satuanOrder), ' dari ' + it.dipesan.pemasok + ', ' + tanggalPendek(it.dipesan.tanggal)]) : null,
+          g && !g.nama && it.terakhir && it.terakhir.nonaktif
+            ? el('span', { class: 'daftar-baris-ket', text: 'Terakhir dari ' + it.terakhir.pemasok + ' (nonaktif)' }) : null
         ]),
         el('div', { class: 'belanja-order' }, [
           el('label', { class: 'kolom-label', for: input.id, text: 'Order' }),
@@ -9727,6 +10055,193 @@
           ket
         ])
       ]);
+    }
+
+    /** Pesanan yang belum datang (semua umur), dengan Tutup pesanan. */
+    function bagianMenunggu(d) {
+      if (!d.menunggu || !d.menunggu.length) return null;
+      return el('section', { class: 'belanja-menunggu', 'aria-labelledby': 'judul-pesanan-menunggu' }, [
+        el('h3', { class: 'judul-sub', id: 'judul-pesanan-menunggu', text: 'Pesanan belum datang' }),
+        el('ul', { class: 'daftar' }, d.menunggu.map(function (p) {
+          return el('li', { class: 'baris-tetap' }, [
+            el('span', { class: 'baris-tetap-teks daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: p.pemasok }),
+              el('span', { class: 'daftar-baris-ket', text: teksItemPesanan(p.item) }),
+              el('span', { class: 'daftar-baris-ket', text: teksDipesan(p) })
+            ]),
+            tombol('Tutup pesanan', 'kedua', { 'aria-label': 'Tutup pesanan ' + namaPesanan(p), onclick: function () { tutup(p); } })
+          ]);
+        }))
+      ]);
+    }
+
+    function tutup(p) {
+      if (navigator.onLine === false) {
+        tulisPesan(pesanKartu, 'Tidak ada sinyal. Tutup pesanan saat ada sinyal.', 'masalah');
+        return;
+      }
+      konfirmasi({
+        judul: 'Tutup pesanan ' + p.pemasok + ', ' + tanggalPendek(p.tanggal) + '?',
+        teks: teksItemPesanan(p.item) + ' tidak ditunggu lagi, dan form Stock tidak menampilkannya. Barang yang datang tetap bisa dicatat seperti biasa.',
+        teksYa: 'Tutup pesanan',
+        teksProses: 'Menutup…',
+        jalankan: function () { return panggilApi('tutupPesanan', { id: p.id }); }
+      }).then(function (h) {
+        if (!h) return;
+        Cache.tulis('belanja', h.belanja);
+        gambar(h.belanja);
+        if (h.ditutup === 0) {
+          tulisPesan(pesanKartu, 'Pesanan ' + p.pemasok + ' sudah tidak menunggu: barangnya sudah dicatat datang, atau pesanannya sudah ditutup.', 'info');
+        } else {
+          tulisPesan(pesanKartu, 'Pesanan ' + p.pemasok + ', ' + tanggalPendek(p.tanggal) + ' ditutup.', 'baik');
+        }
+        pesanKartu.focus();
+      });
+    }
+
+    /** Satu kelompok pemasok: item, lalu "Kirim ke WhatsApp". Kelompok "Belum ada pemasok" memilih "Pesan ke". */
+    function kelompok(d, g, nomorAwal) {
+      var tanpaPemasok = !g.nama;
+      var idKel = 'belanja-kel-' + nomorAwal;
+      var link = el('a', { class: 'tombol tombol-kedua belanja-wa', target: '_blank', rel: 'noopener', 'aria-describedby': idKel + '-info' },
+        el('span', { class: 'tombol-teks', text: 'Kirim ke WhatsApp' }));
+      var info = el('p', { class: 'kolom-bantuan', id: idKel + '-info' });
+      var pesanGrup = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite' });
+      var pilihan = d.pilihanPemasok || [];
+      var pilih = null;
+      if (tanpaPemasok) {
+        pilih = el('select', { class: 'isian', id: idKel + '-ke' }, [el('option', { value: '', text: 'Tanpa pemasok (tidak dicatat)' })]
+          .concat(pilihan.map(function (p) { return el('option', { value: p.nama, text: p.nama }); })));
+        pilih.value = pilihan.some(function (p) { return p.nama === pesanKe; }) ? pesanKe : '';
+        pilih.addEventListener('change', function () {
+          pesanKe = pilih.value;
+          perbaruiGrup();
+        });
+      }
+      function tujuan() {
+        if (!tanpaPemasok) return { nama: g.nama, wa: g.wa };
+        var p = pilihan.filter(function (x) { return x.nama === pilih.value; })[0];
+        return p ? { nama: p.nama, wa: p.wa } : { nama: '', wa: '' };
+      }
+      /** Item yang dipesan: Order berisi angka lebih dari 0 (dalam satuan order). */
+      function isiPesan() {
+        var hasil = { baris: [], salah: null };
+        g.item.forEach(function (it) {
+          var n = bacaAngka(nilaiOrder(it, g));
+          if (n === null || n === 0) return;
+          if (isNaN(n)) {
+            if (!hasil.salah) hasil.salah = it;
+            return;
+          }
+          var besar = !!(it.satuanBesar && it.isiSatuanBesar > 0);
+          hasil.baris.push({ nama: it.nama, jumlah: bulat3(n), besar: besar, satuanOrder: besar ? it.satuanBesar : it.satuan });
+        });
+        return hasil;
+      }
+      function perbaruiGrup() {
+        var isi = isiPesan();
+        var t = tujuan();
+        link.href = tautanWhatsApp(t.wa, pesanWhatsApp(t.nama, d.outlet || sesiKini().namaOutlet || '', isi.baris));
+        var bisa = !isi.salah && isi.baris.length > 0;
+        link.setAttribute('aria-disabled', bisa ? 'false' : 'true');
+        link.classList.toggle('nonaktif', !bisa);
+        var bagian = [];
+        if (isi.salah) bagian.push('Periksa angka Order ' + isi.salah.nama + '.');
+        else if (!isi.baris.length) bagian.push('Isi Order minimal untuk satu item.');
+        else bagian.push('Pesan berisi ' + isi.baris.length + ' item.');
+        if (!t.nama) bagian.push('Tanpa pemasok, pesanannya tidak dicatat dan WhatsApp meminta memilih kontak.');
+        else if (!d.pesananSiap) bagian.push('Pesanan belum bisa dicatat: pemilik Sheet perlu menjalankan ulang setupSpreadsheet.');
+        else if (!t.wa) bagian.push('Kontak ' + t.nama + ' belum berisi nomor HP, jadi WhatsApp meminta memilih kontak.');
+        info.textContent = bagian.join(' ');
+      }
+      // Ketukan dan klik tengah (tab baru di laptop) sama-sama mencatat pesanan.
+      link.addEventListener('auxclick', function (e) { if (e.button === 1) ketukWa(e); });
+      link.addEventListener('click', ketukWa);
+      function ketukWa(e) {
+        var isi = isiPesan();
+        if (isi.salah || !isi.baris.length) {
+          e.preventDefault();
+          tulisPesan(pesanGrup, isi.salah ? 'Periksa angka Order ' + isi.salah.nama + '. Isi angka, misalnya 2.'
+            : 'Isi Order minimal untuk satu item.', 'masalah');
+          return;
+        }
+        perbaruiGrup();
+        var t = tujuan();
+        if (!t.nama || !d.pesananSiap) {
+          tulisPesan(pesanGrup, 'WhatsApp dibuka. Pesanan ini tidak dicatat di aplikasi.', 'info');
+          return;
+        }
+        // Pesanan dicatat di antrean HP lebih dulu (tetap ada walau aplikasi tertutup saat WhatsApp terbuka), lalu dikirim.
+        var kunci = t.nama + '|' + JSON.stringify(isi.baris);
+        var sid = sidPesanan[kunci] = sidPesanan[kunci] || buatId();
+        var hari = tanggalIso(new Date());
+        var kirim = {
+          submissionId: sid, tanggal: hari, waktuPerangkat: new Date().toISOString(), pemasok: t.nama,
+          baris: isi.baris.map(function (b) { return { item: b.nama, jumlah: b.jumlah, satuanOrder: b.besar ? 'besar' : 'dasar' }; })
+        };
+        simpanKeAntrean({ id: sid, aksi: 'catatPesanan', isi: kirim, formId: null, judul: 'Pesanan · ' + t.nama, tanggal: hari });
+        tulisPesan(pesanGrup, 'Mencatat pesanan…', 'info');
+        var p = penggunaKini();
+        jagaProses(panggilApi('catatPesanan', kirim)).then(function (h) {
+          if (p) Antrean.hapus(p.nama, sid);
+          if (segarkanAntrean) segarkanAntrean();
+          // Id hanya dipakai ulang selama pesanan ini belum tercatat (ketukan ganda); pesanan berikutnya dengan isi yang sama
+          // adalah pesanan baru.
+          delete sidPesanan[kunci];
+          // Item yang sudah dipesan kembali ke Order awal (kosong, karena sekarang bertanda Dipesan).
+          isi.baris.forEach(function (b) { delete order[b.nama]; });
+          var bagian = [h.sudahTerkirim ? 'Pesanan ke ' + t.nama + ' ini sudah tercatat.'
+            : 'Pesanan ke ' + t.nama + ' dicatat (' + isi.baris.length + ' item).'];
+          var lain = teksCatatPesanan(h);
+          if (lain) bagian.push(lain);
+          Cache.tulis('belanja', h.belanja);
+          gambar(h.belanja);
+          tulisPesan(pesanKartu, bagian.join(' '), h.lebihBaru && h.lebihBaru.length ? 'info' : 'baik');
+          pesanKartu.focus();
+        }, function (err) {
+          if (tanganiSesiBerakhir(err)) return;
+          if (err && err.jaringan) {
+            diAntrean[sid] = { kunci: kunci, item: isi.baris.map(function (b) { return b.nama; }) };
+            tulisPesan(pesanGrup, 'Pesanan tersimpan di HP dan dicatat saat ada sinyal.', 'info');
+            return;
+          }
+          // Ditolak server: tidak dikirim ulang dari antrean.
+          if (p) Antrean.hapus(p.nama, sid);
+          if (segarkanAntrean) segarkanAntrean();
+          delete sidPesanan[kunci];
+          tulisPesan(pesanGrup, 'WhatsApp dibuka, tetapi pesanan tidak dicatat: ' + pesanGalat(err), 'masalah');
+        });
+      }
+
+      var judul = tanpaPemasok ? 'Belum ada pemasok' : g.nama;
+      var bagian = el('section', { class: 'belanja-kelompok', 'aria-labelledby': idKel }, [
+        el('h3', { class: 'judul-sub', id: idKel, text: judul }),
+        tanpaPemasok
+          ? el('p', { class: 'kolom-bantuan', text: 'Item yang belum punya pemasok aktif dari barang masuk. Isi Order untuk yang dipesan, lalu pilih pemasoknya.' })
+          : (g.kontak ? el('p', { class: 'kolom-bantuan', text: 'Kontak ' + g.kontak }) : null),
+        el('div', { class: 'daftar', role: 'group', 'aria-label': judul }, g.item.map(function (it, i) {
+          return barisItem(it, nomorAwal + i + 1, g, perbaruiGrup);
+        })),
+        pilih ? el('div', { class: 'kolom belanja-pesan-ke' }, [el('label', { class: 'kolom-label', for: pilih.id, text: 'Pesan ke' }), pilih]) : null,
+        el('div', { class: 'deret-tombol belanja-wa-deret' }, [link]),
+        info,
+        pesanGrup
+      ]);
+      perbaruiGrup();
+      return bagian;
+    }
+
+    /** Server lama (Code.gs sebelum v0.29): per kategori, tanpa WhatsApp. */
+    function gambarPerKategori(d) {
+      wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum. Saran order = stok maksimum − stock akhir, ' +
+        'dibulatkan ke atas ke satuan besar.' }));
+      var nomor = 0;
+      d.kategori.forEach(function (g) {
+        wadah.appendChild(el('h3', { class: 'judul-sub', text: g.nama }));
+        wadah.appendChild(el('div', { class: 'daftar', role: 'group', 'aria-label': g.nama }, g.item.map(function (it) {
+          return barisItem(it, ++nomor, null, null);
+        })));
+      });
     }
 
     function gambar(d) {
@@ -9739,18 +10254,26 @@
       Object.keys(order).forEach(function (n) { if (!ada[n]) delete order[n]; });
       unduh.tombol.disabled = !d.jumlah;
       catatan.hidden = !d.jumlah;
+      var menunggu = perKelompok() ? bagianMenunggu(d) : null;
       if (!d.jumlah) {
         wadah.appendChild(kotakKosong('Semua stock di atas batas minimum.', 'centang'));
+        if (menunggu) wadah.appendChild(menunggu);
         return;
       }
-      wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum. Saran order = stok maksimum − stock akhir, ' +
-        'dibulatkan ke atas ke satuan besar.' }));
+      if (!perKelompok()) {
+        catatan.textContent = 'Perubahan di sini hanya untuk cetakan.';
+        gambarPerKategori(d);
+        return;
+      }
+      catatan.textContent = 'Angka Order dipakai untuk pesan WhatsApp dan PDF, dan tidak disimpan. Ketukan Kirim ke WhatsApp mencatat pesanan ' +
+        'ke pemasok itu; jika pesannya tidak jadi dikirim, ketuk Tutup pesanan.';
+      wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum, dikelompokkan menurut pemasok. ' +
+        'Saran order = stok maksimum − stock akhir, dibulatkan ke atas ke satuan besar.' }));
+      if (menunggu) wadah.appendChild(menunggu);
       var nomor = 0;
-      d.kategori.forEach(function (g) {
-        wadah.appendChild(el('h3', { class: 'judul-sub', text: g.nama }));
-        wadah.appendChild(el('div', { class: 'daftar', role: 'group', 'aria-label': g.nama }, g.item.map(function (it) {
-          return barisItem(it, ++nomor);
-        })));
+      d.pemasok.forEach(function (g) {
+        wadah.appendChild(kelompok(d, g, nomor));
+        nomor += g.item.length;
       });
     }
 
@@ -9763,6 +10286,26 @@
       kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(2)); },
       galat: function (teks, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(teks, cobaLagi)); }
     });
+    // Diperbarui saat antrean terkirim (pesanan dari HP tanpa sinyal) dan saat aplikasi dibuka lagi (kembali dari
+    // WhatsApp); digambar ulang hanya jika isinya berubah, jadi angka Order yang sedang diketik tidak terganggu.
+    segarkanLayar = function () {
+      // Pesanan yang sudah keluar dari antrean (terkirim atau ditolak): Order item itu kembali ke nilai awal.
+      var p = penggunaKini();
+      var masih = {};
+      if (p) Antrean.daftar(p.nama).forEach(function (e) { masih[e.id] = true; });
+      var lepas = false;
+      Object.keys(diAntrean).forEach(function (id) {
+        if (masih[id]) return;
+        diAntrean[id].item.forEach(function (n) { delete order[n]; });
+        delete sidPesanan[diAntrean[id].kunci];
+        delete diAntrean[id];
+        lepas = true;
+      });
+      return panggilApi('daftarBelanja').then(function (d) {
+        Cache.tulis('belanja', d);
+        if (lepas || !data || JSON.stringify(d) !== JSON.stringify(data)) gambar(d);
+      }, function (err) { tanganiSesiBerakhir(err); });
+    };
     return kartu;
   }
 
