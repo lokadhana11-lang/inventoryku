@@ -279,6 +279,18 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   satuan }]` (juga `jumlah: 0` tanpa menulis jika tidak ada baris lain). `formStock` ditambah `sisaSiap` (kolom ada). `riwayat`/
   `detailKiriman` Stock: `kolom[]` ditambah `sisa` (tidak dikoreksi, `jikaAda`). Form Stock "Semua kategori" tetap memakai `kirimStock`
   satu kiriman per kategori (aplikasi).
+- Pesanan ke pemasok (Code.gs v0.29, 21 Oktober 2026): `daftarBelanja` ditambah `outlet`, `pembelianSiap`, `pesananSiap`, `pemasok: [{ nama
+  ('' = belum ada pemasok), kontak, wa, item: [item belanja + kategori, terakhir: { pemasok, tanggal, nonaktif } | null, dipesan:
+  { id, pemasok, nama, kategori, jumlah, satuanOrder, dasar, satuan, tanggal, oleh } | null] }]`, `pilihanPemasok: [{ nama, wa }]`,
+  dan `menunggu: [pesanan]` (`kategori` tetap untuk aplikasi lama). Pesanan = `{ id, pemasok, tanggal, oleh, waktu, item: [{ nama,
+  kategori, jumlah, satuanOrder, dasar, satuan }] }`. Khusus Pengelola: `catatPesanan {submissionId, tanggal, waktuPerangkat,
+  pemasok, baris: [{ item, jumlah, satuanOrder: besar|dasar }]}` → `{ sudahTerkirim, id, pemasok, jumlah, diganti: [{ item,
+  pemasok, tanggal, oleh }], sudahDatang: [nama], lebihBaru?: [{ item, pemasok, tanggal, oleh }], belanja }`; `tutupPesanan {id,
+  tanggal?}` → `{ ditutup (0 = sudah tidak menunggu), belanja, form? }`. `formStock` ditambah `pesananSiap` dan `pesanan: [pesanan]`
+  (menunggu, pemasok aktif, paling lama 14 hari); `kirimStock.baris[]` boleh membawa `pesanan` (id; kiriman tidak pernah ditolak
+  karenanya) dan jawabannya ditambah `pesananDatang: [{ pemasok, item }]` dan `pesananSudahDatang: [{ item, pemasok, oleh, waktu }]`
+  (Tambah masuk dari pesanan yang sudah dicatat datang, tidak dicatat lagi; tanpa baris lain `jumlah: 0` tanpa menulis).
+  `unduhPdfBelanja.order` boleh berisi semua item (aplikasi 0.29 mengirim semuanya).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -325,7 +337,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++ | Uji dan pemulihan cadangan (permintaan pemilik 19 Oktober 2026, dari usulan fitur SYS-04): `periksaCadangan`, `ujiPemulihanCadangan`, dan `pulihkanCadangan` dari editor Apps Script membaca cadangan JSON dari Drive dan memulihkannya ke Supabase; aplikasi ditutup selama pemulihan (isian masuk antrean HP), isi sebelum pemulihan selalu dicadangkan, jumlah baris dicocokkan, pemulihan setengah jalan tidak membuka aplikasi; cadangan format 2; langkah di PANDUAN | Kode selesai (Code.gs v0.26, aplikasi 0.26.0), diuji ujung ke ujung: runtime dan pelayan asli `supabase/src` di atas Postgres 16 lokal, Apps Script tiruan (Drive, curl ke server) dengan Code.gs asli (pulihkan, batalkan, uji, format 1, cadangan rusak, putus di tengah, jumlah tidak cocok, project baru), dan Chromium (isian masuk antrean saat server ditutup). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `ujiPemulihanCadangan` sekali pada jam sepi (setupSpreadsheet tidak perlu) |
 | 12+++++++++++++++++++ | Tabel Stock muat di laptop dan teks lama dari masa Apps Script (permintaan pemilik 19 Oktober 2026, butir 1 dari telaah aplikasi): harga beli dan baik sampai pindah ke bawah angka Tambah Masuk seperti di kartu HP, sehingga Stock Akhir selalu terlihat tanpa menggeser tabel mulai 1.024 px; teks yang keliru sesudah pindah ke Supabase (toleransi Google, salinan spreadsheet, perintah pasangTrigger yang tidak perlu, isi tab M_Item/M_Unit, alamat Web App /exec) diganti | Kode selesai (aplikasi 0.26.1; Code.gs tidak berubah), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` dan Chromium (lebar tabel di 1024, 1280, 1366, 1920 px untuk lima kategori sebelum dan sesudah Tambah masuk diisi, urutan Tab, draft, kartu HP dan tablet sama piksel per piksel dengan 0.26.0). Menunggu pemilik: gabungkan PR, uji dari laptop (tidak perlu tempel Code.gs atau Edge Function) |
 | 12++++++++++++++++++++ | Tandai diperiksa sekaligus (permintaan pemilik 19 Oktober 2026, butir 2 dari telaah aplikasi): tombol "Tandai diperiksa (n)" di judul tiap tanggal di daftar Riwayat untuk Pengelola, konfirmasi, isian yang dilaporkan keliru tidak ikut | Kode selesai (Code.gs v0.27, aplikasi 0.27.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (30 uji server: dilaporkan, id ganda dan tak dikenal, ulang, Staff ditolak, batas, lima jenis form, Beranda; sel yang berubah sama dengan Tandai diperiksa satu per satu) dan Chromium (27 uji: HP, desktop dengan detail kanan, Staff, server lama, tanpa sinyal, galat server, delapan ukuran, gerak; 30 uji perbaikan sesudah telaah: tanpa tombol selama filter kategori/item, kalimat filter pengisi, simpanan penuh, tombol 48 px). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
-| 12+++++++++++++++++++++ | Isi form Stock lebih cepat (permintaan pemilik 20 Oktober 2026, butir 3 dari telaah aplikasi): "Semua kategori" di form Stock (satu kiriman per kategori), kotak "Cari item" di form Stock dan Stock opname, "Catat pemakaian: Hitung sisa" (hari ini saja; Stock Keluar dihitung server dari sisa, sisa disimpan di `Sisa Dihitung` dan ikut dikoreksi) | Kode selesai (Code.gs v0.28, aplikasi 0.28.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; jawaban jalur Tambah keluar sama dengan v0.27 selain kolom `sisa` di Riwayat) dan Chromium (87 uji: HP, desktop 1024/1366, antrean, satu kategori ditolak, server lama, pencarian, opname, Kemarin, sisa lama, kirim terkunci, delapan ukuran). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Sisa Dihitung` di `Data_Stock`; sebelum itu Hitung sisa tidak tampil) |
+| 12+++++++++++++++++++++ | Isi form Stock lebih cepat (permintaan pemilik 20 Oktober 2026, butir 3 dari telaah aplikasi): "Semua kategori" di form Stock (satu kiriman per kategori), kotak "Cari item" di form Stock dan Stock opname, "Catat pemakaian: Hitung sisa" (hari ini saja; Stock Keluar dihitung server dari sisa, sisa disimpan di `Sisa Dihitung` dan ikut dikoreksi) | Kode selesai (Code.gs v0.28, aplikasi 0.28.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; jawaban jalur Tambah keluar sama dengan v0.27 selain kolom `sisa` di Riwayat) dan Chromium (87 uji: HP, desktop 1024/1366, antrean, satu kategori ditolak, server lama, pencarian, opname, Kemarin, sisa lama, kirim terkunci, delapan ukuran). Digabung dan dipasang pemilik 21 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
+| 12++++++++++++++++++++++ | Daftar belanja per pemasok dan pesanan (keputusan pemilik 21 Oktober 2026, butir 4 dari telaah aplikasi): kelompok per pemasok (pesanan yang menunggu, lalu pemasok barang masuk terakhir), "Kirim ke WhatsApp" ke nomor di Kontak, pesanan tercatat di `Data_Pesanan` lewat antrean HP, "Pesanan belum datang" dan "Tutup pesanan", kartu "Pesanan menunggu" dengan "Isi dari pesanan" di form Stock (semua role), barang masuk menyelesaikan pesanan, PDF per pemasok, email | Kode selesai (Code.gs v0.29, aplikasi 0.29.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (120 uji server, jawaban aksi lama sama dengan v0.28 selain PDF daftar belanja) dan Chromium (103 uji: Laporan dan form Stock, antrean, dua HP, server lama, delapan ukuran; uji lama tetap lulus), termasuk perbaikan sesudah telaah berlawanan; lihat butir 328–338. Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `Data_Pesanan`; sebelum itu WhatsApp tetap bisa dibuka tetapi pesanan tidak dicatat), uji dari HP (terutama WhatsApp dari aplikasi yang dipasang di Layar Utama) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2453,3 +2466,123 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Chromium (ganti cara ditolak, sisa lebih dikirim dan dilaporkan, pesan tetap saat mencari, sisa sama, Kemarin, sisa lama dibuang,
     inert selama kirim, antrean tidak macet dan barang masuk tercatat, kata kunci panjang di 320 px). Versi tetap Code.gs v0.28 dan
     aplikasi 0.28.0 (belum dirilis).
+
+### Daftar belanja per pemasok dan pesanan (Code.gs v0.29, aplikasi 0.29.0, 21 Oktober 2026)
+
+328. **Asal dan keputusan pemilik:** butir 4 dari telaah aplikasi (19 Oktober 2026). Pemilik memilih: item mengikuti **pemasok
+    terakhir** (dari barang masuk, tanpa isian baru di Pengaturan), "Kirim ke WhatsApp" ke **nomor di Kontak** pemasok, dan
+    **pesanan tersimpan** di server supaya Staff yang menerima barang melihatnya di form Stock (bukan hanya di HP Pengelola).
+    Spesifikasi sistem Bagian 5.0, 5.5, 7.1, 8.2, 9.2, 10, 11, 12; tampilan Bagian 5.3, 5.9, 7. Tidak dibangun: PO dan
+    persetujuan, harga di pesan WhatsApp, pesanan tanpa pemasok yang tercatat, jumlah datang dibanding jumlah pesanan,
+    kedaluwarsa otomatis, pesanan di Riwayat atau Dashboard.
+329. **Data:** `Data_Pesanan` (`TAB_DATA`, dibuat `setupSpreadsheet`): Tanggal, Pemasok, Nama Item, Kategori, Jumlah, Satuan Order,
+    Jumlah Dasar, Satuan, Keadaan (Menunggu, Datang, Diganti, Ditutup; teks biasa, tanpa dropdown), Selesai Oleh, Selesai Pada,
+    Kiriman Stock, lalu 13 kolom sistem (`status` tetap Terkirim dan tidak dipakai; pemeriksaan Riwayat hanya membaca tab form).
+    Satu baris per item; `submission_id` = id pesanan. Urut tanggal terbaru, pemasok, item. `pesananSiap_()` = tab ada. Arsip
+    tahunan, cadangan, dan salinan ke Sheets ikut dengan sendirinya (tab `Data_`). `bacaPesanan_` membaca baris dengan nomornya;
+    `tandaiPesanan_` menulis keadaan sebelum tab diurutkan.
+330. **Catat pesanan** (`aksiCatatPesanan_`, khusus Pengelola, di dalam kunci, `submission_id` diperiksa lebih dulu): pemasok wajib
+    dan harus ada di `M_Pemasok` (nonaktif diterima, dari antrean), item di `M_Item`, jumlah > 0 (3 desimal), `besar` hanya untuk item
+    bersatuan besar, item ganda ditolak, paling banyak 200 baris. **Satu pesanan menunggu per item:** baris Menunggu item yang sama
+    (pemasok mana pun) menjadi Diganti; rancangan awal mengganti semua pesanan menunggu pemasok itu, dan telaah rancangan (butir 336)
+    menunjukkan pesanan yang masih di jalan ikut hilang. **Pesanan yang terlambat dari antrean:** barang masuk item itu yang dicatat
+    di HP sejak `waktuPerangkat` (paling lama 7 hari, `HARI_PESANAN_TERLAMBAT`), dengan pemasok yang sama atau tanpa pemasok, membuat
+    baris langsung Datang (Selesai Oleh/Pada dan Kiriman Stock dari barang masuk itu), dan jawabannya menyebutnya di `sudahDatang`.
+    Waktu pembanding dan barang masuk yang sudah dipakai: butir 338.
+331. **Barang masuk menyelesaikan pesanan** (`selesaikanPesanan_`, di dalam kunci `kirimStock` sesudah baris ditulis): tiap item dengan
+    Stock Masuk > 0. Baris yang membawa `pesanan` (dari "Isi dari pesanan") menyelesaikan pesanan itu; baris lain menyelesaikan
+    pesanan menunggu paling lama untuk item itu dengan pemasok yang sama (huruf besar/kecil tidak dibedakan), atau pemasok mana pun
+    jika kiriman tanpa pemasok, tanggal pesanan tidak sesudah tanggal kiriman, dan diketuk sebelum barang itu dicatat di HP
+    (butir 338). Kiriman tanpa pemasok ikut menyelesaikan karena pemasok di form Stock tidak wajib: tanpa itu pesanan yang barangnya
+    sudah datang tetap ditawarkan dan "Isi dari pesanan" membuat stock palsu. **Tautan** (`barisPesananTertaut_`, sebelum apa pun
+    ditulis; sejak perbaikan butir 338 tidak pernah menolak kiriman): pesanan yang sudah Datang → Tambah masuk baris itu tidak dicatat
+    (`pesananSudahDatang`), supaya isian dari dua HP tidak tercatat dua kali; Ditutup, diganti pesanan ke pemasok lain, atau id yang
+    tidak dikenal → dianggap tanpa tautan; diganti pesanan dari pemasok yang sama → pesanan terbaru itu (menunggu: diselesaikan;
+    sudah datang: seperti Datang). Jawaban `pesananDatang`. Koreksi kiriman sesudahnya tidak membuka pesanan lagi.
+332. **Daftar belanja** (`dataBelanja_`): kelompok = pemasok pesanan menunggu item itu, lalu pemasok barang masuk terakhir
+    (`pemasokTerakhir_`, dari `bacaPembelian_` semua tanggal), hanya pemasok aktif; selain itu kelompok '' ("Belum ada pemasok").
+    Kelompok urut nama, '' paling bawah; item urut kategori (urutan `M_Kategori`) lalu nama. `menunggu` = semua pesanan yang masih
+    punya baris Menunggu (umur dan pemasok mana pun). `kategori` tetap ada untuk aplikasi 0.28. **Nomor WhatsApp** (`nomorWa_`):
+    deret angka yang panjang (boleh berisi spasi, tanda hubung, titik, kurung, dan + di depan); 0 di depan → 62, 8xx → 628xx,
+    10–15 angka; nomor HP (628…) didahulukan, lalu nomor pertama yang sah, selain itu ''.
+333. **Kartu Daftar belanja** (`kartuDaftarBelanja`, aplikasi): "Pesanan belum datang" di atas kelompok (Tutup pesanan dengan
+    konfirmasi, butuh sinyal); tiap kelompok h3 nama pemasok dan "Kontak …"; Order awal = saran, kecuali item yang sudah dipesan dan
+    kelompok "Belum ada pemasok" (kosong, supaya tidak terpesan dua kali atau ke pemasok yang salah; di awal hampir semua item belum
+    punya pemasok). "Pesan ke" untuk kelompok itu. "Kirim ke WhatsApp" adalah `<a href="https://wa.me/<nomor>?text=…"
+    target=_blank>` yang href-nya diperbarui setiap Order diubah; tanpa item atau dengan angka salah `aria-disabled` dan ketukannya
+    dicegah. Ketukan yang sah: **entri antrean ditulis lebih dulu** (formId null, judul "Pesanan · Sumber Segar") lalu `catatPesanan`
+    dikirim lewat `jagaProses`, sehingga pesanan tetap tercatat walau halaman dihentikan HP atau keluar otomatis berjalan selama
+    WhatsApp terbuka; berhasil → entri dihapus, Order item itu kembali kosong, kartu digambar ulang dari `belanja`; galat sambungan →
+    tetap di antrean; ditolak server → entri dihapus dan pesannya tampil. Isi yang sama memakai `submissionId` yang sama selama
+    pesanan itu belum tercatat (ketukan ganda satu pesanan; butir 338). Order tetap hanya di memori; PDF menerima Order semua item (`orderCetak`), server memakai nilai awal yang
+    sama untuk menghitung "diubah". Server lama (tanpa `pemasok`): tampilan per kategori seperti dulu.
+334. **Form Stock** (`gambarPesanan`, `isiDariPesanan`, `tutupPesanan` di `layarStock`): kartu "Pesanan menunggu" hanya untuk hari
+    ini dan hanya jika server mengirim `pesanan` (data dari HP untuk tanggal lain tidak membawa pesanan). "Isi dari pesanan" ditolak
+    jika draft berisi Tambah masuk dan pemasok draft berbeda (kosong = berbeda); item yang sudah diisi, sudah ada di kiriman Stock yang
+    menunggu kirim dengan tautan ke pesanan itu, tidak ada di form, atau satuannya berubah (satuan order bukan satuan besar item
+    sekarang dan satuan dasar berbeda) dilewati dan disebut. Isian mendapat `pesanan` (id), yang dilepas saat Tambah masuk
+    ditinggalkan kosong (butir 338). Pengelola punya "Tutup pesanan" di kartu yang sama (butir 338). **Pemasok kembali kosong**
+    sesudah kiriman (juga ke antrean) jika tidak ada lagi Tambah masuk di draft, supaya pemasok dari pesanan tadi tidak menempel pada
+    barang berikutnya (telaah rancangan). Pesan sesudah kiriman: "Pesanan Tomat dari Sumber Segar tercatat datang." (juga untuk
+    antrean).
+335. **Nama, hapus, PDF, email:** ganti nama item atau pemasok menulis ulang `Data_Pesanan` (`gantiNamaPesanan_`, seperti
+    `M_HargaItem`), bukan memblokir ganti nama; hapus item menutup pesanannya yang menunggu. PDF daftar belanja per pemasok (baris
+    judul kelompok dengan kontak, kolom Kategori, "dipesan 5 kg, 21 Okt" kecil di bawah nama); kalimat lama "hanya untuk cetakan" dan
+    "Aplikasi tidak memesan apa pun" diganti. Email harian: "Pesanan belum datang (n)" di bagian Stock (lihat juga butir 338).
+336. **Telaah rancangan** (tiga penelaah sebelum kode ditulis: data, alur dapur di HP, kompatibilitas): temuan yang mengubah rancangan:
+    Diganti per pemasok menghapus pesanan yang masih di jalan (→ per item); Order terisi saran untuk item yang sudah dipesan (→ kosong);
+    pesanan yang barangnya dicatat tanpa pemasok tetap menunggu dan "Isi dari pesanan" membuat stock palsu (→ kiriman tanpa pemasok
+    menyelesaikan, tautan ditolak jika sudah datang); pemasok draft menempel (→ kembali kosong); catatPesanan "tanpa menunggu" hilang
+    saat halaman dihentikan (→ antrean lebih dulu, pesanan terlambat dicek ke barang masuk); kelompok "Belum ada pemasok" berisi hampir
+    semua item dengan Order terisi (→ kosong); ganti nama dan hapus item yang pernah dipesan terkunci (→ ditulis ulang); server lama
+    dan cache 0.28 (→ tampilan lama); teks "dikirim"/"dipesan" (→ "Dipesan Budi lewat WhatsApp" dengan umurnya di kartu Pesanan
+    belum datang, kartu Pesanan menunggu di form Stock, dan email; tanda baris item dan PDF tetap ringkas "Dipesan 5 kg").
+    Tidak diubah: WhatsApp dari PWA di Layar Utama memakai `https://wa.me` (tautan resmi WhatsApp); perilakunya di iPhone dan Android
+    yang dipasang belum bisa diuji di sini.
+337. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` dengan data contoh: `uji_pesanan.mjs` 84 uji
+    (bentuk daftarBelanja, kelompok, nomor WhatsApp, validasi catatPesanan, Diganti per item, pesanan terlambat, kirimStock
+    menyelesaikan dengan dan tanpa pemasok, tautan dua HP dan diganti, tutup, ganti nama item dan pemasok, hapus item, PDF, email, Sheet
+    tanpa tab), `uji_pesanan_telaah.mjs` 36 uji untuk butir 338 (antrean bertautan ke pesanan yang ditutup, sudah datang dengan dan
+    tanpa baris lain, dengan Hitung sisa, rantai Diganti, waktu di HP lintas HP dan satu HP, jam HP terlalu cepat, barang masuk yang
+    sudah dipakai, pesanan lebih baru, nomor HP didahulukan, kalimat email, PDF Order kosong dan aplikasi lama); jawaban aksi lama
+    sama dengan Code.gs v0.28 selain PDF daftar belanja; uji Hitung sisa (43) dan Tandai diperiksa sekaligus (30) tetap lulus. Chromium
+    dengan API tiruan: `uji_pesanan_ui.mjs` 74 uji (kelompok dan Order awal, isi pesan WhatsApp, antrean saat sinyal putus, Staff
+    mengisi dari pesanan, dua HP dengan Backspace, Tutup dari Laporan dan form Stock, server lama, PDF, delapan ukuran) dan
+    `uji_pesanan_ui2.mjs` 29 uji (kartu diperbarui sesudah antrean terkirim, memesan lagi sesudah Tutup, Tutup pesanan yang sudah
+    datang, Tutup dari form Stock mengosongkan isian, penolakan menyebut item, antrean bertautan tidak macet, nama tombol unik, klik
+    tengah, nama pemasok 40 huruf di 320 px); uji form Stock (87), Tandai diperiksa (27 + 30), dan lebar tabel Stock tetap lulus.
+    Belum diuji: Supabase asli, salinan `Data_Pesanan` ke Sheets, dan WhatsApp dari PWA yang dipasang di HP.
+338. **Perbaikan sesudah telaah berlawanan** (empat penelaah: server, aplikasi, teks, dokumen; satu temuan diperiksa ulang oleh
+    pemeriksa, sisanya oleh Claude dengan skrip pengulangnya karena pemeriksa terhenti di batas pemakaian). (a) **Antrean tidak
+    macet** (ditemukan keempat penelaah): kirimStock dulu menolak seluruh kiriman yang bertautan ke pesanan yang sudah Datang, Ditutup,
+    atau Diganti, padahal kiriman di antrean HP tidak bisa diubah ("Kirim ulang" mengirim isi yang sama), jadi barang masuk dan baris
+    lain kategori itu hilang, seperti butir 327a. Kini `barisPesananTertaut_` tidak pernah menolak (butir 331); untuk Ditutup dan
+    Diganti saran lama "Kosongkan Tambah masuk … jika barangnya sama" malah membuang barang yang belum pernah dicatat. (b) **Backspace
+    melepas tautan:** `ubah('masuk', '')` melepas tautan pada setiap ketikan, jadi membetulkan 5 → 4 dengan menghapus lalu mengetik
+    membuat barang yang sama tercatat dua kali dari dua HP; kini tautan dilepas pada `change` (kolom ditinggalkan kosong). (c) **Waktu
+    di HP:** pesanan dan barang masuk dari antrean bisa sampai jauh sesudah dibuat, jadi `selesaikanPesanan_` hanya memakai pesanan
+    yang diketuk sebelum barang itu dicatat di HP, dan `aksiCatatPesanan_` membandingkan waktu barang masuk di HP (bukan waktu
+    diterima server) dengan waktu ketukan; `waktuHp_` = `timestamp_device` tetapi tidak sesudah `timestamp_server` (jam HP yang
+    terlalu cepat). `bacaPesanan_` dan `bacaPembelian_` ditambah `tw` (dan `kiriman`). (d) **Barang masuk yang sudah dipakai:**
+    barang masuk yang sudah menjadi Kiriman Stock pesanan Datang lain tidak membuat pesanan terlambat Datang. (e) **Pesanan lebih
+    baru:** pesanan dari antrean tidak lagi mengganti pesanan menunggu yang diketuk sesudahnya; itemnya langsung Diganti dan jawaban
+    `lebihBaru` menyebutnya. (f) **Id pesanan dipakai ulang:** `sidPesanan` disimpan selama satu kunjungan layar, jadi memesan isi
+    yang sama lagi (sesudah Tutup atau diganti) dijawab `sudahTerkirim` tanpa menulis tetapi kartu menulis "dicatat"; kini id dibuang
+    sesudah tercatat, dan `sudahTerkirim` ditulis "Pesanan ke … ini sudah tercatat.". (g) **Kartu basi sesudah antrean:** layar
+    Laporan tidak punya `segarkanLayar`, jadi pesanan yang terkirim dari antrean tidak muncul (mengundang pesanan kedua); kini kartu
+    Daftar belanja memasang `segarkanLayar` (juga saat aplikasi dibuka lagi), menggambar ulang hanya jika isinya berubah, dan Order
+    pesanan yang sudah keluar dari antrean kembali kosong. (h) **Tutup yang tidak menutup:** `ditutup: 0` kini ditulis "sudah tidak
+    menunggu: barangnya sudah dicatat datang, atau pesanannya sudah ditutup." (Laporan dan form Stock). (i) **Tutup di form Stock**
+    mengosongkan Tambah masuk (dan harga beli, baik sampai) yang diisi dari pesanan itu, pemasok kembali kosong jika tidak ada masuk
+    lain, dan konfirmasi serta pesan singkatnya menyebutnya. (j) **Penolakan Isi dari pesanan** menyebut item penghalang dan
+    kategorinya, lalu pindah ke Semua kategori dengan pencarian kosong (di satu kategori, Kirim stock tidak mengirim item kategori lain).
+    (k) **PDF:** Order kosong dari kelompok "Belum ada pemasok" atau item yang sudah dipesan dicetak "–" dengan sebab dan saran kecil di
+    bawahnya; catatan lama "tidak diberi saran (–)" membuat "–" dibaca sebagai tanpa stok maksimum. Item yang tidak dikirim (aplikasi
+    0.28) tetap dicetak saran. (l) **Email:** kalimat "Tidak ada Stock Akhir minus …" tetap ada walau hanya ada pesanan yang belum
+    datang. (m) **Nomor WhatsApp:** nomor HP didahulukan (telepon kantor yang ditulis lebih dulu dulu dipakai). (n) **Teks:** catatan
+    kartu kini "Ketukan Kirim ke WhatsApp mencatat pesanan ke pemasok itu; jika pesannya tidak jadi dikirim, ketuk Tutup pesanan."
+    (dulu "Yang dicatat hanya pesanan yang dikirim lewat WhatsApp"), klik tengah ikut mencatat, keterangan "Belum ada pemasok"
+    menyebut pemasok aktif, nama tombol Isi dari pesanan dan Tutup pesanan untuk pembaca layar memuat tanggal dan item (dua pesanan
+    pemasok yang sama dulu bernama sama; label yang terlihat kini di awal nama), fokus sesudah kartu digambar ulang ke pesan kartu,
+    nama pemasok satu kata panjang boleh dipatah (`overflow-wrap: anywhere`), dan spesifikasi sistem 5.5, 9.2, kepala (Bagian 12),
+    serta tampilan 5.3, 5.9, dan 7 disamakan dengan kode. Versi tetap Code.gs v0.29 dan aplikasi 0.29.0 (belum dirilis).
