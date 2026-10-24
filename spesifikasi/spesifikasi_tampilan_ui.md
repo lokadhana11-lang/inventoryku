@@ -6,6 +6,9 @@
 > Jika keduanya berbeda soal fungsi, yang berlaku adalah file sistem.
 >
 > Versi 1.12, 17 Oktober 2026. Semua keputusan tampilan sudah ditetapkan (Bagian 11).
+> Tambahan 22 Oktober 2026 (keputusan pemilik, dari telaah aplikasi): hari libur, yaitu Pengaturan → Hari
+> libur, kemajuan dan tiket Beranda pada hari libur, ubin Form terisi di Dashboard, form kustom, dan
+> teks penjualan (Bagian 5.2, 5.3, 5.6, 5.7, 5.10, 5.11, 7, dan 11).
 > Perubahan sejak versi 1.11 (dipilih pemilik dari pratinjau "Pratinjau Gerak InventoryKu", 17 Oktober
 > 2026): perpindahan layar yang mulus (View Transitions) dengan nama tiket yang terbang ke judul
 > layar form, dan angka utama yang berhitung naik dalam 0,9 detik (Bagian 8.1, 8.2, 8.3, 8.5, 10,
@@ -580,6 +583,16 @@ Satu-satunya layar yang sepenuhnya navy.
   Perlu perhatian yang sama dengan ikon kunci.
 - **Pengingat stock opname** untuk Pengelola jika sudah lewat jadwal: "Stock opname
   terakhir 9 hari lalu." Ketuk untuk membuka layar Stock opname.
+- **Hari libur** (22 Oktober 2026, spesifikasi sistem Bagian 5.8). Kemajuan diganti ikon kalender
+  dan "Hari libur: Lebaran" (tanpa keterangan cukup "Hari libur"), warna Teks di Navy, dan rel
+  tidak tampil. Tiket yang belum diisi bertanda Menunggu "Hari libur" dengan baris sobek "Tidak
+  ditagih hari ini"; tiket yang tetap berisian tampil seperti biasa (Terkirim, Nihil, atau "3 dari 9
+  pengecekan"). Momen selesai tidak terjadi saat hari libur dihapus. Pengelola melihat "Hari ini
+  hari libur" (atau sehari sebelumnya "Besok hari libur") bertanda Menunggu, di bawah permintaan reset
+  PIN dan akun terkunci, dengan keterangan "Lebaran. Ditandai Budi, 21 Okt 07.10. Email harian dan
+  pengingat cek suhu tidak dikirim hari ini. Ketuk untuk mengubah atau menghapus."; ketukan membuka
+  Pengaturan → Hari libur. Tanpa sinyal, Beranda dari data tersimpan kemarin memakai "besok hari
+  libur" kemarin; data yang lebih lama tidak menebak hari libur dan menghitung tagihan dari jadwal form.
 
 ### 5.3 Isi form
 
@@ -779,6 +792,8 @@ Satu-satunya layar yang sepenuhnya navy.
   berjajar jika pilihannya empat atau kurang, selebihnya dropdown; Ya/Tidak sebagai dua
   tombol; Item sebagai pencarian item; Jam sebagai pemilih waktu.
 - Tombol kirim memakai nama form: "Kirim" diikuti nama form dalam huruf kecil.
+- Pada hari libur (22 Oktober 2026) keterangan jadwalnya "Jadwal: Setiap hari. Hari libur, tidak
+  ditagih." Isian tetap bisa dikirim.
 
 ### 5.4 Riwayat
 
@@ -874,6 +889,8 @@ Satu-satunya layar yang sepenuhnya navy.
   angkanya), belum diperiksa, suhu di luar standar, item di bawah stok minimum, dan total
   waste (Rp). Tiap ubin punya ikon kecil di kanan labelnya dan angka Barlow Condensed 30 px.
   HP dan tablet: dua kolom, "Form terisi" selebar dua kolom. Laptop/desktop: satu baris.
+  Pada hari libur (22 Oktober 2026) ubin "Form terisi" bertuliskan "Libur" dengan keterangan "tidak
+  ada form yang ditagih", bukan "0 dari 0".
 - Daftar "Perlu perhatian": tiap baris diawali ubin ikon (Bagian 6) berwarna makna statusnya.
 - Tombol "Stock opname" di bagian atas, dengan tanggal opname terakhir di sampingnya.
 - Di sampingnya (di bawahnya di HP dan tablet) tombol "HPP dan food cost" dengan food cost bulan
@@ -947,7 +964,7 @@ Satu-satunya layar yang sepenuhnya navy.
 
 - Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Menu, Unit, Pemasok, Kategori
   dan satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
-  food cost, bahan kecil).
+  food cost, bahan kecil), dan Hari libur (22 Oktober 2026).
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
 - Staff yang meminta reset PIN diberi tanda Perlu ditinjau di daftar Staff.
@@ -990,10 +1007,13 @@ Satu-satunya layar yang sepenuhnya navy.
 - Selain nama outlet, zona waktu, jam closing, dan jadwal stock opname, ada pilihan
   "Keluar otomatis setelah tidak dipakai": 5, 10, 15, atau 30 menit. Nilai awalnya 5 menit.
   Di bawahnya satu baris keterangan: "Berlaku untuk semua pengguna di semua perangkat."
+- Keterangan jadwal: "Laporan harian dan cadangan mengikuti jam closing, jeda, hari cadangan, dan zona
+  waktu ini. Pada hari libur laporan harian tidak dikirim."
 - Kartu "HPP dan food cost" (versi 1.10): "Target food cost (%)" (1 sampai 100) dan "Bahan kecil (%)"
   (0 sampai 15), masing-masing dengan keterangan satu baris.
 - Kartu "Pengingat cek suhu": keterangan "Notifikasi ke semua HP yang menyalakan notifikasi, jika
-  waktu cek itu belum diisi untuk semua unit. Kosongkan jam untuk mematikan pengingatnya.", lalu tiga
+  waktu cek itu belum diisi untuk semua unit, kecuali pada hari libur. Kosongkan jam untuk mematikan
+  pengingatnya.", lalu tiga
   pemilih jam "Pengingat Opening/Middle/Closing" (awal 08.00, 14.00, 21.00). Jika server belum bisa
   mengirim notifikasi: "Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim."
   Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
@@ -1002,6 +1022,40 @@ Satu-satunya layar yang sepenuhnya navy.
   minimum, stock minus, atau barang yang lewat masa simpan atau habis besok. Kosongkan jam untuk
   mematikannya.", lalu pemilih jam "Jam pengingat stock" (awal 07.00) dan kalimat yang sama jika
   server belum bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.
+
+**Pengaturan → Hari libur** (22 Oktober 2026, spesifikasi sistem Bagian 5.8):
+
+- Kepala: judul "Hari libur" dan tombol utama "Tambah" (nonaktif sampai daftar termuat). Kalimat di
+  bawahnya: "Tanggal dapur tutup. Pada hari libur tidak ada form yang ditagih, penjualan tidak perlu
+  dicatat, dan email harian serta pengingat cek suhu tidak dikirim. Isian yang tetap dikirim diterima
+  seperti biasa."
+- Daftar dua kelompok: "Akan datang" (hari ini dan sesudahnya, urut naik; hari ini bertanda Menunggu
+  "Hari ini") dan "Sudah lewat" (urut turun, 30 terakhir). Tiap baris: ikon kalender, tanggal ("Jumat,
+  23 Oktober"), lalu "Lebaran · Ditandai Budi, 21 Okt 07.10". Kosong: "Belum ada hari libur. Ketuk
+  Tambah untuk menandai tanggal dapur tutup." Tanggal yang sudah diarsip tidak ditampilkan.
+- **Lembar "Tambah hari libur":** pilihan Tanggal "Hari ini, 23 Okt", "Besok, 24 Okt", "Tanggal lain"
+  tanpa pilihan awal (supaya tidak salah menandai hari ini); "Tanggal lain" memunculkan pemilih tanggal
+  "Tanggal libur" (paling jauh setahun ke depan). "Keterangan (tidak wajib)", paling panjang 40 huruf,
+  dengan bantuan "Misalnya Lebaran atau renovasi." Kalimat akibat yang berubah saat tanggal dipilih,
+  diawali tanggalnya: hari ini "Staff melihat Hari libur di Beranda; pengingat cek suhu dan email
+  harian hari ini tidak dikirim.", tanggal ke depan "form tidak ditagih; email harian dan pengingat
+  cek suhu hari itu tidak dikirim.", tanggal lewat "form tidak ditagih. Email dan rekap yang sudah
+  terkirim tidak berubah; Kepatuhan, food cost, dan rekap yang diunduh sesudahnya mengikuti tanda
+  ini.", lalu "Isian yang tetap dikirim diterima seperti biasa." (dan "Tanggal ini sudah hari libur;
+  menyimpan mengganti keterangannya." bila perlu). Jika hari ini sudah ada isian: tanda Perlu ditinjau
+  "Hari ini sudah ada isian Stock dan Suhu. Pastikan dapur memang tutup." Tombol "Batal" dan "Simpan
+  hari libur". Sesudah tersimpan, Tambah berikutnya langsung memilih hari sesudahnya dengan keterangan
+  yang sama (Lebaran beberapa hari).
+- **Lembar ubah** (ketuk baris): judul tanggalnya, "Ditandai Budi, 21 Okt 07.10.", "Keterangan (tidak
+  wajib)", lalu di bagian paling bawah "Hapus jika dapur ternyata buka. Form tanggal itu ditagih lagi."
+  dan tombol bahaya "Hapus hari libur". Tombol "Tutup" dan "Simpan".
+- Konfirmasi hapus: "Hapus hari libur Jumat, 23 Oktober?" dengan kalimat menurut tanggalnya (ke depan:
+  "Form tanggal itu ditagih lagi seperti hari biasa."; hari ini: pengingat cek suhu yang jamnya sudah
+  lewat tidak dikirim ulang; tanggal lewat: laporan harian tanggal itu tidak dikirim ulang). Tombol
+  "Batal" dan "Hapus hari libur".
+- Butuh sinyal (tidak masuk antrean). Hari ini dan besok mengikuti tanggal server.
+- Sebelum pemilik menjalankan setupSpreadsheet: "Hari libur belum bisa dicatat. Pemilik Sheet perlu
+  menjalankan ulang setupSpreadsheet sesudah Edge Function terbaru di-Deploy."
 
 **Pengaturan → Pemasok** (18 Oktober 2026):
 
@@ -1093,7 +1147,8 @@ Satu-satunya layar yang sepenuhnya navy.
 ```
 
 - Di bawah Keterangan ada pilihan **Jadwal**: "Setiap hari", "Hari tertentu" (pilih
-  harinya), atau "Sewaktu-waktu".
+  harinya), atau "Sewaktu-waktu". Keterangannya menyebut bahwa hari libur tidak ditagih ("Ditagih
+  setiap hari di Beranda dan email harian, kecuali hari libur.").
 - "Tambah kolom" membuka lembar bawah: label, jenis kolom, pilihan (jika jenisnya
   Pilihan), dan sakelar wajib.
 - "Lihat pratinjau" menampilkan layar isi form itu persis seperti yang akan dilihat staff.
@@ -1207,11 +1262,13 @@ menu `#/hpp/menu`).
   rincian di atas"), Per kategori (batang mendatar, nilai dan persen, "Bahan dengan pemakaian
   terbesar" yang bisa dibuka, dan bahan tanpa harga bertanda Perlu ditinjau), grafik "Food cost 6
   bulan" (SVG; batang Biru Malam, bulan di atas target berwarna Perlu ditinjau, angka tertulis di
-  atas tiap batang, garis target putus-putus, "–" untuk bulan yang penjualannya belum lengkap), dan
-  kartu Penjualan (jumlah hari tercatat, tiga catatan terakhir, "Catat penjualan").
+  atas tiap batang, garis target putus-putus, "–" untuk bulan yang penjualannya belum lengkap atau
+  semua harinya libur), dan kartu Penjualan (jumlah hari tercatat, "· 2 hari libur" jika ada hari libur
+  tanpa catatan, atau "Semua hari pada periode ini hari libur.", tiga catatan terakhir, "Catat
+  penjualan").
 - **Penjualan belum lengkap:** food cost di kepala "–", dan di atas rincian kartu Menunggu "Penjualan
-  belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat." dengan
-  tombol utama "Catat penjualan 9 Okt".
+  belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat. Hari dapur
+  tutup bisa ditandai sebagai hari libur." dengan tombol utama "Catat penjualan 9 Okt".
 - **Seharusnya vs nyata** (kartu kedua di kolom kiri, spesifikasi sistem Bagian 5.9): sebelum porsi
   per menu pernah dicatat, ajakan "Catat porsi terjual per menu saat mencatat penjualan. …" dengan
   tombol "Catat penjualan". Porsi belum lengkap: kartu Menunggu "Porsi per menu belum dicatat untuk
@@ -1231,8 +1288,11 @@ menu `#/hpp/menu`).
 - Laptop/desktop: bagian Bulan dua kolom (rincian kiri; grafik dan penjualan kanan).
 - **Lembar "Catat penjualan":** tanggal (tombol berjajar "Kemarin, 16 Okt" dan "Tanggal lain" dengan
   pemilih tanggal, maksimal hari ini), "Penjualan (Rp)" ("Total penjualan makanan dan minuman dari
-  kasir, sebelum pajak dan service. Hari tutup: isi 0."), "Sudah tercatat Rp 100.000. Menyimpan
-  akan menggantinya." bila tanggal itu sudah ada (angka dan catatannya ikut terisi), "Catatan
+  kasir, sebelum pajak dan service. Dapur tutup tanggal itu? Tandai sebagai hari libur, atau isi 0."),
+  "Sudah tercatat Rp 100.000. Menyimpan akan menggantinya." bila tanggal itu sudah ada (angka dan
+  catatannya ikut terisi), "Hari libur (Lebaran). Penjualan tidak perlu dicatat." bila tanggal itu hari
+  libur tanpa catatan (tetap bisa disimpan), atau tombol tautan "Tandai 21 Okt sebagai hari libur" yang
+  membuka lembar Tambah hari libur dengan tanggal itu (22 Oktober 2026), "Catatan
   (tidak wajib)", lalu bagian "Porsi terjual per menu": "Dari laporan kasir. Kosong: belum dicatat.
   0: tidak terjual. …", satu baris per menu aktif (nama, harga jual kecil di bawahnya, kolom angka
   96 px di kanan; porsi yang sudah tercatat terisi), dan "Porsi × harga jual: Rp 900.000. Bisa
@@ -1248,7 +1308,7 @@ Lembar (dialog di desktop) dari menu nama pengguna → "Notifikasi" (spesifikasi
 
 - "Yang dikirim ke HP ini, juga saat aplikasi tertutup:" lalu daftar. Pengelola: Suhu di luar
   standar, Permintaan reset PIN, Akun yang terkunci karena PIN salah, dan "Pengingat cek suhu
-  (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap". Pengelola juga "Pengingat stock
+  (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap, kecuali hari libur". Pengelola juga "Pengingat stock
   (07.00), jika ada item di bawah minimum, minus, atau lewat masa simpan" (atau "Pengingat stock
   (sedang dimatikan)"), di atas pengingat cek suhu. Staff: hanya baris pengingat cek suhu.
 - Sakelar "Notifikasi di HP ini" dengan kata "Nyala"/"Mati". Menyalakan meminta izin HP lebih dulu;
@@ -1360,6 +1420,13 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Bahan menu tanpa harga | "Garam belum punya harga, jadi HPP belum lengkap." |
 | Item dipakai menu | "Tidak bisa dinonaktifkan: masih dipakai menu Ayam bakar. Ubah atau nonaktifkan menunya dulu." |
 | Penjualan masa depan | "Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat." |
+| Penjualan kosong | "Isi penjualan. Isi 0 jika tidak ada penjualan." |
+| Hari libur di Beranda | "Hari libur: Lebaran"; tiket "Hari libur" dengan "Tidak ditagih hari ini" |
+| Hari libur tersimpan | "Hari libur Jumat, 23 Oktober tersimpan." (ditambah "Tanggal ini sudah punya isian Suhu; isiannya tetap tersimpan." jika ada) |
+| Hapus hari libur | "Hapus hari libur Jumat, 23 Oktober?", lalu "Hari libur Jumat, 23 Oktober dihapus." ("… sudah dihapus." jika HP lain sudah menghapusnya) |
+| Hari libur kosong | "Belum ada hari libur. Ketuk Tambah untuk menandai tanggal dapur tutup." |
+| Hari libur terlalu jauh | "Hari libur paling jauh setahun ke depan. Pilih tanggal yang lebih dekat." |
+| Hari libur di Catat penjualan | "Hari libur (Lebaran). Penjualan tidak perlu dicatat." |
 
 Pesan kesalahan menyebut apa yang salah dan apa yang harus dilakukan. Tidak ada
 permintaan maaf dan tidak ada kode teknis.
@@ -1533,6 +1600,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Login (17 Oktober 2026) | HP mengingat orang yang terakhir masuk: Login langsung menyapanya dengan papan angka PIN; daftar nama berupa lingkaran inisial hanya lewat "Ganti nama" atau saat HP belum mengingat siapa pun (Bagian 5.1). Login dengan PIN saja dan mengetik nama tidak dipilih. |
 | Hapus staff | Hanya untuk staff nonaktif, dengan konfirmasi (Bagian 5.7) |
 | Hapus item (17 Oktober 2026) | Hanya untuk item nonaktif yang belum punya catatan, dengan konfirmasi, di bagian paling bawah layar ubah item (Bagian 5.7) |
+| Hari libur (22 Oktober 2026) | Ditandai di layar sendiri, Pengaturan → Hari libur, satu tanggal per tindakan; Beranda Pengelola menautkannya saat hari ini atau besok libur, dan lembar Catat penjualan menawarkannya untuk tanggal tanpa penjualan. Tidak ada tanda hari libur di Riwayat. Kata "Hapus" dipakai untuk membatalkan tanda (Bagian 5.2, 5.7, 5.10) |
 | HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |

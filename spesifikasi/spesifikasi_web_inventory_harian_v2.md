@@ -904,6 +904,26 @@ tiket di Beranda, email harian, blok Kepatuhan di dashboard, dan rekap bulanan.
   form kustom yang tampil dan dijadwalkan untuk hari itu. Form kustom berjadwal
   "Sewaktu-waktu", form di luar jadwalnya, dan form yang disembunyikan tidak dihitung.
 
+**Hari libur** (keputusan pemilik 22 Oktober 2026). Pengelola menandai tanggal dapur tutup di
+Pengaturan → Hari libur, satu tanggal per tindakan: hari ini, tanggal yang sudah lewat (yang
+belum diarsip), atau paling jauh setahun ke depan, misalnya Lebaran. Tidak ada hari tutup tetap
+per minggu. Tanda disimpan di `M_HariLibur` (satu baris per tanggal, keterangan tidak wajib) dan
+bisa dihapus; penghapusannya tercatat di `Log_Perubahan`. Staff tidak bisa menandai atau menghapus.
+
+- Pada hari libur **tidak ada form yang ditagih**: form bawaan, form kustom harian, dan form
+  kustom yang hari itu dijadwalkan. Tidak ada yang dihitung belum lengkap di Beranda, Dashboard,
+  email, blok Kepatuhan di tab Dashboard, dan rekap bulanan, dan tidak ada pengecekan suhu yang
+  terlewat (Bagian 6.1).
+- Isian yang tetap dikirim pada hari libur diterima seperti biasa, tetap terlihat (Terkirim,
+  Nihil, atau sebagian), dan tetap perlu diperiksa. Tanda nihil tetap boleh.
+- Kemajuan hari ini di Beranda bertuliskan "Hari libur" (dengan keterangannya). Pengelola melihat
+  hari libur hari ini dan besok di Beranda, supaya tanggal yang salah masih bisa dihapus.
+- Tanggal yang sudah punya isian boleh ditandai libur; isiannya tetap tersimpan.
+- Menandai atau menghapus hari libur pada tanggal yang sudah lewat mengubah Kepatuhan, food cost,
+  dan rekap yang dibuat sesudahnya, bukan email atau rekap yang sudah terkirim.
+- Penjualan hari libur tidak perlu dicatat (Bagian 5.9). Email harian dan pengingat cek suhu ke
+  HP tidak dikirim (Bagian 10 dan 10.1).
+
 ### 5.9 Menu, HPP, dan Food Cost (Pengelola)
 
 Keputusan pemilik 17 Oktober 2026. Pengelola melihat dua hal: berapa persen penjualan yang
@@ -970,8 +990,11 @@ Semuanya khusus Pengelola dan diperiksa di server.
   harga pada sebagian hari), selisihnya disebut.
 - Bahan tanpa harga pada suatu hari tidak dihitung untuk hari itu dan namanya disebut.
 - **Food cost %** = pemakaian bahan ÷ penjualan × 100%. Dihitung hanya jika setiap hari dalam
-  periode punya catatan penjualan (Rp 0 untuk hari tutup). Jika ada yang kosong, food cost tidak
-  ditampilkan dan tanggalnya disebut.
+  periode punya catatan penjualan, kecuali hari libur (Bagian 5.8) yang tidak dicatat: hari itu
+  dianggap Rp 0 dan disebut terpisah ("25 dari 25 hari tercatat · 2 hari libur"). Penjualan yang
+  tetap dicatat pada hari libur ikut dihitung. Hari tutup yang tidak ditandai libur dicatat Rp 0.
+  Jika ada yang kosong, food cost tidak ditampilkan dan tanggalnya disebut. Pemakaian bahan pada
+  hari libur tetap dihitung.
 - Rincian: per kategori item, 10 bahan dengan pemakaian terbesar, dan food cost 6 bulan sampai
   bulan yang dipilih.
 
@@ -983,7 +1006,7 @@ Semuanya khusus Pengelola dan diperiksa di server.
   `Log_Perubahan`.
 - Pengingat di Dashboard ("Perlu perhatian", Menunggu): hari bulan ini yang belum punya catatan
   penjualan, dihitung mulai penjualan pertama yang pernah dicatat, supaya tidak ada pengingat
-  sebelum fitur ini dipakai.
+  sebelum fitur ini dipakai. Hari libur tanpa catatan penjualan tidak diingatkan.
 - Kasir outlet buatan sendiri; angkanya diketik dari laporan kasir harian.
 
 **Penjualan per menu dan pemakaian seharusnya** (keputusan pemilik 17 Oktober 2026):
@@ -999,7 +1022,8 @@ Semuanya khusus Pengelola dan diperiksa di server.
   dengan pemakaian nyata yang menghitung bahan saat dipakai prep. Dipakai resep menu yang berlaku
   sekarang.
 - **Seharusnya vs nyata:** dibandingkan dengan pemakaian bahan (di atas) hanya jika setiap hari dalam
-  periode punya porsi per menu; hari dengan penjualan Rp 0 (tutup) tidak perlu. Selisih = nyata −
+  periode punya porsi per menu; hari dengan penjualan Rp 0 (tutup) dan hari libur tanpa catatan
+  penjualan tidak perlu (hari libur yang tetap punya penjualan lebih dari 0 perlu porsinya). Selisih = nyata −
   seharusnya; plus berarti bahan terpakai lebih banyak dari porsi yang terjual (bocor, porsi
   berlebih, waste, atau pencatatan keliru). Selisih paling banyak 2% dari seharusnya dianggap sesuai.
   Barang jadi yang belum terjual di akhir periode ikut menambah selisih.
@@ -1058,7 +1082,8 @@ menemukan kekeliruan pengisian inventory.
     mencatat, keterangan, jumlah masuk atau keluar, dan saldo sesudah transaksi itu. Saldo
     terakhir tiap hari sama dengan Stock Akhir rekapnya. Catatan Stock, Prep List, dan Waste bisa
     dibuka untuk melihat isiannya di Riwayat. Tidak ada data baru: semuanya dibaca dari tab Data.
-- **Suhu:** suhu di luar standar tampil merah; waktu cek yang tidak diisi diberi tanda.
+- **Suhu:** suhu di luar standar tampil merah; waktu cek yang tidak diisi diberi tanda, kecuali pada
+  hari libur (Bagian 5.8).
 - **Semua form:** baris yang pernah dikoreksi menampilkan nilai lama, siapa yang
   mengubah, dan kapan (diambil dari `Log_Perubahan`).
 
@@ -1144,6 +1169,7 @@ misalnya "2 dari 3 isian diperiksa".
 | Mengelola staff dan PIN, termasuk menonaktifkan dan menghapus staff | Tidak | Ya |
 | Mengatur penerima email | Tidak | Ya |
 | Mengelola master data (item, resep, unit, kategori, satuan) dan konfigurasi | Tidak | Ya |
+| Menandai dan menghapus hari libur (Pengaturan → Hari libur) | Tidak | Ya |
 | Melihat HPP, food cost, dan harga jual menu; mengelola menu; mencatat penjualan | Tidak | Ya |
 | Melihat nominal rupiah waste (harga satuan, estimasi kerugian) | Tidak | Ya |
 
@@ -1252,7 +1278,7 @@ ke file ini (Bagian 7.3).
 | 2 | `Harian_Stock`, `Harian_Suhu`, `Harian_Prep`, `Harian_Waste` | Tampilan satu hari, tata letaknya sama dengan form | Rumus |
 | 3 | `Stock_Harian` | Rekap stock, satu baris per tanggal dan item | Aplikasi (dihitung server) |
 | 3 | `Data_Stock`, `Data_Suhu`, `Data_Prep`, `Data_PrepBahan`, `Data_Waste`, `Data_Penyesuaian`, `Data_Opname`, `Data_Nihil`, `Data_Penjualan`, `Data_PenjualanMenu`, `Data_Pesanan`, dan `Data_K_...` untuk tiap form kustom | Data lengkap, satu baris per item | Aplikasi |
-| 4 | `M_Outlet`, `M_Unit`, `M_Staff`, `M_Item`, `M_HargaItem`, `M_Resep`, `M_ResepBahan`, `M_Menu`, `M_MenuBahan`, `M_Kategori`, `M_Satuan`, `M_Form`, `M_FormKolom`, `M_Konfigurasi` | Master data dan definisi form | Aplikasi (Pengaturan) |
+| 4 | `M_Outlet`, `M_Unit`, `M_Pemasok`, `M_Staff`, `M_Item`, `M_HargaItem`, `M_Resep`, `M_ResepBahan`, `M_Menu`, `M_MenuBahan`, `M_Kategori`, `M_Satuan`, `M_Form`, `M_FormKolom`, `M_HariLibur`, `M_Konfigurasi` | Master data dan definisi form | Aplikasi (Pengaturan) |
 | 5 | `Log_Perubahan` | Jejak koreksi | Aplikasi |
 
 Tiap kelompok tab punya warna tab sendiri, supaya mudah dibedakan.
@@ -1323,7 +1349,7 @@ Tab Data adalah sumber semua tampilan lain, jadi kerapiannya dijaga oleh script:
 | **Waste** | Total per kategori, tren per item, estimasi kerugian (Rp) per bulan, 5 item paling sering waste |
 | **Suhu Chiller & Freezer** | Tren suhu per unit per hari, jumlah kejadian di luar standar |
 | **Prep List** | Total resep dan hasil per item per minggu, pemakaian bahan untuk prep, beban kerja per staff/shift |
-| **Kepatuhan** | Form yang belum diisi atau belum diperiksa per hari (termasuk form kustom), baris yang dilaporkan keliru |
+| **Kepatuhan** | Form yang belum diisi atau belum diperiksa per hari (termasuk form kustom), baris yang dilaporkan keliru. Pada hari libur kolom form yang belum diisi bertuliskan "Libur" (yang sebagian "Libur (3 dari 9)") dan tidak dihitung belum lengkap; ringkasan menyebut jumlah hari libur |
 
 - Blok Stock Inventory aktif sejak Tahap 2. Blok form lain sudah ada sejak pemasangan dan
   terisi saat formnya mulai dipakai.
@@ -1390,7 +1416,8 @@ PDF **tidak** dibuat pada setiap submit: lambat, file menumpuk, dan nama file be
    45 menit sesudahnya (sekitar 22:15) agar suhu Closing dan stock hari itu sempat
    diisi. Trigger berbasis waktu Apps Script punya toleransi sekitar ±15 menit, jadi
    laporan keluar antara kira-kira 22:00 dan 22:30. Hasilnya disimpan ke Drive dan
-   dilampirkan ke email laporan harian.
+   dilampirkan ke email laporan harian. Pada hari libur (Bagian 5.8) email tidak dikirim,
+   tetapi PDF form yang tetap berisian hari itu tetap disimpan ke Drive.
 2. **Unduh oleh pengguna.** Staff dan Pengelola memilih tanggal dan form di menu Laporan,
    lalu menekan "Unduh PDF". Server mengirim isi PDF ke aplikasi. Tombol yang sama
    tersedia di menu Riwayat. Unduhan ini tidak menambah file baru di Drive.
@@ -1490,8 +1517,8 @@ Dibuat otomatis tiap tanggal 1 untuk bulan sebelumnya, disimpan ke Drive di
 Bisa juga diunduh dari menu Laporan untuk bulan mana pun.
 
 Nilai rupiah dihitung dengan cara Bagian 8.5 (harga yang berlaku pada tiap tanggal). Karena
-itu angka rekap bulan yang sudah lewat tidak berubah lagi, kecuali riwayat harganya diubah
-untuk tanggal di bulan itu.
+itu angka rekap bulan yang sudah lewat tidak berubah lagi, kecuali riwayat harganya diubah,
+atau hari libur ditandai atau dihapus (Bagian 5.8), untuk tanggal di bulan itu.
 
 | Bagian | Isi |
 |---|---|
@@ -1499,8 +1526,8 @@ untuk tanggal di bulan itu.
 | Stock opname | Tanggal tiap opname dan nilai selisihnya; item yang paling sering berselisih |
 | Waste | Total jumlah dan nilai (Rp) per kategori waste; sepuluh item dengan nilai waste terbesar |
 | Prep | Total resep dan hasil per item; jika ada hasil aktual yang dicatat: hasil standar per item dan persentase hasil aktual terhadap resep |
-| Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat |
-| Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan |
+| Suhu | Jumlah kejadian di luar standar per unit; pengecekan yang terlewat (hari libur tidak dihitung dan disebut tanggalnya) |
+| Kepatuhan | Jumlah hari tiap form tidak lengkap; isian yang belum diperiksa; laporan kekeliruan. Hari libur tidak ditagih; hari yang dinilai menyebut jumlah dan tanggal hari libur |
 | Pembelian (18 Oktober 2026) | Per pemasok: jumlah kiriman, item, nilai pembelian (stock masuk × harga beli), dan barang masuk tanpa harga beli; hanya jika bulan itu ada pemasok atau harga beli yang dicatat |
 | HPP dan food cost | Pemakaian bahan dan rinciannya, penjualan, food cost dan target, pemakaian per kategori, pemakaian seharusnya (dari porsi terjual) vs nyata dengan 10 bahan berselisih terbesar (jika porsi per menu pernah dicatat), menu di atas target (HPP dengan harga hari terakhir bulan itu); Bagian 5.9 |
 
@@ -1561,6 +1588,13 @@ Keterangan di bawah ini untuk laporan harian.
   seharusnya vs nyata jika porsi per menu pernah dicatat.
 - Sejak pindah ke Supabase (Bagian 4.5) email dikirim lewat Brevo, atau dari Gmail pemilik
   lewat Apps Script jika Brevo tidak dipasang.
+- **Hari libur** (Bagian 5.8): laporan harian dari jadwal tidak mengirim email. PDF form yang tetap
+  berisian hari itu tetap disimpan ke Drive, lalu catatan laporan terakhir bertuliskan "Dilewati …
+  hari libur" (catatan "Gagal" hari sebelumnya tidak ditimpa, supaya tetap terlihat). Uji dari editor
+  (`kirimLaporanSekarang`) tetap mengirim email, dengan keterangan hari libur. Peringatan "laporan
+  belum terkirim" di Beranda Pengelola menganggap "Dilewati" sebagai laporan yang sudah berjalan;
+  hari libur tanpa catatan itu berarti jadwalnya tidak berjalan dan tetap diperingatkan. Rekap
+  bulanan tanggal 1 tetap dikirim walau tanggal itu hari libur.
 
 ### 10.1 Notifikasi ke HP (keputusan pemilik 17 Oktober 2026)
 
@@ -1578,7 +1612,7 @@ Apps Script tidak bisa mengirimnya.
 | Suhu di luar standar (unit, suhu, tindakan, pengisi) | HP Pengelola | Saat isian Suhu berisi suhu di luar standar diterima |
 | "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
-| "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif |
+| "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif, kecuali pada hari libur (Bagian 5.8) |
 | "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
 
 - **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
@@ -1591,6 +1625,9 @@ Apps Script tidak bisa mengirimnya.
 - Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, atau Dashboard untuk
   pengingat stock).
 - Notifikasi tidak menggantikan apa pun: pemberitahuan di Beranda, Dashboard, dan email harian tetap.
+- Pada hari libur hanya pengingat cek suhu yang tidak dikirim. Notifikasi suhu di luar standar, reset
+  PIN, akun terkunci, dan pengingat stock tetap dikirim (isian tetap diterima, dan barang tetap bisa
+  lewat masa simpan saat dapur tutup).
 - HP yang izinnya dicabut atau aplikasinya dihapus dibuang dari daftar saat layanan push menolaknya.
 
 ---
@@ -1680,6 +1717,10 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 - [x] **Arsip tahunan** (keputusan pemilik 17 Oktober 2026, Bagian 8.6): tab menyimpan tahun
       berjalan dan tahun lalu; yang lebih tua pindah ke berkas arsip per tahun di Drive, juga dalam
       bentuk Google Sheets. Riwayat dan rekap tahun yang sudah diarsip tidak dibuka dari aplikasi.
+- [x] **Hari libur** (keputusan pemilik 22 Oktober 2026, Bagian 5.8): ditandai Pengelola per tanggal
+      (hari ini, tanggal lewat, atau sampai setahun ke depan) dan bisa dihapus; tidak ada hari tutup
+      tetap per minggu; tidak ada form yang ditagih dan tidak ada pengecekan suhu yang terlewat;
+      penjualan tidak perlu dicatat; email harian dan pengingat cek suhu tidak dikirim.
 
 - [ ] **Menghapus form kustom** berarti form hilang dari website, tetapi datanya tetap ada
       di spreadsheet dan bisa dipulihkan. Data tidak pernah dihapus permanen dari aplikasi.
@@ -1743,6 +1784,9 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
     jam pengingat cek suhu di Outlet dan jadwal
 15. **Arsip tahunan** (17 Oktober 2026): pemindahan otomatis tiap jam, berkas JSON dan Google Sheets
     per tahun di Drive, penolakan tanggal yang sudah diarsip
+16. **Hari libur** (22 Oktober 2026): `M_HariLibur`, Pengaturan → Hari libur, penagihan form, laporan
+    harian dan pengingat cek suhu yang dilewati, penjualan dan porsi, rekap bulanan, dan blok
+    Kepatuhan di tab Dashboard
 
 ---
 

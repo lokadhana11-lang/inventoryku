@@ -291,6 +291,15 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   karenanya) dan jawabannya ditambah `pesananDatang: [{ pemasok, item }]` dan `pesananSudahDatang: [{ item, pemasok, oleh, waktu }]`
   (Tambah masuk dari pesanan yang sudah dicatat datang, tidak dicatat lagi; tanpa baris lain `jumlah: 0` tanpa menulis).
   `unduhPdfBelanja.order` boleh berisi semua item (aplikasi 0.29 mengirim semuanya).
+- Hari libur (Code.gs v0.30, 22 Oktober 2026): khusus Pengelola `daftarLibur` → `{ siap, hariIni, batasDepan, arsipSampai, libur: [{ tanggal,
+  keterangan, oleh, waktu }] }` (urut tanggal; tanggal sebelum `arsip_sampai` tidak ikut); `simpanLibur {tanggal, keterangan}` (hari ini,
+  tanggal lewat yang belum diarsip, atau paling jauh 366 hari ke depan; keterangan paling panjang 40; tanggal yang sudah libur diganti
+  keterangannya) → jawaban `daftarLibur` + `disimpan: { tanggal, keterangan, baru, isian: [nama form berisian] }`; `hapusLibur {tanggal}` →
+  jawaban `daftarLibur` + `dihapus: tanggal | null`. `beranda` (semua role) ditambah `libur` dan `liburBesok` (`{ tanggal, keterangan,
+  oleh, waktu } | null`); `dashboard`, `formKustom` (dan `kirimKustom.form`), dan `penjualanTanggal` ditambah `libur`; pada hari libur semua
+  `form[].wajib` dan `formKustom.wajib` false. `hpp.penjualan` (juga `simpanPenjualan.hpp`) ditambah `libur: [tanggal]` (hari libur tanpa
+  catatan penjualan; tidak masuk `jumlahHari` dan `kurang`). `M_Konfigurasi.laporan_terakhir` boleh diawali `Dilewati <waktu> untuk
+  <tanggal>: hari libur`. `setupSpreadsheet` di Supabase menjawab `VERSI_KODE`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -339,6 +348,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++ | Tandai diperiksa sekaligus (permintaan pemilik 19 Oktober 2026, butir 2 dari telaah aplikasi): tombol "Tandai diperiksa (n)" di judul tiap tanggal di daftar Riwayat untuk Pengelola, konfirmasi, isian yang dilaporkan keliru tidak ikut | Kode selesai (Code.gs v0.27, aplikasi 0.27.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (30 uji server: dilaporkan, id ganda dan tak dikenal, ulang, Staff ditolak, batas, lima jenis form, Beranda; sel yang berubah sama dengan Tandai diperiksa satu per satu) dan Chromium (27 uji: HP, desktop dengan detail kanan, Staff, server lama, tanpa sinyal, galat server, delapan ukuran, gerak; 30 uji perbaikan sesudah telaah: tanpa tombol selama filter kategori/item, kalimat filter pengisi, simpanan penuh, tombol 48 px). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
 | 12+++++++++++++++++++++ | Isi form Stock lebih cepat (permintaan pemilik 20 Oktober 2026, butir 3 dari telaah aplikasi): "Semua kategori" di form Stock (satu kiriman per kategori), kotak "Cari item" di form Stock dan Stock opname, "Catat pemakaian: Hitung sisa" (hari ini saja; Stock Keluar dihitung server dari sisa, sisa disimpan di `Sisa Dihitung` dan ikut dikoreksi) | Kode selesai (Code.gs v0.28, aplikasi 0.28.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; jawaban jalur Tambah keluar sama dengan v0.27 selain kolom `sisa` di Riwayat) dan Chromium (87 uji: HP, desktop 1024/1366, antrean, satu kategori ditolak, server lama, pencarian, opname, Kemarin, sisa lama, kirim terkunci, delapan ukuran). Digabung dan dipasang pemilik 21 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12++++++++++++++++++++++ | Daftar belanja per pemasok dan pesanan (keputusan pemilik 21 Oktober 2026, butir 4 dari telaah aplikasi): kelompok per pemasok (pesanan yang menunggu, lalu pemasok barang masuk terakhir), "Kirim ke WhatsApp" ke nomor di Kontak, pesanan tercatat di `Data_Pesanan` lewat antrean HP, "Pesanan belum datang" dan "Tutup pesanan", kartu "Pesanan menunggu" dengan "Isi dari pesanan" di form Stock (semua role), barang masuk menyelesaikan pesanan, PDF per pemasok, email | Kode selesai (Code.gs v0.29, aplikasi 0.29.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (120 uji server, jawaban aksi lama sama dengan v0.28 selain PDF daftar belanja) dan Chromium (103 uji: Laporan dan form Stock, antrean, dua HP, server lama, delapan ukuran; uji lama tetap lulus), termasuk perbaikan sesudah telaah berlawanan; lihat butir 328–338. Digabung dan dipasang pemilik 22 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
+| 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HariLibur` dan rumus Kepatuhan), gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2586,3 +2596,89 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     pemasok yang sama dulu bernama sama; label yang terlihat kini di awal nama), fokus sesudah kartu digambar ulang ke pesan kartu,
     nama pemasok satu kata panjang boleh dipatah (`overflow-wrap: anywhere`), dan spesifikasi sistem 5.5, 9.2, kepala (Bagian 12),
     serta tampilan 5.3, 5.9, dan 7 disamakan dengan kode. Versi tetap Code.gs v0.29 dan aplikasi 0.29.0 (belum dirilis).
+
+### Hari libur (Code.gs v0.30, aplikasi 0.30.0, 22 Oktober 2026)
+
+339. **Asal dan keputusan pemilik:** butir 5 dari telaah aplikasi (19 Oktober 2026). Sebelumnya hari dapur tutup tercatat sebagai
+    belum lengkap di Beranda, email, Dashboard, dan rekap, kecuali tiap form ditandai "Tidak ada hari ini" dan penjualan diisi 0.
+    Pemilik memilih: Pengelola menandai, juga untuk tanggal ke depan (Lebaran) dan tanggal lewat, dan bisa membatalkan; tidak ada hari
+    tutup tetap per minggu; tidak ada pengecekan suhu yang ditagih atau terlewat; email harian dan pengingat cek suhu tidak dikirim.
+    Dari itu: tidak ada form yang ditagih dan penjualan tidak perlu dicatat. Spesifikasi sistem Bagian 3, 5.1, 5.8, 5.9, 6.1, 7.1, 8.2,
+    8.5, 9.1, 9.3, 10, 10.1, 12, 13; tampilan Bagian 5.2, 5.3, 5.6, 5.7, 5.10, 5.11, 7, 11. Tidak dibangun: rentang tanggal sekaligus,
+    hari tutup mingguan, tanda hari libur di Riwayat, jenis Perlu perhatian baru, perubahan jadwal opname dan masa simpan.
+340. **Data:** tab master `M_HariLibur` (Tanggal (tanggal), Keterangan, Dicatat Oleh, Dicatat Pada; `TAB_MASTER`, `KUNCI_MASTER` kunci
+    Tanggal), dibuat `setupSpreadsheet`. Master dipilih (bukan tab Data atau baris `M_Konfigurasi`) karena tab berawalan `M_` selalu
+    dimuat di Supabase (jadwal ringan `muat: 'master'` membacanya tanpa percobaan ulang), tidak diarsip (tanggal ke depan aman), ikut
+    salinan ke Sheets (rumus Kepatuhan cukup `COUNTIF`), ikut cadangan, dan menyimpan siapa/kapan. Satu baris per tanggal; menghapus =
+    `deleteRow` semua baris bertanggal itu + satu baris `Log_Perubahan` (`(dihapus)`), pengecualian ketiga "master tidak dihapus".
+    Pembaca `bacaLibur_` (memo `MEMO_LIBUR_`, dibuang `resetMemoForm_` dan setiap tanda ditulis): tanggal dibaca `teksTanggal_` dengan
+    `zonaSheet_`, teks yang bukan tanggal dilewati, baris ganda yang lebih atas dipakai; tab belum ada = tanpa hari libur (jalur baca
+    memakai `bacaTabel_`, bukan `ambilTab_`). `liburPada_(tanggal)` dan `liburUntukJawaban_` dipakai semua tempat.
+341. **Aksi** (khusus Pengelola, pesan per aksi untuk Staff): `daftarLibur`, `simpanLibur` (`periksaTanggalLibur_`: tanggal sah, paling
+    jauh `BATAS_LIBUR_DEPAN_HARI` 366, `periksaBelumDiarsip_`; keterangan `teksMaster_` 40 huruf; ditulis `tambahBarisMaster_` dengan
+    `tanggalSel_`; tanggal yang sudah libur: keterangan diganti dengan `Log_Perubahan`, sama persis: tidak menulis), `hapusLibur`
+    (tanggal sah dan belum diarsip; tanpa batas depan supaya tanggal yang diketik tangan tetap bisa dihapus; yang sudah bukan libur:
+    `dihapus: null`, bukan galat, untuk dua HP). Ketiganya butuh sinyal dan tanpa `submissionId` (simpan bersifat idempoten). Lewat
+    `denganKunci_`, jadi simpanan Beranda 2 menit di Apps Script langsung terbuang. `disimpan.isian` = nama form yang sudah berisian
+    pada tanggal itu (`kelengkapanForm_`, hanya untuk tanggal sampai hari ini), supaya tanggal yang salah pilih langsung ketahuan.
+    `dataLibur_` tidak mengirim tanggal sebelum `arsip_sampai` (tidak bisa dihapus lagi).
+342. **Penagihan:** `wajibPada_` = `!liburPada_(tanggal) && wajibMenurutJadwal_(f, tanggal)` (aturan jadwal lama). Dengan itu Beranda,
+    Dashboard (`formWajib` 0, butir `formBelum` hilang), email, `formKustom.wajib`, dan Kepatuhan rekap ikut. Status form tetap dari
+    isian (Terkirim, Nihil, sebagian); isian, tanda nihil, dan notifikasi suhu di luar standar pada hari libur diterima seperti biasa
+    dan tetap dihitung belum diperiksa. Suhu terlewat dilewati pada hari libur di `suhuTerlewat_` (Riwayat) dan `dataRekapBulan_`.
+    `beranda.liburBesok` (semua role): Pengelola melihat "Besok hari libur", dan HP tanpa sinyal esok hari memakainya.
+343. **Laporan harian** (`jalankanLaporanHarian_`, tanggal laporan, jadi laporan yang berjalan lewat tengah malam memeriksa kemarin):
+    hari libur dan bukan uji → PDF form berstatus terkirim/sebagian tetap disimpan ke Drive (keputusan tambahan dari telaah: tanpa
+    itu isian hari libur tidak pernah masuk Drive atau email mana pun), email tidak dikirim, `laporan_terakhir` = "Dilewati <waktu> untuk
+    <tanggal>: hari libur (ket); n PDF disimpan ke Drive." kecuali nilainya diawali "Gagal" (kegagalan hari kerja tetap terlihat).
+    `kirimLaporanSekarang` (uji) tetap mengirim, dengan "Hari libur: …" di kepala email dan "Tidak ada isian (hari libur)"
+    (`teksStatusForm_(f, libur)`). Keterangan `laporan_terakhir` kini konstanta bersama `KETERANGAN_LAPORAN_TERAKHIR` (teksnya
+    berubah sekali pada laporan pertama sesudah pasang). `laporanTerlambat_` menerima awalan "Dilewati" tanpa melangkah mundur melewati
+    hari libur: jadwal yang berjalan selalu menulis "Dilewati", jadi hari libur tanpa catatan itu berarti jadwalnya berhenti; peringatannya
+    "jadwal laporan tidak berjalan pada … (hari libur, catatan Dilewati tidak ada)". Rekap bulanan tanggal 1 tetap dikirim.
+344. **Pengingat:** `pengingatSuhu_` berhenti pada hari libur (`hariIni_`) sebelum `Data_Suhu` dibaca (di jadwal ringan Supabase tab itu
+    tidak sempat diminta). Pengingat stock, notifikasi suhu di luar standar, reset PIN, dan akun terkunci tetap dikirim.
+345. **Penjualan dan porsi:** `penjualanRentang_` melewati hari libur tanpa catatan (dianggap Rp 0, tidak masuk `jumlahHari` dan
+    `kurang`, disebut di `libur`), jadi `hari + kurang.length = jumlahHari` tetap dan food cost dihitung jika hari lain lengkap; catatan
+    yang tetap ada pada hari libur dihitung. `porsiKurang_`: hari libur tanpa catatan penjualan tidak perlu porsi (hari libur dengan
+    penjualan > 0 tetap perlu; aturan lama Rp 0 = tutup tetap). Pemakaian bahan hari libur tetap dihitung (cek silang tetap cocok).
+    Pengingat penjualan Dashboard dan kartu HPP ikut dengan sendirinya. Galat penjualan kosong: "Isi penjualan. Isi 0 jika tidak ada
+    penjualan." Bulan yang semua harinya libur: food cost "–" dengan alasannya (PDF, email, kartu Penjualan).
+346. **Rekap bulanan:** `hasil.kepatuhan.libur` dan `hasil.suhu.libur` (tanggal), `kepatuhan.form[].liburDitagih` (hari yang ditagih menurut
+    jadwal tetapi libur). Hari yang dinilai tetap hari kalender: "(31 hari, termasuk 2 hari libur: 23 dan 24)" atau ", semuanya hari libur";
+    form yang tidak ditagih karena libur "Hari libur, tidak ditagih"; catatan Suhu dan Kepatuhan; daftar lebih dari 8 tanggal "antara lain
+    …" (`teksHariBulanSingkat_`); HPP "n dari m hari tercatat, k hari libur" dan catatan; email "(2 hari libur)". Tanpa hari libur di bulan
+    itu PDF dan email sama persis dengan v0.29. Rekap yang sudah terkirim tidak berubah; yang diunduh sesudah tanda diubah mengikutinya.
+347. **Rumus tab Dashboard** (`pasangBlokKepatuhanDashboard_`, berlaku sesudah `setupSpreadsheet` di Apps Script): `hlT` = kolom Tanggal
+    `M_HariLibur`, `lb,COUNTIF(hlT,d)>0` di LET per hari; kolom B–E dan I lewat `lib()` (dibuat di JS, tanpa LAMBDA bersarang): belum
+    diisi/"Tidak ada unit"/"0 dari …" → "Libur", sebagian → "Libur (3 dari 9)" (sama dengan Beranda); F = 0 pada hari libur; G dan H tetap.
+    Ringkasan menyebut "(termasuk n hari libur)" dari `SUMPRODUCT((A<>"")*(COUNTIF(hlT,A)>0))` (tanggal ganda tetap satu hari). Format
+    bersyarat memakai `LEFT(…,5)<>"Libur"`. Nama LET baru `hlT`, `lb`, `hl` (butir 120b). Hasil di Google Sheets belum bisa diuji di sini.
+348. **`setupSpreadsheet` sesudah pindah memeriksa versi:** Supabase menjawab `VERSI_KODE`; jika berbeda dengan Code.gs di Apps Script
+    (Edge Function belum di-Deploy), berhenti dengan pesan sebelum Sheet diubah, supaya Sheet tidak punya tab yang tidak ada di
+    Supabase (dari telaah kompatibilitas). Urutan pemasangan yang aman ditulis di PANDUAN ("Versi baru").
+349. **Perbaikan runtime Supabase:** tiruan `Utilities.formatDate` (`supabase/src/layanan.js`) tidak mengenal pola `'H'`, sehingga
+    `kirimLaporanHarian` di Supabase selalu memakai tanggal hari itu walau berjalan sebelum 06.00 (laporan yang dijadwalkan lewat tengah
+    malam ditulis untuk hari yang salah). Ditemukan oleh uji hari libur; kini `'H'` = jam tanpa nol di depan.
+350. **Aplikasi (0.30.0):** rute `#/pengaturan/libur(/yyyy-mm-dd)` (`layarHariLibur`, pola Unit; tanggal di alamat membuka lembar Tambah
+    atau ubah untuk tanggal itu, dipakai tautan "Tandai 21 Okt sebagai hari libur" di Catat penjualan), baris "Hari libur" di
+    Pengaturan, ikon `kalender`. Lembar Tambah tanpa pilihan awal ("Hari ini, 23 Okt" / "Besok, 24 Okt" / "Tanggal lain", hari ini
+    dan batas menurut server), kalimat akibat bertanggal, peringatan jika hari ini sudah berisian (Beranda tersimpan), dan sesudah
+    menyimpan Tambah berikutnya memilih hari sesudahnya dengan keterangan yang sama. Kata "Hapus" (bukan "Batalkan") supaya tidak
+    berdampingan dengan tombol "Batal" konfirmasi. Beranda: kemajuan "Hari libur: …" dengan ikon kalender tanpa rel dan tanpa momen
+    selesai, tiket "Hari libur", pemberitahuan Pengelola hari ini/besok di bawah reset PIN dan akun terkunci; data tersimpan dari
+    tanggal lain menghitung `wajib` dari jadwal (`wajibMenurutJadwal`, juga `dataKustomDariHp`) dan memakai `liburBesok` kemarin;
+    `aturLiburDiBeranda` memperbarui Beranda tersimpan sesudah simpan/hapus. Dashboard ubin "Libur". Server lama: kalimat "Server belum
+    diperbarui…" di layar Hari libur; field baru dianggap null. Keterangan panjang satu kata: `.ket-pecah` dan `.kemajuan-teks.libur`.
+351. **Uji** (di luar repo, `scratchpad/uji`): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js`: `uji_libur.mjs` 100 uji (tanpa tab
+    lalu `setupSpreadsheet` dua kali, validasi, simpan/ubah/hapus dan `Log_Perubahan`, baris ganda dan teks diketik tangan, Beranda
+    Pengelola dan Staff, `liburBesok`, simpanan Beranda, Dashboard, kemarin libur tanpa butir penjualan, HPP dan porsi, form kustom, isian
+    dan tanda nihil pada hari libur, laporan dilewati dengan PDF ke Drive, Gagal tidak ditimpa, laporan 01.00 untuk kemarin, uji dari editor,
+    `laporanTerlambat_` (jadwal berhenti tetap diperingatkan), pengingat suhu dan stock, notifikasi suhu di luar standar, Riwayat Suhu,
+    arsip, rekap PDF dan email, form hari tertentu, daftar panjang); `uji_libur_rumus.mjs` (rumus seimbang, nama LET tanpa bentrok, gaya
+    titik koma); `uji_libur_banding.mjs` (11 aksi dan email harian/rekap tanpa hari libur sama dengan v0.29 selain field baru; urutan cek
+    suhu yang dikirim pada milidetik yang sama juga berbeda antara dua jalan v0.29). Chromium `uji_libur_ui.mjs` 82 uji (Pengaturan, lembar
+    Tambah dan ubah, hapus, Beranda Pengelola dan Staff, Dashboard, form kustom, tanpa sinyal dari simpanan kemarin, Catat penjualan dan
+    tautan Tandai, server lama, tanpa sinyal di layar Hari libur, delapan ukuran dengan keterangan 40 huruf satu kata); uji lama (pesanan
+    84 + 36 + 74 + 29, Hitung sisa 43, form Stock 87, Tandai diperiksa 30 + 27 + 30) tetap lulus. Belum diuji: Supabase dan Google asli
+    (rumus Kepatuhan di Sheets, pg_cron yang melewati laporan), dan HP asli.
