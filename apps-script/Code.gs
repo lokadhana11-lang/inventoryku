@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.29 (daftar belanja per pemasok dan pesanan)
+// InventoryKu Code.gs v0.30 (hari libur)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -96,9 +96,12 @@
  * - 21 Oktober 2026    : daftar belanja per pemasok dan pesanan ke pemasok
  *                        (Data_Pesanan; aksi catatPesanan, tutupPesanan;
  *                        formStock.pesanan; kirimStock menyelesaikan pesanan).
+ * - 22 Oktober 2026    : hari libur (M_HariLibur; aksi daftarLibur, simpanLibur,
+ *                        hapusLibur): tidak ada form yang ditagih, laporan harian
+ *                        dan pengingat cek suhu dilewati, penjualan tidak perlu dicatat.
  */
 
-var VERSI_KODE = 'v0.29';
+var VERSI_KODE = 'v0.30';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -196,6 +199,12 @@ var AKSI_ = {
     pesan: 'Pemasok hanya bisa diubah Head Kitchen atau Manager.' },
   abaikanHargaBeli: { jalankan: aksiAbaikanHargaBeli_, pengelola: true,
     pesan: 'Harga hanya bisa diubah Head Kitchen atau Manager.' },
+  daftarLibur: { jalankan: aksiDaftarLibur_, bacaSaja: true, pengelola: true,
+    pesan: 'Hari libur hanya diatur Head Kitchen atau Manager.' },
+  simpanLibur: { jalankan: aksiSimpanLibur_, pengelola: true,
+    pesan: 'Hari libur hanya bisa ditandai Head Kitchen atau Manager.' },
+  hapusLibur: { jalankan: aksiHapusLibur_, pengelola: true,
+    pesan: 'Hari libur hanya bisa dihapus Head Kitchen atau Manager.' },
   dashboard: { jalankan: aksiDashboard_, bacaSaja: true, pengelola: true,
     pesan: 'Dashboard hanya untuk Head Kitchen dan Manager.' },
   riwayat: { jalankan: aksiRiwayat_, bacaSaja: true },
@@ -1112,7 +1121,8 @@ var KUNCI_MASTER = {
   M_MenuBahan: 'Nama Menu',
   M_Kategori: 'Nama Kategori',
   M_Unit: 'Nama Unit',
-  M_Pemasok: 'Nama Pemasok'
+  M_Pemasok: 'Nama Pemasok',
+  M_HariLibur: 'Tanggal'
 };
 
 function kolomKunciMaster_(sheet) {
@@ -1404,6 +1414,11 @@ function berandaBaru_(tanggal, body, pengguna) {
     namaOutlet: namaOutlet_(),
     tanggal: tanggal,
     form: kelengkapanForm_(tanggal),
+    // Hari libur (Code.gs v0.30): semua form.wajib false; status tetap dari isian.
+    libur: liburUntukJawaban_(tanggal),
+    // Besok hari libur: Pengelola melihatnya sehari sebelumnya (tanggal yang salah masih bisa dihapus), dan HP tanpa
+    // sinyal esok hari tahu bahwa hari itu libur.
+    liburBesok: liburUntukJawaban_(geserTanggal_(tanggal, 1)),
     // Lewat masa simpan dan Habis besok (Bagian 5.3), untuk semua role (Tahap 6).
     masaSimpan: masaSimpan_(tanggal),
     keluarOtomatisMenit: keluarOtomatisMenit_()
@@ -1526,11 +1541,157 @@ function cariForm_(idForm, termasukArsip) {
  * tidak pernah ditagih.
  */
 function wajibPada_(f, tanggal) {
+  return !liburPada_(tanggal) && wajibMenurutJadwal_(f, tanggal); // hari libur: tidak ada form yang ditagih (Code.gs v0.30)
+}
+
+/** Ditagih menurut tampil dan jadwal form saja, tanpa hari libur (rekap membedakan "tidak dijadwalkan" dari "hari libur"). */
+function wajibMenurutJadwal_(f, tanggal) {
   if (!f.aktif || f.diarsipkan) return false;
   if (f.jenis !== 'kustom') return true;
   if (f.jadwal === 'sewaktu-waktu') return false;
   if (f.jadwal === 'hari tertentu') return f.hari.indexOf(namaHari_(tanggal)) >= 0;
   return true;
+}
+
+/* ---------- Hari libur (Code.gs v0.30; spesifikasi sistem Bagian 5.8) ---------- */
+
+var TAB_LIBUR = 'M_HariLibur';
+var BATAS_LIBUR_DEPAN_HARI = 366;
+var PANJANG_KET_LIBUR = 40;
+/** Hari libur yang sudah dibaca dalam permintaan ini (dibuang resetMemoForm_ dan setelah tanda ditulis). */
+var MEMO_LIBUR_ = null;
+
+/**
+ * M_HariLibur: { ada (tab ada), hari: { 'yyyy-mm-dd': { tanggal, keterangan, oleh, pada (Date|null) } } }.
+ * Tab yang belum ada (sebelum setupSpreadsheet) = tanpa hari libur. Teks yang bukan tanggal dilewati;
+ * dua baris bertanggal sama (diketik tangan): yang lebih atas dipakai.
+ */
+function bacaLibur_() {
+  if (MEMO_LIBUR_) return MEMO_LIBUR_;
+  var t = bacaTabel_(TAB_LIBUR);
+  var hasil = { ada: !!t, hari: {} };
+  if (t) {
+    var zona = zonaSheet_();
+    t.baris.forEach(function (b) {
+      var tg = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
+      if (!tanggalSah_(tg) || hasil.hari[tg]) return;
+      var pada = nilai_(t, b, 'Dicatat Pada');
+      hasil.hari[tg] = {
+        tanggal: tg,
+        keterangan: rapikanTeks_(nilai_(t, b, 'Keterangan')),
+        oleh: rapikanTeks_(nilai_(t, b, 'Dicatat Oleh')),
+        pada: pada instanceof Date && !isNaN(pada.getTime()) ? pada : null
+      };
+    });
+  }
+  MEMO_LIBUR_ = hasil;
+  return hasil;
+}
+
+/** Tanda libur pada tanggal itu, atau null. Satu bacaan tab per permintaan. */
+function liburPada_(tanggal) {
+  return bacaLibur_().hari[tanggal] || null;
+}
+
+/** Bentuk untuk jawaban API: { tanggal, keterangan, oleh, waktu (ISO|null) } | null. */
+function liburUntukJawaban_(tanggal) {
+  var x = liburPada_(tanggal);
+  return x ? { tanggal: x.tanggal, keterangan: x.keterangan, oleh: x.oleh, waktu: x.pada ? x.pada.toISOString() : null } : null;
+}
+
+/** Tanggal untuk menandai atau menghapus hari libur: hari ini, tanggal lewat yang belum diarsip, atau paling jauh setahun ke depan. */
+function periksaTanggalLibur_(tanggal) {
+  if (!tanggalSah_(tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  if (tanggal > geserTanggal_(hariIni_(), BATAS_LIBUR_DEPAN_HARI)) {
+    throw galatPengguna_('Hari libur paling jauh setahun ke depan. Pilih tanggal yang lebih dekat.');
+  }
+  periksaBelumDiarsip_(tanggal);
+  return tanggal;
+}
+
+/** Jawaban Pengaturan → Hari libur: { siap, hariIni, batasDepan, arsipSampai, libur: [{ tanggal, keterangan, oleh, waktu }] } urut tanggal. */
+function dataLibur_() {
+  var b = bacaLibur_();
+  var hari = hariIni_();
+  var arsip = arsipSampai_();
+  return {
+    siap: b.ada,
+    hariIni: hari,
+    batasDepan: geserTanggal_(hari, BATAS_LIBUR_DEPAN_HARI),
+    arsipSampai: arsip,
+    // Tanggal yang sudah diarsip tidak dibaca lagi dan tidak bisa dihapus, jadi tidak ditampilkan.
+    libur: Object.keys(b.hari).sort().filter(function (t) { return !arsip || t >= arsip; }).map(function (t) { return liburUntukJawaban_(t); })
+  };
+}
+
+function aksiDaftarLibur_() {
+  return dataLibur_();
+}
+
+/** Nomor baris (dari bawah) M_HariLibur yang tanggalnya sama dengan tanggal. */
+function barisLibur_(t, tanggal) {
+  var zona = zonaSheet_();
+  return t.baris.map(function (b, i) { return teksTanggal_(nilai_(t, b, 'Tanggal'), zona) === tanggal ? i + 2 : 0; })
+    .filter(function (n) { return n; })
+    .sort(function (a, b) { return b - a; });
+}
+
+/**
+ * Menandai satu tanggal sebagai hari libur (khusus Pengelola). body: { tanggal, keterangan }. Tanggal yang sudah libur
+ * hanya diganti keterangannya (dicatat di Log_Perubahan). Jawaban dataLibur_ ditambah disimpan: { tanggal, keterangan,
+ * baru, isian: [nama form yang sudah punya isian pada tanggal itu] }, supaya tanggal yang salah pilih langsung ketahuan.
+ */
+function aksiSimpanLibur_(body, pengguna) {
+  var tanggal = periksaTanggalLibur_(body.tanggal);
+  var ket = teksMaster_(body.keterangan, 'Keterangan', PANJANG_KET_LIBUR);
+  return denganKunci_(function () {
+    MEMO_LIBUR_ = null;
+    var t = bacaTabel_(TAB_LIBUR);
+    if (!t) throw galatPengguna_('Tab ' + TAB_LIBUR + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var lama = bacaLibur_().hari[tanggal];
+    var kini = new Date();
+    if (lama) {
+      if (lama.keterangan !== ket) {
+        tulisBarisMaster_(t, barisLibur_(t, tanggal).pop(), { 'Keterangan': teksAman_(ket) });
+        catatLog_(TAB_LIBUR, tanggal, pengguna, kini, [['Keterangan', lama.keterangan, ket]]);
+      }
+    } else {
+      tambahBarisMaster_(TAB_LIBUR, {
+        'Tanggal': tanggalSel_(tanggal), 'Keterangan': teksAman_(ket), 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini
+      });
+    }
+    MEMO_LIBUR_ = null;
+    var hasil = dataLibur_();
+    var isian = tanggal > hasil.hariIni ? [] : kelengkapanForm_(tanggal).filter(function (f) {
+      return f.status !== 'belum';
+    }).map(function (f) { return f.nama; });
+    hasil.disimpan = { tanggal: tanggal, keterangan: ket, baru: !lama, isian: isian };
+    return hasil;
+  });
+}
+
+/**
+ * Menghapus tanda hari libur (khusus Pengelola): semua baris bertanggal itu dihapus dan dicatat di Log_Perubahan.
+ * Tanggal yang sudah bukan hari libur tidak galat (dua HP menghapus bersamaan): dihapus: null.
+ */
+function aksiHapusLibur_(body, pengguna) {
+  if (!tanggalSah_(body.tanggal)) throw galatPengguna_('Tanggal tidak terbaca. Pilih tanggal lagi.');
+  var tanggal = body.tanggal;
+  periksaBelumDiarsip_(tanggal);
+  return denganKunci_(function () {
+    MEMO_LIBUR_ = null;
+    var t = bacaTabel_(TAB_LIBUR);
+    var lama = t ? bacaLibur_().hari[tanggal] : null;
+    if (lama) {
+      barisLibur_(t, tanggal).forEach(function (n) { t.sheet.deleteRow(n); });
+      catatLog_(TAB_LIBUR, tanggal, pengguna, new Date(),
+        [['Tanggal', tanggal + (lama.keterangan ? ' (' + lama.keterangan + ')' : ''), '(dihapus)']]);
+    }
+    MEMO_LIBUR_ = null;
+    var hasil = dataLibur_();
+    hasil.dihapus = lama ? tanggal : null;
+    return hasil;
+  });
 }
 
 /**
@@ -5015,6 +5176,8 @@ function pengingatSuhuClosing() { return pengingatSuhu_('Closing'); }
  */
 function pengingatSuhu_(waktu) {
   if (!notifikasiTersedia_()) return console.log('Notifikasi tidak tersedia; pengingat ' + waktu + ' dilewati.');
+  // Hari libur (Code.gs v0.30): tidak ada pengecekan yang ditagih. Diperiksa sebelum Data_Suhu dibaca.
+  if (liburPada_(hariIni_())) return console.log('Hari libur; pengingat ' + waktu + ' dilewati.');
   var suhu = bacaDaftarForm_().filter(function (f) { return f.id === 'SUHU'; })[0];
   if (!suhu || !suhu.aktif) return console.log('Form Suhu disembunyikan; pengingat dilewati.');
   var unit = bacaUnit_().filter(function (u) { return u.aktif; });
@@ -5562,6 +5725,7 @@ function aksiDashboard_(body) {
     grafikSuhu: d.suhu,
     opname: d.opname,
     hpp: { bulan: d.hpp.bulan, nama: d.hpp.nama, foodCost: d.hpp.foodCost, target: d.hpp.target },
+    libur: liburUntukJawaban_(tanggal),
     alamatSheet: alamatDashboardSheet_()
   };
 }
@@ -5892,12 +6056,20 @@ function bacaPenjualan_() {
   return hasil;
 }
 
-/** Penjualan dari dari sampai sampai: { total, hari (tercatat), jumlahHari, kurang: [tanggal] }. */
+/**
+ * Penjualan dari dari sampai sampai: { total, hari (tercatat), jumlahHari, kurang: [tanggal], libur: [tanggal] }.
+ * Hari libur tanpa catatan penjualan (Code.gs v0.30) tidak perlu dicatat: dianggap Rp 0, tidak masuk jumlahHari
+ * dan kurang, dan disebut di libur. Penjualan yang tetap dicatat pada hari libur dihitung seperti biasa.
+ */
 function penjualanRentang_(jual, dari, sampai) {
-  var hasil = { total: 0, hari: 0, jumlahHari: 0, kurang: [] };
+  var hasil = { total: 0, hari: 0, jumlahHari: 0, kurang: [], libur: [] };
   for (var d = dari; d <= sampai; d = geserTanggal_(d, 1)) {
-    hasil.jumlahHari++;
     var x = jual.hari[d];
+    if (!x && liburPada_(d)) {
+      hasil.libur.push(d);
+      continue;
+    }
+    hasil.jumlahHari++;
     if (x) {
       hasil.total += x.nilai;
       hasil.hari++;
@@ -5921,7 +6093,7 @@ function aksiSimpanPenjualan_(body, pengguna) {
   var tanggal = body.tanggal;
   if (tanggal > hariIni_()) throw galatPengguna_('Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat.');
   periksaBelumDiarsip_(tanggal);
-  if (body.penjualan === '' || body.penjualan == null) throw galatPengguna_('Isi penjualan. Hari tutup diisi 0.');
+  if (body.penjualan === '' || body.penjualan == null) throw galatPengguna_('Isi penjualan. Isi 0 jika tidak ada penjualan.');
   var nilai = angkaOpsional_(body.penjualan, 'Penjualan', 2);
   var catatan = teksAman_(rapikanTeks_(body.catatan).slice(0, 200));
   var sid = typeof body.submissionId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(body.submissionId) ? body.submissionId : Utilities.getUuid();
@@ -6082,17 +6254,22 @@ function aksiPenjualanTanggal_(body) {
     penjualan: j ? { nilai: j.nilai, catatan: j.catatan } : null,
     menu: daftar,
     siap: { porsi: pm.ada },
-    pernahPorsi: !!pm.pertama
+    pernahPorsi: !!pm.pertama,
+    libur: liburUntukJawaban_(tanggal)
   };
 }
 
-/** Hari dari..sampai yang belum punya porsi per menu. Hari dengan penjualan Rp 0 (tutup) tidak perlu. */
+/**
+ * Hari dari..sampai yang belum punya porsi per menu. Hari dengan penjualan Rp 0 (tutup) tidak perlu, begitu juga
+ * hari libur kecuali penjualannya tetap dicatat lebih dari 0 (Code.gs v0.30).
+ */
 function porsiKurang_(porsi, jual, dari, sampai) {
   var kurang = [];
   for (var d = dari; d <= sampai; d = geserTanggal_(d, 1)) {
     if (porsi.hari[d]) continue;
     var j = jual.hari[d];
     if (j && j.nilai === 0) continue;
+    if (!j && liburPada_(d)) continue;
     kurang.push(d);
   }
   return kurang;
@@ -6390,7 +6567,7 @@ function rentangHpp_(bulan, hari) {
 function foodCostBulan_(ctx, bulan) {
   var r = rentangHpp_(bulan, ctx.hari);
   var pakai = pemakaianBahan_(ctx, r.dari, r.sampai);
-  var jual = r.sampai >= r.dari ? penjualanRentang_(ctx.jual, r.dari, r.sampai) : { total: 0, hari: 0, jumlahHari: 0, kurang: [] };
+  var jual = r.sampai >= r.dari ? penjualanRentang_(ctx.jual, r.dari, r.sampai) : { total: 0, hari: 0, jumlahHari: 0, kurang: [], libur: [] };
   var fc = jual.jumlahHari && !jual.kurang.length && jual.total > 0 ? Math.round(pakai.total / jual.total * 1000) / 10 : null;
   return { rentang: r, pemakaian: pakai, penjualan: jual, foodCost: fc };
 }
@@ -7300,6 +7477,7 @@ var MEMO_FORM_ = {};
 function resetMemoForm_() {
   MEMO_FORM_ = {};
   MEMO_HARGA_ = null;
+  MEMO_LIBUR_ = null;
 }
 
 function normalJenisKolom_(nilai) {
@@ -7926,7 +8104,8 @@ function dataFormKustom_(f, tanggal) {
     item: def.kolom.some(function (c) { return c.jenis === 'Item'; }) ? itemAktifRingkas_() : [],
     kiriman: { jumlah: Object.keys(sid).length, baris: kiriman.length, terakhir: barisTerakhir_(kiriman) },
     nihil: nihil.length ? barisTerakhir_(nihil) : null,
-    wajib: wajibPada_(f, tanggal)
+    wajib: wajibPada_(f, tanggal),
+    libur: liburUntukJawaban_(tanggal)
   };
 }
 
@@ -8671,6 +8850,7 @@ function suhuTerlewat_(r, f) {
   var hari = hariIni_();
   var hasil = [];
   for (var tg = r.dari < pertama ? pertama : r.dari; tg <= r.sampai && tg < hari; tg = geserTanggal_(tg, 1)) {
+    if (liburPada_(tg)) continue; // hari libur: tidak ada pengecekan yang terlewat (Code.gs v0.30)
     var kurang = [];
     unit.forEach(function (u) {
       ['Opening', 'Middle', 'Closing'].forEach(function (w) {
@@ -9955,6 +10135,9 @@ function ujiPemisahHalamanPdf() {
 
 /* ---------- Catatan kegagalan (terlihat Pengelola di M_Konfigurasi dan Beranda) ---------- */
 
+var KETERANGAN_LAPORAN_TERAKHIR = 'Diisi otomatis oleh laporan harian. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola; ' +
+  '"Dilewati" berarti hari libur.';
+
 function waktuSekarangId_() {
   return Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HH:mm');
 }
@@ -9982,10 +10165,11 @@ function catatSurelGagal_(asal, pesan) {
  * yang gagal memanggil Supabase). Laporan untuk tanggal D dijadwalkan pada D + jam closing + jeda (boleh lewat tengah malam);
  * dianggap terlambat 60 menit sesudahnya. Kiriman yang tercatat lebih dari 30 menit sebelum jadwal (misalnya uji
  * kirimLaporanSekarang pagi hari) tidak mencakup tanggal itu. laporan_terakhir yang kosong (belum pernah ada laporan) tidak
- * dianggap terlambat.
+ * dianggap terlambat. Hari libur (Code.gs v0.30): "Dilewati" dihitung sebagai laporan yang sudah berjalan. Hari libur
+ * tetap diperiksa, karena jadwal yang berjalan selalu menulis "Dilewati"; tanpa catatan itu jadwalnya memang berhenti.
  */
 function laporanTerlambat_(nilai, lap) {
-  var m = String(lap).match(/^(?:Terkirim|Gagal) (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/);
+  var m = String(lap).match(/^(?:Terkirim|Gagal|Dilewati) (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/);
   if (!m) return '';
   var jam = jamSah_(nilai.jam_closing) || '21:30';
   var jeda = jedaSah_(nilai.jeda_laporan_menit);
@@ -10010,7 +10194,9 @@ function peringatanSistem_() {
   if (/^Gagal/.test(lap)) hasil.push('Laporan harian: ' + lap);
   var telat = /^Gagal/.test(lap) ? '' : laporanTerlambat_(nilai, lap);
   if (telat) {
-    hasil.push('Laporan harian: laporan untuk ' + tanggalPanjangId_(telat) + ' belum terkirim. Jadwal otomatis mungkin ' +
+    hasil.push('Laporan harian: ' + (liburPada_(telat)
+      ? 'jadwal laporan tidak berjalan pada ' + tanggalPanjangId_(telat) + ' (hari libur, catatan Dilewati tidak ada)'
+      : 'laporan untuk ' + tanggalPanjangId_(telat) + ' belum terkirim') + '. Jadwal otomatis mungkin ' +
       'berhenti. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script.');
   }
   if (/^Gagal/.test(cad)) hasil.push('Cadangan mingguan: ' + cad);
@@ -10126,7 +10312,7 @@ function ringkasStockHari_(tanggal, master, rekap) {
   return { minus: minus.sort(urut), belanja: belanja.sort(urut) };
 }
 
-function teksStatusForm_(f) {
+function teksStatusForm_(f, libur) {
   if (f.status === 'terkirim') {
     return 'Terkirim' + (f.detail ? ' (' + f.detail + ')' : '') +
       (f.terakhir ? ', terakhir ' + f.terakhir.oleh + ' ' + jamId_(new Date(f.terakhir.waktu)) : '');
@@ -10134,6 +10320,7 @@ function teksStatusForm_(f) {
   if (f.status === 'nihil') return 'Nihil (ditandai ' + (f.terakhir ? f.terakhir.oleh : '') + ')';
   if (f.status === 'sebagian') return 'Belum lengkap: ' + f.detail;
   if (f.wajib) return 'Belum diisi';
+  if (libur) return 'Tidak ada isian (hari libur)';
   // Form kustom di luar jadwalnya tidak ditagih (Bagian 5.8).
   return f.jadwal === 'sewaktu-waktu' ? 'Tidak ada isian (sewaktu-waktu, tidak ditagih)' : 'Tidak ada isian (tidak dijadwalkan hari ini)';
 }
@@ -10153,12 +10340,15 @@ function htmlEmailHarian_(d) {
   var html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:' + w.tinta + ';max-width:640px">' +
     '<div style="background:' + w.navy + ';color:#FFFFFF;padding:14px 16px">' +
       '<div style="font-size:18px;font-weight:bold">Laporan harian ' + escHtml_(d.outlet) + '</div>' +
-      '<div style="color:#A9B8CF">' + escHtml_(tanggalPanjangId_(d.tanggal)) + '</div></div>';
+      '<div style="color:#A9B8CF">' + escHtml_(tanggalPanjangId_(d.tanggal)) + '</div>' +
+      // Hari libur (Code.gs v0.30): hanya terlihat lewat kirimLaporanSekarang, karena laporan dari jadwal dilewati.
+      (d.libur ? '<div style="color:#A9B8CF">Hari libur' + (d.libur.keterangan ? ': ' + escHtml_(d.libur.keterangan) : '') + '</div>' : '') +
+    '</div>';
 
   html += bagian('Form hari ini', daftar(d.form.map(function (f) {
     var belum = f.status === 'belum' || f.status === 'sebagian';
     var gaya = belum && f.wajib ? 'color:' + w.masalah + ';font-weight:bold' : '';
-    return '<b>' + escHtml_(f.nama) + '</b>: <span style="' + gaya + '">' + escHtml_(teksStatusForm_(f)) + '</span>';
+    return '<b>' + escHtml_(f.nama) + '</b>: <span style="' + gaya + '">' + escHtml_(teksStatusForm_(f, d.libur)) + '</span>';
   })));
 
   var stock = [];
@@ -10281,6 +10471,9 @@ function htmlEmailHarian_(d) {
  * masa simpan sejak Tahap 6; pengingat stock opname dan ringkasan daftar belanja
  * sejak Tahap 8. PDF Suhu ikut juga saat pengecekannya baru sebagian. Hasil dan kegagalan
  * dicatat di M_Konfigurasi (laporan_terakhir).
+ * Hari libur (Code.gs v0.30): laporan dari jadwal tidak dikirim. PDF form yang tetap berisian disimpan ke
+ * Drive, lalu laporan_terakhir mencatat "Dilewati" (kecuali nilainya diawali "Gagal", supaya kegagalan hari
+ * kerja sebelumnya tetap terlihat di Beranda). Uji dari editor (opsi.uji) tetap mengirim email.
  * opsi: { tanggal, uji: bool }.
  */
 function jalankanLaporanHarian_(opsi) {
@@ -10291,6 +10484,7 @@ function jalankanLaporanHarian_(opsi) {
   var masalah = [];
   var hasil = { tanggal: tanggal, pdf: [], penerima: [], terkirim: false };
   try {
+    var libur = liburPada_(tanggal);
     var form = kelengkapanForm_(tanggal);
     form.forEach(function (f) {
       if ((f.status !== 'terkirim' && f.status !== 'sebagian') || !laporanPdf_(f.id)) return;
@@ -10311,11 +10505,27 @@ function jalankanLaporanHarian_(opsi) {
       }
     });
 
+    if (libur && !opsi.uji) {
+      hasil.dilewati = true;
+      var keDrive = hasil.pdf.filter(function (p) { return p.drive; }).length;
+      var teks = 'Dilewati ' + waktuSekarangId_() + ' untuk ' + tanggal + ': hari libur' +
+        (libur.keterangan ? ' (' + libur.keterangan + ')' : '') + (keDrive ? '; ' + keDrive + ' PDF disimpan ke Drive' : '') +
+        (masalah.length ? '. Masalah: ' + masalah.join('; ') : '') + '.';
+      if (/^Gagal/.test(String(bacaKonfigurasi_().nilai.laporan_terakhir || ''))) {
+        console.log(teks + ' laporan_terakhir tidak diganti karena berisi kegagalan sebelumnya.');
+      } else {
+        catatStatusSistem_('laporan_terakhir', teks, KETERANGAN_LAPORAN_TERAKHIR);
+      }
+      console.log('Laporan harian ' + tanggal + ' dilewati: hari libur.');
+      return hasil;
+    }
+
     var konf = bacaKonfigurasi_().nilai;
     var cadangan = String(konf.cadangan_terakhir || '');
     var data = {
       outlet: namaOutlet_() || 'Outlet',
       tanggal: tanggal,
+      libur: libur,
       form: form,
       stock: ringkasStockHari_(tanggal),
       waste: ringkasWasteHari_(tanggal),
@@ -10348,12 +10558,12 @@ function jalankanLaporanHarian_(opsi) {
     hasil.terkirim = true;
     catatStatusSistem_('laporan_terakhir', 'Terkirim ' + waktuSekarangId_() + ' untuk ' + tanggal + ' ke ' +
       penerima.length + ' penerima, ' + hasil.pdf.length + ' PDF' + (masalah.length ? '. Masalah: ' + masalah.join('; ') : '') + '.',
-      'Diisi otomatis oleh laporan harian. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola.');
+      KETERANGAN_LAPORAN_TERAKHIR);
   } catch (err) {
     console.error('Laporan harian gagal: ' + (err && err.stack ? err.stack : err));
     hasil.galat = err && err.message ? err.message : String(err);
     catatStatusSistem_('laporan_terakhir', 'Gagal ' + waktuSekarangId_() + ' untuk ' + tanggal + ': ' + hasil.galat,
-      'Diisi otomatis oleh laporan harian. Baris yang diawali "Gagal" juga tampil di Beranda Pengelola.');
+      KETERANGAN_LAPORAN_TERAKHIR);
   }
   return hasil;
 }
@@ -10811,8 +11021,14 @@ function dataRekapBulan_(bulan) {
   // sejak isian Suhu pertama, sampai kemarin untuk bulan berjalan.
   var terlewat = [];
   var jumlahTerlewat = 0;
+  var suhuLibur = [];
   if (suhuPertama) {
     for (var tg = dari < suhuPertama ? suhuPertama : dari; tg <= akhirNilai; tg = geserTanggal_(tg, 1)) {
+      // Hari libur (Code.gs v0.30): tidak ada pengecekan yang terlewat; tanggalnya disebut di catatan PDF.
+      if (liburPada_(tg)) {
+        suhuLibur.push(tg);
+        continue;
+      }
       var kurang = [];
       unitAktif.forEach(function (u) {
         ['Opening', 'Middle', 'Closing'].forEach(function (w) {
@@ -10833,6 +11049,7 @@ function dataRekapBulan_(bulan) {
     luar: daftarUnit.reduce(function (n, u) { return n + u.luar; }, 0),
     terlewat: terlewat,
     jumlahTerlewat: jumlahTerlewat,
+    libur: suhuLibur,
     mulai: suhuPertama
   };
 
@@ -10851,7 +11068,7 @@ function dataRekapBulan_(bulan) {
   }
   var formKepatuhan = bacaDaftarForm_().map(function (f) {
     var x = { id: f.id, nama: f.nama, tampil: f.aktif, jadwal: f.jadwal, ditagih: 0, tidakLengkap: [], kiriman: 0, belumDiperiksa: 0,
-      dilaporkan: 0, _f: f, _tanggal: {} };
+      dilaporkan: 0, _f: f, _tanggal: {}, _liburDitagih: 0 };
     var t = f.id === 'SUHU' ? tS : tabel(tabDataForm_(f.id));
     if (!t) return x;
     var sid = {};
@@ -10882,10 +11099,14 @@ function dataRekapBulan_(bulan) {
   }
   var mulaiNilai = pertama && pertama > dari ? pertama : dari;
   var hariDinilai = 0;
+  var liburDinilai = [];
   if (pertama) {
     for (var d = mulaiNilai; d <= akhirNilai; d = geserTanggal_(d, 1)) {
       hariDinilai++;
+      var libur = !!liburPada_(d);
+      if (libur) liburDinilai.push(d); // wajibPada_ false untuk semua form pada hari libur
       formKepatuhan.forEach(function (x) {
+        if (libur && wajibMenurutJadwal_(x._f, d)) x._liburDitagih++;
         if (!wajibPada_(x._f, d)) return;
         x.ditagih++;
         var lengkap = x.id === 'SUHU' ? suhuLengkap(d) : (x._tanggal[d] || nihil[d + '|' + x.id]);
@@ -10895,6 +11116,9 @@ function dataRekapBulan_(bulan) {
   }
   var totalKepatuhan = { kiriman: 0, belumDiperiksa: 0, dilaporkan: 0, hariTidakLengkap: 0 };
   formKepatuhan.forEach(function (x) {
+    // Hari yang ditagih menurut jadwal tetapi libur: "Hari libur, tidak ditagih" di PDF jika tidak ada hari lain yang ditagih.
+    if (x._liburDitagih) x.liburDitagih = x._liburDitagih;
+    delete x._liburDitagih;
     delete x._f;
     delete x._tanggal;
     totalKepatuhan.kiriman += x.kiriman;
@@ -10906,6 +11130,7 @@ function dataRekapBulan_(bulan) {
     form: formKepatuhan,
     total: totalKepatuhan,
     hariDinilai: hariDinilai,
+    libur: liburDinilai,
     mulai: pertama && hariDinilai ? mulaiNilai : '',
     akhir: akhirNilai
   };
@@ -10937,6 +11162,11 @@ function dataRekapBulan_(bulan) {
 function teksPeriodeRekap_(d) {
   var p = d.sampai.split('-');
   return '1–' + Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1] + ' ' + p[0] + (d.berjalan ? ' (bulan berjalan)' : '');
+}
+
+/** Seperti teksHariBulan_, tetapi lebih dari 8 tanggal ditulis "antara lain …" (daftar hari libur di rekap). */
+function teksHariBulanSingkat_(tanggal) {
+  return tanggal.length > 8 ? 'antara lain ' + teksHariBulan_(tanggal.slice(0, 8)) : teksHariBulan_(tanggal);
 }
 
 /** "3, 7, dan 12" (atau "5 dan 20") dari tanggal-tanggal satu bulan. */
@@ -10980,7 +11210,8 @@ function isiPdfRekapHpp_(h) {
   }
   var p = h.pemakaian;
   var j = h.penjualan;
-  var teksJual = j.hari + ' dari ' + j.jumlahHari + ' hari tercatat';
+  var nLibur = (j.libur || []).length;
+  var teksJual = j.hari + ' dari ' + j.jumlahHari + ' hari tercatat' + (nLibur ? ', ' + nLibur + ' hari libur' : '');
   html += tabelRekap_([{ judul: 'Uraian', lebar: 70 }, { judul: 'Nilai (Rp)', lebar: 30, angka: true }], [
     ['Bahan terpakai (keluar dan prep)', rupiahId_(p.terpakai)],
     ['Waste bahan', rupiahId_(p.waste)],
@@ -10998,6 +11229,10 @@ function isiPdfRekapHpp_(h) {
     catatanHpp.push('Food cost tidak dihitung: penjualan belum dicatat untuk ' + j.kurang.length + ' hari (' +
       (j.kurang.length > 8 ? 'antara lain ' + teksHariBulan_(j.kurang.slice(0, 8)) : teksHariBulan_(j.kurang)) + ').');
   }
+  if (h.foodCost == null && !j.kurang.length && !j.jumlahHari && nLibur) {
+    catatanHpp.push('Food cost tidak dihitung: semua hari yang dinilai hari libur.');
+  }
+  if (nLibur) catatanHpp.push('Hari libur (' + teksHariBulanSingkat_(j.libur) + ') tidak perlu catatan penjualan; pemakaian bahan pada hari itu tetap dihitung.');
   if (p.wasteBarangJadi) catatanHpp.push('Waste barang jadi ' + rupiahId_(p.wasteBarangJadi) + ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.');
   if (p.tanpaHarga.length) catatanHpp.push(p.tanpaHarga.length + ' bahan belum punya harga pada sebagian hari dan tidak ikut dihitung: ' + daftarNamaSingkat_(p.tanpaHarga) + '.');
   if (p.stokPembuka) catatanHpp.push('Stok pembuka ' + rupiahId_(p.stokPembuka) + ' tidak dihitung sebagai selisih stock.');
@@ -11163,7 +11398,8 @@ function isiPdfRekap_(d) {
   'Belum ada unit Chiller atau Freezer aktif dan belum ada pengecekan suhu.');
   html += catatan('Pengecekan termasuk cek ulang. Terlewat = Opening, Middle, atau Closing unit aktif yang tidak diisi' +
     (su.mulai ? ', dihitung sejak isian Suhu pertama (' + tanggalSedangId_(su.mulai) + ')' : '') +
-    (d.berjalan ? ' sampai kemarin' : '') + '.');
+    (d.berjalan ? ' sampai kemarin' : '') + '.' +
+    (su.libur && su.libur.length ? ' Hari libur (' + teksHariBulanSingkat_(su.libur) + ') tidak dihitung.' : ''));
   if (su.terlewat.length) {
     html += '<h3>Pengecekan yang terlewat</h3>' + tabelRekap_([
       { judul: 'Tanggal', lebar: 16 }, { judul: 'Terlewat', lebar: 14, angka: true }, { judul: 'Pengecekan yang tidak diisi', lebar: 70 }
@@ -11177,8 +11413,10 @@ function isiPdfRekap_(d) {
   // Kepatuhan
   var k = d.kepatuhan;
   html += '<h2>Kepatuhan</h2>';
+  var nLibur = (k.libur || []).length;
   html += '<p class="isi">' + e(k.hariDinilai
-    ? 'Hari yang dinilai: ' + tanggalSedangId_(k.mulai) + ' sampai ' + tanggalSedangId_(k.akhir) + ' (' + k.hariDinilai + ' hari).'
+    ? 'Hari yang dinilai: ' + tanggalSedangId_(k.mulai) + ' sampai ' + tanggalSedangId_(k.akhir) + ' (' + k.hariDinilai + ' hari' +
+      (!nLibur ? '' : nLibur === k.hariDinilai ? ', semuanya hari libur' : ', termasuk ' + nLibur + ' hari libur: ' + teksHariBulanSingkat_(k.libur)) + ').'
     : (d.berjalan && d.akhirNilai < d.dari
       ? 'Belum ada hari yang dinilai: hari pertama bulan ini belum selesai.'
       : 'Belum ada hari yang dinilai: aplikasi belum dipakai pada bulan ini.')) + '</p>';
@@ -11188,13 +11426,15 @@ function isiPdfRekap_(d) {
     { judul: 'Belum diperiksa', lebar: 12, angka: true }, { judul: 'Dilaporkan keliru', lebar: 12, angka: true }
   ], k.form.map(function (x) {
     var tanggal = x.tidakLengkap.length ? teksHariBulan_(x.tidakLengkap)
-      : (!k.hariDinilai ? '–' : x.ditagih ? 'Semua lengkap' : (!x.tampil ? 'Disembunyikan, tidak ditagih' : (x.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu, tidak ditagih' : 'Tidak ditagih')));
+      : (!k.hariDinilai ? '–' : x.ditagih ? 'Semua lengkap' : (!x.tampil ? 'Disembunyikan, tidak ditagih' :
+        (x.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu, tidak ditagih' : (x.liburDitagih ? 'Hari libur, tidak ditagih' : 'Tidak ditagih'))));
     return [e(x.nama), String(x.ditagih), { html: String(x.tidakLengkap.length), kelas: x.tidakLengkap.length ? 'akhir' : '' }, e(tanggal),
       String(x.kiriman), String(x.belumDiperiksa), { html: String(x.dilaporkan), kelas: x.dilaporkan ? 'akhir' : '' }];
   }), ['Total', '', String(k.total.hariTidakLengkap), '', String(k.total.kiriman), String(k.total.belumDiperiksa), String(k.total.dilaporkan)],
   'Belum ada form.');
   html += catatan('Lengkap menurut aturan kelengkapan: ada kiriman atau ditandai nihil; Suhu lengkap jika semua unit aktif punya ' +
-    'Opening, Middle, dan Closing. Isian = kiriman pada bulan ini; belum diperiksa dan dilaporkan keliru dihitung saat rekap dibuat.');
+    'Opening, Middle, dan Closing. Isian = kiriman pada bulan ini; belum diperiksa dan dilaporkan keliru dihitung saat rekap dibuat.' +
+    (nLibur ? ' Hari libur tidak ditagih.' : ''));
 
   // HPP dan food cost (Bagian 5.9)
   html += isiPdfRekapHpp_(d.hpp);
@@ -11313,7 +11553,8 @@ function htmlEmailRekap_(d, x) {
     return e(f.nama) + ' ' + f.tidakLengkap.length + ' hari';
   });
   html += bagian('Kepatuhan', [
-    k.hariDinilai ? (tidak.length ? 'Form tidak lengkap: ' + tidak.join(', ') : 'Semua form wajib lengkap selama ' + k.hariDinilai + ' hari yang dinilai')
+    k.hariDinilai ? (tidak.length ? 'Form tidak lengkap: ' + tidak.join(', ') : 'Semua form wajib lengkap selama ' + k.hariDinilai + ' hari yang dinilai' +
+      ((k.libur || []).length ? ' (' + k.libur.length + ' hari libur)' : ''))
       : 'Belum ada hari yang dinilai',
     k.total.belumDiperiksa + ' isian belum diperiksa, ' + k.total.dilaporkan + ' baris dilaporkan keliru'
   ]);
@@ -11321,7 +11562,8 @@ function htmlEmailRekap_(d, x) {
   html += bagian('HPP dan food cost', h.sampai < h.dari ? ['Belum ada hari yang dinilai.'] : [
     'Pemakaian bahan ' + rupiahId_(h.pemakaian.total) + (h.penjualan.hari ? ', penjualan ' + rupiahId_(h.penjualan.total) : ''),
     h.foodCost == null
-      ? 'Food cost belum dihitung: penjualan baru tercatat ' + h.penjualan.hari + ' dari ' + h.penjualan.jumlahHari + ' hari'
+      ? (!h.penjualan.jumlahHari && (h.penjualan.libur || []).length ? 'Food cost belum dihitung: semua hari yang dinilai hari libur'
+        : 'Food cost belum dihitung: penjualan baru tercatat ' + h.penjualan.hari + ' dari ' + h.penjualan.jumlahHari + ' hari')
       : 'Food cost ' + e(d.nama.split(' ')[0]) + ' ' + (h.foodCost > h.target ? '<b style="color:' + w.masalah + '">' + persenId_(h.foodCost) + '</b>' :
         '<b>' + persenId_(h.foodCost) + '</b>') + ' (target ' + persenId_(h.target) + ')',
     h.menuDiAtas.length ? h.menuDiAtas.length + ' menu di atas target: ' + e(daftarNamaSingkat_(h.menuDiAtas.map(function (m) { return m.nama; })))
@@ -12621,6 +12863,11 @@ var TAB_MASTER = [
     ]
   },
   {
+    // Hari libur (Code.gs v0.30): satu baris per tanggal; dihapus saat tanda libur dihapus.
+    nama: 'M_HariLibur',
+    kolom: [k_('Tanggal', 'tanggal'), k_('Keterangan'), k_('Dicatat Oleh'), k_('Dicatat Pada', 'waktu')]
+  },
+  {
     nama: 'M_Konfigurasi',
     proteksiKeras: true,
     kolom: [k_('Kunci'), k_('Nilai'), k_('Keterangan')]
@@ -12748,7 +12995,15 @@ function setupSpreadsheet() {
   // Sesudah pindah ke Supabase: susunan data disiapkan di Supabase dulu, lalu Sheet ini (format, rumus, grafik), lalu
   // Sheet disalin penuh dari Supabase supaya sama persis.
   var pindah = sudahPindah_();
-  if (pindah) teruskanKeSupabase_('setupSpreadsheet');
+  if (pindah) {
+    // Edge Function yang belum diperbarui menyiapkan susunan data versi lamanya; Sheet ini lalu punya tab yang tidak pernah
+    // ada di Supabase (Code.gs v0.30). Supabase menjawab versinya; versi yang berbeda dihentikan sebelum Sheet diubah.
+    var versiSupabase = teruskanKeSupabase_('setupSpreadsheet');
+    if (versiSupabase !== VERSI_KODE) {
+      throw new Error('Edge Function di Supabase masih ' + (versiSupabase || 'Code.gs versi lama') + ', sedangkan Code.gs ini ' +
+        VERSI_KODE + '. Tempel supabase/functions/api/index.ts ke Edge Function, Deploy, lalu jalankan setupSpreadsheet lagi.');
+    }
+  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     throw new Error('Jalankan setupSpreadsheet dari editor Apps Script yang menempel pada Google Sheet (Extensions → Apps Script).');
@@ -12834,7 +13089,7 @@ function setupSpreadsheet() {
       aturUrutanTab_(ss);
       console.log('InventoryKu ' + VERSI_KODE + ' setupSpreadsheet di Supabase:\n- ' +
         (catatan.length ? catatan.join('\n- ') : 'tidak ada yang berubah'));
-      return;
+      return VERSI_KODE;
     }
 
     // 4. Rumus Stock (Tahap 2): tab Harian_Stock dan blok Stock Inventory di Dashboard.
@@ -14044,6 +14299,10 @@ function pasangBlokNilaiDashboard_(ss, catatan) {
  * di kolom F, G, H. Tab Data_K_<ID> dibaca lewat INDIRECT dari daftar form
  * kustom yang tampil di M_Form, jadi form baru langsung ikut tanpa
  * setupSpreadsheet. Form sewaktu-waktu dan form di luar jadwalnya tidak ditagih.
+ * Hari libur (Code.gs v0.30, tanggal di M_HariLibur): kolom form yang belum
+ * diisi bertuliskan "Libur" (yang sebagian "Libur (3 dari 9)") dan kolom F
+ * bernilai 0; isian yang tetap dikirim tetap terlihat (Terkirim, Nihil) dan
+ * tetap dihitung di kolom G dan H.
  */
 function pasangBlokKepatuhanDashboard_(ss, catatan) {
   var sheet = ss.getSheetByName('Dashboard');
@@ -14057,11 +14316,16 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
   };
   var fI = K('M_Form', 'ID Form');
   var fN = K('M_Form', 'Nama');
+  var hlT = K(TAB_LIBUR, 'Tanggal');
   var awal = h + 3;
   var akhir = awal + BARIS_TABEL_KEPATUHAN - 1;
-  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('="Hari dengan form belum lengkap: "&COUNTIF($F$' + awal + ':$F$' + akhir + ',">0")&' +
-    '" dari "&COUNT($A$' + awal + ':$A$' + akhir + ')&" hari · Isian belum diperiksa: "&SUM($G$' + awal + ':$G$' + akhir + ')&' +
-    '" · Baris dilaporkan keliru: "&SUM($H$' + awal + ':$H$' + akhir + ')&" · Periode: "&$B$3'))
+  var kolA = '$A$' + awal + ':$A$' + akhir;
+  // Jumlah hari libur dihitung dari tanggal tabel (tanggal yang ditulis dua kali di M_HariLibur tetap satu hari).
+  sheet.getRange(h + 1, 1).setFormula(rumusLokal_('=LET(hl,SUMPRODUCT((' + kolA + '<>"")*(COUNTIF(' + hlT + ',' + kolA + ')>0)),' +
+    '"Hari dengan form belum lengkap: "&COUNTIF($F$' + awal + ':$F$' + akhir + ',">0")&' +
+    '" dari "&COUNT(' + kolA + ')&" hari"&IF(hl>0," (termasuk "&hl&" hari libur)","")&' +
+    '" · Isian belum diperiksa: "&SUM($G$' + awal + ':$G$' + akhir + ')&' +
+    '" · Baris dilaporkan keliru: "&SUM($H$' + awal + ':$H$' + akhir + ')&" · Periode: "&$B$3)'))
     .setFontStyle('normal').setFontColor(WARNA.tinta);
   judulTabelDashboard_(sheet.getRange(h + 2, 1, 1, 9),
     ['Tanggal', 'Stock', 'Suhu', 'Prep list', 'Waste', 'Form belum lengkap', 'Isian belum diperiksa', 'Baris dilaporkan keliru',
@@ -14074,8 +14338,14 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
   // (Tanggal Data_Stock) dan uA (Aktif M_Unit), sehingga rumusnya #NAME?. Dipakai stForm dan unitAktif.
   // Nama untuk form kustom (Tahap 9) diawali "kf" dan "ku" supaya tidak bertabrakan dengan nama lain.
   var hariId = '"Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"';
+  // Hari libur (lb = tanggal ada di M_HariLibur): status yang belum lengkap ditulis "Libur"; isian sebagian tetap
+  // terlihat, misalnya "Libur (3 dari 9)", sama dengan Beranda aplikasi.
+  var lib = function (x) {
+    return 'IF(AND(lb,' + x + '<>"Terkirim",' + x + '<>"Nihil",' + x + '<>"–"),IF(OR(' + x + '="Belum diisi",' + x +
+      '="Tidak ada unit",LEFT(' + x + ',2)="0 "),"Libur","Libur ("&' + x + '&")"),' + x + ')';
+  };
   sheet.getRange(awal, 1).setFormula(rumusLokal_('=LET(' + AWAL_PERIODE_ +
-    'fI,' + fI + ',fA,' + K('M_Form', 'Aktif') + ',' +
+    'fI,' + fI + ',fA,' + K('M_Form', 'Aktif') + ',hlT,' + hlT + ',' +
     'kfJenis,' + K('M_Form', 'Jenis') + ',kfJadwal,' + K('M_Form', 'Jadwal') + ',kfHari,' + K('M_Form', 'Hari') + ',' +
     'kfArsip,' + K('M_Form', 'Diarsipkan') + ',' +
     'nT,' + K('Data_Nihil', 'Tanggal') + ',nF,' + K('Data_Nihil', 'ID Form') + ',' +
@@ -14107,20 +14377,22 @@ function pasangBlokKepatuhanDashboard_(ss, catatan) {
     'hari,SEQUENCE(TODAY()-awalP+1,1,awalP,1),' +
     'isi,REDUCE(HSTACK(' + kosong_(9) + '),hari,LAMBDA(acc,d,LET(' +
       'a,stForm("STOCK",sT,sI,d),b,su(d),c,stForm("PREP",pT,pI,d),e,stForm("WASTE",wT,wI,d),g,ku(d),' +
-      'VSTACK(acc,HSTACK(d,a,b,c,e,' +
-        '(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi")+INDEX(g,1,2),' +
+      'lb,COUNTIF(hlT,d)>0,' +
+      'VSTACK(acc,HSTACK(d,' + lib('a') + ',' + lib('b') + ',' + lib('c') + ',' + lib('e') + ',' +
+        'IF(lb,0,(a="Belum diisi")+(b<>"Terkirim")*(b<>"–")+(c="Belum diisi")+(e="Belum diisi")+INDEX(g,1,2)),' +
         'bp(sT,sS,sSt,d)+bp(cT,cS,cSt,d)+bp(pT,pS,pSt,d)+bp(wT,wS,wSt,d)+INDEX(g,1,3),' +
         'COUNTIFS(sT,d,sF,"<>")+COUNTIFS(cT,d,cF,"<>")+COUNTIFS(pT,d,pF,"<>")+COUNTIFS(wT,d,wF,"<>")+INDEX(g,1,4),' +
-        'INDEX(g,1,1)))))),' +
+        lib('INDEX(g,1,1)') + '))))),' +
     'CHOOSEROWS(isi,SEQUENCE(ROWS(isi)-1,1,2)))'));
   sheet.getRange(awal, 1, BARIS_TABEL_KEPATUHAN, 1).setNumberFormat('d mmm');
   sheet.getRange(awal, 6, BARIS_TABEL_KEPATUHAN, 3).setNumberFormat(FORMAT.bulat);
   pasangAturanWarna_(sheet, [
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(rumusLokal_('=AND(B' + awal + '<>"",B' + awal + '<>"Terkirim",B' + awal + '<>"Nihil",B' + awal + '<>"–")'))
+      .whenFormulaSatisfied(rumusLokal_('=AND(B' + awal + '<>"",B' + awal + '<>"Terkirim",B' + awal + '<>"Nihil",B' + awal + '<>"–",' +
+        'LEFT(B' + awal + ',5)<>"Libur")'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 2, BARIS_TABEL_KEPATUHAN, 4)]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(rumusLokal_('=AND(I' + awal + '<>"",I' + awal + '<>"Terkirim",I' + awal + '<>"–")'))
+      .whenFormulaSatisfied(rumusLokal_('=AND(I' + awal + '<>"",I' + awal + '<>"Terkirim",I' + awal + '<>"–",LEFT(I' + awal + ',5)<>"Libur")'))
       .setFontColor(WARNA.tinjau).setBold(true).setRanges([sheet.getRange(awal, 9, BARIS_TABEL_KEPATUHAN, 1)]).build(),
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(rumusLokal_('=AND(ISNUMBER($H' + awal + '),$H' + awal + '>0)'))

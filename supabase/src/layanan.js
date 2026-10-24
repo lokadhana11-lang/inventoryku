@@ -50,7 +50,7 @@ const NAMA_HARI_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // Code.gs memformat tanggal yang sama berulang kali (setiap baris tab): hasilnya disimpan.
 const simpananFormat = new Map();
 
-/** Utilities.formatDate untuk pola yang dipakai Code.gs (yyyy MM dd HH mm ss, 'teks', E, u). */
+/** Utilities.formatDate untuk pola yang dipakai Code.gs (yyyy MM dd HH H mm ss, 'teks', E, u). */
 export function formatTanggal(d, zona, pola) {
   if (!(d instanceof Date) || isNaN(d.getTime())) throw new Error('formatDate: bukan tanggal');
   const kunci = pola + '|' + zona + '|' + d.getTime();
@@ -73,13 +73,14 @@ function formatTanggalBaru(d, zona, pola) {
       i = j + 1;
       continue;
     }
-    const tok = ['yyyy', 'MM', 'dd', 'HH', 'mm', 'ss', 'EEE', 'u'].find((t) => pola.startsWith(t, i));
+    // H (jam tanpa nol di depan) dipakai kirimLaporanHarian untuk laporan yang berjalan lewat tengah malam.
+    const tok = ['yyyy', 'MM', 'dd', 'HH', 'H', 'mm', 'ss', 'EEE', 'u'].find((t) => pola.startsWith(t, i));
     if (tok) {
       if (tok === 'EEE' || tok === 'u') {
         const hari = new Date(Date.UTC(+o.year, +o.month - 1, +o.day)).getUTCDay();
         hasil += tok === 'EEE' ? NAMA_HARI_EN[hari] : String(hari === 0 ? 7 : hari);
       } else {
-        hasil += { yyyy: o.year, MM: o.month, dd: o.day, HH: o.hour, mm: o.minute, ss: o.second }[tok];
+        hasil += { yyyy: o.year, MM: o.month, dd: o.day, HH: o.hour, H: String(Number(o.hour)), mm: o.minute, ss: o.second }[tok];
       }
       i += tok.length;
     } else {

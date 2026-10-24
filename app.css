@@ -1153,6 +1153,11 @@ body.papan-ketik .layar {
   color: var(--tinta-redup);
 }
 
+/* Keterangan bebas yang bisa berupa satu kata panjang (hari libur, aplikasi 0.30.0). */
+.ket-pecah {
+  overflow-wrap: anywhere;
+}
+
 .daftar-baris > .ikon {
   color: var(--tinta-redup);
 }
@@ -2053,6 +2058,16 @@ body.papan-ketik .lembar-aksi {
   width: 18px;
   height: 18px;
   stroke-width: 2.25;
+}
+
+/* Hari libur (aplikasi 0.30.0): keterangan panjang satu kata tetap di dalam layar 320 px. */
+.kemajuan-teks.libur .ikon {
+  flex: none;
+}
+
+.kemajuan-teks.libur span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .kemajuan-teks.ganti {

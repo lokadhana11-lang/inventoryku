@@ -67,6 +67,10 @@
 > dengan "Kirim ke WhatsApp". Pesanan yang dikirim lewat WhatsApp tercatat (`Data_Pesanan`), dan form
 > Stock semua orang menampilkan pesanan yang belum datang untuk mengisi Tambah masuk (Bagian 5.0, 5.5,
 > 7.1, 8.2, 9.2, 10, 11, 12).
+> Diperbarui 22 Oktober 2026 (keputusan pemilik, dari telaah aplikasi): hari libur. Pengelola menandai
+> tanggal dapur tutup (hari ini, tanggal lewat, atau sampai setahun ke depan); pada hari itu tidak ada
+> form yang ditagih, penjualan tidak perlu dicatat, dan email harian serta pengingat cek suhu tidak
+> dikirim (Bagian 3, 5.1, 5.8, 5.9, 6.1, 7.1, 8.2, 8.5, 9.1, 9.3, 10, 10.1, 12, 13).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -136,6 +140,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Keluar otomatis | Aplikasi keluar sendiri setelah 5 menit tidak dipakai, untuk semua role. Lamanya bisa diubah Pengelola. Isian yang belum dikirim tidak hilang (Bagian 7.2). |
 | Menghapus staff | Hanya untuk staff yang sudah nonaktif. Namanya hilang dari aplikasi, tetapi tetap terbaca di riwayat (Bagian 5.1). |
 | Menghapus item | Hanya untuk item nonaktif yang belum punya catatan apa pun, misalnya item yang salah dibuat (Bagian 5.1). |
+| Hari libur | Pengelola menandai tanggal dapur tutup di Pengaturan → Hari libur: hari ini, tanggal yang sudah lewat, atau sampai setahun ke depan. Tidak ada hari tutup tetap per minggu. Pada hari libur tidak ada form yang ditagih, penjualan tidak perlu dicatat, dan email harian serta pengingat cek suhu tidak dikirim (Bagian 5.8). |
 | Tanggal isian | Staff boleh mengisi untuk hari ini dan kemarin. Tanggal lebih lama hanya Pengelola. Tanggal masa depan ditolak. |
 | PWA | Perlu |
 | Jam closing | 21:30 |
@@ -145,7 +150,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Batas suhu | Chiller 1°C sampai 5°C; Freezer −18°C atau lebih rendah. Tepat −18°C dianggap normal. |
 | Suhu di luar standar | Tampil merah di layar dan Tindakan Korektif wajib diisi. Tanpa email instan. |
 | Email alert instan | Tidak ada, baik untuk suhu maupun waste |
-| Pengingat pengisian form | Bagian "belum diisi" di email laporan harian sekitar 22:15. Tidak ada email pengingat lain. |
+| Pengingat pengisian form | Bagian "belum diisi" di email laporan harian sekitar 22:15 (tidak pada hari libur). Tidak ada email pengingat lain. |
 | Penerima email | Ditambahkan dari halaman Pengaturan di website |
 | Stock Inventory | Tidak wajib hitung fisik harian; pemakaian boleh dicatat dengan menghitung sisa (Bagian 5.5). Stock Akhir dihitung otomatis: Awal + Masuk + Hasil Prep − Keluar − Dipakai Prep − Waste + Penyesuaian. Form boleh dikirim berkali-kali sehari; tiap kiriman menambah, tidak menimpa. |
 | Stock opname | Berkala, oleh Pengelola. Hasil hitung barang nyata meluruskan stock dan menghasilkan laporan selisih (Bagian 5.7). |
@@ -437,6 +442,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Kategori` | Nama Kategori, Urutan, Aktif | Dropdown kategori di Stock Inventory; urutan kelompok di tab Harian dan PDF |
 | `M_Form` | ID Form, Nama, Jenis (bawaan / kustom), Keterangan, Jadwal (harian / hari tertentu / sewaktu-waktu), Urutan, Aktif | Daftar form yang tampil di Beranda, Riwayat, dan Laporan |
 | `M_FormKolom` | ID Form, Urutan, Label, Jenis Kolom, Pilihan, Wajib, Bagian (kepala / baris), Aktif | Susunan kolom tiap form kustom |
+| `M_HariLibur` (22 Oktober 2026) | Tanggal, Keterangan (tidak wajib, paling panjang 40 huruf), Dicatat Oleh, Dicatat Pada | Hari libur (Bagian 5.8) |
 | `M_Satuan` | Satuan, Jenis (Berat / Isi / Hitungan / Kemasan), Aktif | Daftar satuan yang sah |
 | `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit), target food cost (35%), bahan kecil (3%) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis, HPP |
 
@@ -484,7 +490,8 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 
 - Master tidak pernah dihapus, hanya dinonaktifkan, supaya riwayat tetap terbaca.
   Yang punya tombol "Hapus" hanya staff dan item yang belum punya catatan, dengan aturan
-  di bawah.
+  di bawah, dan hari libur: menghapus tanda hari libur menghapus barisnya di `M_HariLibur`
+  dan tercatat di `Log_Perubahan` (Bagian 5.8).
 - Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif, atau
   bahan menu yang aktif (Bagian 5.9).
 - Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan.
