@@ -2682,3 +2682,6 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tautan Tandai, server lama, tanpa sinyal di layar Hari libur, delapan ukuran dengan keterangan 40 huruf satu kata); uji lama (pesanan
     84 + 36 + 74 + 29, Hitung sisa 43, form Stock 87, Tandai diperiksa 30 + 27 + 30) tetap lulus. Belum diuji: Supabase dan Google asli
     (rumus Kepatuhan di Sheets, pg_cron yang melewati laporan), dan HP asli.
+352. **Telaah:** rancangan ditelaah tiga penelaah (alur dapur, kompatibilitas, server) dan temuannya sudah masuk butir 339–350.
+    Telaah berlawanan atas kode yang sudah jadi terhenti di batas pemakaian sebelum melapor, jadi diganti telaah ulang oleh Claude atas
+    diff Code.gs (simpan/ubah/hapus dan baris ganda, laporan harian, rumus Kepatuhan) dan layar Hari libur; tidak ada temuan baru.
