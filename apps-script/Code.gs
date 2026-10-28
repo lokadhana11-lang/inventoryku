@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.35 (email harian: penjualan, food cost, barang masuk)
+// InventoryKu Code.gs v0.36 (nilai stock barang jadi dari resep)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -112,9 +112,11 @@
  *                        lengkap, perkiraan dari hari yang penjualannya sudah tercatat.
  * - 28 Oktober 2026    : email harian memuat barang masuk hari itu (per pemasok, harga beli) dan,
  *                        sejak penjualan pernah dicatat, penjualan, porsi, dan food cost bulan berjalan.
+ * - 28 Oktober 2026    : nilai stock memakai harga dari resep untuk barang jadi tanpa harga satuan
+ *                        (dashboard.nilaiStock.dariResep, tanpaHarga[].resepKurang, daftarItem.item[].hargaResep).
  */
 
-var VERSI_KODE = 'v0.35';
+var VERSI_KODE = 'v0.36';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -4522,6 +4524,8 @@ function dataItem_() {
   var hari = hariIni_();
   var menu = bacaMenu_().menu;
   var rujukan = rujukanItem_(catatan, resep, menu);
+  // Harga dari resep hari ini untuk barang jadi tanpa harga satuan (Code.gs v0.36), seperti nilai stock dan estimasi waste.
+  var hargaHari = lengkapiHargaResep_(itemPadaTanggal_(hari, master), resep);
   var dipakai = {};
   var diResep = {};
   var diMenu = {};
@@ -4547,6 +4551,7 @@ function dataItem_() {
       satuanBesar: m.satuanBesar,
       isiSatuanBesar: m.isiSatuanBesar,
       harga: h.harga,
+      hargaResep: h.harga == null && hargaHari[k] && hargaHari[k].hargaDariResep ? hargaHari[k].harga : null,
       hargaSejak: h.hargaSejak,
       riwayatHarga: h.riwayatHarga,
       jumlahRiwayatHarga: h.jumlahRiwayatHarga,
@@ -5816,9 +5821,10 @@ var HARI_GRAFIK_WASTE = 7;
  * pada tanggal itu (riwayat harga; untuk hari ini sama dengan Harga Satuan di
  * M_Item). Yang dihitung: item aktif, dan item nonaktif yang
  * stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah
- * (tanpaHarga). Harga barang jadi dari resep tidak dipakai di sini, supaya
- * angkanya sama dengan blok Nilai stock di tab Dashboard. Stock minus ikut
- * dihitung apa adanya (nilainya minus).
+ * (tanpaHarga). Sejak Code.gs v0.36 barang jadi tanpa harga satuan dinilai dengan harga dari resep aktifnya pada tanggal
+ * itu (lengkapiHargaResep_, sama dengan estimasi waste), didaftar di dariResep; resep yang bahannya belum lengkap
+ * harganya tetap di tanpaHarga dengan resepKurang. Blok Nilai stock di tab Dashboard Sheets tetap memakai Harga
+ * Satuan M_Item saja. Stock minus ikut dihitung apa adanya (nilainya minus).
  */
 function nilaiStock_(master, rekap, tanggal) {
   var urut = {};
@@ -5831,17 +5837,22 @@ function nilaiStock_(master, rekap, tanggal) {
   var total = 0;
   var jumlah = 0;
   var tanpa = [];
+  var dariResep = [];
+  var resep = bacaResep_();
+  var hargaTgl = lengkapiHargaResep_(itemPadaTanggal_(tanggal, master), resep);
   Object.keys(master).forEach(function (k) {
     var m = master[k];
     var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
     if (!m.aktif && !akhir) return;
     var kat = namaKat[m.kategori.toLowerCase()] || m.kategori || 'Tanpa kategori';
-    var harga = hargaPada_(m, tanggal);
+    var mh = hargaTgl[k];
+    var harga = mh ? mh.harga : null;
     if (harga == null) {
-      tanpa.push({ nama: m.nama, kategori: kat, satuan: m.satuan, stock: akhir, aktif: m.aktif });
+      tanpa.push({ nama: m.nama, kategori: kat, satuan: m.satuan, stock: akhir, aktif: m.aktif, resepKurang: !!resepAktif_(resep, k) });
       return;
     }
     var nilai = akhir * harga;
+    if (mh.hargaDariResep) dariResep.push({ nama: m.nama, kategori: kat, satuan: m.satuan, stock: akhir, harga: harga, nilai: Math.round(nilai) });
     var x = per[kat.toLowerCase()] = per[kat.toLowerCase()] || { kategori: kat, nilai: 0, jumlahItem: 0 };
     x.nilai += nilai;
     x.jumlahItem++;
@@ -5858,10 +5869,12 @@ function nilaiStock_(master, rekap, tanggal) {
   }).sort(function (a, b) {
     return posisi(a.kategori) - posisi(b.kategori) || a.kategori.localeCompare(b.kategori, 'id');
   });
-  tanpa.sort(function (a, b) {
+  var urutItem = function (a, b) {
     return posisi(a.kategori) - posisi(b.kategori) || a.nama.localeCompare(b.nama, 'id');
-  });
-  return { total: Math.round(total), jumlahItem: jumlah, perKategori: perKategori, tanpaHarga: tanpa };
+  };
+  tanpa.sort(urutItem);
+  dariResep.sort(urutItem);
+  return { total: Math.round(total), jumlahItem: jumlah, perKategori: perKategori, tanpaHarga: tanpa, dariResep: dariResep };
 }
 
 /** Grafik waste (tampilan Bagian 5.6): estimasi kerugian per hari selama 7 hari sampai tanggal itu, hari ini paling kanan. */
@@ -11353,6 +11366,13 @@ function dataRekapBulan_(bulan) {
   }
   var tanpaHarga = [];
   var bergerak = 0;
+  // Barang jadi tanpa harga satuan dinilai dari resepnya pada hari itu (Code.gs v0.36), sama dengan nilai stock.
+  var hargaResepHari = {};
+  var hargaResep = function (k, tanggal) {
+    if (!hargaResepHari[tanggal]) hargaResepHari[tanggal] = lengkapiHargaResep_(itemPadaTanggal_(tanggal, master), resep);
+    var mh = hargaResepHari[tanggal][k];
+    return mh ? mh.harga : null;
+  };
   Object.keys(rekap.item).forEach(function (k) {
     var m = master[k];
     if (!m) return;
@@ -11369,6 +11389,7 @@ function dataRekapBulan_(bulan) {
       }
       // Gerakan hari itu × harga yang berlaku hari itu (Bagian 8.5).
       var harga = hargaPada_(m, r.tanggal);
+      if (harga == null && !bahan) harga = hargaResep(k, r.tanggal);
       if (harga == null) {
         if (tanpaHarga.indexOf(m.nama) < 0) tanpaHarga.push(m.nama);
         return;
@@ -11424,7 +11445,7 @@ function dataRekapBulan_(bulan) {
   });
   tanpaHarga.sort(function (a, b) { return a.localeCompare(b, 'id'); });
   hasil.stock = { kategori: daftarKat, total: total, bergerak: bergerak, tanpaHarga: tanpaHarga,
-    perubahanHarga: selisih.item.length };
+    perubahanHarga: selisih.item.length, dariResep: nilai.dariResep.filter(function (x) { return x.stock; }).map(function (x) { return x.nama; }) };
 
   /* ---------- Stock opname: tiap opname dan nilai selisihnya; item paling sering berselisih ---------- */
   var opname = {};
@@ -11899,7 +11920,9 @@ function isiPdfRekap_(d) {
     'tanpa barang jadi hasil resep (biayanya sudah terhitung saat bahannya dipakai). Penyesuaian termasuk hasil stock opname. ' +
     'Selisih harga = stock akhir sehari sebelum harga baru berlaku × (harga baru − harga lama), untuk harga yang berganti pada bulan ini; ' +
     'positif berarti nilai stock naik karena harga naik. ' +
-    'Nilai stock akhir bulan = stock akhir × harga satuan yang berlaku pada ' + tanggalSedangId_(d.sampai) + '.');
+    'Nilai stock akhir bulan = stock akhir × harga satuan yang berlaku pada ' + tanggalSedangId_(d.sampai) + '.' +
+    ((s.dariResep || []).length ? ' Barang jadi tanpa harga satuan dinilai dari harga bahan resepnya pada tanggal itu (juga ' +
+      'masuk dan penyesuaiannya, dengan harga resep pada hari itu): ' + daftarNamaSingkat_(s.dariResep) + '.' : ''));
   if (s.tanpaHarga.length) {
     html += catatan(s.tanpaHarga.length + ' item belum punya harga (pada sebagian atau semua harinya) dan tidak ikut dihitung ' +
       'untuk hari tanpa harga: ' + daftarNamaSingkat_(s.tanpaHarga) + '.');

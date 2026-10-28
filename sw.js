@@ -5,7 +5,7 @@
    dibuang. Permintaan ke API (POST ke Apps Script) tidak disentuh. */
 'use strict';
 
-var VERSI = '0.35.0';
+var VERSI = '0.36.0';
 var AWALAN_CACHE = 'inventoryku-';
 var CACHE = AWALAN_CACHE + VERSI;
 

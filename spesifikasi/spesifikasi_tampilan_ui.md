@@ -36,6 +36,8 @@
 > Dashboard selama penjualan belum lengkap (Bagian 5.6, 5.10, dan 7).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): daftar Perlu perhatian di Dashboard
 > dikelompokkan "Hari ini" dan "Rutin" (Bagian 5.6).
+> Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): barang jadi yang dinilai dari resepnya
+> di lembar Nilai stock dan Pengaturan → Item (Bagian 5.6 dan 5.7).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -992,6 +994,11 @@ Satu-satunya layar yang sepenuhnya navy.
   (positif = nilai stock naik karena harga naik; cara hitung di spesifikasi sistem Bagian 8.5).
   Ketuk baris itu untuk rincian per item: tanggal berlaku, harga lama dan baru, stock saat itu,
   dan selisihnya.
+  Sejak 28 Oktober 2026 kalimat pembukanya menambahkan "Barang jadi tanpa harga satuan memakai harga
+  dari resepnya.", dan di atas "Belum punya harga" ada "Harga dari resep (n)": per barang jadi nama,
+  "Barang jadi · stock 10 kg × Rp 45.875 per kg", nilainya, dan tautan ke resepnya. Barang jadi yang
+  resepnya punya bahan tanpa harga tetap di "Belum punya harga" dengan "Ada bahan resep yang belum
+  punya harga. Ketuk untuk membuka resepnya." (tautan ke resep, bukan ke item).
 - Tombol "Buka dashboard di Google Sheets" untuk grafik lengkap dan pilihan periode.
 - Layar ini tetap ringkasan: hanya dua grafik itu. Tren lain ada di spreadsheet.
 
@@ -1132,6 +1139,9 @@ Satu-satunya layar yang sepenuhnya navy.
   sebelumnya ditulis dengan kata dan panah ("↗ naik Rp 2.000" bertanda Perlu ditinjau, "↘ turun
   Rp 500" bertanda Baik), dan siapa yang mencatat, dalam garis waktu dengan titik di kiri.
 - Harga sekarang dan stock hari ini juga tampil di kepala navy layar item (Bagian 4.7).
+- Barang jadi tanpa harga satuan yang resepnya lengkap (28 Oktober 2026): di daftar item
+  "Rp 45.875 per kg dari resep" tanpa tanda "Belum punya harga", dan di kepala layar item harga
+  itu dengan "Dari resep". Harga satuan tetap bisa diisi; sesudah itu harga itulah yang dipakai.
 - Item baru menampilkan ajakan setelah disimpan: "Isi stok pembuka sekarang?" yang membuka
   Sesuaikan stock dengan alasan Stok pembuka.
 - Sakelar "Datang dalam kemasan besar". Jika dinyalakan, muncul dua isian: satuan besar

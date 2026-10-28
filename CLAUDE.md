@@ -319,6 +319,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `foodCostSementara: { foodCost, pemakaian, penjualan, hari, jumlahHari } | null` dan `grafik[].sementara` (persen atau null);
   `dashboard.hpp` ditambah `foodCostSementara` (bentuk sama). Hanya ada selama `foodCost` null karena penjualan belum lengkap dan
   sudah ada penjualan yang tercatat bulan itu.
+- Nilai stock barang jadi dari resep (Code.gs v0.36, 28 Oktober 2026): `dashboard.nilaiStock` ditambah `dariResep: [{ nama, kategori,
+  satuan, stock, harga, nilai }]` dan `tanpaHarga[].resepKurang`; `daftarItem.item[]` ditambah `hargaResep` (harga dari resep hari ini
+  untuk item tanpa harga satuan, atau null).
 - Email harian (Code.gs v0.35, 28 Oktober 2026): tidak ada aksi baru. Email laporan harian ditambah bagian "Barang masuk" dan
   (sejak penjualan pernah dicatat) "Penjualan dan food cost".
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
@@ -375,7 +378,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++++++++ | Ubah banyak item sekaligus (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): "Ganti harga beberapa item" (satu tanggal berlaku, item tanpa harga mendapat harga pertama sejak awal) dan "Tambah dari Excel/Sheets" (tempelan dengan pratinjau dan baris salah ditandai) dari Pengaturan → Item | Kode selesai (Code.gs v0.33, aplikasi 0.33.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; 300 item dengan riwayat panjang 0,1 detik) dan Chromium (60 uji: dua layar, draft, tanggal lain, baris judul dan tanpa judul, sel berkutip, angka ribuan, baris salah tersisa, server lama, delapan ukuran), termasuk perbaikan sesudah telaah berlawanan (butir 368). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
 | 12+++++++++++++++++++++++++++ | Food cost sementara (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): selama penjualan bulan itu belum lengkap, perkiraan dari hari yang penjualannya sudah tercatat (pemakaian bahan hari-hari itu ÷ penjualannya), bertanda sementara di kepala layar HPP, kartu Menunggu, grafik 6 bulan (batang pucat), Dashboard, rekap bulanan PDF, dan email rekap | Kode selesai (Code.gs v0.34, aplikasi 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji server dengan angka dihitung dari data) dan Chromium (29 uji: Dashboard, layar HPP, grafik, server lama, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
 | 12++++++++++++++++++++++++++++ | Email harian lebih lengkap (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): bagian "Barang masuk" (per pemasok, harga beli, total) dan "Penjualan dan food cost" (penjualan dan porsi hari itu, food cost bulan berjalan sampai tanggal laporan atau sementara) | Kode selesai (Code.gs v0.35; aplikasi tetap 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (27 uji server, email dirender di Chromium). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
-| 12+++++++++++++++++++++++++++++ | Perlu perhatian dikelompokkan (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): daftar di Dashboard dibagi "Hari ini" dan "Rutin" (bisa dilipat, terlipat selama ada butir Hari ini, pilihan diingat di HP) | Kode selesai (aplikasi 0.35.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji: kelompok, terlipat dan diingat, papan ketik, butir Rutin membuka Riwayat, hanya Rutin, hanya Hari ini, jenis baru, kosong, delapan ukuran). Menunggu pemilik: gabungkan PR (tidak perlu tempel Code.gs atau Edge Function) |
+| 12+++++++++++++++++++++++++++++ | Perlu perhatian dikelompokkan (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): daftar di Dashboard dibagi "Hari ini" dan "Rutin" (bisa dilipat, terlipat selama ada butir Hari ini, pilihan diingat di HP) | Kode selesai (aplikasi 0.35.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji: kelompok, terlipat dan diingat, papan ketik, butir Rutin membuka Riwayat, hanya Rutin, hanya Hari ini, jenis baru, kosong, delapan ukuran). Digabung pemilik 28 Oktober 2026 |
+| 12++++++++++++++++++++++++++++++ | Nilai stock barang jadi dari resep (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): barang jadi tanpa harga satuan dinilai dengan harga dari resepnya pada tanggal itu di nilai stock Dashboard dan rekap bulanan (juga masuk dan penyesuaiannya), "Harga dari resep" di lembar Nilai stock, "dari resep" di Pengaturan → Item | Kode selesai (Code.gs v0.36, aplikasi 0.36.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (24 uji server dengan harga resep dihitung tangan) dan Chromium (19 uji: lembar, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -974,7 +978,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 111. **Nilai stock** (`nilaiStock_` dan blok Nilai stock di Sheet, cara hitung sama): Stock Akhir pada tanggal itu × harga yang berlaku
     pada tanggal itu (riwayat harga, butir 164; untuk hari ini sama dengan Harga Satuan di `M_Item`, yang dipakai Sheet). Dihitung: item aktif, dan item nonaktif yang stock-nya belum nol. Item tanpa harga tidak dihitung dan didaftar terpisah.
     Harga barang jadi dari resep (butir 98) tidak dipakai di sini supaya aplikasi dan Sheet sama; barang jadi tanpa harga muncul di
-    daftar "belum punya harga". Stock minus ikut dihitung apa adanya (nilainya minus). Nilai bahan terpakai (hanya di Sheet) =
+    daftar "belum punya harga" (dicabut sejak Code.gs v0.36: aplikasi memakai harga dari resep, butir 381). Stock minus ikut dihitung apa adanya (nilainya minus). Nilai bahan terpakai (hanya di Sheet) =
     (Stock Keluar + Dipakai Prep) tiap hari × harga yang berlaku hari itu menurut `M_HargaItem` (sejak Code.gs v0.13, butir 168),
     untuk item yang tidak punya baris aktif di `M_Resep`, dalam periode B3.
 112. **Pengaturan → Item** (`#/pengaturan/item`, `-baru`, `/<nama>`): daftar per kategori (urutan kategori) lalu kelompok Nonaktif,
@@ -2906,3 +2910,25 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     sesudah dimuat ulang, Enter menutup, butir Rutin membuka Riwayat, hanya Rutin terbuka dengan kalimat kosong, hanya Hari ini tanpa
     Rutin dan jenis baru di Hari ini, kosong, delapan ukuran tanpa gulir samping dan ringkasan ≥ 44 px), tampilan HP dan desktop
     diperiksa dari tangkapan layar. Belum diuji di HP asli.
+
+### Nilai stock barang jadi dari resep (Code.gs v0.36, aplikasi 0.36.0, 28 Oktober 2026)
+
+381. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap": Sambal dasar punya resep, tetapi terus ditandai "belum punya harga"
+    dan tidak ikut nilai stock. Pemilik memilih butir ini tanpa pilihan tambahan. Keputusan butir 111 ("harga barang jadi dari resep
+    tidak dipakai di nilai stock supaya sama dengan Sheet") dicabut: sejak pindah ke Supabase, Sheet hanya salinan untuk dicek, jadi
+    aplikasi yang benar lebih penting. Spesifikasi sistem Bagian 8.5; tampilan Bagian 5.6 dan 5.7.
+382. **Server:** `nilaiStock_` memakai `lengkapiHargaResep_(itemPadaTanggal_(tanggal, master), resep)`, jadi harga bahan pada tanggal
+    yang dinilai (sama dengan estimasi waste, butir 98). Barang jadi yang dinilai dari resep masuk `dariResep` (dan per kategori serta
+    total); yang resepnya punya bahan tanpa harga tetap di `tanpaHarga` dengan `resepKurang: true`. Item yang punya Harga Satuan tetap
+    memakai harganya sendiri. Rekap bulanan: nilai stock akhir bulan ikut, gerakan barang jadi tanpa harga (masuk, penyesuaian)
+    dinilai dengan harga resep hari itu (`hargaResep` disimpan per tanggal), `stock.dariResep` dan satu kalimat di catatan Stock.
+    `daftarItem.item[].hargaResep` (hari ini). Penyesuaian dan opname tetap menulis Nilai Selisih dari Harga Satuan saja (butir 40,
+    120); HPP tidak berubah (barang jadi memang tidak dihitung lagi di pemakaian bahan). Blok Nilai stock di tab Dashboard Sheets
+    tidak diubah (rumusnya hanya membaca `M_Item`), jadi bisa lebih kecil dari aplikasi; dicatat di spesifikasi.
+383. **Aplikasi:** lembar Nilai stock: kalimat pembuka (hanya jika server mengirim `dariResep`), "Harga dari resep (n)" dengan nilai dan
+    tautan ke resep, dan "Ada bahan resep yang belum punya harga. Ketuk untuk membuka resepnya." untuk `resepKurang`. Daftar item: "Rp
+    45.875 per kg dari resep" tanpa tanda Belum punya harga; kepala layar item: harga itu dengan "Dari resep". Server lama: seperti dulu.
+384. **Uji** (di luar repo): `uji_nilai_resep.mjs` 24 uji (harga resep Rp 45.875 dihitung tangan, nilai, per kategori, total, ringkas,
+    Perlu perhatian, daftarItem, harga bahan berganti hari ini dan kemarin tetap, rekap PDF dan data, penyesuaian barang jadi di rekap
+    1 × Rp 47.125, bahan resep tanpa harga, resep nonaktif, harga satuan sendiri menang); `uji_nilai_resep_ui.mjs` 19 uji Chromium
+    (lembar, membuka resep, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Uji fitur sebelumnya tetap lulus.
