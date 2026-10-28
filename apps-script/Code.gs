@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.30 (hari libur)
+// InventoryKu Code.gs v0.31 (pengingat sebelum closing)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -99,9 +99,12 @@
  * - 22 Oktober 2026    : hari libur (M_HariLibur; aksi daftarLibur, simpanLibur,
  *                        hapusLibur): tidak ada form yang ditagih, laporan harian
  *                        dan pengingat cek suhu dilewati, penjualan tidak perlu dicatat.
+ * - 28 Oktober 2026    : pengingatClosing (trigger harian, hanya Supabase): form wajib
+ *                        yang belum lengkap, ke semua HP, beberapa menit sebelum jam
+ *                        closing (pengingat_closing_menit; Outlet dan jadwal).
  */
 
-var VERSI_KODE = 'v0.30';
+var VERSI_KODE = 'v0.31';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -5015,7 +5018,7 @@ function aksiAbaikanHargaBeli_(body) {
  * Langganan per HP disimpan di Script Properties (PUSH_<hash alamat>), atas
  * nama pengguna yang menyalakannya. Pengelola menerima suhu di luar standar,
  * permintaan reset PIN, akun terkunci, dan pengingat stock pagi; semua HP menerima
- * pengingat cek suhu.
+ * pengingat cek suhu dan pengingat sebelum closing.
  * ========================================================================= */
 
 var AWALAN_PUSH = 'PUSH_';
@@ -5036,6 +5039,34 @@ var PENGINGAT_STOCK = {
 };
 /** Semua pengingat berjam yang diatur di Outlet dan jadwal. */
 var PENGINGAT_JAM = PENGINGAT_SUHU.concat([PENGINGAT_STOCK]);
+/**
+ * Pengingat sebelum closing ke semua HP (Code.gs v0.31): sekian menit sebelum jam closing, jika masih ada form wajib
+ * yang belum lengkap. Disimpan sebagai menit (bukan jam), supaya ikut bergeser saat jam closing diubah. 0 = mati.
+ */
+var PENGINGAT_CLOSING = {
+  kunci: 'pengingat_closing_menit', fungsi: 'pengingatClosing', awal: 30, field: 'pengingatClosingMenit',
+  keterangan: 'Menit sebelum jam closing untuk pengingat form yang belum lengkap ke semua HP (0, 15, 30, atau 60; 0 = tanpa ' +
+    'pengingat). Diubah dari Pengaturan → Outlet dan jadwal.'
+};
+var PILIHAN_PENGINGAT_CLOSING = [0, 15, 30, 60];
+
+/** Menit pengingat sebelum closing: nilai M_Konfigurasi (kosong atau 0 = mati), atau 30 jika barisnya belum ada atau tidak terbaca. */
+function menitPengingatClosing_(n) {
+  if (!Object.prototype.hasOwnProperty.call(n, PENGINGAT_CLOSING.kunci)) return PENGINGAT_CLOSING.awal;
+  var t = String(n[PENGINGAT_CLOSING.kunci] == null ? '' : n[PENGINGAT_CLOSING.kunci]).trim();
+  if (t === '') return 0;
+  var x = Number(t);
+  return PILIHAN_PENGINGAT_CLOSING.indexOf(x) >= 0 ? x : PENGINGAT_CLOSING.awal;
+}
+
+/** Jam pengingat sebelum closing (jj:mm; jam closing dikurangi menitnya, boleh mundur lewat tengah malam), atau '' jika mati. */
+function jamPengingatClosing_(n) {
+  var menit = menitPengingatClosing_(n);
+  if (!menit) return '';
+  var jam = jamSah_(n.jam_closing) || '21:30';
+  var m = ((Number(jam.slice(0, 2)) * 60 + Number(jam.slice(3)) - menit) % 1440 + 1440) % 1440;
+  return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+}
 
 /** Notifikasi bisa dikirim: berjalan di Supabase dan kunci VAPID sudah ada. */
 function notifikasiTersedia_() {
@@ -5108,7 +5139,8 @@ function dataNotifikasi_(endpoint, pengguna) {
     atasNama: l ? l.nama : '',
     pengelola: !!pengguna.pengelola,
     pengingat: PENGINGAT_SUHU.map(function (p) { return { waktu: p.waktu, jam: jamPengingat_(n, p) }; }),
-    pengingatStock: jamPengingat_(n, PENGINGAT_STOCK)
+    pengingatStock: jamPengingat_(n, PENGINGAT_STOCK),
+    pengingatClosing: jamPengingatClosing_(n)
   };
 }
 
@@ -5253,6 +5285,58 @@ function isiPengingatStock_(tanggal) {
   return { judul: 'Stock hari ini: ' + judul.join(', '), isi: baris.join(' '), url: '#/dashboard', tag: 'pengingat-stock', ttl: 12 * 3600 };
 }
 
+function pengingatClosing() { return pengingatClosing_(); }
+
+/**
+ * Pengingat sebelum closing (Code.gs v0.31; trigger harian pada jam closing dikurangi pengingat_closing_menit): form wajib
+ * hari itu yang belum diisi atau belum lengkap, ke semua HP yang berlangganan. Tidak dikirim jika semuanya lengkap atau
+ * hari libur. Suhu tidak disebut selama pengingat cek suhu Closing menyala, karena pengingat itu sudah mengabarkannya.
+ * Pengingat yang berjalan sebelum 06.00 (jam closing lewat tengah malam) untuk hari kemarin, seperti laporan harian.
+ * Mengembalikan isi notifikasi (atau null).
+ */
+function pengingatClosing_() {
+  if (!notifikasiTersedia_()) {
+    console.log('Notifikasi tidak tersedia; pengingat closing dilewati.');
+    return null;
+  }
+  var jam = Number(Utilities.formatDate(new Date(), zonaWaktu_(), 'H'));
+  var tanggal = jam < 6 ? geserTanggal_(hariIni_(), -1) : hariIni_();
+  if (liburPada_(tanggal)) {
+    console.log('Hari libur; pengingat closing dilewati.');
+    return null;
+  }
+  var isi = isiPengingatClosing_(tanggal, bacaKonfigurasi_().nilai);
+  if (!isi) {
+    console.log('Semua form wajib ' + tanggal + ' lengkap; pengingat closing tidak dikirim.');
+    return null;
+  }
+  var n = kirimNotifikasi_('semua', isi);
+  console.log('Pengingat closing ' + tanggal + ' dikirim ke ' + n + ' HP.');
+  return isi;
+}
+
+/** Isi notifikasi pengingat sebelum closing pada tanggal itu: { judul, isi, url, tag, ttl }, atau null jika semua form wajib lengkap. */
+function isiPengingatClosing_(tanggal, n) {
+  var suhuSendiri = !!jamPengingat_(n, PENGINGAT_SUHU[2]);
+  var form = kelengkapanForm_(tanggal).filter(function (f) {
+    return f.wajib && (f.status === 'belum' || f.status === 'sebagian') && !(suhuSendiri && f.id === 'SUHU');
+  });
+  if (!form.length) return null;
+  var belum = form.filter(function (f) { return f.status === 'belum'; }).map(function (f) { return f.nama; });
+  var sebagian = form.filter(function (f) { return f.status === 'sebagian'; }).map(function (f) {
+    return f.nama + (f.detail ? ' (' + f.detail + ')' : '');
+  });
+  var baris = [];
+  if (belum.length) baris.push('Belum diisi: ' + daftarNamaSingkat_(belum) + '.');
+  if (sebagian.length) baris.push('Belum lengkap: ' + daftarNamaSingkat_(sebagian) + '.');
+  if (belum.length) baris.push('Jika memang tidak ada, ketuk Tidak ada hari ini di formnya.');
+  var closing = (jamSah_(n.jam_closing) || '21:30').replace(':', '.');
+  return {
+    judul: 'Closing ' + closing + ': ' + form.length + ' form belum ' + (sebagian.length ? 'lengkap' : 'diisi'),
+    isi: baris.join(' '), url: '#/', tag: 'pengingat-closing', ttl: 3 * 3600
+  };
+}
+
 /* ---------- Pengaturan → Outlet dan jadwal ---------- */
 
 /** "21:30" dari teks jj:mm atau jj.mm (atau nilai waktu Sheet); '' jika tidak sah. */
@@ -5311,6 +5395,7 @@ function dataOutletJadwal_() {
     jamCekMiddle: jamPengingat_(n, PENGINGAT_SUHU[1]),
     jamCekClosing: jamPengingat_(n, PENGINGAT_SUHU[2]),
     jamPengingatStock: jamPengingat_(n, PENGINGAT_STOCK),
+    pengingatClosingMenit: menitPengingatClosing_(n),
     notifikasiTersedia: notifikasiTersedia_(),
     perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
   };
@@ -5373,6 +5458,12 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
     baru[p.field] = t === '' ? '' : jamSah_(t);
     if (t !== '' && !baru[p.field]) throw galatPengguna_('Jam pengingat ' + p.waktu + ' diisi jj:mm, misalnya 08:00, atau dikosongkan.');
   });
+  if (ada(PENGINGAT_CLOSING.field)) {
+    baru[PENGINGAT_CLOSING.field] = Number(body[PENGINGAT_CLOSING.field]);
+    if (PILIHAN_PENGINGAT_CLOSING.indexOf(baru[PENGINGAT_CLOSING.field]) < 0) {
+      throw galatPengguna_('Pilih pengingat sebelum closing: mati, 15, 30, atau 60 menit.');
+    }
+  }
 
   return denganKunci_(function () {
     var kini = dataOutletJadwal_();
@@ -5409,6 +5500,10 @@ function aksiSimpanOutletJadwal_(body, pengguna) {
       tulisKonfigurasi_(p.kunci, baru[p.field], p.keterangan || KETERANGAN_JAM_CEK);
       pengingatBerubah = true;
     });
+    if (berubah(PENGINGAT_CLOSING.field)) {
+      tulisKonfigurasi_(PENGINGAT_CLOSING.kunci, String(baru[PENGINGAT_CLOSING.field]), PENGINGAT_CLOSING.keterangan);
+      pengingatBerubah = true;
+    }
     // Pengingat hanya berjalan di Supabase; di sana jadwalnya langsung dipasang ulang.
     if (pengingatBerubah && DI_SUPABASE_ && !(berubah('zonaWaktu') || berubah('jamClosing') || berubah('jedaLaporanMenit') ||
       berubah('hariCadangan'))) {
@@ -11713,6 +11808,7 @@ function pasangTrigger() {
   // mengirim notifikasi.
   var pengingat = [];
   var jamStock = '';
+  var jamClosingPengingat = '';
   if (DI_SUPABASE_) {
     PENGINGAT_JAM.forEach(function (p) {
       var jam = jamPengingat_(konf, p);
@@ -11722,12 +11818,19 @@ function pasangTrigger() {
       if (p === PENGINGAT_STOCK) jamStock = jam;
       else pengingat.push(p.waktu + ' ' + jam);
     });
+    // Pengingat sebelum closing (Code.gs v0.31): jam closing dikurangi menitnya, jadi ikut dipasang ulang saat jam closing berubah.
+    jamClosingPengingat = jamPengingatClosing_(konf);
+    if (jamClosingPengingat) {
+      ScriptApp.newTrigger(PENGINGAT_CLOSING.fungsi).timeBased().atHour(Number(jamClosingPengingat.slice(0, 2)))
+        .nearMinute(Number(jamClosingPengingat.slice(3, 5))).everyDays(1).inTimezone(zona).create();
+    }
   }
   // Arsip tahunan (Code.gs v0.20): tiap jam, tanpa kerja kecuali ada data yang perlu dipindah.
   ScriptApp.newTrigger('arsipTahunan').timeBased().everyHours(1).create();
   var jamTeks = ('0' + Math.floor(menit / 60)).slice(-2) + ':' + ('0' + (menit % 60)).slice(-2);
   var rekapTeks = 'rekap bulanan tiap tanggal 1 sekitar ' + ('0' + JAM_REKAP).slice(-2) + ':00' +
     (pengingat.length ? ', pengingat cek suhu ' + pengingat.join(', ') : '') + (jamStock ? ', pengingat stock ' + jamStock : '') +
+    (jamClosingPengingat ? ', pengingat sebelum closing ' + jamClosingPengingat : '') +
     ', arsip tahunan tiap jam';
   console.log('Trigger terpasang (zona ' + zona + '): laporan harian sekitar ' + jamTeks +
     ' (toleransi Google sekitar 15 menit), cadangan tiap ' + konf.hari_cadangan + ' sekitar 03:00, ' + rekapTeks + '.');

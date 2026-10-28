@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.30.0';
+  var VERSI_APLIKASI = '0.31.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1888,6 +1888,12 @@
           : 'Pengingat stock (sedang dimatikan)');
       }
       daftar.push(jam.length ? 'Pengingat cek suhu (' + jam.join(', ') + '), jika belum lengkap, kecuali hari libur' : 'Pengingat cek suhu (sedang dimatikan)');
+      // Pengingat sebelum closing (Code.gs v0.31); server lama tidak mengirim pengingatClosing.
+      if (d.pengingatClosing != null) {
+        daftar.push(d.pengingatClosing
+          ? 'Pengingat sebelum closing (' + d.pengingatClosing.replace(':', '.') + '), jika masih ada form yang belum lengkap, kecuali hari libur'
+          : 'Pengingat sebelum closing (sedang dimatikan)');
+      }
       isi.appendChild(el('p', { class: 'kartu-teks', text: 'Yang dikirim ke HP ini, juga saat aplikasi tertutup:' }));
       isi.appendChild(el('ul', { class: 'notif-daftar' }, daftar.map(function (t) { return el('li', { text: t }); })));
 
@@ -10577,6 +10583,16 @@
     return 'Laporan harian dikirim sekitar pukul ' + duaAngka(Math.floor(menit / 60)) + '.' + duaAngka(menit % 60) + '.';
   }
 
+  var PILIHAN_PENGINGAT_CLOSING = [0, 15, 30, 60];
+
+  /** "21:00" dari jam closing dikurangi menit (boleh mundur lewat tengah malam); '' jika jam tidak terbaca atau pengingat mati. */
+  function jamSebelumClosing(jamClosing, menit) {
+    var m = String(jamClosing || '').match(/^(\d{1,2}):(\d{2})$/);
+    if (!m || !menit) return '';
+    var x = ((Number(m[1]) * 60 + Number(m[2]) - menit) % 1440 + 1440) % 1440;
+    return duaAngka(Math.floor(x / 60)) + ':' + duaAngka(x % 60);
+  }
+
   function layarOutletJadwal(k) {
     aturJudul('Outlet dan jadwal');
     var penanda = el('span', { class: 'memperbarui', role: 'status' });
@@ -10602,7 +10618,9 @@
         jamCekMiddle: d.jamCekMiddle == null ? null : d.jamCekMiddle,
         jamCekClosing: d.jamCekClosing == null ? null : d.jamCekClosing,
         // Jam pengingat stock (Code.gs v0.22); sama: server lama tidak mengirimnya.
-        jamPengingatStock: d.jamPengingatStock == null ? null : d.jamPengingatStock
+        jamPengingatStock: d.jamPengingatStock == null ? null : d.jamPengingatStock,
+        // Menit pengingat sebelum closing (Code.gs v0.31; 0 = mati); sama: server lama tidak mengirimnya.
+        pengingatClosingMenit: d.pengingatClosingMenit == null ? null : Number(d.pengingatClosingMenit)
       };
     }
 
@@ -10686,6 +10704,27 @@
       var adaPengingatStock = data.jamPengingatStock != null;
       var kStock = kolomIsian({ label: 'Jam pengingat stock', type: 'time', nilai: isi.jamPengingatStock || '' });
       kStock.input.addEventListener('input', function () { isi.jamPengingatStock = kStock.input.value; perbarui(); });
+      // Pengingat sebelum closing ke semua HP (aplikasi 0.31.0): menit sebelum jam closing, jadi ikut bergeser bersama jam closing.
+      var adaPengingatClosing = data.pengingatClosingMenit != null;
+      var labelClosing = function (n) { return n ? n + ' menit' : 'Mati'; };
+      var gClosing = grupPilihan('Kirim sebelum jam closing', PILIHAN_PENGINGAT_CLOSING.map(labelClosing),
+        labelClosing(PILIHAN_PENGINGAT_CLOSING.indexOf(isi.pengingatClosingMenit) >= 0 ? isi.pengingatClosingMenit : 30));
+      var bantuanClosing = el('p', { class: 'kolom-bantuan', 'aria-live': 'polite' });
+      function perbaruiClosing() {
+        var jam = jamSebelumClosing(isi.jamClosing, isi.pengingatClosingMenit);
+        bantuanClosing.textContent = !isi.pengingatClosingMenit ? 'Pengingat sebelum closing sedang dimatikan.'
+          : jam ? 'Dikirim sekitar pukul ' + jam.replace(':', '.') + '.' : 'Isi jam closing dulu.';
+      }
+      gClosing.input.forEach(function (i) {
+        i.addEventListener('change', function () {
+          var v = gClosing.nilai();
+          isi.pengingatClosingMenit = v === 'Mati' ? 0 : parseInt(v, 10);
+          perbaruiClosing();
+          perbarui();
+        });
+      });
+      kJam.input.addEventListener('input', perbaruiClosing);
+      perbaruiClosing();
 
       simpan.addEventListener('click', function () {
         if (simpan.disabled) return;
@@ -10759,6 +10798,15 @@
         ].concat(kolomPengingat.map(function (x) { return x.k.wadah; }), [
           data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
         ])));
+      }
+      if (adaPengingatClosing) {
+        wadah.appendChild(el('section', { class: 'kartu formulir' }, [
+          el('h2', { class: 'kartu-judul', text: 'Pengingat sebelum closing' }),
+          el('p', { class: 'kartu-teks', text: 'Notifikasi ke semua HP yang menyalakan notifikasi, jika masih ada form wajib yang belum diisi ' +
+            'atau belum lengkap, kecuali pada hari libur. Suhu tidak disebut selama pengingat cek suhu Closing menyala.' }),
+          gClosing.wadah, bantuanClosing,
+          data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
+        ]));
       }
       if (adaPengingatStock) {
         wadah.appendChild(el('section', { class: 'kartu formulir' }, [
