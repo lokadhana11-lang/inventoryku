@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.34 (food cost sementara)
+// InventoryKu Code.gs v0.35 (email harian: penjualan, food cost, barang masuk)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -110,9 +110,11 @@
  * - 28 Oktober 2026    : food cost sementara (hpp.foodCostSementara, grafik[].sementara,
  *                        dashboard.hpp.foodCostSementara, rekap bulanan): selama penjualan belum
  *                        lengkap, perkiraan dari hari yang penjualannya sudah tercatat.
+ * - 28 Oktober 2026    : email harian memuat barang masuk hari itu (per pemasok, harga beli) dan,
+ *                        sejak penjualan pernah dicatat, penjualan, porsi, dan food cost bulan berjalan.
  */
 
-var VERSI_KODE = 'v0.34';
+var VERSI_KODE = 'v0.35';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -10776,6 +10778,74 @@ function ringkasStockHari_(tanggal, master, rekap) {
   return { minus: minus.sort(urut), belanja: belanja.sort(urut) };
 }
 
+/**
+ * Barang masuk satu tanggal untuk email harian (Code.gs v0.35): baris Data_Stock dengan Stock Masuk, dikelompokkan per
+ * pemasok (tanpa pemasok paling bawah). { jumlah, nilai (dari harga beli yang dicatat), tanpaHarga, pemasok: [{ nama ('' =
+ * tanpa pemasok), nilai, baris: [{ item, masuk, satuan, hargaBeli, nilai }] }] }.
+ */
+function ringkasBarangMasukHari_(tanggal) {
+  var peta = {};
+  var hasil = { jumlah: 0, nilai: 0, tanpaHarga: 0, pemasok: [] };
+  bacaPembelian_(tanggal, tanggal).forEach(function (p) {
+    var k = p.pemasok.toLowerCase();
+    var g = peta[k];
+    if (!g) {
+      g = peta[k] = { nama: p.pemasok, nilai: 0, baris: [] };
+      hasil.pemasok.push(g);
+    }
+    g.baris.push({ item: p.item, masuk: p.masuk, satuan: p.satuan, hargaBeli: p.hargaBeli, nilai: p.nilai });
+    hasil.jumlah++;
+    if (p.nilai == null) hasil.tanpaHarga++;
+    else {
+      g.nilai += p.nilai;
+      hasil.nilai += p.nilai;
+    }
+  });
+  hasil.pemasok.sort(function (a, b) { return (a.nama ? 0 : 1) - (b.nama ? 0 : 1) || a.nama.localeCompare(b.nama, 'id'); });
+  hasil.pemasok.forEach(function (g) { g.baris.sort(function (a, b) { return a.item.localeCompare(b.item, 'id'); }); });
+  return hasil;
+}
+
+/**
+ * Penjualan dan food cost untuk email harian (Code.gs v0.35), hanya jika penjualan pernah dicatat (outlet yang memakai HPP):
+ * penjualan dan porsi per menu tanggal itu, dan food cost bulan itu sampai tanggal itu (atau sementara, Code.gs v0.34).
+ * null jika penjualan belum pernah dicatat.
+ */
+function ringkasPenjualanHari_(tanggal) {
+  var ctx = konteksHpp_();
+  if (!ctx.jual.ada || !ctx.jual.pertama) return null;
+  // Laporan berjalan sesudah closing, jadi tanggal laporan ikut dinilai (rentangHpp_ menilai sampai sehari sebelum "hari").
+  ctx.hari = geserTanggal_(tanggal, 1);
+  var bulan = tanggal.slice(0, 7);
+  var x = foodCostBulan_(ctx, bulan);
+  var p = ctx.jual.hari[tanggal];
+  var porsi = null;
+  if (ctx.porsi.pertama) {
+    var hari = ctx.porsi.hari[tanggal] || {};
+    porsi = Object.keys(hari).map(function (k) { return hari[k]; }).filter(function (m) { return m.porsi > 0; })
+      .sort(function (a, b) { return b.porsi - a.porsi || a.nama.localeCompare(b.nama, 'id'); })
+      .map(function (m) { return { nama: m.nama, porsi: m.porsi }; });
+    if (!Object.keys(hari).length) porsi = null;
+  }
+  return {
+    penjualan: p ? { nilai: p.nilai, catatan: p.catatan } : null,
+    porsiPernah: !!ctx.porsi.pertama, porsi: porsi,
+    bulan: bulan, dari: x.rentang.dari, sampai: x.rentang.sampai, foodCost: x.foodCost, sementara: x.sementara,
+    target: targetFoodCost_(bacaKonfigurasi_().nilai), penjualanBulan: x.penjualan
+  };
+}
+
+/** ringkasPenjualanHari_ yang tidak menggagalkan email: galat dicatat di log dan bagiannya dilewati. */
+function penjualanUntukEmail_(tanggal) {
+  try {
+    return ringkasPenjualanHari_(tanggal);
+  } catch (err) {
+    if (err && err.tabBelumDimuat) throw err; // Supabase: tab dimuat lalu laporan diulang (runtime.js)
+    console.error('Penjualan untuk email gagal dihitung: ' + (err && err.stack ? err.stack : err));
+    return null;
+  }
+}
+
 function teksStatusForm_(f, libur) {
   if (f.status === 'terkirim') {
     return 'Terkirim' + (f.detail ? ' (' + f.detail + ')' : '') +
@@ -10844,6 +10914,23 @@ function htmlEmailHarian_(d) {
   }
   html += bagian('Stock', stock.join(''));
 
+  // Barang masuk hari itu per pemasok, dengan harga beli yang dicatat (Code.gs v0.35).
+  var bm = d.barangMasuk;
+  if (bm) {
+    html += bagian('Barang masuk', bm.jumlah
+      ? (bm.nilai ? '<p style="margin:0 0 2px"><b>Total ' + rupiahId_(bm.nilai) + '</b>' +
+          (bm.tanpaHarga ? ' dari harga beli yang dicatat; ' + bm.tanpaHarga + ' baris tanpa harga beli' : '') + '</p>' : '') +
+        daftar(bm.pemasok.map(function (g) {
+          return '<b>' + escHtml_(g.nama || 'Tanpa pemasok') + '</b>' + (g.nilai && bm.pemasok.length > 1 ? ' (' + rupiahId_(g.nilai) + ')' : '') + ': ' +
+            g.baris.map(function (r) {
+              return escHtml_(r.item) + ' ' + angkaId_(r.masuk) + ' ' + escHtml_(r.satuan) +
+                (r.hargaBeli != null ? ' × ' + rupiahId_(r.hargaBeli) : '');
+            }).join(', ');
+        })) +
+        (bm.nilai ? '' : '<p style="margin:4px 0 0;color:' + w.tintaRedup + ';font-size:12px">Harga beli belum dicatat.</p>')
+      : '<p style="margin:0">Tidak ada barang masuk tercatat.</p>');
+  }
+
   // Suhu di luar standar beserta tindakan korektif dan cek ulangnya (Bagian 10).
   var merah = 'color:' + w.masalah + ';font-weight:bold';
   html += bagian('Suhu', d.suhu.luar.length
@@ -10892,6 +10979,31 @@ function htmlEmailHarian_(d) {
     '<p style="margin:6px 0 0;color:' + w.tintaRedup + ';font-size:12px">Perkiraan: yang dibuat lebih dulu dianggap dipakai lebih dulu. ' +
     'Catat sebagai waste dari Beranda aplikasi.</p>'
     : '<p style="margin:0">Tidak ada barang yang lewat masa simpan atau habis besok.</p>');
+
+  // Penjualan dan food cost (Code.gs v0.35), hanya untuk outlet yang pernah mencatat penjualan.
+  var pj = d.penjualan;
+  if (pj) {
+    var baris = [];
+    baris.push(pj.penjualan
+      ? 'Penjualan hari ini <b>' + rupiahId_(pj.penjualan.nilai) + '</b>' + (pj.penjualan.catatan ? ' (' + escHtml_(pj.penjualan.catatan) + ')' : '')
+      : (d.libur ? 'Hari libur: penjualan tidak perlu dicatat.' : 'Penjualan hari ini belum dicatat. Catat dari Dashboard → HPP dan food cost.'));
+    if (pj.porsiPernah) {
+      var nPorsi = (pj.porsi || []).reduce(function (n, m) { return n + m.porsi; }, 0);
+      baris.push(pj.porsi == null ? (pj.penjualan ? 'Porsi per menu belum dicatat.' : '')
+        : nPorsi + ' porsi terjual' + (pj.porsi.length ? ': ' + escHtml_(pj.porsi.slice(0, 8).map(function (m) { return m.nama + ' ' + m.porsi; }).join(', ')) +
+          (pj.porsi.length > 8 ? ', dan ' + (pj.porsi.length - 8) + ' menu lain' : '') : ''));
+    }
+    var periode = 'Food cost ' + BULAN_ID[Number(pj.bulan.slice(5, 7)) - 1] + ' sampai ' + tanggalPendekId_(pj.sampai);
+    var tebal = function (n) {
+      return n > pj.target ? '<b style="color:' + w.masalah + '">' + persenId_(n) + '</b>' : '<b>' + persenId_(n) + '</b>';
+    };
+    var jb = pj.penjualanBulan;
+    baris.push(pj.foodCost != null ? periode + ': ' + tebal(pj.foodCost) + ' (target ' + persenId_(pj.target) + ')'
+      : pj.sementara ? periode + ': sementara ' + tebal(pj.sementara.foodCost) + ' (penjualan baru tercatat ' + pj.sementara.hari + ' dari ' +
+        pj.sementara.jumlahHari + ' hari; target ' + persenId_(pj.target) + ')'
+      : periode + ': belum dihitung, ' + (!jb.jumlahHari && (jb.libur || []).length ? 'semua hari yang dinilai hari libur.' : 'belum ada penjualan tercatat.'));
+    html += bagian('Penjualan dan food cost', daftar(baris.filter(Boolean)));
+  }
 
   var periksa = [];
   if (d.pemeriksaan.belumDiperiksa) periksa.push(d.pemeriksaan.belumDiperiksa + ' isian belum diperiksa (31 hari terakhir)');
@@ -11001,6 +11113,8 @@ function jalankanLaporanHarian_(opsi) {
       terkunci: akunTerkunci_(),
       opname: statusOpname_(),
       pesanan: pesananSiap_() ? pesananMenunggu_(bacaPesanan_()) : [],
+      barangMasuk: ringkasBarangMasukHari_(tanggal),
+      penjualan: penjualanUntukEmail_(tanggal),
       pdf: hasil.pdf,
       masalah: masalah,
       cadanganGagal: /^Gagal/.test(cadangan) ? cadangan : '',

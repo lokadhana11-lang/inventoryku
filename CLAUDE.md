@@ -319,6 +319,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `foodCostSementara: { foodCost, pemakaian, penjualan, hari, jumlahHari } | null` dan `grafik[].sementara` (persen atau null);
   `dashboard.hpp` ditambah `foodCostSementara` (bentuk sama). Hanya ada selama `foodCost` null karena penjualan belum lengkap dan
   sudah ada penjualan yang tercatat bulan itu.
+- Email harian (Code.gs v0.35, 28 Oktober 2026): tidak ada aksi baru. Email laporan harian ditambah bagian "Barang masuk" dan
+  (sejak penjualan pernah dicatat) "Penjualan dan food cost".
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -371,7 +373,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++++++ | Pengingat sebelum closing (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): notifikasi ke semua HP 15, 30, atau 60 menit sebelum jam closing (awal 30) berisi form wajib yang belum diisi atau belum lengkap, kecuali hari libur; kartu di Outlet dan jadwal, baris di lembar Notifikasi | Kode selesai (Code.gs v0.31, aplikasi 0.31.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (39 uji server) dan Chromium (24 uji: Outlet dan jadwal, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `pasangTrigger`) |
 | 12+++++++++++++++++++++++++ | Staff membetulkan isiannya sendiri (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): tombol "Betulkan" di detail Riwayat untuk isian sendiri selama 15 menit sesudah dikirim dan belum diperiksa, kolom dan aturan sama dengan Koreksi Pengelola, tanda "Bisa dibetulkan sampai …" | Kode selesai (Code.gs v0.32, aplikasi 0.32.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server) dan Chromium (24 uji: HP, desktop, Staff lain, Pengelola, lewat batas, Tandai diperiksa dari layar lama, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
 | 12++++++++++++++++++++++++++ | Ubah banyak item sekaligus (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): "Ganti harga beberapa item" (satu tanggal berlaku, item tanpa harga mendapat harga pertama sejak awal) dan "Tambah dari Excel/Sheets" (tempelan dengan pratinjau dan baris salah ditandai) dari Pengaturan → Item | Kode selesai (Code.gs v0.33, aplikasi 0.33.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; 300 item dengan riwayat panjang 0,1 detik) dan Chromium (60 uji: dua layar, draft, tanggal lain, baris judul dan tanpa judul, sel berkutip, angka ribuan, baris salah tersisa, server lama, delapan ukuran), termasuk perbaikan sesudah telaah berlawanan (butir 368). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
-| 12+++++++++++++++++++++++++++ | Food cost sementara (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): selama penjualan bulan itu belum lengkap, perkiraan dari hari yang penjualannya sudah tercatat (pemakaian bahan hari-hari itu ÷ penjualannya), bertanda sementara di kepala layar HPP, kartu Menunggu, grafik 6 bulan (batang pucat), Dashboard, rekap bulanan PDF, dan email rekap | Kode selesai (Code.gs v0.34, aplikasi 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji server dengan angka dihitung dari data) dan Chromium (29 uji: Dashboard, layar HPP, grafik, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
+| 12+++++++++++++++++++++++++++ | Food cost sementara (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): selama penjualan bulan itu belum lengkap, perkiraan dari hari yang penjualannya sudah tercatat (pemakaian bahan hari-hari itu ÷ penjualannya), bertanda sementara di kepala layar HPP, kartu Menunggu, grafik 6 bulan (batang pucat), Dashboard, rekap bulanan PDF, dan email rekap | Kode selesai (Code.gs v0.34, aplikasi 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji server dengan angka dihitung dari data) dan Chromium (29 uji: Dashboard, layar HPP, grafik, server lama, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
+| 12++++++++++++++++++++++++++++ | Email harian lebih lengkap (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): bagian "Barang masuk" (per pemasok, harga beli, total) dan "Penjualan dan food cost" (penjualan dan porsi hari itu, food cost bulan berjalan sampai tanggal laporan atau sementara) | Kode selesai (Code.gs v0.35; aplikasi tetap 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (27 uji server, email dirender di Chromium). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2860,3 +2863,26 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     email, penjualan lengkap: food cost tetap dan sementara hilang, bulan tanpa penjualan); `uji_fc_sementara_ui.mjs` 29 uji Chromium
     (Dashboard, kepala, kartu Menunggu, grafik dan uraiannya, server lama seperti dulu, delapan ukuran untuk layar HPP dan Dashboard).
     Uji fitur 28 Oktober dan sebelumnya tetap lulus. Belum diuji di Supabase asli dan HP.
+
+### Email harian: barang masuk, penjualan, dan food cost (Code.gs v0.35, 28 Oktober 2026)
+
+373. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap": email harian belum memuat penjualan, food cost, dan barang yang dibeli
+    hari itu. Pemilik memilih butir ini tanpa pilihan tambahan. Spesifikasi sistem Bagian 10. Aplikasi tidak berubah (tetap 0.34.0).
+374. **Barang masuk** (`ringkasBarangMasukHari_`, dari `bacaPembelian_` tanggal itu, jadi hanya baris dengan Stock Masuk): bagian
+    "Barang masuk" sesudah Stock, selalu tampil ("Tidak ada barang masuk tercatat." jika kosong). Per pemasok urut nama, "Tanpa pemasok"
+    paling bawah, item urut nama: "Tomat 5 kg × Rp 16.000" (jumlah dalam satuan dasar; harga beli per satuan dasar). Total dari harga
+    beli yang dicatat dan "n baris tanpa harga beli"; nilai per pemasok hanya jika lebih dari satu pemasok; tanpa harga beli sama
+    sekali: "Harga beli belum dicatat." Bagian lain email tidak berubah.
+375. **Penjualan dan food cost** (`ringkasPenjualanHari_`, sebelum "Untuk Head Kitchen dan Manager"): hanya jika `Data_Penjualan`
+    pernah berisi (keputusan tambahan: outlet yang tidak memakai HPP tidak mendapat bagian kosong). Penjualan hari itu dan catatannya,
+    "belum dicatat. Catat dari Dashboard → HPP dan food cost.", atau pada hari libur (hanya lewat uji dari editor) "tidak perlu
+    dicatat"; porsi terjual (menu berporsi 0 tidak disebut, paling banyak 8) jika porsi per menu pernah dicatat; food cost bulan
+    itu "sampai 28 Okt": `foodCostBulan_` dengan `ctx.hari` = tanggal laporan + 1, karena email dikirim sesudah closing sehingga
+    tanggal laporan ikut dinilai (layar HPP menilai sampai kemarin); angka tetap, sementara "(penjualan baru tercatat 12 dari 28
+    hari; target 35%)", atau "belum dihitung". Di atas target: merah tebal. `penjualanUntukEmail_` menangkap galat supaya email
+    tetap terkirim (galat dicatat di log), kecuali galat tab belum dimuat Supabase yang harus diteruskan ke runtime.
+376. **Uji** (di luar repo): `uji_email_harian.mjs` 27 uji (barang masuk dua pemasok dan tanpa pemasok dengan total dan urutan, baris
+    keluar saja tidak ikut, satu pemasok, tanpa harga beli, tanpa barang masuk; penjualan belum dicatat, dicatat dengan porsi,
+    tanggal lalu, sementara sampai tanggal laporan, di atas target, penjualan lengkap dengan angka dari `foodCostBulan_`, akhir bulan
+    lalu tanpa penjualan, outlet tanpa penjualan tanpa bagian, bagian lama tetap); email dirender di Chromium dan diperiksa.
+    Uji fitur sebelumnya tetap lulus. Belum diuji: email asli (Gmail dari Apps Script) dan waktu CPU di Supabase asli.
