@@ -1138,13 +1138,17 @@ Satu-satunya layar yang sepenuhnya navy.
   lain dengan pemilih tanggal) dan "Cari item", lalu satu kartu per kategori (urutan kategori) berisi
   item aktif. Tiap baris: nama, "Sekarang Rp 15.000 per kg" (atau "Sekarang belum punya harga"), dan
   isian harga baru berawalan Rp di kanan (turun ke bawah nama pada layar di bawah 360 px). Di bawah
-  isian: "Naik Rp 1.000.", "Turun Rp 500.", "Sama dengan harga sekarang.", "Harga pertama, berlaku
-  sejak awal.", atau galat "Isi rupiah, misalnya 15000 atau 15.000." Bilah bawah: "3 item, 1 angkanya
-  salah." dan tombol utama "Simpan harga" (nonaktif selama belum ada harga baru). Harga yang tersembunyi
+  isian: beda dengan harga yang berlaku pada tanggal berlaku ("Naik Rp 1.000.", "Turun Rp 500.",
+  "Sama dengan harga sekarang, jadi tidak berubah."; untuk tanggal lain "Naik Rp 1.000 dari harga pada
+  25 Okt (Rp 15.000)."), "Harga pertama, berlaku sejak awal.", atau galat ("Harga harus rupiah, misalnya
+  15000 atau 15.000.", atau untuk "15,000" "Harga "15,000" bisa dibaca dua cara. …"). Bilah bawah: "3 item,
+  1 angkanya salah." dan tombol utama "Simpan harga" (nonaktif selama daftar item belum dimuat atau belum
+  ada harga baru). Harga yang tersembunyi
   karena pencarian tetap ikut dan disebut. Konfirmasi "Simpan harga 2 item?" dengan tanggal dan
   "Tomat: Rp 15.000 → Rp 16.000" (paling banyak 8, sisanya "dan n item lain"). Sesudahnya kembali ke
   daftar item dengan "Harga 2 item tersimpan, berlaku mulai 28 Okt." (ditambah item yang mendapat harga
-  pertama dan yang tidak berubah). Isian tersimpan sebagai draft.
+  pertama dan yang tidak berubah), atau "Tidak ada harga yang berubah. …" jika semuanya sama. Isian
+  tersimpan sebagai draft.
 - **Tambah dari Excel/Sheets:** kotak tempel "Tempel baris item" dengan urutan kolom di bantuannya,
   kalimat bahwa kategori dan satuan harus sudah ada, lalu "Pratinjau": tiap baris "Baris 2 · Wortel",
   ringkasan "Sayur · kg · Rp 12.000 · minimum 1,5", dan tanda Baik "Siap ditambah" atau tanda Masalah
@@ -1152,7 +1156,12 @@ Satu-satunya layar yang sepenuhnya navy.
   utama "Tambah 2 item". Konfirmasi menyebut nama item dan "1 baris yang salah tidak ikut dan tetap di
   kotak tempel." Sesudahnya baris yang salah (dengan baris judulnya) tetap di kotak supaya bisa
   dibetulkan; jika semua berhasil, kembali ke daftar item dengan "8 item ditambahkan. Stock-nya 0
-  sampai stok pembuka diisi di layar tiap item." Teks tempelan tersimpan sebagai draft.
+  sampai stok pembuka diisi di layar tiap item." Jika server menolak, pesannya menyebut nomor baris
+  yang sama dengan pratinjau dan pratinjau dimuat ulang. Teks tempelan tersimpan sebagai draft.
+  Nomor baris = baris di kotak tempel (sel berisi ganti baris membuat satu item memakai beberapa
+  baris). Angka mengikuti tampilan spreadsheet: "15.000" dan "1.250.000" ribuan, "1.250,5" dan
+  "1,250.5" berdesimal, "2,5" dan "0.250" desimal; koma lalu tepat tiga angka ("15,000") ditolak
+  karena bisa dibaca dua cara.
 
 **Pengaturan → Resep:**
 

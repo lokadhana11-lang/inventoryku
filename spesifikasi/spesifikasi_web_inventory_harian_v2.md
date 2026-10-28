@@ -476,7 +476,10 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 - **Tambah item dari tempelan Excel atau Google Sheets:** baris yang disalin dari lembar kerja
   ditempel di aplikasi. Kolom: Nama, Kategori, Satuan, Harga, Stok minimum, Stok maksimum,
   Satuan besar, Isi satuan besar, Masa simpan (hari); hanya tiga yang pertama wajib. Baris judul
-  boleh ikut dan menentukan urutan kolom. Aturannya sama dengan item baru satu per satu: nama
+  boleh ikut dan menentukan urutan kolom (dikenali jika berisi judul nama dan paling sedikit satu
+  judul kolom lain). Sel berkutip dari spreadsheet (berisi ganti baris atau tanda kutip) dibaca
+  utuh. Angka yang pemisah ribuannya tidak jelas ("15,000") ditolak supaya tidak tersimpan seribu
+  kali lebih kecil. Aturannya sama dengan item baru satu per satu: nama
   unik (juga di antara baris tempelan), kategori dan satuan harus sudah ada dan aktif (tidak
   dibuat otomatis), harga berlaku sejak awal, item langsung aktif, stock 0 sampai stok pembuka
   diisi. Aplikasi menandai baris yang salah sebelum menyimpan dan hanya mengirim baris yang
