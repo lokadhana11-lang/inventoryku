@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.35.0';
+  var VERSI_APLIKASI = '0.36.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -9105,17 +9105,33 @@
           onclick: function () { bukaSelisihHarga(n); } }, isiSelisih.concat([ikon('kanan')]))
         : el('div', { class: 'daftar-baris daftar-baris-diam' }, isiSelisih);
     }
+    var dariResep = n.dariResep || [];
     var isi = [
-      el('p', { class: 'kartu-teks', text: 'Stock Akhir × harga satuan yang berlaku sekarang. Item tanpa harga tidak ikut dihitung.' }),
+      el('p', { class: 'kartu-teks', text: 'Stock Akhir × harga satuan yang berlaku sekarang. ' +
+        ('dariResep' in n ? 'Barang jadi tanpa harga satuan memakai harga dari resepnya. ' : '') + 'Item tanpa harga tidak ikut dihitung.' }),
       tabel,
       barisSelisih ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Selisih karena perubahan harga' }, barisSelisih) : null,
-      el('h3', { class: 'judul-sub', text: 'Belum punya harga (' + tanpa.length + ')' }),
-      tanpa.length ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Item belum punya harga' }, tanpa.map(function (x) {
-        return el('a', { class: 'daftar-baris', href: hrefItem(x.nama) }, [
+      // Barang jadi yang dinilai dari resepnya (Code.gs v0.36).
+      dariResep.length ? el('h3', { class: 'judul-sub', text: 'Harga dari resep (' + dariResep.length + ')' }) : null,
+      dariResep.length ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Barang jadi dengan harga dari resep' }, dariResep.map(function (x) {
+        return el('a', { class: 'daftar-baris', href: hrefResep(x.nama) }, [
           el('span', { class: 'daftar-baris-isi' }, [
             el('span', { class: 'daftar-baris-judul', text: x.nama }),
             el('span', { class: 'daftar-baris-ket', text: x.kategori + ' · stock ' + formatAngka(x.stock) + (x.satuan ? ' ' + x.satuan : '') +
-              (x.aktif ? '' : ' · nonaktif') + '. Ketuk untuk mengisi harga.' })
+              ' × ' + formatRupiah(x.harga).replace(' ', '\u00a0') + (x.satuan ? ' per ' + x.satuan : '') })
+          ]),
+          el('strong', { class: 'angka-satuan', text: formatRupiah(x.nilai) }),
+          ikon('kanan')
+        ]);
+      })) : null,
+      el('h3', { class: 'judul-sub', text: 'Belum punya harga (' + tanpa.length + ')' }),
+      tanpa.length ? el('div', { class: 'daftar', role: 'group', 'aria-label': 'Item belum punya harga' }, tanpa.map(function (x) {
+        return el('a', { class: 'daftar-baris', href: x.resepKurang ? hrefResep(x.nama) : hrefItem(x.nama) }, [
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: x.nama }),
+            el('span', { class: 'daftar-baris-ket', text: x.kategori + ' · stock ' + formatAngka(x.stock) + (x.satuan ? ' ' + x.satuan : '') +
+              (x.aktif ? '' : ' · nonaktif') + (x.resepKurang ? '. Ada bahan resep yang belum punya harga. Ketuk untuk membuka resepnya.'
+                : '. Ketuk untuk mengisi harga.') })
           ]),
           ikon('kanan')
         ]);
@@ -10962,10 +10978,12 @@
     function baris(it, katNonaktif) {
       var ket = [it.satuan + (it.satuanBesar ? ' (' + teksKemasan(it) + ')' : '')];
       if (it.harga != null) ket.push(formatRupiah(it.harga) + ' per ' + it.satuan);
+      // Barang jadi tanpa harga satuan: harga dari resepnya (Code.gs v0.36) dipakai nilai stock dan estimasi waste.
+      else if (it.hargaResep != null) ket.push(formatRupiah(it.hargaResep) + ' per ' + it.satuan + ' dari resep');
       if (it.stokMin != null) ket.push('minimum ' + formatAngka(it.stokMin));
       var tanda = [];
       if (!it.aktif) tanda.push(tandaStatus('menunggu', 'Nonaktif'));
-      if (it.harga == null) tanda.push(tandaStatus('tinjau', 'Belum punya harga'));
+      if (it.harga == null && it.hargaResep == null) tanda.push(tandaStatus('tinjau', 'Belum punya harga'));
       if (it.aktif && katNonaktif) tanda.push(tandaStatus('tinjau', 'Kategori nonaktif'));
       return el('a', { class: 'daftar-baris' + (it.aktif ? '' : ' nonaktif'), href: hrefItem(it.nama) }, [
         el('span', { class: 'daftar-baris-isi' }, [
@@ -11958,10 +11976,10 @@
         ]),
         el('div', {}, [
           el('span', { class: 'kepala-angka-label', text: 'Harga sekarang' }),
-          it.harga == null
+          it.harga == null && it.hargaResep == null
             ? el('span', { class: 'kepala-angka-nilai', text: '–' })
-            : el('span', { class: 'kepala-angka-nilai' }, [formatRupiah(it.harga), el('small', { text: '/' + (it.satuan || 'satuan') })]),
-          el('span', { class: 'kepala-angka-sub', text: it.harga == null ? 'Belum punya harga'
+            : el('span', { class: 'kepala-angka-nilai' }, [formatRupiah(it.harga != null ? it.harga : it.hargaResep), el('small', { text: '/' + (it.satuan || 'satuan') })]),
+          el('span', { class: 'kepala-angka-sub', text: it.harga == null ? (it.hargaResep != null ? 'Dari resep' : 'Belum punya harga')
             : (it.hargaSejak ? 'sejak ' + tanggalHarga(it.hargaSejak) : (it.jumlahRiwayatHarga ? 'sejak awal' : '')) })
         ])
       ]));

@@ -55,6 +55,8 @@
 > belum lengkap (Bagian 5.9).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): email laporan harian memuat barang
 > masuk hari itu, dan penjualan serta food cost bulan berjalan (Bagian 10).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): nilai stock barang jadi tanpa harga
+> satuan memakai harga dari resepnya (Bagian 8.5).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1413,6 +1415,13 @@ Tab Data adalah sumber semua tampilan lain, jadi kerapiannya dijaga oleh script:
   saat barang dibeli: tidak ada FIFO atau harga rata-rata. Item yang belum punya harga pada T
   tidak dihitung dan dicantumkan dalam daftar "belum punya harga". Nilai stock saat ini memakai
   harga hari ini, yaitu Harga Satuan di `M_Item`.
+- **Barang jadi tanpa harga satuan** (28 Oktober 2026): dinilai dengan harga dari resep aktifnya
+  pada tanggal itu, yaitu harga bahan yang berlaku pada tanggal itu ÷ hasil per resep (cara yang
+  sama dengan estimasi waste, Bagian 5.3). Berlaku untuk nilai stock (Dashboard dan rekap
+  bulanan) serta nilai masuk dan penyesuaian barang jadi di rekap bulanan. Resep yang bahannya
+  belum lengkap harganya membuat barang jadi itu tetap "belum punya harga". Barang jadi yang
+  punya Harga Satuan sendiri tetap memakai harga itu. Blok Nilai stock di tab Dashboard Google
+  Sheets tetap memakai Harga Satuan `M_Item` saja, jadi angkanya bisa lebih kecil dari aplikasi.
 - **Nilai masuk, bahan terpakai, dan penyesuaian** = jumlah gerakan per hari × harga yang
   berlaku pada hari itu. Bahan terpakai = Stock Keluar + Dipakai Prep, hanya untuk item yang
   bukan hasil resep. Barang jadi tidak dihitung lagi, karena biayanya sudah terhitung saat
