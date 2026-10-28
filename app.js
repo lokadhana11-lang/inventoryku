@@ -13745,8 +13745,12 @@
         return el('span', { class: i === g.length - 1 ? 'hari-ini' : null, text: NAMA_BULAN[Number(x.bulan.slice(5, 7)) - 1].slice(0, 3) });
       }))
     ]));
-    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: 'Bulan di atas target ditulis jingga. Angka miring: sementara, dari hari yang penjualannya ' +
-      'sudah tercatat saja. "–": belum ada penjualan yang tercatat, atau semua harinya libur.' }));
+    // Server sebelum Code.gs v0.34 tidak mengirim sementara: "–" di sana juga berarti penjualan belum lengkap.
+    var kenalSementara = g.some(function (x) { return 'sementara' in x; });
+    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: kenalSementara
+      ? 'Bulan di atas target ditulis jingga. Angka miring: sementara, dari hari yang penjualannya sudah tercatat saja. ' +
+        '"–": belum ada penjualan yang tercatat, atau semua harinya libur.'
+      : 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap, atau semua harinya libur.' }));
     return kartu;
   }
 
