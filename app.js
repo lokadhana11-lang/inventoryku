@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.31.0';
+  var VERSI_APLIKASI = '0.32.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -7051,7 +7051,29 @@
     var tanda = [k.status === 'Diperiksa' ? tandaStatus('baik', 'Diperiksa') : tandaStatus('baik', 'Terkirim')];
     if (k.dilaporkan) tanda.push(tandaStatus('tinjau', k.dilaporkan + ' dilaporkan keliru'));
     if (k.dikoreksi) tanda.push(tandaStatus('menunggu', 'Pernah dikoreksi'));
+    if (bisaDibetulkan(k)) tanda.push(tandaStatus('menunggu', 'Bisa dibetulkan sampai ' + jam(k.betulkanSampai)));
     return tanda;
+  }
+
+  /**
+   * Staff membetulkan isiannya sendiri (aplikasi 0.32.0): server mengirim betulkanSampai hanya untuk pengisinya, selama
+   * 15 menit sesudah diterima dan belum diperiksa. Jam HP yang sedikit meleset tidak berbahaya: server memeriksa lagi.
+   */
+  function bisaDibetulkan(k) {
+    return !!(k && k.betulkanSampai && k.status !== 'Diperiksa' && Date.parse(k.betulkanSampai) > Date.now());
+  }
+
+  /**
+   * Waktu koreksi terbaru yang tampil di layar untuk satu kiriman (ISO, '' jika belum pernah dikoreksi). Dikirim bersama
+   * Tandai diperiksa (Code.gs v0.32): isian yang dibetulkan Staff sesudah layar dimuat tidak ikut tertandai.
+   */
+  function koreksiTerlihat(k) {
+    var ms = 0;
+    (k.baris || []).forEach(function (b) {
+      var w = b.dikoreksi ? Date.parse(b.dikoreksi.waktu) : NaN;
+      if (!isNaN(w) && w > ms) ms = w;
+    });
+    return ms ? new Date(ms).toISOString() : '';
   }
 
   /**
@@ -7576,7 +7598,10 @@
           (dilaporkan ? ' ' + dilaporkan + ' isian yang punya baris dilaporkan keliru tidak ikut.' : ''),
         teksYa: 'Tandai diperiksa',
         jalankan: function () {
-          return panggilApi('tandaiDiperiksaBanyak', { formId: data.formId, submissionId: bisa.map(function (kr) { return kr.id; }) });
+          var terlihat = {};
+          bisa.forEach(function (kr) { terlihat[kr.id] = koreksiTerlihat(kr); });
+          return panggilApi('tandaiDiperiksaBanyak', { formId: data.formId, submissionId: bisa.map(function (kr) { return kr.id; }),
+            terlihat: terlihat });
         }
       }).then(function (h) {
         if (!h) return;
@@ -7589,11 +7614,13 @@
     function teksHasilPeriksa(h) {
       var lewat = h.dilewati || [];
       var lapor = lewat.filter(function (x) { return x.sebab === 'dilaporkan'; }).length;
-      var hilang = lewat.length - lapor;
+      var berubah = lewat.filter(function (x) { return x.sebab === 'berubah'; }).length;
+      var hilang = lewat.length - lapor - berubah;
       var bagian = [];
       if (h.diperiksa) bagian.push(h.diperiksa + ' isian ditandai diperiksa.');
       if (h.sudah) bagian.push(h.sudah + ' isian sudah diperiksa sebelumnya.');
       if (lapor) bagian.push(lapor + ' isian dilewati karena ada baris dilaporkan keliru.');
+      if (berubah) bagian.push(berubah + ' isian dilewati karena baru dibetulkan. Periksa lagi angkanya.');
       if (hilang) bagian.push(hilang + ' isian tidak ditemukan. Muat ulang Riwayat.');
       return bagian.join(' ') || 'Tidak ada isian yang ditandai.';
     }
@@ -7896,6 +7923,8 @@
     var terkunci = kr.status === 'Diperiksa';
     var desktop = window.matchMedia(DESKTOP).matches;
     var kepala = teksKepalaKiriman(info.kepala, kr);
+    var adaKoreksi = kolom.some(function (k) { return k.koreksi; });
+    var betulkan = !opsi.pengelola && adaKoreksi && bisaDibetulkan(kr);
     kosongkan(wadah);
 
     var waktuKirim = 'Dikirim ' + jam(kr.waktu);
@@ -7935,6 +7964,8 @@
       el('p', { class: 'otomatis', text: 'Diisi ' + kr.oleh + '. ' + waktuKirim + '. ' + kr.jumlahBaris + ' baris.' }),
       el('div', { class: 'tanda-deret bungkus' }, tandaUtama),
       terkunci && opsi.pengelola ? el('p', { class: 'kolom-bantuan' }, [ikon('kunci'), ' Terkunci karena sudah diperiksa. Buka kunci untuk mengoreksi.']) : null,
+      betulkan ? el('p', { class: 'kolom-bantuan' }, [ikon('pensil'), ' Salah ketik? Kamu bisa membetulkan isian ini sampai ' +
+        jam(kr.betulkanSampai) + '. Sesudah itu, laporkan kekeliruan.']) : null,
       aksiKiriman.childNodes.length ? aksiKiriman : null,
       unduh ? unduh.pesan : null
     ]));
@@ -7947,11 +7978,14 @@
         onclick: function () { bukaLaporkan(info, b, opsi.perbarui); }
       }));
       t[0].insertBefore(ikon('bendera'), t[0].lastChild);
-      if (opsi.pengelola && !terkunci && kolom.some(function (k) { return k.koreksi; })) {
-        var kor = tombol('Koreksi', 'tautan', {
-          'aria-label': 'Koreksi ' + (nama ? b.nilai[nama.kunci] : ''),
+      // Staff tidak membetulkan baris yang sudah dikoreksi orang lain (server juga menolak).
+      var dikoreksiLain = b.dikoreksi && String(b.dikoreksi.oleh).toLowerCase() !== String(kr.oleh).toLowerCase();
+      if ((opsi.pengelola || (betulkan && !dikoreksiLain)) && !terkunci && adaKoreksi) {
+        var kataKor = opsi.pengelola ? 'Koreksi' : 'Betulkan';
+        var kor = tombol(kataKor, 'tautan', {
+          'aria-label': kataKor + ' ' + (nama ? b.nilai[nama.kunci] : ''),
           'aria-haspopup': 'dialog',
-          onclick: function () { bukaKoreksi(info, b, opsi.perbarui); }
+          onclick: function () { bukaKoreksi(info, b, opsi.perbarui, !opsi.pengelola); }
         });
         kor.insertBefore(ikon('pensil'), kor.lastChild);
         t.push(kor);
@@ -8053,7 +8087,7 @@
         return;
       }
       aturTombolProses(t, true, 'Menyimpan…');
-      panggilApi('tandaiDiperiksa', { formId: info.formId, submissionId: kr.id }).then(function (h) {
+      panggilApi('tandaiDiperiksa', { formId: info.formId, submissionId: kr.id, terlihat: koreksiTerlihat(kr) }).then(function (h) {
         capKiriman = kr.id;
         opsi.perbarui(h.kiriman);
         toast('Ditandai diperiksa.');
@@ -8151,10 +8185,10 @@
   }
 
   /**
-   * Koreksi satu baris (Pengelola). Yang dikoreksi catatan sumbernya; untuk
-   * Stock, Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang server.
+   * Koreksi satu baris (Pengelola) atau Betulkan (Staff, isiannya sendiri dalam 15 menit; betulkan = true). Yang dikoreksi
+   * catatan sumbernya; untuk Stock, Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang server.
    */
-  function bukaKoreksi(info, b, selesai) {
+  function bukaKoreksi(info, b, selesai, betulkan) {
     // Kolom "jikaAda" hanya untuk baris yang berisi (prep: jumlah resep atau Qty).
     var kolom = (info.kolom || []).filter(function (k) { return k.koreksi && kolomBerlaku(k, b) && !(k.jikaAda && b.nilai[k.kunci] == null); });
     var nama = kolomNama(info.kolom || []);
@@ -8198,7 +8232,8 @@
     });
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
     var form = el('form', { class: 'formulir', novalidate: true }, [
-      el('p', { class: 'kartu-teks', text: 'Isian ' + info.kiriman.oleh + ', ' + tanggalJudul(info.kiriman.tanggal) + ', ' + jam(info.kiriman.waktu) + '.' }),
+      el('p', { class: 'kartu-teks', text: 'Isian ' + info.kiriman.oleh + ', ' + tanggalJudul(info.kiriman.tanggal) + ', ' + jam(info.kiriman.waktu) + '.' +
+        (betulkan && info.kiriman.betulkanSampai ? ' Bisa dibetulkan sampai ' + jam(info.kiriman.betulkanSampai) + '.' : '') }),
       b.flag ? el('p', { class: 'pesan-formulir tinjau' }, [ikon('bendera'),
         el('span', { text: 'Dilaporkan ' + b.flag.oleh + ': ' + b.flag.catatan })]) : null
     ].concat(kolomIsi.map(function (x) { return x.kolom.wadah; })).concat([
@@ -8255,7 +8290,8 @@
         l.sibuk(false);
         l.tutup();
         selesai(h.kiriman);
-        toast(info.gerakStock || info.formId === 'STOCK' ? 'Koreksi tersimpan. Stock dihitung ulang.' : 'Koreksi tersimpan.');
+        var kata = betulkan ? 'Isian dibetulkan.' : 'Koreksi tersimpan.';
+        toast(info.gerakStock || info.formId === 'STOCK' ? kata + ' Stock dihitung ulang.' : kata);
       }).catch(function (err) {
         l.sibuk(false);
         aturTombolProses(t, false);
@@ -8268,11 +8304,11 @@
       simpan(lembar.tombol[1], lembar);
     });
     var lembar = bukaLembar({
-      judul: 'Koreksi' + (namaBaris ? ' ' + namaBaris : ''),
+      judul: (betulkan ? 'Betulkan' : 'Koreksi') + (namaBaris ? ' ' + namaBaris : ''),
       isi: form,
       aksi: [
         { teks: 'Batal', jenis: 'kedua' },
-        { teks: 'Simpan koreksi', jenis: 'utama', klik: simpan }
+        { teks: betulkan ? 'Simpan' : 'Simpan koreksi', jenis: 'utama', klik: simpan }
       ]
     });
   }
