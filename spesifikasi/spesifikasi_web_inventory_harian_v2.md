@@ -53,6 +53,8 @@
 > harga beberapa item dengan satu tanggal berlaku dan item baru dari tempelan Excel/Google Sheets (Bagian 5.1).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): food cost sementara selama penjualan
 > belum lengkap (Bagian 5.9).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): email laporan harian memuat barang
+> masuk hari itu, dan penjualan serta food cost bulan berjalan (Bagian 10).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1618,6 +1620,13 @@ Keterangan di bawah ini untuk laporan harian.
   - Total waste hari itu (qty dan estimasi Rp)
   - Ringkasan daftar belanja: item di bawah stok minimum dan saran ordernya
   - Pesanan ke pemasok yang belum datang (21 Oktober 2026)
+  - Barang masuk hari itu (28 Oktober 2026): per pemasok (tanpa pemasok paling bawah), jumlah dan
+    harga beli per item, nilai per pemasok dan totalnya dari harga beli yang dicatat, dan jumlah baris
+    tanpa harga beli
+  - Penjualan dan food cost (28 Oktober 2026), hanya jika penjualan pernah dicatat (Bagian 5.9):
+    penjualan hari itu (atau "belum dicatat"), porsi terjual per menu jika porsi pernah dicatat, dan
+    food cost bulan itu sampai tanggal laporan (tanggal laporan ikut dinilai karena email dikirim
+    sesudah closing), atau food cost sementara selama penjualan belum lengkap
   - Item dengan Stock Akhir minus
   - Barang jadi dan barang masuk yang lewat masa simpan atau habis besok
   - Jumlah data yang belum diperiksa, baris yang dilaporkan keliru, dan permintaan reset PIN
