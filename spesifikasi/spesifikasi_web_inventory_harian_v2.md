@@ -47,6 +47,8 @@
 > HP Pengelola untuk item di bawah stok minimum, stock minus, dan masa simpan (Bagian 10.1).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): pengingat sebelum closing ke
 > semua HP untuk form wajib yang belum lengkap (Bagian 10.1).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): Staff boleh membetulkan
+> isiannya sendiri dalam 15 menit sesudah dikirim, selama belum diperiksa (Bagian 3, 5.5, 6.2, 6.3, 7.1).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -168,7 +170,7 @@ Kebutuhan berkembang: form-form ini perlu menjadi **sistem web** yang:
 | Kategori stock | Dikelola Pengelola. Form, tab Harian, dan PDF stock tersusun per kategori. PDF stock bisa diunduh untuk satu kategori saja (Bagian 9.1). |
 | Nominal waste | Estimasi kerugian (Rp) = qty × harga satuan yang berlaku pada tanggal waste. Harga satuan diisi Pengelola di master Item dan punya riwayat (Bagian 5.1). |
 | Waste dan stock | Waste punya form sendiri dan langsung mengurangi stock. Stock Keluar yang diketik staff hanya pemakaian langsung, di luar prep dan waste. |
-| Koreksi data | Hanya oleh Pengelola. Staff tidak bisa mengubah data setelah submit. |
+| Koreksi data | Oleh Pengelola, kapan pun. Staff hanya membetulkan isiannya sendiri dalam 15 menit sesudah dikirim, selama belum diperiksa (Bagian 6.3). |
 | Menu Riwayat | Ada, untuk semua role. Staff hanya melihat. |
 | Tombol "Laporkan Kekeliruan" | Ada, untuk staff dan Pengelola |
 | Lupa PIN | Ada di layar Login. Permintaan muncul sebagai pemberitahuan di aplikasi Pengelola, tanpa email. |
@@ -736,8 +738,9 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
   **menambah**, tidak menimpa kiriman sebelumnya. Contoh: barang datang pagi 5 kg dan sore
   3 kg, lewat dua kiriman, menjadi Masuk 8 kg pada hari itu.
 - Item yang Masuk dan Keluar-nya (atau Sisa-nya) dikosongkan tidak ikut terkirim.
-- Jika salah ketik, staff melaporkannya lewat Riwayat; Pengelola mengoreksi catatan
-  gerakan itu (Bagian 6.3). Staff tidak mengirim angka minus untuk membatalkan.
+- Jika salah ketik, staff membetulkannya sendiri lewat Riwayat dalam 15 menit; sesudah itu
+  staff melaporkannya dan Pengelola mengoreksi catatan gerakan itu (Bagian 6.3). Staff tidak
+  mengirim angka minus untuk membatalkan.
 
 **Rekap harian per item (dihitung server, disimpan di `Stock_Harian`):**
 
@@ -1095,7 +1098,7 @@ menemukan kekeliruan pengisian inventory.
 |---|---|---|
 | Unduh PDF tanggal tersebut | Ya | Ya |
 | Laporkan Kekeliruan | Ya | Ya |
-| Koreksi | Tidak | Ya |
+| Koreksi | Isiannya sendiri, 15 menit sesudah dikirim ("Betulkan") | Ya |
 | Tandai Diperiksa | Tidak | Ya |
 
 **Catatan teknis:**
@@ -1126,7 +1129,13 @@ misalnya "2 dari 3 isian diperiksa".
 
 ### 6.3 Laporan kekeliruan dan koreksi
 
-- **Staff tidak bisa mengubah data setelah submit.** Jika menemukan kekeliruan di Riwayat,
+- **Staff membetulkan isiannya sendiri** (28 Oktober 2026): selama 15 menit sesudah server
+  menerima kiriman (kiriman dari antrean dihitung sejak sampai) dan selama kiriman belum
+  diperiksa, pengisinya bisa membetulkan kolom yang sama dengan yang bisa dikoreksi Pengelola,
+  dengan aturan yang sama (stock dihitung ulang, `Log_Perubahan` mencatat namanya, tanda
+  dilaporkan keliru pada baris itu hilang). Isian orang lain tidak bisa dibetulkan. Batas waktu
+  menjaga angka yang sudah dipakai orang lain (stock, laporan) tidak berubah diam-diam.
+- **Sesudah itu staff tidak bisa mengubah data.** Jika menemukan kekeliruan di Riwayat,
   staff menekan "Laporkan Kekeliruan" pada baris itu dan menulis catatan singkat
   (misalnya "Stock Masuk seharusnya 5, bukan 50"). Baris mendapat tanda "dilaporkan keliru".
 - Pengelola melihat semua baris yang dilaporkan lewat filter status, lalu mengoreksinya.
@@ -1161,7 +1170,7 @@ misalnya "2 dari 3 isian diperiksa".
 | Menandai form "Tidak ada hari ini" (nihil) | Ya | Ya |
 | Melihat daftar lewat masa simpan dan mencatatnya sebagai waste | Ya | Ya |
 | Melihat pesanan ke pemasok yang belum datang dan mengisi Tambah masuk darinya (form Stock) | Ya | Ya |
-| Mengoreksi data | Tidak | Ya |
+| Mengoreksi data | Isiannya sendiri, 15 menit sesudah dikirim, selama belum diperiksa | Ya |
 | Penyesuaian stock dan stock opname | Tidak | Ya |
 | Melihat daftar belanja, mengirim pesanan ke pemasok lewat WhatsApp, dan menutup pesanan | Tidak | Ya |
 | Melihat nilai rupiah stock dan rekap bulanan | Tidak | Ya |

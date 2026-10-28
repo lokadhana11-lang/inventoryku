@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.31 (pengingat sebelum closing)
+// InventoryKu Code.gs v0.32 (Staff membetulkan isiannya sendiri)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -102,9 +102,11 @@
  * - 28 Oktober 2026    : pengingatClosing (trigger harian, hanya Supabase): form wajib
  *                        yang belum lengkap, ke semua HP, beberapa menit sebelum jam
  *                        closing (pengingat_closing_menit; Outlet dan jadwal).
+ * - 28 Oktober 2026    : Staff membetulkan isiannya sendiri (aksi koreksi) dalam 15 menit
+ *                        sesudah dikirim, selama belum diperiksa; riwayat.kiriman[].betulkanSampai.
  */
 
-var VERSI_KODE = 'v0.31';
+var VERSI_KODE = 'v0.32';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -220,8 +222,8 @@ var AKSI_ = {
     pesan: 'Tandai diperiksa hanya bisa dilakukan Head Kitchen atau Manager.' },
   bukaKunci: { jalankan: aksiBukaKunci_, pengelola: true,
     pesan: 'Buka kunci hanya bisa dilakukan Head Kitchen atau Manager.' },
-  koreksi: { jalankan: aksiKoreksi_, pengelola: true,
-    pesan: 'Koreksi hanya bisa dilakukan Head Kitchen atau Manager. Laporkan kekeliruan supaya Pengelola mengoreksinya.' },
+  // Semua role sejak Code.gs v0.32: Staff hanya isiannya sendiri dalam BATAS_BETULKAN_MENIT (periksaBetulkanSendiri_).
+  koreksi: { jalankan: aksiKoreksi_ },
   tutupLaporan: { jalankan: aksiTutupLaporan_, pengelola: true,
     pesan: 'Menutup laporan kekeliruan hanya bisa dilakukan Head Kitchen atau Manager.' },
   infoLaporan: { jalankan: aksiInfoLaporan_, bacaSaja: true },
@@ -8782,6 +8784,9 @@ function susunKiriman_(def, t, daftar, log, zona) {
         kepala: {},
         baris: []
       };
+      // Staff membetulkan isiannya sendiri (Code.gs v0.32): batas waktunya, hanya untuk pengisi itu dan selama belum lewat.
+      var batas = batasBetulkan_(k.oleh, nilai_(t, b, 'timestamp_server'), PENGGUNA_AKSI_);
+      if (batas && batas > new Date()) k.betulkanSampai = batas.toISOString();
       urut.push(k);
     }
     (def.kepala || []).forEach(function (kp) {
@@ -8795,6 +8800,7 @@ function susunKiriman_(def, t, daftar, log, zona) {
   urut.forEach(function (k) {
     var semua = k.baris.every(function (b) { return b.status === STATUS_DIPERIKSA; });
     k.status = semua ? STATUS_DIPERIKSA : STATUS_TERKIRIM;
+    if (semua) delete k.betulkanSampai;
     k.diperiksa = null;
     if (semua) {
       k.baris.forEach(function (b) {
@@ -9468,8 +9474,10 @@ function aksiKoreksi_(body, pengguna) {
   return denganKunci_(function () {
     var c = cariBarisRiwayat_(def, body.rowId);
     if (rapikanTeks_(nilai_(c.t, c.b, 'status')) === STATUS_DIPERIKSA) {
-      throw galatPengguna_('Isian ini sudah diperiksa dan terkunci. Ketuk Buka kunci dulu untuk mengoreksi.');
+      throw galatPengguna_(pengguna.pengelola ? 'Isian ini sudah diperiksa dan terkunci. Ketuk Buka kunci dulu untuk mengoreksi.'
+        : 'Isian ini sudah diperiksa, jadi tidak bisa dibetulkan lagi. ' + SARAN_LAPORKAN);
     }
+    if (!pengguna.pengelola) periksaBetulkanSendiri_(c, pengguna);
     var namaBaris = def.item ? rapikanTeks_(nilai_(c.t, c.b, def.item)) : '';
     var ubah = {};
     var perubahan = [];
@@ -9540,6 +9548,34 @@ function aksiKoreksi_(body, pengguna) {
     }
     return { kiriman: kirimanSatu_(def, String(nilai_(c.t, c.b, 'submission_id'))) };
   });
+}
+
+/* ---------- Staff membetulkan isiannya sendiri (Code.gs v0.32; spesifikasi sistem Bagian 6.3) ---------- */
+
+var BATAS_BETULKAN_MENIT = 15;
+var SARAN_LAPORKAN = 'Laporkan kekeliruan supaya Head Kitchen atau Manager mengoreksinya.';
+
+/**
+ * Batas waktu Staff membetulkan satu kiriman (Date), atau null: hanya pengisinya sendiri (submitted_by, huruf besar/kecil tidak
+ * dibedakan) dan BATAS_BETULKAN_MENIT sesudah server menerimanya (timestamp_server, jadi kiriman dari antrean dihitung sejak sampai).
+ */
+function batasBetulkan_(oleh, diterima, pengguna) {
+  if (!pengguna || pengguna.pengelola || !(diterima instanceof Date) || isNaN(diterima.getTime())) return null;
+  if (rapikanTeks_(oleh).toLowerCase() !== rapikanTeks_(pengguna.nama).toLowerCase()) return null;
+  return new Date(diterima.getTime() + BATAS_BETULKAN_MENIT * 60000);
+}
+
+/** Staff yang memanggil koreksi: hanya isiannya sendiri, sebelum batas waktunya lewat. Status Diperiksa sudah ditolak lebih dulu. */
+function periksaBetulkanSendiri_(c, pengguna) {
+  var oleh = nilai_(c.t, c.b, 'submitted_by');
+  if (rapikanTeks_(oleh).toLowerCase() !== rapikanTeks_(pengguna.nama).toLowerCase()) {
+    throw galatPengguna_('Kamu hanya bisa membetulkan isianmu sendiri. ' + SARAN_LAPORKAN);
+  }
+  var batas = batasBetulkan_(oleh, nilai_(c.t, c.b, 'timestamp_server'), pengguna);
+  if (!batas || new Date() > batas) {
+    throw galatPengguna_('Isian ini dikirim lebih dari ' + BATAS_BETULKAN_MENIT + ' menit lalu, jadi tidak bisa dibetulkan lagi. ' +
+      SARAN_LAPORKAN);
+  }
 }
 
 /** Tutup laporan kekeliruan tanpa koreksi (Bagian 6.3), khusus Pengelola. Tercatat di Log_Perubahan. */

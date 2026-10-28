@@ -28,6 +28,8 @@
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): kartu "Pengingat sebelum closing"
 > di Outlet dan jadwal dan satu baris di lembar "Notifikasi di HP ini" untuk semua role (Bagian 5.7 dan 5.11).
+> Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): tombol "Betulkan" dan tanda "Bisa
+> dibetulkan sampai …" untuk Staff di Riwayat (Bagian 5.4 dan 7).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -844,6 +846,15 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Laporkan kekeliruan:** ikon bendera di tiap baris. Ketuk, tulis catatan, kirim.
   Baris lalu bertanda Perlu ditinjau.
 - **Pengelola** melihat tombol tambahan di detail: "Koreksi" dan "Tandai diperiksa".
+- **Staff membetulkan isiannya sendiri** (28 Oktober 2026, spesifikasi sistem Bagian 6.3): selama
+  15 menit sesudah dikirim dan belum diperiksa, isiannya sendiri bertanda Menunggu "Bisa dibetulkan
+  sampai 21.45" di daftar dan detail. Detail menulis "Salah ketik? Kamu bisa membetulkan isian ini
+  sampai 21.45. Sesudah itu, laporkan kekeliruan." (ikon pensil), dan tiap baris punya tombol tautan
+  "Betulkan" (ikon pensil) di samping Laporkan kekeliruan. Lembarnya sama dengan Koreksi Pengelola,
+  berjudul "Betulkan Tomat", dengan "Bisa dibetulkan sampai 21.45." dan tombol "Batal" dan "Simpan";
+  sesudahnya "Isian dibetulkan. Stock dihitung ulang." (atau "Isian dibetulkan."). Lewat batas waktu
+  saat lembar terbuka: pesan server di lembar ("Isian ini dikirim lebih dari 15 menit lalu, jadi
+  tidak bisa dibetulkan lagi. Laporkan kekeliruan supaya Head Kitchen atau Manager mengoreksinya.").
 - **Tandai diperiksa sekaligus** (Pengelola, 19 Oktober 2026): di kanan judul tanggal di daftar
   Catatan ada tombol kedua "Tandai diperiksa (3)", hanya jika tanggal itu punya isian yang belum
   diperiksa dan tidak dilaporkan keliru (angkanya jumlah isian itu), dan tidak ada selama filter
@@ -1388,6 +1399,8 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Notifikasi suhu (judul, isi) | "Suhu di luar standar: Opening", "Chiller 1 9 °C (Pintu ditutup). Dicatat Rina." |
 | Notifikasi pengingat | "Waktunya cek suhu Middle", "Belum diisi: Chiller 1 dan Freezer 1." |
 | Notifikasi reset PIN dan kunci | "Rina meminta reset PIN" / "Rina terkunci karena PIN salah", "… Ketuk untuk membuat PIN baru." |
+| Notifikasi sebelum closing | "Closing 21.30: 3 form belum diisi", "Belum diisi: Stock, Prep list, dan Waste. Jika memang tidak ada, ketuk Tidak ada hari ini di formnya." |
+| Staff membetulkan isiannya | "Bisa dibetulkan sampai 21.45", "Betulkan", "Isian dibetulkan." / "Isian ini dikirim lebih dari 15 menit lalu, jadi tidak bisa dibetulkan lagi. Laporkan kekeliruan supaya Head Kitchen atau Manager mengoreksinya." |
 | PIN terlalu mudah | "PIN ini terlalu mudah ditebak (angka sama, berurutan, atau berulang). Pilih 6 angka lain." |
 | Kunci 24 jam | "PIN salah 5 kali lagi. Akun terkunci 24 jam, atau sampai Head Kitchen atau Manager mereset PIN." |
 | Form kustom tersimpan | "Form tersimpan dan sudah tampil di Beranda." |
