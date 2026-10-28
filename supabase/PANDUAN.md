@@ -78,7 +78,10 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
 - **Jadwal** mengikuti Pengaturan → Outlet dan jadwal secara otomatis.
 - **Versi baru:** jika `Code.gs` berubah, tempel `Code.gs` ke Apps Script **dan** tempel ulang
   `supabase/functions/api/index.ts` ke function `api` lalu Deploy (file itu dirakit dari Code.gs dengan
-  `node supabase/rakit.mjs`). Jika `skema.sql` berubah, jalankan lagi di SQL Editor.
+  `node supabase/rakit.mjs`). Jika `skema.sql` berubah, jalankan lagi di SQL Editor. Urutan yang aman:
+  Deploy Edge Function lebih dulu, lalu tempel Code.gs, lalu (jika diminta) `setupSpreadsheet`. Sejak Code.gs
+  v0.30, `setupSpreadsheet` berhenti dengan pesan jika Edge Function masih versi lama, supaya Sheet tidak
+  punya tab yang tidak ada di Supabase.
 - **Log:** Supabase → Edge Functions → api → Logs (lama tiap aksi: "Aksi beranda: 12 ms").
 
 ## Function di region yang sama dengan database
@@ -120,6 +123,8 @@ dijalankan dari editor Apps Script (pilih nama fungsi → **Run**), dan hasilnya
   3. Jalankan `pulihkanCadangan`. **Semua isian sesudah cadangan itu dibuat hilang**; isi sebelum pemulihan
      disimpan sebagai "Cadangan sebelum pemulihan …" (namanya ditulis di log). PIN, sesi, dan notifikasi tetap.
   4. Untuk membatalkan: pulihkan berkas "Cadangan sebelum pemulihan …" dengan cara yang sama.
+  5. Buka Pengaturan → Hari libur di aplikasi: hari libur yang ditandai sesudah cadangan itu dibuat (misalnya
+     Lebaran yang akan datang) ikut hilang dan perlu ditandai lagi.
   - Selama pemulihan, aplikasi di HP menulis "Server sedang dipulihkan…" dan isian masuk antrean HP. Peringatan
     "Laporan harian belum terkirim" bisa tampil sampai laporan harian berikutnya.
   - Jika pemulihan berhenti di tengah (misalnya waktu habis), aplikasi **tetap ditutup** supaya tidak ada isian

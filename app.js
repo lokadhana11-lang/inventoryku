@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.29.0';
+  var VERSI_APLIKASI = '0.30.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -456,6 +456,7 @@
     naik: '<path d="M7 17 17 7M9.5 7H17v7.5"/>',
     turun: '<path d="M7 7l10 10M17 9.5V17H9.5"/>',
     lonceng: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    kalender: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
     kamera: '<path d="M3.5 8.5a2 2 0 0 1 2-2h2.5l1.5-2.5h5l1.5 2.5h2.5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>'
   };
 
@@ -1359,6 +1360,7 @@
     { pola: /^\/pengaturan\/item\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarItemUbah },
     { pola: /^\/pengaturan\/unit$/, menu: 'pengaturan', pengelola: true, layar: layarUnit },
     { pola: /^\/pengaturan\/pemasok$/, menu: 'pengaturan', pengelola: true, layar: layarPemasok },
+    { pola: /^\/pengaturan\/libur(?:\/(\d{4}-\d{2}-\d{2}))?$/, menu: 'pengaturan', pengelola: true, layar: layarHariLibur },
     { pola: /^\/pengaturan\/kategori$/, menu: 'pengaturan', pengelola: true, layar: layarKategoriSatuan },
     { pola: /^\/pengaturan\/resep$/, menu: 'pengaturan', pengelola: true, layar: layarResep },
     { pola: /^\/pengaturan\/resep-baru$/, menu: 'pengaturan', pengelola: true, layar: layarResepUbah },
@@ -1885,7 +1887,7 @@
           ? 'Pengingat stock (' + d.pengingatStock.replace(':', '.') + '), jika ada item di bawah minimum, minus, atau lewat masa simpan'
           : 'Pengingat stock (sedang dimatikan)');
       }
-      daftar.push(jam.length ? 'Pengingat cek suhu (' + jam.join(', ') + '), jika belum lengkap' : 'Pengingat cek suhu (sedang dimatikan)');
+      daftar.push(jam.length ? 'Pengingat cek suhu (' + jam.join(', ') + '), jika belum lengkap, kecuali hari libur' : 'Pengingat cek suhu (sedang dimatikan)');
       isi.appendChild(el('p', { class: 'kartu-teks', text: 'Yang dikirim ke HP ini, juga saat aplikasi tertutup:' }));
       isi.appendChild(el('ul', { class: 'notif-daftar' }, daftar.map(function (t) { return el('li', { text: t }); })));
 
@@ -2758,13 +2760,21 @@
     }
 
     function gambar(data, dariHp) {
-      // Data tersimpan dari hari lain: daftar form tetap, statusnya kembali "Belum diisi".
-      if (data.tanggal !== tanggalIso(new Date())) {
+      // Data tersimpan dari hari lain: daftar form tetap, statusnya kembali "Belum diisi". Hari libur hanya diketahui
+      // server, jadi tidak ditebak; ditagih atau tidaknya dihitung dari jadwal form (aplikasi 0.30.0).
+      var hariIni = tanggalIso(new Date());
+      if (data.tanggal !== hariIni) {
+        // Simpanan kemarin tahu apakah hari ini libur (liburBesok); simpanan yang lebih lama tidak.
+        var liburKini = data.tanggal === geserHari(hariIni, -1) && data.liburBesok && data.liburBesok.tanggal === hariIni
+          ? data.liburBesok : null;
         data = Object.assign({}, data, {
           form: (data.form || []).map(function (f) {
-            return Object.assign({}, f, { status: 'belum', lengkap: false, detail: null, terakhir: null });
+            return Object.assign({}, f, { status: 'belum', lengkap: false, detail: null, terakhir: null,
+              wajib: liburKini ? false : wajibMenurutJadwal(f, hariIni) });
           }),
-          masaSimpan: null
+          masaSimpan: null,
+          libur: liburKini,
+          liburBesok: null
         });
       }
       if (data.namaOutlet) outlet.textContent = data.namaOutlet;
@@ -2772,15 +2782,16 @@
       if (!dariHp) simpanMenitKeluarOtomatis(data.keluarOtomatisMenit);
 
       var form = data.form || [];
-      gambarTiket(form);
-      gambarKemajuan(form);
+      var libur = data.libur || null;
+      gambarTiket(form, libur);
+      gambarKemajuan(form, libur);
       gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null,
-        data.opname || null, data.terkunci || []);
+        data.opname || null, data.terkunci || [], libur, data.liburBesok || null);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
 
-    function gambarTiket(form) {
+    function gambarTiket(form, libur) {
       kosongkan(grid);
       if (!form.length) {
         grid.appendChild(kotakKosong('Belum ada form yang tampil. Pengelola mengatur form di Pengaturan.'));
@@ -2790,8 +2801,10 @@
       form.forEach(function (f, i) {
         var st = STATUS_TIKET[f.status] || STATUS_TIKET.belum;
         var kataTiket = st.kata || f.detail || 'Belum diisi';
-        // Form kustom di luar jadwalnya tidak ditagih (Bagian 5.8): tiketnya tidak menulis "Belum diisi".
-        if (f.status === 'belum' && !f.wajib) kataTiket = f.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu' : 'Tidak dijadwalkan hari ini';
+        // Form kustom di luar jadwalnya, dan semua form pada hari libur, tidak ditagih (Bagian 5.8): tiketnya tidak menulis "Belum diisi".
+        if (f.status === 'belum' && !f.wajib) {
+          kataTiket = libur ? 'Hari libur' : (f.jadwal === 'sewaktu-waktu' ? 'Sewaktu-waktu' : 'Tidak dijadwalkan hari ini');
+        }
         var tanda = tandaStatus(st.jenis, kataTiket);
         var lama = statusSebelum[f.id];
         if (lama && lama !== f.status && (f.status === 'terkirim' || f.status === 'nihil')) {
@@ -2826,9 +2839,9 @@
       tiketSudahTampil = true;
     }
 
-    /** Rel: satu ruas per form wajib hari itu, dalam urutan tiket; menyala saat formnya lengkap. */
-    function gambarKemajuan(form) {
-      var wajib = form.filter(function (f) { return f.wajib; });
+    /** Rel: satu ruas per form wajib hari itu, dalam urutan tiket; menyala saat formnya lengkap. Hari libur: tanpa rel. */
+    function gambarKemajuan(form, libur) {
+      var wajib = libur ? [] : form.filter(function (f) { return f.wajib; });
       var lengkap = wajib.filter(function (f) { return f.lengkap; }).length;
       var ruas = rel.children;
       if (ruas.length !== wajib.length) {
@@ -2848,6 +2861,14 @@
       rel.classList.toggle('selesai', selesai);
       kosongkan(kemajuanTeks);
       kemajuanTeks.classList.toggle('selesai', selesai);
+      kemajuanTeks.classList.toggle('libur', !!libur);
+      if (libur) {
+        // Menghapus hari libur saat semua form sudah lengkap tidak memicu momen selesai.
+        kemajuanTeks.appendChild(ikon('kalender'));
+        kemajuanTeks.appendChild(el('span', { text: 'Hari libur' + (libur.keterangan ? ': ' + libur.keterangan : '') }));
+        selesaiSebelum = null;
+        return;
+      }
       if (selesai) {
         kemajuanTeks.appendChild(ikon('centang'));
         kemajuanTeks.appendChild(el('span', { text: 'Semua form hari ini sudah terisi' }));
@@ -2874,7 +2895,7 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci, libur, liburBesok) {
       kosongkan(bawah);
       // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
       var simpan = barisMasaSimpan(masaSimpan);
@@ -2896,6 +2917,9 @@
           ]));
         })), bawah.firstChild);
       }
+      // Hari libur hari ini atau besok (aplikasi 0.30.0): di bawah reset PIN dan akun terkunci, di atas peringatan sistem.
+      var hl = barisHariLibur(libur, liburBesok);
+      if (hl) bawah.insertBefore(hl, bawah.firstChild);
       if (!permintaan.length && !terkunci.length) return;
       var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemberitahuan' });
       permintaan.forEach(function (p) {
@@ -6697,7 +6721,9 @@
     var c = Cache.baca('kustom:' + id);
     if (!c || !c.data || !c.data.form) return null;
     if (c.data.tanggal === tanggal) return c.data;
-    return Object.assign({}, c.data, { tanggal: tanggal, kiriman: { jumlah: 0, baris: 0, terakhir: null }, nihil: null, turunan: true });
+    // Hari libur hanya diketahui server: tanggal lain tanpa sinyal ditagih menurut jadwal (aplikasi 0.30.0).
+    return Object.assign({}, c.data, { tanggal: tanggal, kiriman: { jumlah: 0, baris: 0, terakhir: null }, nihil: null, turunan: true,
+      libur: null, wajib: wajibMenurutJadwal(c.data.form, tanggal) });
   }
 
   function layarFormKustom(k) {
@@ -6788,7 +6814,8 @@
       aturJudul(f.nama);
       judul.textContent = f.nama;
       gantiTeksTombol(tombolKirim, 'Kirim ' + f.nama.toLowerCase());
-      keterangan.textContent = kalimatKeterangan(f.keterangan, 'Jadwal: ' + teksJadwal(f) + (d.wajib ? '.' : ', tidak ditagih pada tanggal ini.'));
+      keterangan.textContent = kalimatKeterangan(f.keterangan, 'Jadwal: ' + teksJadwal(f) +
+        (d.libur ? '. Hari libur, tidak ditagih.' : (d.wajib ? '.' : ', tidak ditagih pada tanggal ini.')));
       gambarStatus();
       if (!defBerubah && isian) return;
       isian = isianFormKustom({
@@ -9291,8 +9318,10 @@
         cincinKemajuan(lengkap, wajib),
         el('span', { class: 'ubin-isi' }, [
           el('span', { class: 'ubin-label', text: 'Form terisi' }),
-          el('span', { class: 'ubin-nilai' }, [String(lengkap), el('small', { text: ' dari ' + wajib })]),
-          el('span', { class: 'ubin-ket', text: 'hari ini' })
+          // Hari libur (aplikasi 0.30.0): tidak ada form yang ditagih, jadi bukan "0 dari 0".
+          d.libur ? el('span', { class: 'ubin-nilai', text: 'Libur' })
+            : el('span', { class: 'ubin-nilai' }, [String(lengkap), el('small', { text: ' dari ' + wajib })]),
+          el('span', { class: 'ubin-ket', text: d.libur ? 'tidak ada form yang ditagih' : 'hari ini' })
         ])
       ]),
       ubin('Belum diperiksa', String(r.belumDiperiksa || 0), 'isian, ' + BATAS_RIWAYAT_HARI + ' hari terakhir', 'centang'),
@@ -9414,6 +9443,45 @@
         ]),
         ikon('kanan')
       ]));
+  }
+
+  /** "Ditandai Budi, 21 Okt 07.10" dari tanda hari libur. */
+  function teksDitandaiLibur(x) {
+    return 'Ditandai ' + (x.oleh || 'Pengelola') + (x.waktu ? ', ' + waktuPendek(x.waktu) : '');
+  }
+
+  /**
+   * Beranda Pengelola (aplikasi 0.30.0): hari ini hari libur, atau besok hari libur, dengan tautan ke
+   * Pengaturan → Hari libur supaya tanggal yang salah masih bisa diubah atau dihapus.
+   */
+  function barisHariLibur(libur, liburBesok) {
+    var x = libur || liburBesok;
+    if (!x) return null;
+    var akibat = libur ? 'Email harian dan pengingat cek suhu tidak dikirim hari ini.'
+      : 'Form besok tidak ditagih; email harian dan pengingat cek suhu besok tidak dikirim.';
+    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Hari libur' },
+      el('a', { class: 'daftar-baris pemberitahuan', href: '#/pengaturan/libur' }, [
+        el('span', { class: 'daftar-baris-isi' }, [
+          tandaStatus('menunggu', libur ? 'Hari ini hari libur' : 'Besok hari libur'),
+          el('span', { class: 'daftar-baris-ket ket-pecah', text: (x.keterangan ? x.keterangan + '. ' : '') + teksDitandaiLibur(x) + '. ' +
+            akibat + ' Ketuk untuk mengubah atau menghapus.' })
+        ]),
+        ikon('kanan')
+      ]));
+  }
+
+  /**
+   * Ditagih menurut jadwal saja (tanpa hari libur, yang hanya diketahui server), untuk data form dari tanggal lain
+   * yang dipakai tanpa sinyal. f: form dari Beranda atau formKustom (jenis, jadwal, hari).
+   */
+  function wajibMenurutJadwal(f, iso) {
+    if (f.jenis !== 'kustom') return true;
+    if (f.jadwal === 'sewaktu-waktu') return false;
+    if (f.jadwal === 'hari tertentu') {
+      var p = String(iso).split('-');
+      return (f.hari || []).indexOf(NAMA_HARI[new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay()]) >= 0;
+    }
+    return true;
   }
 
   /** Pesan siap pakai (ikon dan warna seperti tulisPesan). */
@@ -10448,6 +10516,14 @@
             el('span', { class: 'daftar-baris-ket', text: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis, target food cost.' })
           ]),
           ikon('kanan')
+        ]),
+        el('a', { class: 'daftar-baris', href: '#/pengaturan/libur' }, [
+          ikon('kalender'),
+          el('span', { class: 'daftar-baris-isi' }, [
+            el('span', { class: 'daftar-baris-judul', text: 'Hari libur' }),
+            el('span', { class: 'daftar-baris-ket', text: 'Tanggal dapur tutup: form tidak ditagih, email harian dan pengingat cek suhu tidak dikirim.' })
+          ]),
+          ikon('kanan')
         ])
       ])
     ]));
@@ -10663,7 +10739,8 @@
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
         el('h2', { class: 'kartu-judul', text: 'Jadwal' }),
         kJam.wadah, kJeda.wadah,
-        el('p', { class: 'kolom-bantuan', text: 'Laporan harian dan cadangan mengikuti jam closing, jeda, hari cadangan, dan zona waktu ini.' }),
+        el('p', { class: 'kolom-bantuan', text: 'Laporan harian dan cadangan mengikuti jam closing, jeda, hari cadangan, dan zona waktu ini. ' +
+          'Pada hari libur laporan harian tidak dikirim.' }),
         gOpname.wadah, kHari.wadah
       ]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
@@ -10677,8 +10754,8 @@
       if (adaPengingat) {
         wadah.appendChild(el('section', { class: 'kartu formulir' }, [
           el('h2', { class: 'kartu-judul', text: 'Pengingat cek suhu' }),
-          el('p', { class: 'kartu-teks', text: 'Notifikasi ke semua HP yang menyalakan notifikasi, jika waktu cek itu belum diisi untuk semua unit. ' +
-            'Kosongkan jam untuk mematikan pengingatnya.' })
+          el('p', { class: 'kartu-teks', text: 'Notifikasi ke semua HP yang menyalakan notifikasi, jika waktu cek itu belum diisi untuk semua unit, ' +
+            'kecuali pada hari libur. Kosongkan jam untuk mematikan pengingatnya.' })
         ].concat(kolomPengingat.map(function (x) { return x.k.wadah; }), [
           data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
         ])));
@@ -11591,6 +11668,307 @@
     });
   }
 
+  /* ---------- Hari libur (aplikasi 0.30.0; spesifikasi sistem Bagian 5.8, tampilan Bagian 5.7) ---------- */
+
+  var BATAS_LIBUR_LEWAT_TAMPIL = 30;
+
+  /**
+   * Beranda tersimpan untuk hari ini mengikuti tanda yang baru disimpan atau dihapus, supaya Beranda yang dibuka
+   * sesudahnya tidak menampilkan keadaan lama sesaat. libur: { tanggal, keterangan, oleh, waktu } | null.
+   */
+  function aturLiburDiBeranda(tanggal, libur) {
+    var c = Cache.baca('beranda');
+    if (!c || !c.data) return;
+    var d = c.data;
+    var besok = geserHari(d.tanggal, 1);
+    if (d.tanggal !== tanggal && besok !== tanggal) return;
+    d = Object.assign({}, d);
+    if (d.tanggal === tanggal) {
+      d.libur = libur;
+      d.form = (d.form || []).map(function (f) {
+        return Object.assign({}, f, { wajib: libur ? false : wajibMenurutJadwal(f, tanggal) });
+      });
+    } else {
+      d.liburBesok = libur;
+    }
+    Cache.tulis('beranda', d);
+  }
+
+  function layarHariLibur(k) {
+    aturJudul('Hari libur');
+    // Dari lembar Catat penjualan: #/pengaturan/libur/<tanggal> langsung membuka lembar Tambah dengan tanggal itu.
+    var tanggalAwal = k.cocok && k.cocok[1] ? k.cocok[1] : '';
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var data = null;
+    var terakhir = null; // tanggal dan keterangan yang baru disimpan: Tambah berikutnya memilih hari sesudahnya
+    var tambah = tombol('Tambah', 'utama', { 'aria-haspopup': 'dialog', disabled: true, onclick: function () { bukaTambah(); } });
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Pengaturan', '#/pengaturan'),
+      el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Hari libur' }), tambah]),
+      el('p', { class: 'kartu-teks', text: 'Tanggal dapur tutup. Pada hari libur tidak ada form yang ditagih, penjualan tidak perlu ' +
+        'dicatat, dan email harian serta pengingat cek suhu tidak dikirim. Isian yang tetap dikirim diterima seperti biasa.' }),
+      penanda,
+      wadah
+    ]));
+
+    function barisLibur(x) {
+      var ket = [x.keterangan, teksDitandaiLibur(x)].filter(Boolean).join(' · ');
+      return el('button', { type: 'button', class: 'daftar-baris', 'aria-haspopup': 'dialog', onclick: function () { bukaUbah(x); } }, [
+        ikon('kalender'),
+        el('span', { class: 'daftar-baris-isi' }, [
+          el('span', { class: 'daftar-baris-judul', text: tanggalJudul(x.tanggal) }),
+          el('span', { class: 'daftar-baris-ket ket-pecah', text: ket }),
+          x.tanggal === data.hariIni ? el('span', { class: 'tanda-deret' }, tandaStatus('menunggu', 'Hari ini')) : null
+        ]),
+        ikon('kanan')
+      ]);
+    }
+
+    function gambar(d) {
+      data = d;
+      kosongkan(wadah);
+      tambah.disabled = !d.siap;
+      if (!d.siap) {
+        wadah.appendChild(kotakKosong('Hari libur belum bisa dicatat. Pemilik Sheet perlu menjalankan ulang setupSpreadsheet sesudah ' +
+          'Edge Function terbaru di-Deploy.', 'kalender'));
+        return;
+      }
+      var libur = d.libur || [];
+      if (!libur.length) {
+        wadah.appendChild(kotakKosong('Belum ada hari libur. Ketuk Tambah untuk menandai tanggal dapur tutup.', 'kalender'));
+        return;
+      }
+      var depan = libur.filter(function (x) { return x.tanggal >= d.hariIni; });
+      var lewat = libur.filter(function (x) { return x.tanggal < d.hariIni; }).reverse();
+      if (depan.length) {
+        wadah.appendChild(el('section', { class: 'kelompok' }, [
+          el('h2', { class: 'kelompok-judul', text: 'Akan datang' }),
+          el('div', { class: 'daftar', role: 'group', 'aria-label': 'Hari libur akan datang' }, depan.map(barisLibur))
+        ]));
+      }
+      if (lewat.length) {
+        wadah.appendChild(el('section', { class: 'kelompok' }, [
+          el('h2', { class: 'kelompok-judul', text: 'Sudah lewat' }),
+          el('div', { class: 'daftar', role: 'group', 'aria-label': 'Hari libur yang sudah lewat' },
+            lewat.slice(0, BATAS_LIBUR_LEWAT_TAMPIL).map(barisLibur)),
+          lewat.length > BATAS_LIBUR_LEWAT_TAMPIL ? el('p', { class: 'kolom-bantuan', text: (lewat.length - BATAS_LIBUR_LEWAT_TAMPIL) +
+            ' hari libur yang lebih lama tidak ditampilkan. Semuanya ada di tab M_HariLibur.' }) : null
+        ]));
+      }
+    }
+
+    function cariLibur(t) {
+      return (data.libur || []).filter(function (x) { return x.tanggal === t; })[0] || null;
+    }
+
+    /** Form yang sudah punya isian hari ini menurut Beranda tersimpan (hanya untuk peringatan; server yang memastikan). */
+    function isianHariIni() {
+      var c = Cache.baca('beranda');
+      if (!c || !c.data || c.data.tanggal !== tanggalIso(new Date())) return [];
+      return (c.data.form || []).filter(function (f) { return f.status && f.status !== 'belum'; }).map(function (f) { return f.nama; });
+    }
+
+    function teksAkibat(t) {
+      var hari = data.hariIni;
+      var teks = tanggalJudul(t) + ': ';
+      if (t === hari) {
+        teks += 'Staff melihat Hari libur di Beranda; pengingat cek suhu dan email harian hari ini tidak dikirim.';
+      } else if (t > hari) {
+        teks += 'form tidak ditagih; email harian dan pengingat cek suhu hari itu tidak dikirim.';
+      } else {
+        teks += 'form tidak ditagih. Email dan rekap yang sudah terkirim tidak berubah; Kepatuhan, food cost, dan rekap yang ' +
+          'diunduh sesudahnya mengikuti tanda ini.';
+      }
+      return teks + ' Isian yang tetap dikirim diterima seperti biasa.';
+    }
+
+    function bukaTambah(awal) {
+      if (!data || !data.siap) return;
+      // Sesudah menyimpan (Lebaran beberapa hari), Tambah berikutnya memilih hari sesudahnya dengan keterangan yang sama.
+      if (!awal && terakhir) awal = { tanggal: geserHari(terakhir.tanggal, 1), keterangan: terakhir.keterangan };
+      awal = awal || {};
+      var hari = data.hariIni;
+      var besok = geserHari(hari, 1);
+      var PILIH_HARI = 'Hari ini, ' + tanggalPendek(hari);
+      var PILIH_BESOK = 'Besok, ' + tanggalPendek(besok);
+      var PILIH_LAIN = 'Tanggal lain';
+      var tAwal = awal.tanggal || '';
+      var gTanggal = grupPilihan('Tanggal', [PILIH_HARI, PILIH_BESOK, PILIH_LAIN],
+        !tAwal ? '' : (tAwal === hari ? PILIH_HARI : (tAwal === besok ? PILIH_BESOK : PILIH_LAIN)));
+      var inTanggal = el('input', { type: 'date', class: 'isian', id: 'libur-tanggal-' + Date.now(), max: data.batasDepan,
+        min: data.arsipSampai || null, 'aria-label': 'Tanggal libur' });
+      if (tAwal && tAwal !== hari && tAwal !== besok) inTanggal.value = tAwal;
+      var kolomLain = el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: inTanggal.id, text: 'Tanggal libur' }), inTanggal]);
+      var kKet = kolomIsian({ label: 'Keterangan (tidak wajib)', maxlength: 40, nilai: awal.keterangan || '',
+        bantuan: 'Misalnya Lebaran atau renovasi.' });
+      var akibat = el('p', { class: 'kolom-bantuan', 'aria-live': 'polite' });
+      var peringatan = el('div');
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+
+      function tanggalDipilih() {
+        var v = gTanggal.nilai();
+        if (v === PILIH_HARI) return hari;
+        if (v === PILIH_BESOK) return besok;
+        if (v === PILIH_LAIN) return inTanggal.value || '';
+        return '';
+      }
+      function perbarui() {
+        kolomLain.hidden = gTanggal.nilai() !== PILIH_LAIN;
+        var t = tanggalDipilih();
+        kosongkan(peringatan);
+        if (!t) {
+          akibat.textContent = 'Pilih tanggal dapur tutup.';
+          return;
+        }
+        akibat.textContent = teksAkibat(t) + (cariLibur(t) ? ' Tanggal ini sudah hari libur; menyimpan mengganti keterangannya.' : '');
+        var isian = t === hari ? isianHariIni() : [];
+        if (isian.length) {
+          peringatan.appendChild(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'),
+            el('span', { text: 'Hari ini sudah ada isian ' + daftarNama(isian) + '. Pastikan dapur memang tutup.' })]));
+        }
+      }
+      gTanggal.input.forEach(function (i) {
+        i.addEventListener('change', function () {
+          gTanggal.galat('');
+          perbarui();
+          if (gTanggal.nilai() === PILIH_LAIN && !inTanggal.value) inTanggal.focus();
+        });
+      });
+      inTanggal.addEventListener('change', perbarui);
+      inTanggal.addEventListener('input', perbarui);
+      perbarui();
+
+      function simpan(t0, l) {
+        tulisPesan(pesan, '');
+        var t = tanggalDipilih();
+        if (!t) {
+          if (gTanggal.nilai() === PILIH_LAIN) {
+            tulisPesan(pesan, 'Pilih tanggal libur.', 'masalah');
+            inTanggal.focus();
+          } else {
+            gTanggal.galat('Pilih tanggal libur.');
+            gTanggal.input[0].focus();
+          }
+          return;
+        }
+        if (t > data.batasDepan) {
+          tulisPesan(pesan, 'Hari libur paling jauh setahun ke depan. Pilih tanggal yang lebih dekat.', 'masalah');
+          return;
+        }
+        var ket = kKet.input.value.trim().replace(/\s+/g, ' ');
+        aturTombolProses(t0, true, 'Menyimpan…');
+        l.sibuk(true);
+        panggilApi('simpanLibur', { tanggal: t, keterangan: ket }).then(function (hasil) {
+          Cache.tulis('libur', hasil);
+          terakhir = { tanggal: t, keterangan: ket };
+          l.sibuk(false);
+          l.tutup();
+          gambar(hasil);
+          var x = (hasil.libur || []).filter(function (y) { return y.tanggal === t; })[0] || null;
+          aturLiburDiBeranda(t, x);
+          var isian = hasil.disimpan && hasil.disimpan.isian ? hasil.disimpan.isian : [];
+          toast('Hari libur ' + tanggalJudul(t) + ' tersimpan.' + (isian.length ? ' Tanggal ini sudah punya isian ' + daftarNama(isian) +
+            '; isiannya tetap tersimpan.' : ''), isian.length ? 'info' : null);
+        }).catch(function (err) {
+          l.sibuk(false);
+          aturTombolProses(t0, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesan, pesanGalat(err), 'masalah');
+        });
+      }
+      bukaLembar({
+        judul: 'Tambah hari libur',
+        isi: el('form', { class: 'formulir', novalidate: true, onsubmit: function (e) { e.preventDefault(); } },
+          [gTanggal.wadah, kolomLain, kKet.wadah, akibat, peringatan, pesan]),
+        aksi: [{ teks: 'Batal', jenis: 'kedua' }, { teks: 'Simpan hari libur', jenis: 'utama', klik: simpan }]
+      });
+    }
+
+    function bukaUbah(x) {
+      var kKet = kolomIsian({ label: 'Keterangan (tidak wajib)', maxlength: 40, nilai: x.keterangan || '',
+        bantuan: 'Misalnya Lebaran atau renovasi.' });
+      var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+      function simpan(t0, l) {
+        tulisPesan(pesan, '');
+        aturTombolProses(t0, true, 'Menyimpan…');
+        l.sibuk(true);
+        panggilApi('simpanLibur', { tanggal: x.tanggal, keterangan: kKet.input.value.trim().replace(/\s+/g, ' ') }).then(function (hasil) {
+          Cache.tulis('libur', hasil);
+          l.sibuk(false);
+          l.tutup();
+          gambar(hasil);
+          aturLiburDiBeranda(x.tanggal, (hasil.libur || []).filter(function (y) { return y.tanggal === x.tanggal; })[0] || null);
+          toast('Hari libur ' + tanggalJudul(x.tanggal) + ' tersimpan.');
+        }).catch(function (err) {
+          l.sibuk(false);
+          aturTombolProses(t0, false);
+          if (tanganiSesiBerakhir(err)) return;
+          tulisPesan(pesan, pesanGalat(err), 'masalah');
+        });
+      }
+      bukaLembar({
+        judul: tanggalJudul(x.tanggal),
+        isi: el('form', { class: 'formulir', novalidate: true, onsubmit: function (e) { e.preventDefault(); } }, [
+          el('p', { class: 'kartu-teks', text: teksDitandaiLibur(x) + '.' }),
+          kKet.wadah,
+          pesan,
+          el('div', { class: 'bagian-hapus' }, [
+            el('p', { class: 'kartu-teks', text: 'Hapus jika dapur ternyata buka. Form tanggal itu ditagih lagi.' }),
+            tombol('Hapus hari libur', 'bahaya', { onclick: function () { hapus(x); } })
+          ])
+        ]),
+        aksi: [{ teks: 'Tutup', jenis: 'kedua' }, { teks: 'Simpan', jenis: 'utama', klik: simpan }]
+      });
+    }
+
+    function hapus(x) {
+      var hari = data.hariIni;
+      var teks = x.tanggal > hari ? 'Form tanggal itu ditagih lagi seperti hari biasa.'
+        : x.tanggal === hari ? 'Form hari ini ditagih lagi. Pengingat cek suhu yang jamnya sudah lewat tidak dikirim ulang; minta Staff ' +
+          'mengecek suhu. Jika laporan harian hari ini sudah dilewati, laporannya tidak dikirim ulang.'
+          : 'Form tanggal itu ditagih lagi. Laporan harian tanggal itu tidak dikirim ulang; unduh PDF-nya dari menu Laporan jika perlu. ' +
+            'Email dan rekap yang sudah terkirim tidak berubah.';
+      konfirmasi({
+        judul: 'Hapus hari libur ' + tanggalJudul(x.tanggal) + '?',
+        teks: teks,
+        teksYa: 'Hapus hari libur',
+        teksProses: 'Menghapus…',
+        bahaya: true,
+        jalankan: function () { return panggilApi('hapusLibur', { tanggal: x.tanggal }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Cache.tulis('libur', hasil);
+        gambar(hasil);
+        aturLiburDiBeranda(x.tanggal, null);
+        toast('Hari libur ' + tanggalJudul(x.tanggal) + (hasil.dihapus ? ' dihapus.' : ' sudah dihapus.'));
+      });
+    }
+
+    muatData({
+      kunciCache: 'libur',
+      ambil: function () { return panggilApi('daftarLibur'); },
+      gambar: function (d) {
+        gambar(d);
+        if (tanggalAwal && d.siap && !lembarKini) {
+          var x = cariLibur(tanggalAwal);
+          if (x) bukaUbah(x);
+          else bukaTambah({ tanggal: tanggalAwal });
+          tanggalAwal = '';
+        }
+      },
+      kerangka: function () {
+        kosongkan(wadah).appendChild(kerangkaBaris(3));
+      },
+      galat: function (pesan, cobaLagi) {
+        // Server lama (sebelum Code.gs v0.30) tidak mengenal aksi daftarLibur.
+        if (/Aksi tidak dikenal/.test(pesan)) pesan = 'Server belum diperbarui. Pemilik perlu memasang Code.gs v0.30 dan Edge Function terbaru.';
+        kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
+      },
+      penanda: penanda
+    });
+  }
+
   /* ---------- Pemasok (aplikasi 0.23.0; spesifikasi sistem Bagian 5.1, tampilan Bagian 5.7) ---------- */
 
   function layarPemasok(k) {
@@ -12453,8 +12831,11 @@
     var kTanggal = kolomIsian({ label: 'Pilih tanggal', type: 'date', nilai: tanggal, atribut: { max: hari } });
     kTanggal.wadah.hidden = tanggal === kemarin;
     var sudah = el('p', { class: 'kolom-bantuan', 'aria-live': 'polite' });
+    // Hari libur (aplikasi 0.30.0): tanggal tanpa catatan penjualan bisa langsung ditandai dari sini.
+    var tandaiLibur = el('div', { hidden: true });
     var kJual = kolomIsian({ label: 'Penjualan (Rp)', inputmode: 'numeric', kelas: 'isian-angka',
-      bantuan: 'Total penjualan makanan dan minuman dari kasir, sebelum pajak dan service. Hari tutup: isi 0.' });
+      bantuan: 'Total penjualan makanan dan minuman dari kasir, sebelum pajak dan service. Dapur tutup tanggal itu? Tandai sebagai hari ' +
+        'libur, atau isi 0.' });
     var kCatatan = kolomIsian({ label: 'Catatan (tidak wajib)', maxlength: 200 });
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
     // Porsi per menu: diisi setelah daftar menu tanggal itu termuat.
@@ -12539,6 +12920,7 @@
       var t = tanggalTerpilih();
       var nomor = ++nomorMuat;
       sudah.textContent = '';
+      kosongkan(tandaiLibur).hidden = true;
       kosongkan(porsiIsi).appendChild(el('p', { class: 'kolom-bantuan', text: t ? 'Memuat menu…' : 'Pilih tanggal untuk mengisi porsi per menu.' }));
       kolomPorsi = [];
       if (!t) return;
@@ -12551,6 +12933,14 @@
         } else {
           if (!diketik.jual) kJual.input.value = '';
           if (!diketik.catatan) kCatatan.input.value = '';
+          if (d.libur) {
+            sudah.textContent = 'Hari libur' + (d.libur.keterangan ? ' (' + d.libur.keterangan + ')' : '') + '. Penjualan tidak perlu dicatat.';
+          } else if ('libur' in d) {
+            // Server yang mengenal hari libur (Code.gs v0.30): membuka Pengaturan → Hari libur dengan tanggal ini.
+            tandaiLibur.appendChild(el('a', { class: 'tombol tombol-tautan', href: '#/pengaturan/libur/' + t,
+              text: 'Tandai ' + tanggalPendek(t) + ' sebagai hari libur' }));
+            tandaiLibur.hidden = false;
+          }
         }
         gambarPorsi(d);
       }).catch(function (err) {
@@ -12574,7 +12964,7 @@
 
     bukaLembar({
       judul: 'Catat penjualan',
-      isi: [gTanggal.wadah, kTanggal.wadah, kJual.wadah, sudah, kCatatan.wadah, porsiWadah, pesan],
+      isi: [gTanggal.wadah, kTanggal.wadah, kJual.wadah, sudah, tandaiLibur, kCatatan.wadah, porsiWadah, pesan],
       aksi: [
         { teks: 'Batal', jenis: 'kedua' },
         { teks: 'Simpan penjualan', jenis: 'utama', klik: function (t, lembar) {
@@ -12583,7 +12973,7 @@
           var okTanggal = kTanggal.galat(!t1 ? 'Pilih tanggal.' : (t1 > hari ? 'Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat.' : ''));
           var teks = kJual.input.value.trim().replace(/^rp\s*/i, '').replace(/\./g, '');
           var nilai = bacaAngka(teks);
-          var okJual = kJual.galat(nilai === null ? 'Isi penjualan. Hari tutup diisi 0.' : (isNaN(nilai) || nilai < 0 ? 'Isi angka 0 atau lebih, misalnya 3450000.' : ''));
+          var okJual = kJual.galat(nilai === null ? 'Isi penjualan. Isi 0 jika tidak ada penjualan.' : (isNaN(nilai) || nilai < 0 ? 'Isi angka 0 atau lebih, misalnya 3450000.' : ''));
           var porsi = [];
           var okPorsi = true;
           var salahPertama = null;
@@ -12658,7 +13048,7 @@
         return el('span', { class: i === g.length - 1 ? 'hari-ini' : null, text: NAMA_BULAN[Number(x.bulan.slice(5, 7)) - 1].slice(0, 3) });
       }))
     ]));
-    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap.' }));
+    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap, atau semua harinya libur.' }));
     return kartu;
   }
 
@@ -12811,7 +13201,7 @@
         return el('section', { class: 'kartu kartu-menunggu' }, [judul,
           el('p', {}, tandaStatus('menunggu', 'Menunggu')),
           el('p', { class: 'kartu-teks', text: 'Porsi per menu belum dicatat untuk ' + t.kurang.length + ' hari: ' + daftar +
-            '. Pemakaian seharusnya dibandingkan setelah semua hari tercatat (hari tutup tidak perlu).' }),
+            '. Pemakaian seharusnya dibandingkan setelah semua hari tercatat (hari libur dan hari tanpa penjualan tidak perlu).' }),
           tombolCatat('Catat porsi ' + tanggalPendek(t.kurang[0]), t.kurang[0])]);
       }
       var batas = Math.abs(t.selisihPersen == null ? 0 : t.selisihPersen) <= BATAS_SELISIH_PORSI;
@@ -12903,13 +13293,16 @@
 
     function kartuPenjualan(h) {
       var j = h.penjualan;
+      var nLibur = (j.libur || []).length; // hari libur tanpa catatan: tidak perlu dicatat (Code.gs v0.30)
       var catat = tombol('Catat penjualan', 'kedua', { 'aria-haspopup': 'dialog' });
       catat.addEventListener('click', function () {
         bukaCatatPenjualan({ bulan: h.bulan, terakhir: j.terakhir, selesai: function (hasil) { if (hasil.hpp) terima(hasil.hpp); } });
       });
       return el('section', { class: 'kartu' }, [
         el('h2', { class: 'kartu-judul', text: 'Penjualan' }),
-        el('p', { class: 'kartu-teks', text: j.jumlahHari ? j.hari + ' dari ' + j.jumlahHari + ' hari tercatat' : 'Belum ada hari yang selesai bulan ini.' }),
+        el('p', { class: 'kartu-teks', text: j.jumlahHari
+          ? j.hari + ' dari ' + j.jumlahHari + ' hari tercatat' + (nLibur ? ' · ' + nLibur + ' hari libur' : '')
+          : (nLibur ? 'Semua hari pada periode ini hari libur.' : 'Belum ada hari yang selesai bulan ini.') }),
         j.terakhir.length ? el('div', { class: 'daftar-nilai' }, j.terakhir.map(function (x) {
           return barisNilai(tanggalJudul(x.tanggal) + (x.catatan ? ' · ' + x.catatan : ''), formatRupiah(x.nilai));
         })) : null,
@@ -12928,7 +13321,7 @@
       return el('section', { class: 'kartu kartu-menunggu' }, [
         el('p', {}, tandaStatus('menunggu', 'Menunggu')),
         el('p', { class: 'kartu-teks', text: 'Penjualan belum dicatat untuk ' + j.kurang.length + ' hari: ' + daftar +
-          '. Food cost dihitung setelah semua hari tercatat.' }),
+          '. Food cost dihitung setelah semua hari tercatat.' + ('libur' in j ? ' Hari dapur tutup bisa ditandai sebagai hari libur.' : '') }),
         el('div', {}, catat)
       ]);
     }
@@ -13964,7 +14357,8 @@
           var v = gJadwal.nilai();
           hari.hidden = v !== 'Hari tertentu';
           bantuJadwal.textContent = v === 'Sewaktu-waktu' ? 'Diisi hanya saat perlu. Tidak pernah ditagih di Beranda dan email harian.'
-            : (v === 'Hari tertentu' ? 'Hanya ditagih di Beranda dan email harian pada hari yang dipilih.' : 'Ditagih setiap hari di Beranda dan email harian.');
+            : (v === 'Hari tertentu' ? 'Hanya ditagih di Beranda dan email harian pada hari yang dipilih, kecuali hari libur.'
+              : 'Ditagih setiap hari di Beranda dan email harian, kecuali hari libur.');
         }
         gJadwal.input.forEach(function (i) {
           i.addEventListener('change', function () {
