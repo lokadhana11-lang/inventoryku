@@ -1132,9 +1132,12 @@ misalnya "2 dari 3 isian diperiksa".
 - **Staff membetulkan isiannya sendiri** (28 Oktober 2026): selama 15 menit sesudah server
   menerima kiriman (kiriman dari antrean dihitung sejak sampai) dan selama kiriman belum
   diperiksa, pengisinya bisa membetulkan kolom yang sama dengan yang bisa dikoreksi Pengelola,
-  dengan aturan yang sama (stock dihitung ulang, `Log_Perubahan` mencatat namanya, tanda
-  dilaporkan keliru pada baris itu hilang). Isian orang lain tidak bisa dibetulkan. Batas waktu
-  menjaga angka yang sudah dipakai orang lain (stock, laporan) tidak berubah diam-diam.
+  dengan aturan yang sama (stock dihitung ulang, `Log_Perubahan` mencatat namanya). Isian orang
+  lain tidak bisa dibetulkan, begitu juga baris yang sudah dikoreksi Pengelola. Laporan
+  kekeliruan dari rekan pada baris itu tetap ada sampai Pengelola mengoreksi atau menutupnya.
+  Batas waktu menjaga angka yang sudah dipakai orang lain (stock, laporan) tidak berubah
+  diam-diam. Tandai diperiksa (satu per satu atau sekaligus) tidak menandai isian yang dibetulkan
+  sesudah layar Pengelola dimuat; Pengelola memuat ulang dan memeriksanya lagi.
 - **Sesudah itu staff tidak bisa mengubah data.** Jika menemukan kekeliruan di Riwayat,
   staff menekan "Laporkan Kekeliruan" pada baris itu dan menulis catatan singkat
   (misalnya "Stock Masuk seharusnya 5, bukan 50"). Baris mendapat tanda "dilaporkan keliru".
@@ -1620,7 +1623,7 @@ Apps Script tidak bisa mengirimnya.
 
 | Notifikasi | Penerima | Kapan |
 |---|---|---|
-| Suhu di luar standar (unit, suhu, tindakan, pengisi) | HP Pengelola | Saat isian Suhu berisi suhu di luar standar diterima |
+| Suhu di luar standar (unit, suhu, tindakan, pengisi) | HP Pengelola | Saat isian Suhu berisi suhu di luar standar diterima, atau suhu dikoreksi/dibetulkan menjadi di luar standar (28 Oktober 2026) |
 | "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif, kecuali pada hari libur (Bagian 5.8) |

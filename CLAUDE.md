@@ -307,7 +307,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Staff membetulkan isiannya sendiri (Code.gs v0.32, 28 Oktober 2026): `koreksi` kini untuk semua role; Staff hanya baris yang
   `submitted_by`-nya dirinya, dalam 15 menit sesudah `timestamp_server`, selama belum Diperiksa (selain itu `{ ok: false, pesan }`).
   `riwayat.kiriman[]`, `detailKiriman.kiriman`, dan `kiriman` di jawaban koreksi/laporkan ditambah `betulkanSampai` (ISO) hanya untuk
-  pengisinya (Staff) selama batas belum lewat.
+  pengisinya (Staff) selama batas belum lewat. `tandaiDiperiksa` menerima `terlihat` (ISO koreksi terbaru yang tampil, '' jika belum
+  pernah) dan `tandaiDiperiksaBanyak` menerima `terlihat: { id: ISO }`; kiriman yang dikoreksi sesudahnya ditolak / dilewati
+  (`sebab: 'berubah'`).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -358,7 +360,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++++ | Daftar belanja per pemasok dan pesanan (keputusan pemilik 21 Oktober 2026, butir 4 dari telaah aplikasi): kelompok per pemasok (pesanan yang menunggu, lalu pemasok barang masuk terakhir), "Kirim ke WhatsApp" ke nomor di Kontak, pesanan tercatat di `Data_Pesanan` lewat antrean HP, "Pesanan belum datang" dan "Tutup pesanan", kartu "Pesanan menunggu" dengan "Isi dari pesanan" di form Stock (semua role), barang masuk menyelesaikan pesanan, PDF per pemasok, email | Kode selesai (Code.gs v0.29, aplikasi 0.29.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (120 uji server, jawaban aksi lama sama dengan v0.28 selain PDF daftar belanja) dan Chromium (103 uji: Laporan dan form Stock, antrean, dua HP, server lama, delapan ukuran; uji lama tetap lulus), termasuk perbaikan sesudah telaah berlawanan; lihat butir 328–338. Digabung dan dipasang pemilik 22 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12++++++++++++++++++++++++ | Pengingat sebelum closing (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): notifikasi ke semua HP 15, 30, atau 60 menit sebelum jam closing (awal 30) berisi form wajib yang belum diisi atau belum lengkap, kecuali hari libur; kartu di Outlet dan jadwal, baris di lembar Notifikasi | Kode selesai (Code.gs v0.31, aplikasi 0.31.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (39 uji server) dan Chromium (24 uji: Outlet dan jadwal, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `pasangTrigger`) |
-| 12+++++++++++++++++++++++++ | Staff membetulkan isiannya sendiri (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): tombol "Betulkan" di detail Riwayat untuk isian sendiri selama 15 menit sesudah dikirim dan belum diperiksa, kolom dan aturan sama dengan Koreksi Pengelola, tanda "Bisa dibetulkan sampai …" | Kode selesai (Code.gs v0.32, aplikasi 0.32.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (29 uji server) dan Chromium (21 uji: HP, desktop, Staff lain, Pengelola, lewat batas, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
+| 12+++++++++++++++++++++++++ | Staff membetulkan isiannya sendiri (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): tombol "Betulkan" di detail Riwayat untuk isian sendiri selama 15 menit sesudah dikirim dan belum diperiksa, kolom dan aturan sama dengan Koreksi Pengelola, tanda "Bisa dibetulkan sampai …" | Kode selesai (Code.gs v0.32, aplikasi 0.32.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server) dan Chromium (24 uji: HP, desktop, Staff lain, Pengelola, lewat batas, Tandai diperiksa dari layar lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2742,8 +2744,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 360. **Server:** `koreksi` tanpa `pengelola: true`; `aksiKoreksi_` memanggil `periksaBetulkanSendiri_` untuk non-Pengelola sesudah
     pemeriksaan Diperiksa (pesan Staff tanpa "Buka kunci"). Pengisi = `submitted_by` baris itu (huruf besar/kecil tidak dibedakan),
     batas = `timestamp_server` + `BATAS_BETULKAN_MENIT` (15), jadi kiriman dari antrean dihitung sejak sampai di server. Sisanya
-    jalur koreksi yang sama: `turunan`, `periksaKoreksi`, `setelahKoreksi`, `Log_Perubahan` atas nama Staff, `updated_by`, tanda
-    dilaporkan keliru dibersihkan. `susunKiriman_` menambah `betulkanSampai` (`batasBetulkan_`, memakai `PENGGUNA_AKSI_`) untuk
+    jalur koreksi yang sama: `turunan`, `periksaKoreksi`, `setelahKoreksi`, `Log_Perubahan` atas nama Staff, `updated_by`; tanda
+    dilaporkan keliru hanya dibersihkan jika yang mengoreksi Pengelola (butir 363). `susunKiriman_` menambah `betulkanSampai` (`batasBetulkan_`, memakai `PENGGUNA_AKSI_`) untuk
     pengisinya selama batas belum lewat dan kiriman belum Diperiksa, sehingga ikut di `riwayat`, `detailKiriman`, dan jawaban aksi
     Riwayat lain; Pengelola tidak mendapatnya (Koreksi tanpa batas waktu).
 361. **Aplikasi:** `bisaDibetulkan(k)` (status, batas dibanding jam HP; server memeriksa lagi). `tandaKiriman` menambah tanda Menunggu
@@ -2757,5 +2759,16 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dengan pesan Staff; Waste tanpa rupiah di jawaban dan estimasi di Sheet dihitung ulang; Suhu di luar standar tanpa tindakan
     ditolak; antrean dihitung sejak diterima; form kustom). Chromium `uji_betulkan_ui.mjs` 21 uji (tanda di daftar, petunjuk, tombol,
     lembar, kiriman, pesan, Dikoreksi Rina; Andi tanpa Betulkan, Budi Koreksi; lewat batas tanpa tombol; batas lewat saat lembar
-    terbuka; desktop; delapan ukuran). Uji lama (Tandai diperiksa, Hitung sisa, pesanan, Hari libur, pengingat closing) tetap lulus.
+    terbuka; Tandai diperiksa dari layar lama; desktop; delapan ukuran; kini 24). Uji server kini 43 (butir 363). Uji lama (Tandai diperiksa, Hitung sisa, pesanan, Hari libur, pengingat closing) tetap lulus.
     Belum diuji di Supabase asli dan HP asli.
+363. **Telaah berlawanan** (satu penelaah; dua temuan diulang dengan skrip): (a) Staff yang membetulkan baris yang dilaporkan rekan
+    menghapus laporan itu tanpa jejak (`laporkanKeliru` tidak menulis `Log_Perubahan`), sehingga Pengelola tidak pernah melihatnya;
+    kini hanya koreksi Pengelola yang membersihkan tanda dilaporkan keliru. (b) Staff bisa membatalkan koreksi Pengelola di dalam 15
+    menit; kini baris yang `updated_by`-nya orang lain ditolak ("Baris ini sudah dikoreksi Budi, …") dan tombol Betulkan tidak tampil
+    di baris itu. (c) Tandai diperiksa (satu per satu dan sekaligus) bisa menandai angka yang dibetulkan Staff sesudah layar Pengelola
+    dimuat; kini aplikasi mengirim `terlihat` (koreksi terbaru yang tampil, `koreksiTerlihat`), dan server (`berubahSesudahDilihat_`,
+    toleransi 1 detik untuk milidetik yang hilang di Sheets) menolak dengan "Isian ini baru saja dibetulkan, …" atau melewatinya
+    ("n isian dilewati karena baru dibetulkan."); aplikasi lama tanpa `terlihat` tetap seperti dulu. (d) Suhu yang dikoreksi atau
+    dibetulkan menjadi di luar standar kini mengirim notifikasi ke HP Pengelola seperti isian baru ("… Dikoreksi Rina."). Tidak diubah:
+    pesanan yang sudah Datang tetap Datang jika Tambah masuk-nya dibetulkan menjadi 0 (sama dengan koreksi Pengelola, butir 331), dan
+    jam HP yang meleset (server memeriksa lagi).

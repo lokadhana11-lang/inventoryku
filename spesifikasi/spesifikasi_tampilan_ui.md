@@ -850,7 +850,11 @@ Satu-satunya layar yang sepenuhnya navy.
   15 menit sesudah dikirim dan belum diperiksa, isiannya sendiri bertanda Menunggu "Bisa dibetulkan
   sampai 21.45" di daftar dan detail. Detail menulis "Salah ketik? Kamu bisa membetulkan isian ini
   sampai 21.45. Sesudah itu, laporkan kekeliruan." (ikon pensil), dan tiap baris punya tombol tautan
-  "Betulkan" (ikon pensil) di samping Laporkan kekeliruan. Lembarnya sama dengan Koreksi Pengelola,
+  "Betulkan" (ikon pensil) di samping Laporkan kekeliruan, kecuali baris yang sudah dikoreksi Head Kitchen
+  atau Manager. Laporan kekeliruan rekan pada baris itu tetap tampil sesudah dibetulkan. Pengelola yang
+  menandai diperiksa dari layar yang dimuat sebelum isian dibetulkan mendapat "Isian ini baru saja
+  dibetulkan, jadi angka di layar sudah lama. Muat ulang, lalu periksa lagi." (sekaligus: "1 isian
+  dilewati karena baru dibetulkan. Periksa lagi angkanya."). Lembarnya sama dengan Koreksi Pengelola,
   berjudul "Betulkan Tomat", dengan "Bisa dibetulkan sampai 21.45." dan tombol "Batal" dan "Simpan";
   sesudahnya "Isian dibetulkan. Stock dihitung ulang." (atau "Isian dibetulkan."). Lewat batas waktu
   saat lembar terbuka: pesan server di lembar ("Isian ini dikirim lebih dari 15 menit lalu, jadi

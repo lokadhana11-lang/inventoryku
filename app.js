@@ -7064,6 +7064,19 @@
   }
 
   /**
+   * Waktu koreksi terbaru yang tampil di layar untuk satu kiriman (ISO, '' jika belum pernah dikoreksi). Dikirim bersama
+   * Tandai diperiksa (Code.gs v0.32): isian yang dibetulkan Staff sesudah layar dimuat tidak ikut tertandai.
+   */
+  function koreksiTerlihat(k) {
+    var ms = 0;
+    (k.baris || []).forEach(function (b) {
+      var w = b.dikoreksi ? Date.parse(b.dikoreksi.waktu) : NaN;
+      if (!isNaN(w) && w > ms) ms = w;
+    });
+    return ms ? new Date(ms).toISOString() : '';
+  }
+
+  /**
    * Kolom dengan jikaKolom (hasil aktual prep) hanya berlaku untuk baris yang kolom itu berisi (baris beresep);
    * jikaPositif (harga beli dan baik sampai Stock) hanya untuk baris yang kolom itu lebih dari 0 (barang masuk).
    */
@@ -7585,7 +7598,10 @@
           (dilaporkan ? ' ' + dilaporkan + ' isian yang punya baris dilaporkan keliru tidak ikut.' : ''),
         teksYa: 'Tandai diperiksa',
         jalankan: function () {
-          return panggilApi('tandaiDiperiksaBanyak', { formId: data.formId, submissionId: bisa.map(function (kr) { return kr.id; }) });
+          var terlihat = {};
+          bisa.forEach(function (kr) { terlihat[kr.id] = koreksiTerlihat(kr); });
+          return panggilApi('tandaiDiperiksaBanyak', { formId: data.formId, submissionId: bisa.map(function (kr) { return kr.id; }),
+            terlihat: terlihat });
         }
       }).then(function (h) {
         if (!h) return;
@@ -7598,11 +7614,13 @@
     function teksHasilPeriksa(h) {
       var lewat = h.dilewati || [];
       var lapor = lewat.filter(function (x) { return x.sebab === 'dilaporkan'; }).length;
-      var hilang = lewat.length - lapor;
+      var berubah = lewat.filter(function (x) { return x.sebab === 'berubah'; }).length;
+      var hilang = lewat.length - lapor - berubah;
       var bagian = [];
       if (h.diperiksa) bagian.push(h.diperiksa + ' isian ditandai diperiksa.');
       if (h.sudah) bagian.push(h.sudah + ' isian sudah diperiksa sebelumnya.');
       if (lapor) bagian.push(lapor + ' isian dilewati karena ada baris dilaporkan keliru.');
+      if (berubah) bagian.push(berubah + ' isian dilewati karena baru dibetulkan. Periksa lagi angkanya.');
       if (hilang) bagian.push(hilang + ' isian tidak ditemukan. Muat ulang Riwayat.');
       return bagian.join(' ') || 'Tidak ada isian yang ditandai.';
     }
@@ -7960,7 +7978,9 @@
         onclick: function () { bukaLaporkan(info, b, opsi.perbarui); }
       }));
       t[0].insertBefore(ikon('bendera'), t[0].lastChild);
-      if ((opsi.pengelola || betulkan) && !terkunci && adaKoreksi) {
+      // Staff tidak membetulkan baris yang sudah dikoreksi orang lain (server juga menolak).
+      var dikoreksiLain = b.dikoreksi && String(b.dikoreksi.oleh).toLowerCase() !== String(kr.oleh).toLowerCase();
+      if ((opsi.pengelola || (betulkan && !dikoreksiLain)) && !terkunci && adaKoreksi) {
         var kataKor = opsi.pengelola ? 'Koreksi' : 'Betulkan';
         var kor = tombol(kataKor, 'tautan', {
           'aria-label': kataKor + ' ' + (nama ? b.nilai[nama.kunci] : ''),
@@ -8067,7 +8087,7 @@
         return;
       }
       aturTombolProses(t, true, 'Menyimpan…');
-      panggilApi('tandaiDiperiksa', { formId: info.formId, submissionId: kr.id }).then(function (h) {
+      panggilApi('tandaiDiperiksa', { formId: info.formId, submissionId: kr.id, terlihat: koreksiTerlihat(kr) }).then(function (h) {
         capKiriman = kr.id;
         opsi.perbarui(h.kiriman);
         toast('Ditandai diperiksa.');
@@ -8165,10 +8185,9 @@
   }
 
   /**
-   * Koreksi satu baris (Pengelola). Yang dikoreksi catatan sumbernya; untuk
-   * Stock, Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang server.
+   * Koreksi satu baris (Pengelola) atau Betulkan (Staff, isiannya sendiri dalam 15 menit; betulkan = true). Yang dikoreksi
+   * catatan sumbernya; untuk Stock, Stock Akhir hari itu dan hari-hari sesudahnya dihitung ulang server.
    */
-  /** Lembar koreksi (Pengelola) atau Betulkan (Staff, isiannya sendiri dalam 15 menit; betulkan = true). */
   function bukaKoreksi(info, b, selesai, betulkan) {
     // Kolom "jikaAda" hanya untuk baris yang berisi (prep: jumlah resep atau Qty).
     var kolom = (info.kolom || []).filter(function (k) { return k.koreksi && kolomBerlaku(k, b) && !(k.jikaAda && b.nilai[k.kunci] == null); });
