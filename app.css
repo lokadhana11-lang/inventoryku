@@ -6832,6 +6832,79 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
   transform-origin: 0 50%;
 }
 
+/* Perlu perhatian: Hari ini dan Rutin (aplikasi 0.35.0) */
+.dashboard-perhatian > .judul-sub:first-of-type {
+  margin-top: 0;
+}
+
+.perhatian-kosong {
+  margin: 0 0 4px;
+}
+
+.perhatian-rutin {
+  margin-top: 16px;
+}
+
+.perhatian-rutin > summary {
+  min-height: 44px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 10px 0;
+  cursor: pointer;
+  border-top: 1px solid var(--garis-halus);
+}
+
+.perhatian-rutin-judul {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta-redup);
+}
+
+.perhatian-rutin-jumlah {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--biru-malam);
+}
+
+.perhatian-rutin > summary::-webkit-details-marker {
+  display: none;
+}
+
+.perhatian-rutin > summary:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+.perhatian-rutin-panah {
+  margin-left: auto;
+  align-self: center;
+  color: var(--biru-malam);
+  display: inline-flex;
+}
+
+.perhatian-rutin[open] .perhatian-rutin-panah {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .perhatian-rutin-panah {
+    transition: transform 200ms var(--ayun-masuk);
+  }
+}
+
+.perhatian-rutin-ket {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--tinta-redup);
+}
+
+.perhatian-rutin[open] > summary {
+  margin-bottom: 8px;
+}
+
 .hpp-rinci {
   margin-top: 12px;
   border-top: 1px solid var(--garis-halus);

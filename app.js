@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.34.0';
+  var VERSI_APLIKASI = '0.35.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -9297,10 +9297,45 @@
     return el('span', { class: 'ubin-ikon ubin-ikon-' + jenis, 'aria-hidden': 'true' }, ikon(namaIkon));
   }
 
+  /**
+   * Butir Perlu perhatian yang rutin (aplikasi 0.35.0): pekerjaan berkala yang tidak terikat hari ini. Jenis lain (juga
+   * jenis baru dari server) masuk "Hari ini".
+   */
+  var PERHATIAN_RUTIN = { belumDiperiksa: true, opname: true, hargaBeli: true, menu: true, tanpaHarga: true };
+
+  /**
+   * Daftar Perlu perhatian (tampilan Bagian 5.6), dikelompokkan "Hari ini" dan "Rutin" (aplikasi 0.35.0). Rutin bisa dilipat;
+   * bawaannya terlipat selama ada butir Hari ini, dan pilihan pengguna diingat di HP (cache:perhatian-rutin).
+   */
   function daftarPerhatian(d) {
     var butir = d.perhatian || [];
     if (!butir.length) return kotakKosong('Tidak ada yang perlu perhatian. Form, suhu, dan stock dalam keadaan baik.', 'centang');
-    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Perlu perhatian' }, butir.map(function (p) {
+    var hariIni = butir.filter(function (p) { return !PERHATIAN_RUTIN[p.jenis]; });
+    var rutin = butir.filter(function (p) { return PERHATIAN_RUTIN[p.jenis]; });
+    var hasil = [el('h3', { class: 'judul-sub', id: 'judul-perhatian-hari', text: 'Hari ini' })];
+    hasil.push(hariIni.length ? barisPerhatian(hariIni, d, 'judul-perhatian-hari')
+      : el('p', { class: 'kolom-bantuan perhatian-kosong', text: 'Tidak ada yang mendesak hari ini.' }));
+    if (rutin.length) {
+      var simpan = Cache.baca('perhatian-rutin');
+      var buka = simpan && simpan.data && typeof simpan.data.buka === 'boolean' ? simpan.data.buka : !hariIni.length;
+      var lipat = el('details', { class: 'perhatian-rutin' }, [
+        el('summary', {}, [
+          el('span', { class: 'perhatian-rutin-judul', id: 'judul-perhatian-rutin', text: 'Rutin' }),
+          el('span', { class: 'perhatian-rutin-jumlah', text: rutin.length + ' butir' }),
+          el('span', { class: 'perhatian-rutin-panah' }, ikon('bawah')),
+          el('span', { class: 'perhatian-rutin-ket', text: 'Pemeriksaan isian, stock opname, harga, dan menu' })
+        ]),
+        barisPerhatian(rutin, d, 'judul-perhatian-rutin')
+      ]);
+      lipat.open = buka;
+      lipat.addEventListener('toggle', function () { Cache.tulis('perhatian-rutin', { buka: lipat.open }); });
+      hasil.push(lipat);
+    }
+    return hasil;
+  }
+
+  function barisPerhatian(butir, d, idJudul) {
+    return el('div', { class: 'daftar', role: 'group', 'aria-labelledby': idJudul }, butir.map(function (p) {
       var isi = el('span', { class: 'daftar-baris-isi' }, [
         el('span', { class: 'daftar-baris-judul' }, [el('span', { class: 'sr', text: (KATA_TINGKAT[p.tingkat] || '') + ': ' }), p.judul]),
         p.ket ? el('span', { class: 'daftar-baris-ket', text: p.ket }) : null
