@@ -34,6 +34,8 @@
 > "Tambah dari Excel/Sheets" dari Pengaturan → Item (Bagian 5.7 dan 7).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): food cost sementara di layar HPP dan
 > Dashboard selama penjualan belum lengkap (Bagian 5.6, 5.10, dan 7).
+> Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): daftar Perlu perhatian di Dashboard
+> dikelompokkan "Hari ini" dan "Rutin" (Bagian 5.6).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -929,6 +931,16 @@ Satu-satunya layar yang sepenuhnya navy.
   membuka HPP bagian Per menu) dan "Penjualan kemarin belum dicatat" / "Penjualan n hari belum
   dicatat" (Menunggu, membuka lembar Catat penjualan).
 - Di bawahnya daftar "Perlu perhatian", diurutkan dari yang paling mendesak.
+- **Hari ini dan Rutin** (28 Oktober 2026): daftar dibagi dua kelompok, masing-masing tetap urut dari
+  yang paling mendesak. "Hari ini" (subjudul kecil) berisi yang perlu ditangani hari itu: suhu di luar
+  standar, stock minus, di bawah stok minimum, lewat masa simpan, habis besok, laporan atau jadwal
+  yang gagal, baris dilaporkan keliru, reset PIN, akun terkunci, form belum lengkap, dan penjualan
+  belum dicatat; tanpa butir: "Tidak ada yang mendesak hari ini." "Rutin" berisi pekerjaan berkala:
+  isian belum diperiksa, stock opname, harga beli berbeda, menu di atas target, dan item belum punya
+  harga. Rutin bisa dilipat: baris "Rutin · 5 butir" dengan keterangan "Pemeriksaan isian, stock
+  opname, harga, dan menu" dan panah; bawaannya terlipat selama ada butir Hari ini (terbuka jika
+  tidak ada), dan pilihan pengguna diingat di HP itu. Jenis butir yang tidak dikenal masuk Hari ini.
+  Tanpa butir sama sekali: kotak kosong seperti dulu.
 - **Dua grafik kecil** di bawah daftar itu. Di laptop/desktop keduanya berada di kolom kanan.
 
 ```
