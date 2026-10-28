@@ -5290,7 +5290,7 @@ function pengingatClosing() { return pengingatClosing_(); }
 /**
  * Pengingat sebelum closing (Code.gs v0.31; trigger harian pada jam closing dikurangi pengingat_closing_menit): form wajib
  * hari itu yang belum diisi atau belum lengkap, ke semua HP yang berlangganan. Tidak dikirim jika semuanya lengkap atau
- * hari libur. Suhu tidak disebut selama pengingat cek suhu Closing menyala, karena pengingat itu sudah mengabarkannya.
+ * hari libur. Selama pengingat cek suhu Closing menyala, Suhu hanya disebut jika Opening atau Middle belum lengkap.
  * Pengingat yang berjalan sebelum 06.00 (jam closing lewat tengah malam) untuk hari kemarin, seperti laporan harian.
  * Mengembalikan isi notifikasi (atau null).
  */
@@ -5305,7 +5305,7 @@ function pengingatClosing_() {
     console.log('Hari libur; pengingat closing dilewati.');
     return null;
   }
-  var isi = isiPengingatClosing_(tanggal, bacaKonfigurasi_().nilai);
+  var isi = isiPengingatClosing_(tanggal, bacaKonfigurasi_().nilai, jam < 6);
   if (!isi) {
     console.log('Semua form wajib ' + tanggal + ' lengkap; pengingat closing tidak dikirim.');
     return null;
@@ -5316,10 +5316,11 @@ function pengingatClosing_() {
 }
 
 /** Isi notifikasi pengingat sebelum closing pada tanggal itu: { judul, isi, url, tag, ttl }, atau null jika semua form wajib lengkap. */
-function isiPengingatClosing_(tanggal, n) {
+function isiPengingatClosing_(tanggal, n, kemarin) {
   var suhuSendiri = !!jamPengingat_(n, PENGINGAT_SUHU[2]);
   var form = kelengkapanForm_(tanggal).filter(function (f) {
-    return f.wajib && (f.status === 'belum' || f.status === 'sebagian') && !(suhuSendiri && f.id === 'SUHU');
+    if (!f.wajib || (f.status !== 'belum' && f.status !== 'sebagian')) return false;
+    return f.id !== 'SUHU' || suhuPerluDiingatkan_(tanggal, suhuSendiri);
   });
   if (!form.length) return null;
   var belum = form.filter(function (f) { return f.status === 'belum'; }).map(function (f) { return f.nama; });
@@ -5327,14 +5328,37 @@ function isiPengingatClosing_(tanggal, n) {
     return f.nama + (f.detail ? ' (' + f.detail + ')' : '');
   });
   var baris = [];
+  // Sesudah tengah malam (jam closing lewat tengah malam) form yang diingatkan milik kemarin; Beranda sudah menampilkan hari baru.
+  if (kemarin) baris.push('Untuk ' + tanggalPanjangId_(tanggal) + '.');
   if (belum.length) baris.push('Belum diisi: ' + daftarNamaSingkat_(belum) + '.');
   if (sebagian.length) baris.push('Belum lengkap: ' + daftarNamaSingkat_(sebagian) + '.');
-  if (belum.length) baris.push('Jika memang tidak ada, ketuk Tidak ada hari ini di formnya.');
+  // Suhu tidak punya "Tidak ada hari ini" (butir 41).
+  if (form.some(function (f) { return f.status === 'belum' && f.id !== 'SUHU'; })) {
+    baris.push('Jika memang tidak ada, ketuk Tidak ada hari ini di formnya.');
+  }
   var closing = (jamSah_(n.jam_closing) || '21:30').replace(':', '.');
   return {
     judul: 'Closing ' + closing + ': ' + form.length + ' form belum ' + (sebagian.length ? 'lengkap' : 'diisi'),
     isi: baris.join(' '), url: '#/', tag: 'pengingat-closing', ttl: 3 * 3600
   };
+}
+
+/**
+ * Suhu ikut pengingat sebelum closing? Tidak jika tidak ada unit aktif (Suhu tidak pernah lengkap, butir 25, dan pengingat cek suhu
+ * juga diam). Selama pengingat cek suhu Closing menyala, hanya jika Opening atau Middle belum lengkap: Closing sudah dikabarkan
+ * pengingat itu, tetapi Opening dan Middle yang terlewat tidak.
+ */
+function suhuPerluDiingatkan_(tanggal, suhuSendiri) {
+  var unit = bacaUnit_().filter(function (u) { return u.aktif; });
+  if (!unit.length) return false;
+  if (!suhuSendiri) return true;
+  var sudah = {};
+  bacaBarisTanggal_('Data_Suhu', tanggal, zonaSheet_(), ['Nama Unit', 'Waktu Cek']).forEach(function (b) {
+    sudah[rapikanTeks_(b['Waktu Cek']).toLowerCase() + '|' + rapikanTeks_(b['Nama Unit']).toLowerCase()] = true;
+  });
+  return unit.some(function (u) {
+    return !sudah['opening|' + u.nama.toLowerCase()] || !sudah['middle|' + u.nama.toLowerCase()];
+  });
 }
 
 /* ---------- Pengaturan → Outlet dan jadwal ---------- */

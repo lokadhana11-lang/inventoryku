@@ -1628,10 +1628,11 @@ Apps Script tidak bisa mengirimnya.
   sebelum jam closing: 15, 30 (nilai awal), atau 60 menit, atau mati. Karena berupa menit, jamnya ikut
   bergeser saat jam closing diubah (jam closing 21.30 dan 30 menit = 21.00; boleh mundur lewat tengah
   malam). Isinya: form wajib yang belum diisi, lalu yang belum lengkap (misalnya Suhu 6 dari 9
-  pengecekan), dengan ajakan menandai "Tidak ada hari ini" untuk form yang memang kosong. Suhu tidak
-  disebut selama pengingat cek suhu Closing menyala, supaya tidak ada dua notifikasi untuk hal yang
-  sama. Pengingat yang berjalan sebelum 06.00 (jam closing lewat tengah malam) untuk hari kemarin,
-  seperti laporan harian.
+  pengecekan), dengan ajakan menandai "Tidak ada hari ini" untuk form selain Suhu yang memang kosong.
+  Selama pengingat cek suhu Closing menyala, Suhu hanya disebut jika Opening atau Middle belum lengkap,
+  supaya tidak ada dua notifikasi untuk hal yang sama; tanpa unit aktif Suhu tidak disebut. Pengingat
+  yang berjalan sebelum 06.00 (jam closing lewat tengah malam) untuk hari kemarin, dan isinya menyebut
+  tanggalnya.
 - Hanya pengguna aktif yang punya PIN yang menerima; Pengelola menurut role saat notifikasi dikirim.
 - Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, Dashboard untuk
   pengingat stock, atau Beranda untuk pengingat sebelum closing).

@@ -1021,8 +1021,8 @@ Satu-satunya layar yang sepenuhnya navy.
   Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
 - Kartu "Pengingat sebelum closing" (28 Oktober 2026), di bawah Pengingat cek suhu: keterangan
   "Notifikasi ke semua HP yang menyalakan notifikasi, jika masih ada form wajib yang belum diisi atau
-  belum lengkap, kecuali pada hari libur. Suhu tidak disebut selama pengingat cek suhu Closing
-  menyala.", lalu tombol berjajar "Kirim sebelum jam closing": Mati, 15 menit, 30 menit (awal), 60
+  belum lengkap, kecuali pada hari libur. Selama pengingat cek suhu Closing menyala, Suhu hanya
+  disebut jika Opening atau Middle belum lengkap.", lalu tombol berjajar "Kirim sebelum jam closing": Mati, 15 menit, 30 menit (awal), 60
   menit, dan di bawahnya jamnya, yang ikut berubah saat jam closing diketik: "Dikirim sekitar pukul
   21.00." (atau "Pengingat sebelum closing sedang dimatikan."). Kalimat yang sama jika server belum
   bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.

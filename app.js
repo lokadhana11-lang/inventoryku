@@ -10803,7 +10803,8 @@
         wadah.appendChild(el('section', { class: 'kartu formulir' }, [
           el('h2', { class: 'kartu-judul', text: 'Pengingat sebelum closing' }),
           el('p', { class: 'kartu-teks', text: 'Notifikasi ke semua HP yang menyalakan notifikasi, jika masih ada form wajib yang belum diisi ' +
-            'atau belum lengkap, kecuali pada hari libur. Suhu tidak disebut selama pengingat cek suhu Closing menyala.' }),
+            'atau belum lengkap, kecuali pada hari libur. Selama pengingat cek suhu Closing menyala, Suhu hanya disebut jika Opening atau ' +
+            'Middle belum lengkap.' }),
           gClosing.wadah, bantuanClosing,
           data.notifikasiTersedia ? null : el('p', { class: 'kolom-bantuan', text: 'Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim.' })
         ]));
