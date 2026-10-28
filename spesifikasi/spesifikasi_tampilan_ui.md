@@ -26,6 +26,8 @@
 > (Bagian 5.3, 5.4, 5.6, 5.7).
 > Tambahan 18 Oktober 2026 (permintaan pemilik): kartu "Pengingat stock" di Outlet dan jadwal dan satu
 > baris di lembar "Notifikasi di HP ini" untuk Pengelola (Bagian 5.7 dan 5.11).
+> Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): kartu "Pengingat sebelum closing"
+> di Outlet dan jadwal dan satu baris di lembar "Notifikasi di HP ini" untuk semua role (Bagian 5.7 dan 5.11).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -1017,7 +1019,14 @@ Satu-satunya layar yang sepenuhnya navy.
   pemilih jam "Pengingat Opening/Middle/Closing" (awal 08.00, 14.00, 21.00). Jika server belum bisa
   mengirim notifikasi: "Notifikasi belum tersedia di server ini, jadi pengingat belum terkirim."
   Disimpan bersama tombol Simpan yang sama; di Supabase jadwalnya langsung dipasang ulang.
-- Kartu "Pengingat stock" (18 Oktober 2026), di bawah Pengingat cek suhu: keterangan "Notifikasi pagi
+- Kartu "Pengingat sebelum closing" (28 Oktober 2026), di bawah Pengingat cek suhu: keterangan
+  "Notifikasi ke semua HP yang menyalakan notifikasi, jika masih ada form wajib yang belum diisi atau
+  belum lengkap, kecuali pada hari libur. Selama pengingat cek suhu Closing menyala, Suhu hanya
+  disebut jika Opening atau Middle belum lengkap.", lalu tombol berjajar "Kirim sebelum jam closing": Mati, 15 menit, 30 menit (awal), 60
+  menit, dan di bawahnya jamnya, yang ikut berubah saat jam closing diketik: "Dikirim sekitar pukul
+  21.00." (atau "Pengingat sebelum closing sedang dimatikan."). Kalimat yang sama jika server belum
+  bisa mengirim notifikasi. Disimpan dengan tombol Simpan yang sama.
+- Kartu "Pengingat stock" (18 Oktober 2026), di bawah Pengingat sebelum closing: keterangan "Notifikasi pagi
   ke HP Head Kitchen dan Manager yang menyalakan notifikasi, hanya jika ada item di bawah stok
   minimum, stock minus, atau barang yang lewat masa simpan atau habis besok. Kosongkan jam untuk
   mematikannya.", lalu pemilih jam "Jam pengingat stock" (awal 07.00) dan kalimat yang sama jika
@@ -1310,7 +1319,9 @@ Lembar (dialog di desktop) dari menu nama pengguna → "Notifikasi" (spesifikasi
   standar, Permintaan reset PIN, Akun yang terkunci karena PIN salah, dan "Pengingat cek suhu
   (Opening 08.00, Middle 14.00, Closing 21.00), jika belum lengkap, kecuali hari libur". Pengelola juga "Pengingat stock
   (07.00), jika ada item di bawah minimum, minus, atau lewat masa simpan" (atau "Pengingat stock
-  (sedang dimatikan)"), di atas pengingat cek suhu. Staff: hanya baris pengingat cek suhu.
+  (sedang dimatikan)"), di atas pengingat cek suhu. Staff: baris pengingat cek suhu. Semua role
+  (28 Oktober 2026), di bawah pengingat cek suhu: "Pengingat sebelum closing (21.00), jika masih ada
+  form yang belum lengkap, kecuali hari libur" (atau "Pengingat sebelum closing (sedang dimatikan)").
 - Sakelar "Notifikasi di HP ini" dengan kata "Nyala"/"Mati". Menyalakan meminta izin HP lebih dulu;
   sesudahnya "Notifikasi menyala di HP ini." (Baik), "Menyala untuk Budi.", dan tombol kedua
   "Kirim notifikasi uji" ("Notifikasi uji dikirim. Jika tidak muncul dalam satu menit, periksa

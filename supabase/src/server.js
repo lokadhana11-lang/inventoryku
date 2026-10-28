@@ -17,9 +17,9 @@ const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekara
 // Satu-satunya fungsi yang boleh berjalan selama aplikasi ditutup untuk pemulihan cadangan.
 const FUNGSI_SAAT_PULIH = ['buatCadanganSebelumPulih'];
 const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
-  'pengingatSuhuClosing', 'pengingatStock', 'arsipTahunan'];
+  'pengingatSuhuClosing', 'pengingatStock', 'pengingatClosing', 'arsipTahunan'];
 // Jadwal yang cukup memuat tab master; tab lain dimuat saat dibutuhkan.
-const JADWAL_RINGAN = /^(pengingatSuhu|pengingatStock$|arsipTahunan$)/;
+const JADWAL_RINGAN = /^(pengingatSuhu|pengingatStock$|pengingatClosing$|arsipTahunan$)/;
 
 function samaAman(a, b) {
   a = String(a || '');

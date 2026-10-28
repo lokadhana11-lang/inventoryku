@@ -45,6 +45,8 @@
 > item menampilkan setiap transaksi yang menggerakkan stock beserta saldo sesudahnya (Bagian 6).
 > Diperbarui 18 Oktober 2026 (permintaan pemilik, dari usulan fitur SYS-07): pengingat stock pagi ke
 > HP Pengelola untuk item di bawah stok minimum, stock minus, dan masa simpan (Bagian 10.1).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): pengingat sebelum closing ke
+> semua HP untuk form wajib yang belum lengkap (Bagian 10.1).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1614,6 +1616,7 @@ Apps Script tidak bisa mengirimnya.
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif, kecuali pada hari libur (Bagian 5.8) |
 | "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
+| "Closing 21.30: 3 form belum diisi" dan nama formnya (28 Oktober 2026) | Semua HP yang menyala | Sekian menit sebelum jam closing, hanya jika ada form wajib hari itu yang belum diisi atau belum lengkap (Bagian 5.8), kecuali pada hari libur |
 
 - **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
   Middle 14.00, Closing 21.00 (nilai awal); jam yang dikosongkan mematikan pengingat itu. Tidak ada
@@ -1621,11 +1624,20 @@ Apps Script tidak bisa mengirimnya.
 - **Jam pengingat stock** (18 Oktober 2026) juga diatur di Outlet dan jadwal: 07.00 (nilai awal);
   dikosongkan berarti mati. Isinya dihitung sama dengan Dashboard pada hari itu (stock menurut
   catatan, Bagian 5.8 dan 5.3); item yang minus tidak diulang di daftar di bawah minimum.
+- **Pengingat sebelum closing** (28 Oktober 2026) juga diatur di Outlet dan jadwal sebagai menit
+  sebelum jam closing: 15, 30 (nilai awal), atau 60 menit, atau mati. Karena berupa menit, jamnya ikut
+  bergeser saat jam closing diubah (jam closing 21.30 dan 30 menit = 21.00; boleh mundur lewat tengah
+  malam). Isinya: form wajib yang belum diisi, lalu yang belum lengkap (misalnya Suhu 6 dari 9
+  pengecekan), dengan ajakan menandai "Tidak ada hari ini" untuk form selain Suhu yang memang kosong.
+  Selama pengingat cek suhu Closing menyala, Suhu hanya disebut jika Opening atau Middle belum lengkap,
+  supaya tidak ada dua notifikasi untuk hal yang sama; tanpa unit aktif Suhu tidak disebut. Pengingat
+  yang berjalan sebelum 06.00 (jam closing lewat tengah malam) untuk hari kemarin, dan isinya menyebut
+  tanggalnya.
 - Hanya pengguna aktif yang punya PIN yang menerima; Pengelola menurut role saat notifikasi dikirim.
-- Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, atau Dashboard untuk
-  pengingat stock).
+- Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, Dashboard untuk
+  pengingat stock, atau Beranda untuk pengingat sebelum closing).
 - Notifikasi tidak menggantikan apa pun: pemberitahuan di Beranda, Dashboard, dan email harian tetap.
-- Pada hari libur hanya pengingat cek suhu yang tidak dikirim. Notifikasi suhu di luar standar, reset
+- Pada hari libur pengingat cek suhu dan pengingat sebelum closing tidak dikirim. Notifikasi suhu di luar standar, reset
   PIN, akun terkunci, dan pengingat stock tetap dikirim (isian tetap diterima, dan barang tetap bisa
   lewat masa simpan saat dapur tutup).
 - HP yang izinnya dicabut atau aplikasinya dihapus dibuang dari daftar saat layanan push menolaknya.

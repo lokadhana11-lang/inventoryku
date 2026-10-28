@@ -300,6 +300,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `form[].wajib` dan `formKustom.wajib` false. `hpp.penjualan` (juga `simpanPenjualan.hpp`) ditambah `libur: [tanggal]` (hari libur tanpa
   catatan penjualan; tidak masuk `jumlahHari` dan `kurang`). `M_Konfigurasi.laporan_terakhir` boleh diawali `Dilewati <waktu> untuk
   <tanggal>: hari libur`. `setupSpreadsheet` di Supabase menjawab `VERSI_KODE`.
+- Pengingat sebelum closing (Code.gs v0.31, 28 Oktober 2026): `bacaOutletJadwal`/`simpanOutletJadwal` ditambah
+  `pengingatClosingMenit` (0 = mati, 15, 30, 60); `infoNotifikasi` ditambah `pengingatClosing` (jam atau ''). Fungsi trigger
+  `pengingatClosing` (juga di `FUNGSI_JADWAL` server.js); isi notifikasi `{ judul: 'Closing 21.30: 3 form belum diisi', isi, url: '#/',
+  tag: 'pengingat-closing', ttl }`. `M_Konfigurasi` baris `pengingat_closing_menit` (belum ada = 30).
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -348,7 +352,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++ | Tandai diperiksa sekaligus (permintaan pemilik 19 Oktober 2026, butir 2 dari telaah aplikasi): tombol "Tandai diperiksa (n)" di judul tiap tanggal di daftar Riwayat untuk Pengelola, konfirmasi, isian yang dilaporkan keliru tidak ikut | Kode selesai (Code.gs v0.27, aplikasi 0.27.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (30 uji server: dilaporkan, id ganda dan tak dikenal, ulang, Staff ditolak, batas, lima jenis form, Beranda; sel yang berubah sama dengan Tandai diperiksa satu per satu) dan Chromium (27 uji: HP, desktop dengan detail kanan, Staff, server lama, tanpa sinyal, galat server, delapan ukuran, gerak; 30 uji perbaikan sesudah telaah: tanpa tombol selama filter kategori/item, kalimat filter pengisi, simpanan penuh, tombol 48 px). Menunggu pemilik: gabungkan PR, tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu) |
 | 12+++++++++++++++++++++ | Isi form Stock lebih cepat (permintaan pemilik 20 Oktober 2026, butir 3 dari telaah aplikasi): "Semua kategori" di form Stock (satu kiriman per kategori), kotak "Cari item" di form Stock dan Stock opname, "Catat pemakaian: Hitung sisa" (hari ini saja; Stock Keluar dihitung server dari sisa, sisa disimpan di `Sisa Dihitung` dan ikut dikoreksi) | Kode selesai (Code.gs v0.28, aplikasi 0.28.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; jawaban jalur Tambah keluar sama dengan v0.27 selain kolom `sisa` di Riwayat) dan Chromium (87 uji: HP, desktop 1024/1366, antrean, satu kategori ditolak, server lama, pencarian, opname, Kemarin, sisa lama, kirim terkunci, delapan ukuran). Digabung dan dipasang pemilik 21 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12++++++++++++++++++++++ | Daftar belanja per pemasok dan pesanan (keputusan pemilik 21 Oktober 2026, butir 4 dari telaah aplikasi): kelompok per pemasok (pesanan yang menunggu, lalu pemasok barang masuk terakhir), "Kirim ke WhatsApp" ke nomor di Kontak, pesanan tercatat di `Data_Pesanan` lewat antrean HP, "Pesanan belum datang" dan "Tutup pesanan", kartu "Pesanan menunggu" dengan "Isi dari pesanan" di form Stock (semua role), barang masuk menyelesaikan pesanan, PDF per pemasok, email | Kode selesai (Code.gs v0.29, aplikasi 0.29.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (120 uji server, jawaban aksi lama sama dengan v0.28 selain PDF daftar belanja) dan Chromium (103 uji: Laporan dan form Stock, antrean, dua HP, server lama, delapan ukuran; uji lama tetap lulus), termasuk perbaikan sesudah telaah berlawanan; lihat butir 328–338. Digabung dan dipasang pemilik 22 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
-| 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (tab `M_HariLibur` dan rumus Kepatuhan), gabungkan PR |
+| 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
+| 12++++++++++++++++++++++++ | Pengingat sebelum closing (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): notifikasi ke semua HP 15, 30, atau 60 menit sebelum jam closing (awal 30) berisi form wajib yang belum diisi atau belum lengkap, kecuali hari libur; kartu di Outlet dan jadwal, baris di lembar Notifikasi | Kode selesai (Code.gs v0.31, aplikasi 0.31.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (39 uji server) dan Chromium (24 uji: Outlet dan jadwal, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `pasangTrigger` sekali, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2685,3 +2690,40 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 352. **Telaah:** rancangan ditelaah tiga penelaah (alur dapur, kompatibilitas, server) dan temuannya sudah masuk butir 339–350.
     Telaah berlawanan atas kode yang sudah jadi terhenti di batas pemakaian sebelum melapor, jadi diganti telaah ulang oleh Claude atas
     diff Code.gs (simpan/ubah/hapus dan baris ganda, laporan harian, rumus Kepatuhan) dan layar Hari libur; tidak ada temuan baru.
+
+### Pengingat sebelum closing (Code.gs v0.31, aplikasi 0.31.0, 28 Oktober 2026)
+
+353. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap", dipilih pemilik sesudah Hari libur. Spesifikasi sistem Bagian 10.1;
+    tampilan Bagian 5.7 dan 5.11. Tidak ada tab, kolom, atau aksi baru.
+354. **Pengaturan (keputusan tambahan):** disimpan sebagai menit sebelum jam closing (`pengingat_closing_menit`, pilihan 0/15/30/60),
+    bukan jam sendiri seperti pengingat stock, supaya jamnya ikut bergeser saat jam closing diubah. Baris yang belum ada = 30 (menyala
+    sejak pasang, seperti pengingat cek suhu); kosong atau 0 = mati; nilai lain yang tidak terbaca = 30. Jam = jam closing − menit,
+    boleh mundur lewat tengah malam (`jamPengingatClosing_`, `jamSebelumClosing` di app.js). `pasangTrigger` memasang trigger harian
+    `pengingatClosing` hanya `DI_SUPABASE_`; mengubah menitnya di Outlet dan jadwal memasang ulang jadwal di Supabase (jalur
+    `pengingatBerubah`), mengubah jam closing juga (jalur `jadwalBerubah`).
+355. **Isi** (`isiPengingatClosing_`): form `kelengkapanForm_` yang `wajib` dan berstatus belum atau sebagian; judul "Closing 21.30: n form
+    belum diisi" (atau "belum lengkap" jika ada yang sebagian), isi "Belum diisi: …. Belum lengkap: Suhu (3 dari 9 pengecekan)." dan
+    "Jika memang tidak ada, ketuk Tidak ada hari ini di formnya." (hanya jika ada form selain Suhu yang belum diisi; Suhu tidak punya
+    tanda nihil). Ketuk membuka Beranda. TTL 3 jam, urgensi biasa. Sasaran `semua` (yang mengisi form adalah Staff). **Suhu**
+    (`suhuPerluDiingatkan_`, keputusan tambahan): tanpa unit aktif tidak disebut (Suhu tidak pernah lengkap, butir 25); selama
+    pengingat cek suhu Closing menyala hanya disebut jika Opening atau Middle belum lengkap untuk semua unit aktif, karena dengan nilai
+    awal keduanya berbunyi pukul 21.00 dan Closing sudah dikabarkan pengingat itu. Tidak dikirim jika tidak ada yang kurang, pada hari
+    libur, atau tanpa kunci notifikasi. Pengingat yang berjalan sebelum 06.00 memakai tanggal kemarin dan isinya diawali "Untuk Selasa,
+    27 Oktober 2026." (Beranda sudah menampilkan hari baru). Aturan 06.00 dinilai pada jam pengingat, sedangkan laporan harian
+    menilainya pada jam closing + jeda; keduanya hanya berbeda untuk jam closing sekitar 05.00–06.30. Di server.js masuk
+    `FUNGSI_JADWAL` dan `JADWAL_RINGAN`.
+356. **Aplikasi:** kartu "Pengingat sebelum closing" di Outlet dan jadwal, di antara Pengingat cek suhu dan Pengingat stock: `grupPilihan`
+    "Kirim sebelum jam closing" (Mati, 15, 30, 60 menit) dan "Dikirim sekitar pukul 21.00." yang ikut berubah saat jam closing diketik;
+    hanya jika server mengirim `pengingatClosingMenit` (server lama: tidak tampil dan tidak dikirim). Lembar Notifikasi (semua role):
+    "Pengingat sebelum closing (21.00), jika masih ada form yang belum lengkap, kecuali hari libur" atau "(sedang dimatikan)".
+357. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js`: `uji_closing.mjs` 39 uji (nilai awal, isi dan
+    penerima Staff dan Pengelola, Suhu disebut saat Middle belum lengkap, tidak saat hanya Closing, ikut saat pengingat suhu Closing
+    mati, tanpa unit aktif, tanpa ajakan Tidak ada hari ini untuk Suhu, semua lengkap, hanya sebagian, hari libur, 00.15 memakai
+    kemarin dan menyebut tanggalnya, `pasangTrigger` 21:00, simpan 60 → 20:30, jam closing 00:10 → 23:10, mati tanpa jadwal, 45 dan Staff ditolak, nilai tidak
+    terbaca dan kosong, tanpa kunci notifikasi). Chromium `uji_closing_ui.mjs` 24 uji (kartu dan jam yang ikut jam closing, simpan 60
+    dan Mati, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Belum diuji di Supabase asli (pg_cron) dan HP asli.
+358. **Telaah berlawanan** (satu penelaah atas server dan aplikasi): tidak ada bug besar. Diperbaiki: Suhu yang Opening atau Middle-nya
+    terlewat tidak disebut kedua pengingat (dulu Suhu selalu dibuang selama pengingat cek suhu Closing menyala); outlet tanpa unit aktif
+    mendapat "Belum diisi: Suhu" tiap hari; ajakan "Tidak ada hari ini" juga untuk Suhu; pengingat sesudah tengah malam tanpa
+    tanggal. Tidak diubah: aturan 06.00 yang dinilai pada jam pengingat (butir 355) dan nilai awal 30 yang tampil di Outlet dan
+    jadwal sebelum `pasangTrigger` dijalankan (sama dengan pengingat stock; langkah pemilik menyebut pasangTrigger).
