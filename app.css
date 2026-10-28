@@ -6951,6 +6951,23 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
   fill: var(--tinjau-teks);
 }
 
+.grafik-fc-svg .batang.sementara {
+  fill-opacity: 0.38;
+  stroke: var(--biru-malam);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.grafik-fc-svg .batang.sementara.di-atas {
+  stroke: var(--tinjau-teks);
+}
+
+.grafik-fc-nilai .sementara {
+  font-weight: 500;
+  font-style: italic;
+}
+
 .grafik-fc-svg .garis-target {
   stroke: var(--tinta);
   stroke-width: 1.5;

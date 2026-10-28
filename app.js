@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.33.0';
+  var VERSI_APLIKASI = '0.34.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -9405,7 +9405,7 @@
         // HPP dan food cost (tampilan Bagian 5.6 dan 5.10), dengan food cost bulan ini di sampingnya.
         el('div', { class: 'dashboard-opname' }, [
           el('a', { class: 'tombol tombol-kedua', href: '#/hpp' }, el('span', { class: 'tombol-teks', text: 'HPP dan food cost' })),
-          d.hpp && d.hpp.foodCost != null && d.hpp.foodCost > d.hpp.target
+          d.hpp && foodCostTampil(d.hpp) != null && foodCostTampil(d.hpp) > d.hpp.target
             ? tandaStatus('tinjau', teksFoodCostDashboard(d.hpp))
             : el('span', { class: 'kolom-bantuan', text: teksFoodCostDashboard(d.hpp) })
         ])
@@ -9462,10 +9462,19 @@
     return 'Stock opname terakhir ' + (s.hariLalu === 0 ? 'hari ini' : s.hariLalu + ' hari lalu') + '.';
   }
 
-  /** "Oktober 34,0% · target 35%", di samping tombol HPP dan food cost di Dashboard. */
+  /** Food cost yang ditampilkan: yang sudah dihitung, atau yang sementara selama penjualan belum lengkap (Code.gs v0.34). */
+  function foodCostTampil(h) {
+    if (h.foodCost != null) return h.foodCost;
+    return h.foodCostSementara ? h.foodCostSementara.foodCost : null;
+  }
+
+  /** "Oktober 34,0% · target 35%" (atau "Oktober 34,0% sementara · target 35%"), di samping tombol HPP dan food cost di Dashboard. */
   function teksFoodCostDashboard(h) {
     if (!h) return 'Food cost bulan ini';
     var bulan = NAMA_BULAN[Number(h.bulan.slice(5, 7)) - 1];
+    if (h.foodCost == null && h.foodCostSementara) {
+      return bulan + ' ' + formatPersen(h.foodCostSementara.foodCost) + ' sementara · target ' + formatPersen(h.target);
+    }
     return h.foodCost == null ? bulan + ': penjualan belum lengkap' : bulan + ' ' + formatPersen(h.foodCost) + ' · target ' + formatPersen(h.target);
   }
 
@@ -13696,39 +13705,52 @@
     var kartu = el('section', { class: 'kartu grafik-kartu', 'aria-labelledby': idJudul }, [
       el('h2', { class: 'kartu-judul', id: idJudul, text: 'Food cost 6 bulan' })
     ]);
+    // Bulan yang penjualannya belum lengkap memakai food cost sementara (Code.gs v0.34), digambar sebagai batang pucat.
+    var nilaiFc = function (x) { return x.foodCost != null ? x.foodCost : (x.sementara != null ? x.sementara : null); };
     var ada = g.filter(function (x) { return x.foodCost != null; });
+    var adaSementara = g.some(function (x) { return x.foodCost == null && x.sementara != null; });
     var tertinggi = null;
     ada.forEach(function (x) { if (!tertinggi || x.foodCost > tertinggi.foodCost) tertinggi = x; });
-    kartu.appendChild(el('p', { class: 'grafik-ringkas', text: tertinggi
-      ? 'Tertinggi ' + namaBulanIso(tertinggi.bulan).split(' ')[0] + ' ' + formatPersen(tertinggi.foodCost) + '. Garis putus-putus: target ' + formatPersen(h.target) + '.'
-      : 'Belum ada bulan dengan penjualan lengkap. Garis putus-putus: target ' + formatPersen(h.target) + '.' }));
-    var maks = Math.max(h.target * 1.3, ada.reduce(function (m, x) { return Math.max(m, x.foodCost); }, 0) * 1.1, 10);
+    kartu.appendChild(el('p', { class: 'grafik-ringkas', text: (tertinggi
+      ? 'Tertinggi ' + namaBulanIso(tertinggi.bulan).split(' ')[0] + ' ' + formatPersen(tertinggi.foodCost) + '. '
+      : 'Belum ada bulan dengan penjualan lengkap. ') + (adaSementara ? 'Batang pucat: sementara, penjualan belum lengkap. ' : '') +
+      'Garis putus-putus: target ' + formatPersen(h.target) + '.' }));
+    var maks = Math.max(h.target * 1.3, g.reduce(function (m, x) { return Math.max(m, nilaiFc(x) || 0); }, 0) * 1.1, 10);
     var TINGGI = 120;
     var LEBAR = 100;
     var svg = svgEl('svg', { class: 'grafik-fc-svg', viewBox: '0 0 ' + (LEBAR * g.length) + ' ' + TINGGI, preserveAspectRatio: 'none',
       'aria-hidden': 'true', focusable: 'false' });
     g.forEach(function (x, i) {
-      if (x.foodCost == null) return;
-      var tinggi = Math.max(3, Math.round(Math.min(x.foodCost, maks) / maks * TINGGI));
-      svg.appendChild(svgEl('rect', { class: 'batang' + (x.foodCost > h.target ? ' di-atas' : '') + ' tumbuh', style: '--i:' + i,
-        x: i * LEBAR + 24, y: TINGGI - tinggi, width: LEBAR - 48, height: tinggi }));
+      var v = nilaiFc(x);
+      if (v == null) return;
+      var tinggi = Math.max(3, Math.round(Math.min(v, maks) / maks * TINGGI));
+      svg.appendChild(svgEl('rect', { class: 'batang' + (v > h.target ? ' di-atas' : '') + (x.foodCost == null ? ' sementara' : '') + ' tumbuh',
+        style: '--i:' + i, x: i * LEBAR + 24, y: TINGGI - tinggi, width: LEBAR - 48, height: tinggi }));
     });
     var yTarget = TINGGI - h.target / maks * TINGGI;
     svg.appendChild(svgEl('line', { class: 'garis-target', x1: 0, y1: yTarget, x2: LEBAR * g.length, y2: yTarget }));
     svg.appendChild(svgEl('line', { class: 'garis-dasar', x1: 0, y1: TINGGI - 0.5, x2: LEBAR * g.length, y2: TINGGI - 0.5 }));
     var uraian = g.map(function (x) {
-      return namaBulanIso(x.bulan) + ' ' + (x.foodCost == null ? 'belum dihitung' : formatPersen(x.foodCost));
+      return namaBulanIso(x.bulan) + ' ' + (x.foodCost != null ? formatPersen(x.foodCost)
+        : x.sementara != null ? formatPersen(x.sementara) + ' sementara' : 'belum dihitung');
     }).join(', ');
     kartu.appendChild(el('div', { class: 'grafik-fc', role: 'img', 'aria-label': 'Food cost per bulan: ' + uraian + '. Target ' + formatPersen(h.target) + '.' }, [
       el('div', { class: 'grafik-fc-nilai', 'aria-hidden': 'true' }, g.map(function (x) {
-        return el('span', { class: x.foodCost != null && x.foodCost > h.target ? 'di-atas' : null, text: x.foodCost == null ? '–' : formatAngka(x.foodCost) });
+        var v = nilaiFc(x);
+        var kelas = [v != null && v > h.target ? 'di-atas' : '', x.foodCost == null && v != null ? 'sementara' : ''].join(' ').trim();
+        return el('span', { class: kelas || null, text: v == null ? '–' : formatAngka(v) });
       })),
       svg,
       el('div', { class: 'grafik-waste-hari grafik-fc-bulan', 'aria-hidden': 'true' }, g.map(function (x, i) {
         return el('span', { class: i === g.length - 1 ? 'hari-ini' : null, text: NAMA_BULAN[Number(x.bulan.slice(5, 7)) - 1].slice(0, 3) });
       }))
     ]));
-    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap, atau semua harinya libur.' }));
+    // Server sebelum Code.gs v0.34 tidak mengirim sementara: "–" di sana juga berarti penjualan belum lengkap.
+    var kenalSementara = g.some(function (x) { return 'sementara' in x; });
+    kartu.appendChild(el('p', { class: 'kolom-bantuan', text: kenalSementara
+      ? 'Bulan di atas target ditulis jingga. Angka miring: sementara, dari hari yang penjualannya sudah tercatat saja. ' +
+        '"–": belum ada penjualan yang tercatat, atau semua harinya libur.'
+      : 'Bulan di atas target ditulis jingga. "–": penjualan bulan itu belum lengkap, atau semua harinya libur.' }));
     return kartu;
   }
 
@@ -13814,10 +13836,13 @@
         return;
       }
       var fcSeharusnya = h.teoritis && h.teoritis.foodCostSeharusnya;
+      var sem = h.foodCost == null ? h.foodCostSementara : null;
+      var fc = foodCostTampil(h);
       ringkasKepala.appendChild(el('div', { class: 'kepala-nilai kepala-nilai-diam' }, [
-        el('span', { class: 'kepala-nilai-label', text: 'Food cost ' + periode }),
-        el('span', { class: 'kepala-nilai-angka' }, [formatPersen(h.foodCost), el('small', { text: ' target ' + formatPersen(h.target) })]),
-        h.foodCost != null && h.foodCost > h.target ? el('span', { class: 'kepala-nilai-selisih', text: 'Di atas target' }) : null,
+        el('span', { class: 'kepala-nilai-label', text: 'Food cost ' + (sem ? 'sementara ' : '') + periode }),
+        el('span', { class: 'kepala-nilai-angka' }, [formatPersen(fc), el('small', { text: ' target ' + formatPersen(h.target) })]),
+        fc != null && fc > h.target ? el('span', { class: 'kepala-nilai-selisih', text: 'Di atas target' }) : null,
+        sem ? el('span', { class: 'kepala-nilai-ket', text: 'Dari ' + sem.hari + ' dari ' + sem.jumlahHari + ' hari yang penjualannya tercatat' }) : null,
         fcSeharusnya != null ? el('span', { class: 'kepala-nilai-ket', text: 'Seharusnya ' + formatPersen(fcSeharusnya) + ' menurut porsi terjual' }) : null
       ]));
       ringkasKepala.appendChild(el('div', { class: 'kepala-angka' }, [
@@ -14000,8 +14025,11 @@
       var daftar = j.kurang.length > 6 ? teksTanggalBulan(j.kurang.slice(0, 5)) + ', dan ' + (j.kurang.length - 5) + ' hari lain' : teksTanggalBulan(j.kurang);
       return el('section', { class: 'kartu kartu-menunggu' }, [
         el('p', {}, tandaStatus('menunggu', 'Menunggu')),
-        el('p', { class: 'kartu-teks', text: 'Penjualan belum dicatat untuk ' + j.kurang.length + ' hari: ' + daftar +
-          '. Food cost dihitung setelah semua hari tercatat.' + ('libur' in j ? ' Hari dapur tutup bisa ditandai sebagai hari libur.' : '') }),
+        el('p', { class: 'kartu-teks', text: 'Penjualan belum dicatat untuk ' + j.kurang.length + ' hari: ' + daftar + '. ' +
+          (h.foodCostSementara ? 'Food cost sementara ' + formatPersen(h.foodCostSementara.foodCost) + ' dihitung dari ' + h.foodCostSementara.hari +
+            ' hari yang sudah tercatat saja (pemakaian bahan hari-hari itu ÷ penjualannya); angka tetapnya dihitung setelah semua hari tercatat.'
+            : 'Food cost dihitung setelah semua hari tercatat.') +
+          ('libur' in j ? ' Hari dapur tutup bisa ditandai sebagai hari libur.' : '') }),
         el('div', {}, catat)
       ]);
     }

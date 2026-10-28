@@ -32,6 +32,8 @@
 > dibetulkan sampai …" untuk Staff di Riwayat (Bagian 5.4 dan 7).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): layar "Ganti harga beberapa item" dan
 > "Tambah dari Excel/Sheets" dari Pengaturan → Item (Bagian 5.7 dan 7).
+> Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): food cost sementara di layar HPP dan
+> Dashboard selama penjualan belum lengkap (Bagian 5.6, 5.10, dan 7).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -914,6 +916,8 @@ Satu-satunya layar yang sepenuhnya navy.
 - Tombol "Stock opname" di bagian atas, dengan tanggal opname terakhir di sampingnya.
 - Di sampingnya (di bawahnya di HP dan tablet) tombol "HPP dan food cost" dengan food cost bulan
   ini dan targetnya ("Oktober 33,8% · target 35%"; bertanda Perlu ditinjau jika di atas target).
+  Selama penjualan bulan ini belum lengkap: food cost sementara ("Oktober 33,8% sementara · target
+  35%", juga bertanda Perlu ditinjau jika di atas target).
   Jumlah menu utama tetap lima.
 - **Harga beli berbeda** (18 Oktober 2026): butir Perlu ditinjau "n harga beli berbeda dari harga
   satuan" (ikon truk). Ketukan membuka lembar: penjelasan "Pakai" dan "Abaikan", lalu per item nama
@@ -1319,13 +1323,17 @@ menu `#/hpp/menu`).
   rincian di atas"), Per kategori (batang mendatar, nilai dan persen, "Bahan dengan pemakaian
   terbesar" yang bisa dibuka, dan bahan tanpa harga bertanda Perlu ditinjau), grafik "Food cost 6
   bulan" (SVG; batang Biru Malam, bulan di atas target berwarna Perlu ditinjau, angka tertulis di
-  atas tiap batang, garis target putus-putus, "–" untuk bulan yang penjualannya belum lengkap atau
-  semua harinya libur), dan kartu Penjualan (jumlah hari tercatat, "· 2 hari libur" jika ada hari libur
+  atas tiap batang, garis target putus-putus; bulan yang penjualannya belum lengkap memakai food cost
+  sementara, digambar pucat bergaris putus dengan angka miring dan kalimat "Batang pucat: sementara,
+  penjualan belum lengkap."; "–" untuk bulan tanpa penjualan tercatat atau semua harinya libur), dan kartu Penjualan (jumlah hari tercatat, "· 2 hari libur" jika ada hari libur
   tanpa catatan, atau "Semua hari pada periode ini hari libur.", tiga catatan terakhir, "Catat
   penjualan").
-- **Penjualan belum lengkap:** food cost di kepala "–", dan di atas rincian kartu Menunggu "Penjualan
-  belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat. Hari dapur
-  tutup bisa ditandai sebagai hari libur." dengan tombol utama "Catat penjualan 9 Okt".
+- **Penjualan belum lengkap:** kepala "Food cost sementara 1–16 Oktober" dengan angka sementara dan
+  "Dari 14 dari 16 hari yang penjualannya tercatat" ("–" jika belum ada penjualan yang tercatat), dan
+  di atas rincian kartu Menunggu "Penjualan belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost
+  sementara 33,8% dihitung dari 14 hari yang sudah tercatat saja (pemakaian bahan hari-hari itu ÷
+  penjualannya); angka tetapnya dihitung setelah semua hari tercatat. Hari dapur tutup bisa ditandai
+  sebagai hari libur." dengan tombol utama "Catat penjualan 9 Okt".
 - **Seharusnya vs nyata** (kartu kedua di kolom kiri, spesifikasi sistem Bagian 5.9): sebelum porsi
   per menu pernah dicatat, ajakan "Catat porsi terjual per menu saat mencatat penjualan. …" dengan
   tombol "Catat penjualan". Porsi belum lengkap: kartu Menunggu "Porsi per menu belum dicatat untuk
@@ -1477,7 +1485,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
 | Menu tersimpan | "Menu tersimpan." |
 | Penjualan tersimpan | "Penjualan 16 Okt tersimpan." |
-| Penjualan belum lengkap | "Penjualan belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost dihitung setelah semua hari tercatat." |
+| Penjualan belum lengkap | "Penjualan belum dicatat untuk 2 hari: 9 dan 14 Okt. Food cost sementara 33,8% dihitung dari 14 hari yang sudah tercatat saja (pemakaian bahan hari-hari itu ÷ penjualannya); angka tetapnya dihitung setelah semua hari tercatat." |
 | Bahan menu tanpa harga | "Garam belum punya harga, jadi HPP belum lengkap." |
 | Item dipakai menu | "Tidak bisa dinonaktifkan: masih dipakai menu Ayam bakar. Ubah atau nonaktifkan menunya dulu." |
 | Penjualan masa depan | "Penjualan hanya bisa dicatat untuk hari ini atau tanggal yang sudah lewat." |

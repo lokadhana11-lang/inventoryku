@@ -51,6 +51,8 @@
 > isiannya sendiri dalam 15 menit sesudah dikirim, selama belum diperiksa (Bagian 3, 5.5, 6.2, 6.3, 7.1).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): ubah banyak item sekaligus, yaitu
 > harga beberapa item dengan satu tanggal berlaku dan item baru dari tempelan Excel/Google Sheets (Bagian 5.1).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): food cost sementara selama penjualan
+> belum lengkap (Bagian 5.9).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1022,6 +1024,13 @@ Semuanya khusus Pengelola dan diperiksa di server.
   tetap dicatat pada hari libur ikut dihitung. Hari tutup yang tidak ditandai libur dicatat Rp 0.
   Jika ada yang kosong, food cost tidak ditampilkan dan tanggalnya disebut. Pemakaian bahan pada
   hari libur tetap dihitung.
+- **Food cost sementara** (28 Oktober 2026): selama penjualan belum lengkap, perkiraan dari hari
+  yang penjualannya sudah tercatat saja: pemakaian bahan pada hari-hari itu ÷ penjualan hari-hari
+  itu × 100%, supaya keduanya sebanding (pemakaian pada hari tanpa catatan penjualan, misalnya
+  waste atau opname, tidak ikut). Selalu ditandai "sementara" dan tidak menggantikan food cost:
+  begitu semua hari tercatat, food cost dihitung seperti di atas dan angka sementara hilang. Tidak
+  ada angka sementara jika belum ada penjualan yang tercatat pada bulan itu. Tampil di layar HPP
+  (kepala dan grafik 6 bulan), Dashboard, rekap bulanan, dan email rekap.
 - Rincian: per kategori item, 10 bahan dengan pemakaian terbesar, dan food cost 6 bulan sampai
   bulan yang dipilih.
 

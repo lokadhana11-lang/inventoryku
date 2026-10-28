@@ -315,6 +315,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   `tambahItemBanyak {baris: [{ nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, masaSimpan }]}` →
   jawaban `daftarItem` ditambah `ditambah: [nama]`. Keduanya paling banyak 300 baris dan menolak semuanya jika satu salah.
   `daftarItem` ditambah `ubahBanyakSiap`.
+- Food cost sementara (Code.gs v0.34, 28 Oktober 2026; khusus Pengelola): `hpp` (juga `simpanPenjualan.hpp`) ditambah
+  `foodCostSementara: { foodCost, pemakaian, penjualan, hari, jumlahHari } | null` dan `grafik[].sementara` (persen atau null);
+  `dashboard.hpp` ditambah `foodCostSementara` (bentuk sama). Hanya ada selama `foodCost` null karena penjualan belum lengkap dan
+  sudah ada penjualan yang tercatat bulan itu.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -366,7 +370,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12++++++++++++++++++++++++ | Pengingat sebelum closing (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): notifikasi ke semua HP 15, 30, atau 60 menit sebelum jam closing (awal 30) berisi form wajib yang belum diisi atau belum lengkap, kecuali hari libur; kartu di Outlet dan jadwal, baris di lembar Notifikasi | Kode selesai (Code.gs v0.31, aplikasi 0.31.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (39 uji server) dan Chromium (24 uji: Outlet dan jadwal, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `pasangTrigger`) |
 | 12+++++++++++++++++++++++++ | Staff membetulkan isiannya sendiri (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): tombol "Betulkan" di detail Riwayat untuk isian sendiri selama 15 menit sesudah dikirim dan belum diperiksa, kolom dan aturan sama dengan Koreksi Pengelola, tanda "Bisa dibetulkan sampai …" | Kode selesai (Code.gs v0.32, aplikasi 0.32.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server) dan Chromium (24 uji: HP, desktop, Staff lain, Pengelola, lewat batas, Tandai diperiksa dari layar lama, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
-| 12++++++++++++++++++++++++++ | Ubah banyak item sekaligus (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): "Ganti harga beberapa item" (satu tanggal berlaku, item tanpa harga mendapat harga pertama sejak awal) dan "Tambah dari Excel/Sheets" (tempelan dengan pratinjau dan baris salah ditandai) dari Pengaturan → Item | Kode selesai (Code.gs v0.33, aplikasi 0.33.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; 300 item dengan riwayat panjang 0,1 detik) dan Chromium (60 uji: dua layar, draft, tanggal lain, baris judul dan tanpa judul, sel berkutip, angka ribuan, baris salah tersisa, server lama, delapan ukuran), termasuk perbaikan sesudah telaah berlawanan (butir 368). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
+| 12++++++++++++++++++++++++++ | Ubah banyak item sekaligus (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): "Ganti harga beberapa item" (satu tanggal berlaku, item tanpa harga mendapat harga pertama sejak awal) dan "Tambah dari Excel/Sheets" (tempelan dengan pratinjau dan baris salah ditandai) dari Pengaturan → Item | Kode selesai (Code.gs v0.33, aplikasi 0.33.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server; 300 item dengan riwayat panjang 0,1 detik) dan Chromium (60 uji: dua layar, draft, tanggal lain, baris judul dan tanpa judul, sel berkutip, angka ribuan, baris salah tersisa, server lama, delapan ukuran), termasuk perbaikan sesudah telaah berlawanan (butir 368). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
+| 12+++++++++++++++++++++++++++ | Food cost sementara (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): selama penjualan bulan itu belum lengkap, perkiraan dari hari yang penjualannya sudah tercatat (pemakaian bahan hari-hari itu ÷ penjualannya), bertanda sementara di kepala layar HPP, kartu Menunggu, grafik 6 bulan (batang pucat), Dashboard, rekap bulanan PDF, dan email rekap | Kode selesai (Code.gs v0.34, aplikasi 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji server dengan angka dihitung dari data) dan Chromium (29 uji: Dashboard, layar HPP, grafik, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2830,3 +2835,28 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     60 (harga pada tanggal lain, koma ribuan, tombol selama dimuat, judul palsu, sel berkutip, angka ribuan dan desimal, nomor baris
     dari server dan pratinjau dimuat ulang, sisa baris salah), `ukur_banyak.mjs` dan `banding_banyak.mjs`; uji fitur 28 Oktober dan
     sebelumnya tetap lulus. Versi tetap Code.gs v0.33 dan aplikasi 0.33.0 (belum dirilis).
+
+### Food cost sementara (Code.gs v0.34, aplikasi 0.34.0, 28 Oktober 2026)
+
+369. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap": food cost tampil "–" selama ada satu hari tanpa catatan
+    penjualan, sehingga kepala layar HPP, Dashboard, dan grafik 6 bulan kosong hampir sepanjang bulan. Pemilik memilih butir ini
+    tanpa pilihan tambahan. Spesifikasi sistem Bagian 5.9; tampilan Bagian 5.6, 5.10, dan 7. Tidak ada tab, kolom, atau aksi baru.
+370. **Hitungan** (keputusan tambahan): hanya hari yang penjualannya sudah tercatat (termasuk hari libur yang tetap dicatat), yaitu
+    pemakaian bahan hari-hari itu ÷ penjualannya. Dipilih daripada pemakaian sebulan ÷ penjualan yang tercatat (food cost jauh terlalu
+    tinggi selama banyak hari belum dicatat) dan daripada perkiraan penjualan hari yang kosong (menebak angka). `pemakaianBahan_`
+    menerima `hariSaja` (rekap dan waste barang jadi di luar hari itu dilewati; cek silang tidak dipakai), `foodCostBulan_` menjawab
+    `sementara: { foodCost, pemakaian, penjualan, hari, jumlahHari }` hanya jika `foodCost` null, ada hari yang kurang, dan penjualan
+    tercatat > 0. `foodCost` tidak berubah, jadi aplikasi lama tetap seperti dulu. Food cost seharusnya (porsi terjual) tidak diberi
+    angka sementara.
+371. **Tampilan:** kepala layar HPP "Food cost sementara 1–27 Oktober", angkanya, dan "Dari 11 dari 27 hari yang penjualannya
+    tercatat" (tanda "Di atas target" juga untuk angka sementara); kartu Menunggu menjelaskan cara hitungnya; grafik 6 bulan memakai
+    angka sementara untuk bulan yang belum lengkap (batang `.sementara`: isi pucat 38% dan garis tepi putus-putus non-scaling,
+    angka miring, kalimat "Batang pucat: sementara, penjualan belum lengkap.", uraian pembaca layar "… 20,4% sementara"), dan
+    keterangan di bawah grafik kini menyebut angka miring (server lama: kalimat lama). Dashboard: "Oktober 20,4% sementara · target 35%" (`foodCostTampil`,
+    bertanda Perlu ditinjau jika di atas target). Rekap bulanan PDF: baris Food cost "20,4% (sementara)" dan catatan cara hitungnya;
+    email rekap: "…; sementara 20,4% dari hari yang tercatat (target 35%)". Pemakaian bahan di kepala tetap pemakaian sebulan.
+372. **Uji** (di luar repo): `uji_fc_sementara.mjs` 20 uji (sementara dari data contoh = pemakaian ÷ penjualan, grafik, waste pada hari
+    tanpa penjualan naik di pemakaian bulan tetapi tidak di sementara, penjualan hari itu dicatat lalu ikut, Dashboard, rekap PDF dan
+    email, penjualan lengkap: food cost tetap dan sementara hilang, bulan tanpa penjualan); `uji_fc_sementara_ui.mjs` 29 uji Chromium
+    (Dashboard, kepala, kartu Menunggu, grafik dan uraiannya, server lama seperti dulu, delapan ukuran untuk layar HPP dan Dashboard).
+    Uji fitur 28 Oktober dan sebelumnya tetap lulus. Belum diuji di Supabase asli dan HP.

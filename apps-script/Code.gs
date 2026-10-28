@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.33 (ubah banyak item sekaligus)
+// InventoryKu Code.gs v0.34 (food cost sementara)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -107,9 +107,12 @@
  * - 28 Oktober 2026    : ubah banyak item sekaligus (aksi gantiHargaBanyak dan tambahItemBanyak):
  *                        harga beberapa item dengan satu tanggal berlaku, item baru dari tempelan
  *                        Excel/Google Sheets.
+ * - 28 Oktober 2026    : food cost sementara (hpp.foodCostSementara, grafik[].sementara,
+ *                        dashboard.hpp.foodCostSementara, rekap bulanan): selama penjualan belum
+ *                        lengkap, perkiraan dari hari yang penjualannya sudah tercatat.
  */
 
-var VERSI_KODE = 'v0.33';
+var VERSI_KODE = 'v0.34';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -6085,7 +6088,7 @@ function aksiDashboard_(body) {
     grafikWaste: d.waste,
     grafikSuhu: d.suhu,
     opname: d.opname,
-    hpp: { bulan: d.hpp.bulan, nama: d.hpp.nama, foodCost: d.hpp.foodCost, target: d.hpp.target },
+    hpp: { bulan: d.hpp.bulan, nama: d.hpp.nama, foodCost: d.hpp.foodCost, foodCostSementara: d.hpp.sementara, target: d.hpp.target },
     libur: liburUntukJawaban_(tanggal),
     alamatSheet: alamatDashboardSheet_()
   };
@@ -6810,9 +6813,10 @@ function nilaiWasteTercatat_() {
  * waste barang jadi hanya dilaporkan (estimasi yang tercatat). Stok pembuka tidak dihitung sebagai
  * selisih stock. Cek silang: nilai stock bahan awal + nilai masuk + stok
  * pembuka − nilai stock bahan akhir + selisih karena perubahan harga.
- * ctx: { master, rekap, resep, urutKat, namaKat, pembuka, waste }.
+ * ctx: { master, rekap, resep, urutKat, namaKat, pembuka, waste }. hariSaja (opsional, { 'yyyy-mm-dd': true }): hanya
+ * hari-hari itu yang dihitung (food cost sementara; cek silang lalu tidak bermakna).
  */
-function pemakaianBahan_(ctx, dari, sampai) {
+function pemakaianBahan_(ctx, dari, sampai, hariSaja) {
   // peta: { itemKecil: { qty, nilai } } untuk setiap bahan, dipakai perbandingan seharusnya vs nyata.
   var hasil = { terpakai: 0, waste: 0, selisihStock: 0, total: 0, wasteBarangJadi: 0, masuk: 0, stokPembuka: 0,
     perKategori: [], bahanTerbesar: [], tanpaHarga: [], cek: null, peta: {} };
@@ -6841,7 +6845,7 @@ function pemakaianBahan_(ctx, dari, sampai) {
     if (bahan) hasil.peta[k] = x;
     rekapItem.forEach(function (r) {
       if (r.tanggal < dari || r.tanggal > sampai) return;
-      if (!bahan) return;
+      if (!bahan || (hariSaja && !hariSaja[r.tanggal])) return;
       var h = hargaPada_(m, r.tanggal);
       var pakai = r.keluar + r.dipakaiPrep - r.hasilPrep;
       var pembuka = (ctx.pembuka || {})[k + '|' + r.tanggal] || 0;
@@ -6867,7 +6871,9 @@ function pemakaianBahan_(ctx, dari, sampai) {
   });
   hasil.total = hasil.terpakai + hasil.waste + hasil.selisihStock;
   (ctx.waste || []).forEach(function (w) {
-    if (w.tanggal >= dari && w.tanggal <= sampai && !kunciBahan[w.kecil] && ctx.master[w.kecil]) hasil.wasteBarangJadi += w.rp;
+    if (w.tanggal >= dari && w.tanggal <= sampai && (!hariSaja || hariSaja[w.tanggal]) && !kunciBahan[w.kecil] && ctx.master[w.kecil]) {
+      hasil.wasteBarangJadi += w.rp;
+    }
   });
   var selisih = selisihHarga_(ctx.master, ctx.rekap, dari, sampai);
   var sh = 0;
@@ -6924,13 +6930,27 @@ function rentangHpp_(bulan, hari) {
   return { dari: dari, sampai: berjalan ? geserTanggal_(hari, -1) : akhir, akhirBulan: akhir, berjalan: berjalan };
 }
 
-/** Food cost satu bulan: { pemakaian, penjualan, foodCost } (foodCost null jika penjualan belum lengkap atau 0). */
+/**
+ * Food cost satu bulan: { pemakaian, penjualan, foodCost, sementara } (foodCost null jika penjualan belum lengkap atau 0).
+ * sementara (Code.gs v0.34): selama penjualan belum lengkap, perkiraan dari hari-hari yang penjualannya sudah tercatat saja,
+ * { foodCost, pemakaian, penjualan, hari, jumlahHari } (pemakaian bahan hari-hari itu ÷ penjualannya); null jika food cost
+ * sudah dihitung atau belum ada penjualan yang tercatat.
+ */
 function foodCostBulan_(ctx, bulan) {
   var r = rentangHpp_(bulan, ctx.hari);
   var pakai = pemakaianBahan_(ctx, r.dari, r.sampai);
   var jual = r.sampai >= r.dari ? penjualanRentang_(ctx.jual, r.dari, r.sampai) : { total: 0, hari: 0, jumlahHari: 0, kurang: [], libur: [] };
   var fc = jual.jumlahHari && !jual.kurang.length && jual.total > 0 ? Math.round(pakai.total / jual.total * 1000) / 10 : null;
-  return { rentang: r, pemakaian: pakai, penjualan: jual, foodCost: fc };
+  var sementara = null;
+  if (fc == null && jual.kurang.length && jual.hari && jual.total > 0) {
+    // Hanya hari yang penjualannya tercatat (termasuk hari libur yang tetap dicatat), supaya pemakaian dan penjualan sebanding.
+    var tercatat = {};
+    for (var d = r.dari; d <= r.sampai; d = geserTanggal_(d, 1)) if (ctx.jual.hari[d]) tercatat[d] = true;
+    var pakaiS = pemakaianBahan_(ctx, r.dari, r.sampai, tercatat);
+    sementara = { foodCost: Math.round(pakaiS.total / jual.total * 1000) / 10, pemakaian: pakaiS.total, penjualan: jual.total,
+      hari: jual.hari, jumlahHari: jual.jumlahHari };
+  }
+  return { rentang: r, pemakaian: pakai, penjualan: jual, foodCost: fc, sementara: sementara };
 }
 
 /**
@@ -6954,7 +6974,7 @@ function dataHpp_(bulan) {
     for (var j = 0; j < i; j++) b = bulanLalu_(b + '-01');
     var g = b === bulan ? x : foodCostBulan_(ctx, b);
     grafik.push({ bulan: b, foodCost: g.foodCost, pemakaian: g.pemakaian.total, penjualan: g.penjualan.total,
-      lengkap: g.penjualan.jumlahHari > 0 && !g.penjualan.kurang.length });
+      lengkap: g.penjualan.jumlahHari > 0 && !g.penjualan.kurang.length, sementara: g.sementara ? g.sementara.foodCost : null });
   }
   var terakhir = Object.keys(ctx.jual.hari).sort().reverse().slice(0, 3).map(function (t) {
     var p = ctx.jual.hari[t];
@@ -6976,6 +6996,7 @@ function dataHpp_(bulan) {
     cekSilang: p.cek,
     penjualan: gabung_(x.penjualan, { terakhir: terakhir, pernah: !!ctx.jual.pertama }),
     foodCost: x.foodCost,
+    foodCostSementara: x.sementara,
     perKategori: p.perKategori,
     bahanTerbesar: p.bahanTerbesar,
     tanpaHarga: p.tanpaHarga,
@@ -7016,7 +7037,7 @@ function ringkasHppDashboard_(tanggal) {
   kurang = kurang.concat(hanyaPorsi).sort();
   var diAtas = hppSemuaMenu_(tanggal, true, n).filter(function (m) { return m.diAtasTarget; }).sort(urutMenuFoodCost_);
   return {
-    bulan: bulan, nama: namaBulanId_(bulan), foodCost: x.foodCost, target: targetFoodCost_(n),
+    bulan: bulan, nama: namaBulanId_(bulan), foodCost: x.foodCost, sementara: x.sementara, target: targetFoodCost_(n),
     penjualanKurang: kurang, porsiKurang: hanyaPorsi, kemarin: geserTanggal_(ctx.hari, -1),
     menuDiAtas: diAtas.map(function (m) { return { nama: m.nama, foodCost: m.foodCost }; })
   };
@@ -11591,7 +11612,7 @@ function dataRekapBulan_(bulan) {
   var menuHpp = hppSemuaMenu_(fcb.rentang.berjalan ? hari : akhirBulan, true, konf);
   hasil.hpp = {
     dari: fcb.rentang.dari, sampai: fcb.rentang.sampai, target: targetFoodCost_(konf), pemakaian: fcb.pemakaian,
-    penjualan: fcb.penjualan, foodCost: fcb.foodCost, jumlahMenu: menuHpp.length,
+    penjualan: fcb.penjualan, foodCost: fcb.foodCost, sementara: fcb.sementara, jumlahMenu: menuHpp.length,
     menuDiAtas: menuHpp.filter(function (m) { return m.diAtasTarget; }).sort(urutMenuFoodCost_),
     teoritis: bandingTeoritis_(ctxHpp, fcb.rentang, fcb.pemakaian, fcb.penjualan)
   };
@@ -11662,7 +11683,7 @@ function isiPdfRekapHpp_(h) {
     [{ html: '<b>Pemakaian bahan</b>' }, { html: '<b>' + rupiahId_(p.total) + '</b>' }],
     ['Penjualan (' + teksJual + ')', j.hari ? rupiahId_(j.total) : '–']
   ], [e('Food cost (target ' + persenId_(h.target) + ')'),
-    { html: h.foodCost == null ? '–' : persenId_(h.foodCost) + (h.foodCost > h.target ? ' *' : ''),
+    { html: h.foodCost == null ? (h.sementara ? persenId_(h.sementara.foodCost) + ' (sementara)' : '–') : persenId_(h.foodCost) + (h.foodCost > h.target ? ' *' : ''),
       kelas: h.foodCost != null && h.foodCost > h.target ? 'akhir' : '' }], '');
   var catatanHpp = ['Pemakaian bahan = jumlah per hari × harga yang berlaku pada hari itu, hanya bahan mentah (barang jadi terhitung ' +
     'saat bahannya dipakai prep). Selisih stock: stock yang hilang menurut opname dan penyesuaian menambah pemakaian. Food cost = ' +
@@ -11670,7 +11691,10 @@ function isiPdfRekapHpp_(h) {
   if (h.foodCost != null && h.foodCost > h.target) catatanHpp.push('* Di atas target.');
   if (h.foodCost == null && j.kurang.length) {
     catatanHpp.push('Food cost tidak dihitung: penjualan belum dicatat untuk ' + j.kurang.length + ' hari (' +
-      (j.kurang.length > 8 ? 'antara lain ' + teksHariBulan_(j.kurang.slice(0, 8)) : teksHariBulan_(j.kurang)) + ').');
+      (j.kurang.length > 8 ? 'antara lain ' + teksHariBulan_(j.kurang.slice(0, 8)) : teksHariBulan_(j.kurang)) + ').' +
+      (h.sementara ? ' Food cost sementara ' + persenId_(h.sementara.foodCost) + ' dihitung dari ' + h.sementara.hari +
+        ' hari yang penjualannya tercatat saja: pemakaian bahan hari-hari itu ' + rupiahId_(h.sementara.pemakaian) + ' ÷ penjualan ' +
+        rupiahId_(h.sementara.penjualan) + '.' : ''));
   }
   if (h.foodCost == null && !j.kurang.length && !j.jumlahHari && nLibur) {
     catatanHpp.push('Food cost tidak dihitung: semua hari yang dinilai hari libur.');
@@ -12006,7 +12030,8 @@ function htmlEmailRekap_(d, x) {
     'Pemakaian bahan ' + rupiahId_(h.pemakaian.total) + (h.penjualan.hari ? ', penjualan ' + rupiahId_(h.penjualan.total) : ''),
     h.foodCost == null
       ? (!h.penjualan.jumlahHari && (h.penjualan.libur || []).length ? 'Food cost belum dihitung: semua hari yang dinilai hari libur'
-        : 'Food cost belum dihitung: penjualan baru tercatat ' + h.penjualan.hari + ' dari ' + h.penjualan.jumlahHari + ' hari')
+        : 'Food cost belum dihitung: penjualan baru tercatat ' + h.penjualan.hari + ' dari ' + h.penjualan.jumlahHari + ' hari' +
+          (h.sementara ? '; sementara <b>' + persenId_(h.sementara.foodCost) + '</b> dari hari yang tercatat (target ' + persenId_(h.target) + ')' : ''))
       : 'Food cost ' + e(d.nama.split(' ')[0]) + ' ' + (h.foodCost > h.target ? '<b style="color:' + w.masalah + '">' + persenId_(h.foodCost) + '</b>' :
         '<b>' + persenId_(h.foodCost) + '</b>') + ' (target ' + persenId_(h.target) + ')',
     h.menuDiAtas.length ? h.menuDiAtas.length + ' menu di atas target: ' + e(daftarNamaSingkat_(h.menuDiAtas.map(function (m) { return m.nama; })))
