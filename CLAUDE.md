@@ -310,6 +310,11 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   pengisinya (Staff) selama batas belum lewat. `tandaiDiperiksa` menerima `terlihat` (ISO koreksi terbaru yang tampil, '' jika belum
   pernah) dan `tandaiDiperiksaBanyak` menerima `terlihat: { id: ISO }`; kiriman yang dikoreksi sesudahnya ditolak / dilewati
   (`sebab: 'berubah'`).
+- Ubah banyak item sekaligus (Code.gs v0.33, 28 Oktober 2026; khusus Pengelola): `gantiHargaBanyak {berlakuMulai, harga: [{ nama,
+  harga }]}` → jawaban `daftarItem` ditambah `hargaDisimpan: { berlakuMulai, jumlah, mengganti, pertama: [nama], sama: [nama] }`;
+  `tambahItemBanyak {baris: [{ nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, masaSimpan }]}` →
+  jawaban `daftarItem` ditambah `ditambah: [nama]`. Keduanya paling banyak 300 baris dan menolak semuanya jika satu salah.
+  `daftarItem` ditambah `ubahBanyakSiap`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -361,6 +366,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++++++++++++ | Hari libur (keputusan pemilik 22 Oktober 2026, dari telaah aplikasi): `M_HariLibur` dan Pengaturan → Hari libur (hari ini, tanggal lewat, atau sampai setahun ke depan; hapus), tidak ada form yang ditagih dan tidak ada suhu terlewat pada hari libur (Beranda, Dashboard, email, rekap bulanan, blok Kepatuhan Sheets), penjualan dan porsi tidak perlu dicatat, laporan harian tanpa email (PDF berisian tetap ke Drive) dan pengingat cek suhu dilewati | Kode selesai (Code.gs v0.30, aplikasi 0.30.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (100 uji server, rumus Kepatuhan, jawaban aksi lama sama dengan v0.29 selain field baru) dan Chromium (82 uji: HP, desktop, Staff, tanpa sinyal, server lama, delapan ukuran; uji lama tetap lulus). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `setupSpreadsheet`) |
 | 12++++++++++++++++++++++++ | Pengingat sebelum closing (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): notifikasi ke semua HP 15, 30, atau 60 menit sebelum jam closing (awal 30) berisi form wajib yang belum diisi atau belum lengkap, kecuali hari libur; kartu di Outlet dan jadwal, baris di lembar Notifikasi | Kode selesai (Code.gs v0.31, aplikasi 0.31.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (39 uji server) dan Chromium (24 uji: Outlet dan jadwal, server lama, lembar Notifikasi Staff dan Pengelola, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs, `pasangTrigger`) |
 | 12+++++++++++++++++++++++++ | Staff membetulkan isiannya sendiri (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): tombol "Betulkan" di detail Riwayat untuk isian sendiri selama 15 menit sesudah dikirim dan belum diperiksa, kolom dan aturan sama dengan Koreksi Pengelola, tanda "Bisa dibetulkan sampai …" | Kode selesai (Code.gs v0.32, aplikasi 0.32.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (43 uji server) dan Chromium (24 uji: HP, desktop, Staff lain, Pengelola, lewat batas, Tandai diperiksa dari layar lama, delapan ukuran). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
+| 12++++++++++++++++++++++++++ | Ubah banyak item sekaligus (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): "Ganti harga beberapa item" (satu tanggal berlaku, item tanpa harga mendapat harga pertama sejak awal) dan "Tambah dari Excel/Sheets" (tempelan dengan pratinjau dan baris salah ditandai) dari Pengaturan → Item | Kode selesai (Code.gs v0.33, aplikasi 0.33.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (41 uji server) dan Chromium (46 uji: dua layar, draft, tanggal lain, baris judul dan tanpa judul, baris salah tersisa, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2772,3 +2778,32 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dibetulkan menjadi di luar standar kini mengirim notifikasi ke HP Pengelola seperti isian baru ("… Dikoreksi Rina."). Tidak diubah:
     pesanan yang sudah Datang tetap Datang jika Tambah masuk-nya dibetulkan menjadi 0 (sama dengan koreksi Pengelola, butir 331), dan
     jam HP yang meleset (server memeriksa lagi).
+
+### Ubah banyak item sekaligus (Code.gs v0.33, aplikasi 0.33.0, 28 Oktober 2026)
+
+364. **Asal:** telaah aplikasi 19 Oktober, bagian "Pembelian dan data master": sejak pindah ke Supabase, Sheet hanya salinan, jadi item
+    dan harga hanya bisa diubah satu per satu dari aplikasi. Pemilik memilih butir ini tanpa pilihan tambahan, jadi dipilih yang paling
+    sederhana (keputusan tambahan): kategori dan satuan tidak dibuat otomatis, tempelan hanya untuk item baru (tidak mengubah item
+    yang ada), tanpa stok awal di tempelan (stok pembuka tetap lewat layar item, karena HPP membedakan alasan Stok pembuka), dan hanya
+    item aktif di Ganti harga. Spesifikasi sistem Bagian 5.1; tampilan Bagian 5.7. Tidak ada tab atau kolom baru.
+365. **Server:** inti `aksiGantiHarga_` dipindah ke `tulisHargaBaru_(m, mulai, harga, pengguna, kini)` (baris harga awal, menimpa tanggal
+    yang sama dengan `Log_Perubahan`, `samakanHargaMItem_`; `{ sama: true }` tanpa menulis), dipakai `gantiHarga` (yang tetap menolak harga
+    sama pada tanggal yang sama) dan `aksiGantiHargaBanyak_`. Bulk: tanggal sama aturannya, semua baris diperiksa sebelum kunci (angka) dan
+    di dalam kunci (item ada, tidak ganda); item tanpa harga dan tanpa riwayat mendapat harga pertama sejak awal (`pertama`); harga yang
+    sama dengan `hargaPada_` tanggal itu dilewati (`sama`). `aksiTambahItemBanyak_`: aturan item baru `simpanItem` per baris di dalam satu
+    kunci (`periksaNama_`, `pilihTempelan_` untuk kategori/satuan/satuan besar yang menyebut tulisan tempelan, `angkaOpsional_`,
+    `masaSimpanIsian_`), galat diberi awalan "Baris n (nama): ", lalu semua baris ditulis (`tambahBarisMaster_`, harga pertama
+    `tambahBarisHarga_`). `BATAS_UBAH_BANYAK` 300.
+366. **Aplikasi:** `layarItemHargaBanyak` dan `layarItemTempel` (rute `#/pengaturan/item-harga` dan `-tempel`, tautan di daftar item hanya
+    jika `ubahBanyakSiap`). Harga dibaca `bacaRupiah` (titik ribuan). Tempelan: `uraiTempelan` (tab, atau titik koma jika tidak ada tab;
+    baris pertama yang berisi judul nama memetakan kolom lewat `JUDUL_TEMPEL`, selain itu `URUTAN_TEMPEL`), pemeriksaan per baris di HP
+    dengan aturan server, hanya baris yang benar dikirim; sesudah berhasil, baris yang salah dan baris judulnya tetap di kotak. Draft
+    `draft:item-harga` dan `draft:item-tempel`. CSS `.harga-banyak-*` dan `.isian-tempel`.
+367. **Uji** (di luar repo): Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js`: `uji_ubah_banyak.mjs` 41 uji (harga baru, sama
+    dilewati, harga pertama sejak awal, harga kemarin tetap, menimpa tanggal yang sama dan `Log_Perubahan`, tanggal lewat, item tak dikenal
+    dan ganda menolak semuanya, minus, masa depan, kosong, Staff; `gantiHarga` lama tetap; tambah dengan ejaan master, satuan besar, masa
+    simpan, form Stock, sepuluh penolakan dengan nomor baris, ganda di tempelan, kategori nonaktif, 301 baris, 120 item sekaligus).
+    Chromium `uji_ubah_banyak_ui.mjs` 46 uji (tautan dan server lama, keterangan naik/harga pertama/salah, draft sesudah dimuat ulang,
+    fokus ke angka salah, isian tersembunyi karena cari, konfirmasi, tanggal lain, tempelan dengan judul dan baris salah, sisa baris
+    salah, tanpa judul, item yang sudah ada, delapan ukuran untuk tiga layar). Belum diuji di Supabase asli dan di HP (menempel dari
+    Excel/Sheets di HP asli).
