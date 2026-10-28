@@ -7091,3 +7091,24 @@ hr.pemisah {
 .harga-beli-baris .deret-tombol {
   margin-top: 4px;
 }
+
+/* Ganti harga beberapa item (aplikasi 0.33.0): nama di kiri, harga baru di kanan; turun baris di layar sempit. */
+.harga-banyak-baris {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--garis);
+}
+.harga-banyak-kelompok > .harga-banyak-baris:first-of-type { border-top: 0; }
+.harga-banyak-nama { display: grid; gap: 2px; min-width: 0; }
+.harga-banyak-nama .daftar-baris-judul,
+.harga-banyak-nama .daftar-baris-ket { overflow-wrap: anywhere; }
+.harga-banyak-isian .satuan-tetap { min-width: 0; }
+.harga-banyak-baris > .kolom-bantuan { grid-column: 1 / -1; margin: 0; }
+.harga-banyak-baris > .kolom-bantuan:empty { display: none; }
+@media (max-width: 359px) {
+  .harga-banyak-baris { grid-template-columns: minmax(0, 1fr); }
+}
+.isian-tempel { font-family: inherit; min-height: 9rem; white-space: pre; overflow-x: auto; }

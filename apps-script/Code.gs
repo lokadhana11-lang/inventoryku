@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.32 (Staff membetulkan isiannya sendiri)
+// InventoryKu Code.gs v0.33 (ubah banyak item sekaligus)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -104,9 +104,12 @@
  *                        closing (pengingat_closing_menit; Outlet dan jadwal).
  * - 28 Oktober 2026    : Staff membetulkan isiannya sendiri (aksi koreksi) dalam 15 menit
  *                        sesudah dikirim, selama belum diperiksa; riwayat.kiriman[].betulkanSampai.
+ * - 28 Oktober 2026    : ubah banyak item sekaligus (aksi gantiHargaBanyak dan tambahItemBanyak):
+ *                        harga beberapa item dengan satu tanggal berlaku, item baru dari tempelan
+ *                        Excel/Google Sheets.
  */
 
-var VERSI_KODE = 'v0.32';
+var VERSI_KODE = 'v0.33';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -176,6 +179,10 @@ var AKSI_ = {
     pesan: 'Pengaturan item hanya untuk Head Kitchen dan Manager.' },
   simpanItem: { jalankan: aksiSimpanItem_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
+  gantiHargaBanyak: { jalankan: aksiGantiHargaBanyak_, pengelola: true,
+    pesan: 'Harga hanya bisa diubah Head Kitchen atau Manager.' },
+  tambahItemBanyak: { jalankan: aksiTambahItemBanyak_, pengelola: true,
+    pesan: 'Item hanya bisa ditambah Head Kitchen atau Manager.' },
   gantiHarga: { jalankan: aksiGantiHarga_, pengelola: true,
     pesan: 'Harga hanya bisa diganti Head Kitchen atau Manager.' },
   daftarKategoriSatuan: { jalankan: aksiDaftarKategoriSatuan_, bacaSaja: true, pengelola: true,
@@ -2406,6 +2413,46 @@ function tambahBarisHarga_(nama, mulai, harga, oleh, kini) {
 }
 
 /**
+ * Banyak baris baru di tab master sekaligus (di dalam kunci): tab dirapikan sekali, lalu semua baris ditulis dalam satu rentang
+ * tepat di bawah baris terakhir yang kolom kuncinya terisi (butir 79). Dipakai ubah banyak item sekaligus.
+ */
+function tambahBanyakBarisMaster_(nama, daftarIsi) {
+  if (!daftarIsi.length) return;
+  var t = wajibTabel_(nama);
+  var kolKunci = t.kol[KUNCI_MASTER[nama]];
+  if (kolKunci === undefined) {
+    throw galatPengguna_('Kolom ' + KUNCI_MASTER[nama] + ' tidak ada di tab ' + nama + '. Jalankan ulang setupSpreadsheet di editor Apps Script.');
+  }
+  var nilai = daftarIsi.map(function (isi) { return susunBaris_(t, isi); });
+  rapikanTabMaster_(t.sheet, kolKunci + 1);
+  t.sheet.getRange(barisBaruMaster_(t.sheet, kolKunci + 1, nilai.length), 1, nilai.length, t.judul.length).setValues(nilai);
+  if (nama === TAB_HARGA) MEMO_HARGA_ = null;
+}
+
+/**
+ * Harga Satuan di M_Item untuk banyak item sekaligus (di dalam kunci): hargaKini { nama: harga hari ini atau null }. Hanya sel
+ * yang berubah yang ditulis.
+ */
+function samakanHargaMItemBanyak_(hargaKini) {
+  var nama = Object.keys(hargaKini);
+  if (!nama.length) return;
+  var t = wajibTabel_('M_Item');
+  var cNama = t.kol['Nama Item'];
+  var cHarga = t.kol['Harga Satuan (Rp)'];
+  if (cNama === undefined || cHarga === undefined) return;
+  var peta = {};
+  nama.forEach(function (n) { peta[n.toLowerCase()] = hargaKini[n]; });
+  t.baris.forEach(function (b, i) {
+    var k = rapikanTeks_(b[cNama]).toLowerCase();
+    if (!(k in peta)) return;
+    var baru = peta[k] == null ? '' : peta[k];
+    var lama = b[cHarga] === '' || b[cHarga] == null ? '' : Number(b[cHarga]);
+    if (lama !== baru) t.sheet.getRange(i + 2, cHarga + 1).setValue(baru);
+    delete peta[k]; // baris ganda diisi tangan: yang lebih atas, sama dengan bacaItem_
+  });
+}
+
+/**
  * Ganti harga (Bagian 5.1), khusus Pengelola. body: { nama, harga,
  * berlakuMulai: 'yyyy-mm-dd' (hari ini atau tanggal yang sudah lewat) }.
  * Menambah baris M_HargaItem; tanggal yang sudah punya baris untuk item itu
@@ -2426,32 +2473,224 @@ function aksiGantiHarga_(body, pengguna) {
   return denganKunci_(function () {
     var m = bacaItem_()[rapikanTeks_(body.nama).toLowerCase()];
     if (!m) throw galatPengguna_('Item ' + rapikanTeks_(body.nama) + ' tidak ditemukan. Kembali ke daftar item.');
-    var t = bacaTabel_(TAB_HARGA);
-    if (!t) throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
-    MEMO_HARGA_ = null;
-    var kini = new Date();
-    var daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
-    if (!daftar.length && m.harga != null) {
-      tambahBarisHarga_(m.nama, '', m.harga, OLEH_HARGA_AWAL, kini);
-      daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+    if (!bacaTabel_(TAB_HARGA)) throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var h = tulisHargaBaru_(m, mulai, harga, pengguna, new Date());
+    if (h.sama) {
+      throw galatPengguna_('Harga ' + m.nama + ' yang berlaku mulai ' + tanggalPendekId_(mulai) + ' sudah ' + rupiahId_(harga) + '.');
     }
-    var sama = null;
-    daftar.forEach(function (x) { if (x.mulai === mulai) sama = x; });
-    if (sama) {
-      if (sama.harga === harga) {
-        throw galatPengguna_('Harga ' + m.nama + ' yang berlaku mulai ' + tanggalPendekId_(mulai) + ' sudah ' + rupiahId_(harga) + '.');
-      }
-      t = wajibTabel_(TAB_HARGA);
-      tulisBarisMaster_(t, sama.nomor, { 'Harga Satuan (Rp)': harga, 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini });
-      catatLog_(TAB_HARGA, m.nama + ' · ' + mulai, pengguna, kini, [['Harga Satuan (Rp)', String(sama.harga), String(harga)]]
-        .concat(sama.oleh !== pengguna.nama ? [['Dicatat Oleh', sama.oleh, pengguna.nama]] : []));
-      MEMO_HARGA_ = null;
-    } else {
-      tambahBarisHarga_(m.nama, mulai, harga, pengguna.nama, kini);
-    }
-    samakanHargaMItem_(m.nama);
     var data = dataItem_();
-    data.hargaDisimpan = { nama: m.nama, harga: harga, berlakuMulai: mulai, mengganti: !!sama };
+    data.hargaDisimpan = { nama: m.nama, harga: harga, berlakuMulai: mulai, mengganti: h.mengganti };
+    return data;
+  });
+}
+
+/**
+ * Menulis harga baru satu item yang berlaku mulai tanggal itu (di dalam kunci; bersama gantiHarga dan gantiHargaBanyak).
+ * Item tanpa riwayat yang sudah berharga di M_Item mendapat baris harga awal dulu. Tanggal yang sudah punya baris: harganya
+ * ditimpa dan dicatat di Log_Perubahan. { sama: true } (tidak menulis) jika tanggal itu sudah berharga sama persis.
+ * Jawaban { mengganti, sama }.
+ */
+function tulisHargaBaru_(m, mulai, harga, pengguna, kini) {
+  MEMO_HARGA_ = null;
+  var daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+  if (!daftar.length && m.harga != null) {
+    tambahBarisHarga_(m.nama, '', m.harga, OLEH_HARGA_AWAL, kini);
+    daftar = bacaRiwayatHarga_().item[m.nama.toLowerCase()] || [];
+  }
+  var sama = null;
+  daftar.forEach(function (x) { if (x.mulai === mulai) sama = x; });
+  if (sama) {
+    if (sama.harga === harga) return { mengganti: false, sama: true };
+    var t = wajibTabel_(TAB_HARGA);
+    tulisBarisMaster_(t, sama.nomor, { 'Harga Satuan (Rp)': harga, 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini });
+    catatLog_(TAB_HARGA, m.nama + ' · ' + mulai, pengguna, kini, [['Harga Satuan (Rp)', String(sama.harga), String(harga)]]
+      .concat(sama.oleh !== pengguna.nama ? [['Dicatat Oleh', sama.oleh, pengguna.nama]] : []));
+    MEMO_HARGA_ = null;
+  } else {
+    tambahBarisHarga_(m.nama, mulai, harga, pengguna.nama, kini);
+  }
+  samakanHargaMItem_(m.nama);
+  return { mengganti: !!sama, sama: false };
+}
+
+/* ---------- Ubah banyak item sekaligus (Code.gs v0.33; spesifikasi sistem Bagian 5.1) ---------- */
+
+var BATAS_UBAH_BANYAK = 300;
+
+/**
+ * Ganti harga beberapa item dengan satu tanggal berlaku (khusus Pengelola). body: { berlakuMulai: 'yyyy-mm-dd' (hari ini atau
+ * tanggal lewat), harga: [{ nama, harga }] }. Semua baris diperiksa dulu (item ada, tidak ganda, angka sah); satu yang salah
+ * menolak semuanya dengan nama itemnya. Item yang belum punya harga sama sekali mendapat harga pertama yang berlaku sejak awal
+ * (seperti harga di isian item). Harga yang sama dengan harga yang berlaku pada tanggal itu dilewati. Jawaban daftarItem
+ * ditambah hargaDisimpan: { berlakuMulai, jumlah, mengganti, pertama: [nama], sama: [nama] }.
+ */
+function aksiGantiHargaBanyak_(body, pengguna) {
+  var mulai = String(body.berlakuMulai || '');
+  if (!tanggalSah_(mulai)) throw galatPengguna_('Tanggal berlaku mulai tidak terbaca. Pilih tanggal lagi.');
+  if (mulai > hariIni_()) throw galatPengguna_('Harga tidak bisa berlaku mulai tanggal yang belum tiba. Pilih hari ini atau tanggal yang sudah lewat.');
+  var baris = Array.isArray(body.harga) ? body.harga : [];
+  if (!baris.length) throw galatPengguna_('Isi harga baru minimal untuk satu item.');
+  if (baris.length > BATAS_UBAH_BANYAK) throw galatPengguna_('Paling banyak ' + BATAS_UBAH_BANYAK + ' item sekaligus.');
+  var isian = baris.map(function (b) {
+    var nama = rapikanTeks_(b && b.nama);
+    var harga = angkaOpsional_(b && b.harga, 'Harga ' + (nama || 'item'), 2);
+    if (harga == null) throw galatPengguna_('Isi harga baru untuk ' + (nama || 'item') + '.');
+    return { nama: nama, harga: harga };
+  });
+  return denganKunci_(function () {
+    if (!bacaTabel_(TAB_HARGA)) throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    var master = bacaItem_();
+    var sudah = {};
+    var item = isian.map(function (x) {
+      var m = master[x.nama.toLowerCase()];
+      if (!m) throw galatPengguna_('Item ' + x.nama + ' tidak ditemukan. Muat ulang daftar item.');
+      if (sudah[x.nama.toLowerCase()]) throw galatPengguna_(m.nama + ' tertulis dua kali.');
+      sudah[x.nama.toLowerCase()] = true;
+      return { m: m, harga: x.harga };
+    });
+    // Riwayat dibaca sekali dan semua perubahan dihitung di memori, lalu ditulis sekaligus: menulis per item membaca ulang tab
+    // M_HargaItem dan M_Item tiap kali, yang untuk 300 item mendekati batas CPU Edge Function (butir 368).
+    var kini = new Date();
+    var hari = hariIni_();
+    var hasil = { berlakuMulai: mulai, jumlah: 0, mengganti: 0, pertama: [], sama: [] };
+    var riwayat = bacaRiwayatHarga_();
+    var tHarga = wajibTabel_(TAB_HARGA);
+    var barisBaru = [];
+    var log = [];
+    var hargaKini = {};
+    item.forEach(function (x) {
+      var m = x.m;
+      var daftar = (riwayat.item[m.nama.toLowerCase()] || []).map(function (d) { return { mulai: d.mulai, harga: d.harga, oleh: d.oleh, nomor: d.nomor }; });
+      if (!daftar.length && m.harga == null) {
+        barisBaru.push({ nama: m.nama, mulai: '', harga: x.harga, oleh: pengguna.nama });
+        hasil.pertama.push(m.nama);
+        hasil.jumlah++;
+        hargaKini[m.nama] = x.harga;
+        return;
+      }
+      if (hargaPada_(m, mulai) === x.harga) {
+        hasil.sama.push(m.nama);
+        return;
+      }
+      if (!daftar.length) {
+        barisBaru.push({ nama: m.nama, mulai: '', harga: m.harga, oleh: OLEH_HARGA_AWAL });
+        daftar.push({ mulai: '', harga: m.harga });
+      }
+      var tanggalSama = null;
+      daftar.forEach(function (d) { if (d.mulai === mulai) tanggalSama = d; });
+      if (tanggalSama) {
+        tulisBarisMaster_(tHarga, tanggalSama.nomor, { 'Harga Satuan (Rp)': x.harga, 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini });
+        log.push([m.nama + ' · ' + mulai, 'Harga Satuan (Rp)', String(tanggalSama.harga), String(x.harga)]);
+        if (tanggalSama.oleh !== pengguna.nama) log.push([m.nama + ' · ' + mulai, 'Dicatat Oleh', tanggalSama.oleh, pengguna.nama]);
+        tanggalSama.harga = x.harga;
+        hasil.mengganti++;
+      } else {
+        barisBaru.push({ nama: m.nama, mulai: mulai, harga: x.harga, oleh: pengguna.nama });
+        daftar.push({ mulai: mulai, harga: x.harga });
+      }
+      hasil.jumlah++;
+      var h = null;
+      daftar.forEach(function (d) { if (d.mulai <= hari && (h === null || d.mulai >= h.mulai)) h = d; });
+      hargaKini[m.nama] = h ? h.harga : null;
+    });
+    tambahBanyakBarisMaster_(TAB_HARGA, barisBaru.map(function (b) {
+      return { 'Nama Item': b.nama, 'Berlaku Mulai': b.mulai ? tanggalSel_(b.mulai) : '', 'Harga Satuan (Rp)': b.harga,
+        'Dicatat Oleh': b.oleh, 'Dicatat Pada': kini };
+    }));
+    if (log.length) {
+      tambahBarisTabel_(wajibTabel_(TAB_LOG.nama), log.map(function (l) {
+        return { 'Waktu': kini, 'Oleh': pengguna.nama, 'Tab': TAB_HARGA, 'row_id': l[0], 'Kolom': l[1],
+          'Nilai Lama': teksAman_(String(l[2] == null ? '' : l[2])), 'Nilai Baru': teksAman_(String(l[3] == null ? '' : l[3])) };
+      }));
+    }
+    samakanHargaMItemBanyak_(hargaKini);
+    MEMO_HARGA_ = null;
+    var data = dataItem_();
+    data.hargaDisimpan = hasil;
+    return data;
+  });
+}
+
+/** Kategori atau satuan dari tempelan: harus ada dan aktif; pesan menyebut tulisan yang ditempel. */
+function pilihTempelan_(daftar, kunci, nilai, label) {
+  var teks = rapikanTeks_(nilai);
+  if (!teks) throw galatPengguna_('Isi ' + label.toLowerCase() + '.');
+  var x = null;
+  daftar.forEach(function (d) { if (!x && d[kunci].toLowerCase() === teks.toLowerCase()) x = d; });
+  if (!x) throw galatPengguna_(label + ' "' + teks + '" tidak ada. Buat dulu di Pengaturan → Kategori dan satuan, atau samakan tulisannya.');
+  if (!x.aktif) throw galatPengguna_(label + ' ' + x[kunci] + ' nonaktif.');
+  return x[kunci];
+}
+
+/**
+ * Tambah banyak item baru (khusus Pengelola), dari tempelan Excel atau Google Sheets yang sudah diurai aplikasi. body: { baris:
+ * [{ no, nama, kategori, satuan, satuanBesar, isiSatuanBesar, harga, stokMin, stokMaks, masaSimpan }] } (no: nomor baris di
+ * kotak tempel, untuk pesan). Aturan sama dengan item
+ * baru di simpanItem (nama unik juga di antara baris, kategori dan satuan harus ada dan aktif, harga pertama berlaku sejak awal).
+ * Satu baris yang salah menolak semuanya dengan nomor barisnya, supaya tidak ada separuh tempelan yang masuk. Jawaban daftarItem
+ * ditambah ditambah: [nama].
+ */
+function aksiTambahItemBanyak_(body, pengguna) {
+  var baris = Array.isArray(body.baris) ? body.baris : [];
+  if (!baris.length) throw galatPengguna_('Tidak ada item untuk ditambahkan.');
+  if (baris.length > BATAS_UBAH_BANYAK) throw galatPengguna_('Paling banyak ' + BATAS_UBAH_BANYAK + ' item sekaligus.');
+  return denganKunci_(function () {
+    var t = wajibTabel_('M_Item');
+    var master = bacaItem_();
+    var kategori = bacaSemuaKategori_();
+    var satuan = bacaSatuan_();
+    var adaMasa = t.kol['Masa Simpan (hari)'] !== undefined;
+    var adaHarga = bacaRiwayatHarga_().ada;
+    var sudah = {};
+    var siap = baris.map(function (b, i) {
+      b = b || {};
+      // no: nomor baris di kotak tempel (aplikasi), supaya pesan sama dengan pratinjau; tanpa itu urutan di kiriman.
+      var no = Math.floor(Number(b.no)) > 0 ? Math.floor(Number(b.no)) : i + 1;
+      var label = 'Baris ' + no + (rapikanTeks_(b.nama) ? ' (' + rapikanTeks_(b.nama) + ')' : '') + ': ';
+      try {
+        var nama = periksaNama_(b.nama, 'Nama item', PANJANG_ITEM_MAKS);
+        var ada = master[nama.toLowerCase()];
+        if (ada) throw galatPengguna_('Item ' + ada.nama + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif.'));
+        if (sudah[nama.toLowerCase()]) throw galatPengguna_('Nama ini tertulis dua kali.');
+        sudah[nama.toLowerCase()] = true;
+        var kat = pilihTempelan_(kategori, 'nama', b.kategori, 'Kategori');
+        var sat = pilihTempelan_(satuan, 'satuan', b.satuan, 'Satuan');
+        var besar = '';
+        var isi = null;
+        if (rapikanTeks_(b.satuanBesar)) {
+          besar = pilihTempelan_(satuan, 'satuan', b.satuanBesar, 'Satuan besar');
+          if (besar.toLowerCase() === sat.toLowerCase()) throw galatPengguna_('Satuan besar harus berbeda dari satuan dasar.');
+          isi = angkaOpsional_(b.isiSatuanBesar, 'Isi satuan besar', 3);
+          if (!(isi > 0)) throw galatPengguna_('Isi berapa ' + sat + ' dalam 1 ' + besar + ', lebih dari 0.');
+        }
+        var harga = angkaOpsional_(b.harga, 'Harga satuan', 2);
+        if (harga != null && !adaHarga) throw galatPengguna_('Tab ' + TAB_HARGA + ' belum ada. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+        var stokMin = angkaOpsional_(b.stokMin, 'Stok minimum', 3);
+        var stokMaks = angkaOpsional_(b.stokMaks, 'Stok maksimum', 3);
+        if (stokMin != null && stokMaks != null && stokMaks < stokMin) {
+          throw galatPengguna_('Stok maksimum harus sama dengan atau lebih besar dari stok minimum.');
+        }
+        var masa = masaSimpanIsian_(b.masaSimpan);
+        if (masa != null && !adaMasa) throw galatPengguna_('Masa simpan item belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+        var nilai = {
+          'Nama Item': nama, 'Kategori': kat, 'Satuan': sat, 'Satuan Besar': besar, 'Isi per Satuan Besar': besar ? isi : '',
+          'Harga Satuan (Rp)': harga == null ? '' : harga, 'Stok Minimum': stokMin == null ? '' : stokMin,
+          'Stok Maksimum': stokMaks == null ? '' : stokMaks, 'Aktif': true
+        };
+        if (adaMasa) nilai['Masa Simpan (hari)'] = masa == null ? '' : masa;
+        return { nama: nama, nilai: nilai, harga: harga };
+      } catch (err) {
+        if (err && err.untukPengguna) throw galatPengguna_(label + err.message);
+        throw err;
+      }
+    });
+    var kini = new Date();
+    tambahBanyakBarisMaster_('M_Item', siap.map(function (x) { return x.nilai; }));
+    tambahBanyakBarisMaster_(TAB_HARGA, siap.filter(function (x) { return x.harga != null; }).map(function (x) {
+      return { 'Nama Item': x.nama, 'Berlaku Mulai': '', 'Harga Satuan (Rp)': x.harga, 'Dicatat Oleh': pengguna.nama, 'Dicatat Pada': kini };
+    }));
+    var data = dataItem_();
+    data.ditambah = siap.map(function (x) { return x.nama; });
     return data;
   });
 }
@@ -4323,6 +4562,7 @@ function dataItem_() {
     hariIni: hari,
     riwayatHargaSiap: bacaRiwayatHarga_().ada,
     masaSimpanSiap: masaSimpanItemSiap_(),
+    ubahBanyakSiap: true, // gantiHargaBanyak dan tambahItemBanyak (Code.gs v0.33)
     item: item,
     kategori: bacaSemuaKategori_().map(function (k) { return { nama: k.nama, aktif: k.aktif }; }),
     satuan: bacaSatuan_()

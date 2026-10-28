@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.32.0';
+  var VERSI_APLIKASI = '0.33.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1357,6 +1357,8 @@
     { pola: /^\/pengaturan\/outlet$/, menu: 'pengaturan', pengelola: true, layar: layarOutletJadwal },
     { pola: /^\/pengaturan\/item$/, menu: 'pengaturan', pengelola: true, layar: layarItem },
     { pola: /^\/pengaturan\/item-baru$/, menu: 'pengaturan', pengelola: true, layar: layarItemUbah },
+    { pola: /^\/pengaturan\/item-harga$/, menu: 'pengaturan', pengelola: true, layar: layarItemHargaBanyak },
+    { pola: /^\/pengaturan\/item-tempel$/, menu: 'pengaturan', pengelola: true, layar: layarItemTempel },
     { pola: /^\/pengaturan\/item\/([^/]+)$/, menu: 'pengaturan', pengelola: true, layar: layarItemUbah },
     { pola: /^\/pengaturan\/unit$/, menu: 'pengaturan', pengelola: true, layar: layarUnit },
     { pola: /^\/pengaturan\/pemasok$/, menu: 'pengaturan', pengelola: true, layar: layarPemasok },
@@ -10897,10 +10899,16 @@
     var wadah = el('div');
     var tambah = el('a', { class: 'tombol tombol-utama', href: '#/pengaturan/item-baru' }, el('span', { class: 'tombol-teks', text: 'Tambah' }));
     var kCari = kolomIsian({ label: 'Cari item', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+    // Ubah banyak item sekaligus (aplikasi 0.33.0): hanya jika server mengenalnya (ubahBanyakSiap).
+    var ubahBanyak = el('div', { class: 'deret-tombol', hidden: true }, [
+      el('a', { class: 'tombol tombol-kedua', href: '#/pengaturan/item-harga' }, el('span', { class: 'tombol-teks', text: 'Ganti harga beberapa item' })),
+      el('a', { class: 'tombol tombol-kedua', href: '#/pengaturan/item-tempel' }, el('span', { class: 'tombol-teks', text: 'Tambah dari Excel/Sheets' }))
+    ]);
     k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
       tautanKembali('Pengaturan', '#/pengaturan'),
       el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Item' }), tambah]),
       el('p', { class: 'kartu-teks', text: 'Bahan dan barang jadi yang dipakai semua form. Item yang sudah punya catatan cukup dinonaktifkan, supaya riwayatnya tetap terbaca; item yang belum punya catatan bisa dihapus.' }),
+      ubahBanyak,
       kCari.wadah,
       penanda,
       wadah
@@ -10971,6 +10979,7 @@
       ambil: function () { return panggilApi('daftarItem'); },
       gambar: function (d) {
         data = d;
+        ubahBanyak.hidden = !d.ubahBanyakSiap;
         saring();
       },
       kerangka: function () {
@@ -10979,6 +10988,592 @@
       galat: function (pesan, cobaLagi) {
         kosongkan(wadah).appendChild(kotakGalat(pesan, cobaLagi));
       },
+      penanda: penanda
+    });
+  }
+
+  /* ---------- Ubah banyak item sekaligus (aplikasi 0.33.0; spesifikasi tampilan Bagian 5.7) ---------- */
+
+  /** Bentuk teks satu harga di daftar dan konfirmasi: "Rp 15.000 per kg". */
+  function teksHargaSatuan(harga, satuan) {
+    return harga == null ? 'Belum punya harga' : formatRupiah(harga) + ' per ' + satuan;
+  }
+
+  /**
+   * Angka dari tempelan Excel/Sheets atau dari kolom harga banyak item: { n: angka atau null (kosong), galat: '' atau kalimat }.
+   * Spreadsheet menyalin angka seperti yang tampil, jadi pemisah ribuan bisa titik (Indonesia) atau koma (Inggris). Titik dan
+   * koma sekaligus: yang terakhir pemisah desimal ("1.250,5", "1,250.5"). Satu jenis berulang: pemisah ribuan ("1.000.000").
+   * Titik lalu tepat tiga angka: ribuan ("15.000", sama dengan bacaRupiah). Koma lalu tepat tiga angka ("15,000", "2,500") bisa
+   * berarti dua hal, jadi ditolak supaya tidak tersimpan seribu kali lebih kecil. Lainnya seperti bacaAngka ("2,5", "0.250").
+   */
+  function angkaTempel(teks, label) {
+    var t = String(teks == null ? '' : teks).replace(/[\s\u00a0]/g, '').replace(/^Rp\.?/i, '');
+    if (t === '') return { n: null, galat: '' };
+    var kelompok = function (x, p) {
+      return new RegExp('^[1-9]\\d{0,2}(\\' + p + '\\d{3})+$').test(x);
+    };
+    var n = NaN;
+    var titik = t.lastIndexOf('.');
+    var koma = t.lastIndexOf(',');
+    if (titik >= 0 && koma >= 0) {
+      var desimal = titik > koma ? '.' : ',';
+      var ribuan = desimal === '.' ? ',' : '.';
+      var bagian = t.split(desimal);
+      if (bagian.length === 2 && /^\d+$/.test(bagian[1]) && kelompok(bagian[0], ribuan)) {
+        n = Number(bagian[0].split(ribuan).join('') + '.' + bagian[1]);
+      }
+    } else if (/^\d+$/.test(t)) {
+      n = Number(t);
+    } else if (kelompok(t, '.') || (kelompok(t, ',') && t.split(',').length > 2)) {
+      n = Number(t.replace(/[.,]/g, ''));
+    } else if (/^\d+,\d{3}$/.test(t)) {
+      return { n: NaN, galat: label + ' "' + teks + '" bisa dibaca dua cara. Tulis tanpa pemisah ribuan (misalnya 15000), atau ' +
+        'pakai koma untuk desimal seperti 2,5.' };
+    } else {
+      n = bacaAngka(t);
+    }
+    if (n === null || isNaN(n)) return { n: NaN, galat: label + ' "' + teks + '" bukan angka.' };
+    return { n: n, galat: '' };
+  }
+
+  /**
+   * Harga item yang berlaku pada tanggal itu menurut data di HP: { harga, tahu }. riwayatHarga hanya 10 perubahan terakhir,
+   * jadi tanggal yang lebih tua dari itu tidak diketahui (tahu: false); server tetap memeriksanya sendiri.
+   */
+  function hargaPadaHp(it, tanggal) {
+    var r = it.riwayatHarga || [];
+    if (!r.length) return { harga: it.harga, tahu: true };
+    for (var i = 0; i < r.length; i++) {
+      if ((r[i].berlakuMulai || '') <= tanggal) return { harga: r[i].harga, tahu: true };
+    }
+    return { harga: null, tahu: (it.jumlahRiwayatHarga || r.length) <= r.length };
+  }
+
+  /**
+   * Ganti harga beberapa item dengan satu tanggal berlaku (`#/pengaturan/item-harga`). Hanya item aktif. Kolom yang dikosongkan
+   * tidak diubah. Item yang belum punya harga mendapat harga pertama yang berlaku sejak awal (seperti di layar item). Draft per
+   * pengguna `draft:item-harga` ({ tanggal, harga: { namaKecil: teks } }).
+   */
+  function layarItemHargaBanyak(k) {
+    aturJudul('Ganti harga beberapa item');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var data = null;
+    var dr = Draft.baca('item-harga');
+    var draft = dr && dr.data ? dr.data : {};
+    draft.harga = draft.harga || {};
+    var hariIni = tanggalIso(new Date());
+    var lain = draft.tanggal && draft.tanggal !== hariIni;
+    var gTanggal = grupPilihan('Berlaku mulai', ['Hari ini', 'Tanggal lain'], lain ? 'Tanggal lain' : 'Hari ini');
+    var inTanggal = el('input', { type: 'date', class: 'isian', id: 'harga-banyak-tanggal', max: hariIni });
+    if (lain) inTanggal.value = draft.tanggal;
+    var kolomTanggal = el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: inTanggal.id, text: 'Tanggal berlaku' }), inTanggal]);
+    var kCari = kolomIsian({ label: 'Cari item', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolSimpan = tombol('Simpan harga', 'utama', { onclick: function () { simpan(); } });
+    tombolSimpan.disabled = true; // sampai daftar item dimuat
+    var kolom = {};
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Item', '#/pengaturan/item'),
+      el('h1', { class: 'judul-layar', text: 'Ganti harga beberapa item' }),
+      el('p', { class: 'kartu-teks', text: 'Ketik harga baru untuk item yang berganti harga; yang dikosongkan tidak berubah. Harga lama tetap ' +
+        'dipakai untuk catatan sebelum tanggal berlaku. Item yang belum punya harga mendapat harga pertama yang berlaku sejak awal.' }),
+      el('section', { class: 'kartu formulir' }, [gTanggal.wadah, kolomTanggal, kCari.wadah]),
+      penanda,
+      wadah,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolSimpan])
+    ]));
+
+    function tanggalDipilih() {
+      return gTanggal.nilai() === 'Tanggal lain' ? inTanggal.value : hariIni;
+    }
+    function simpanDraft() {
+      Draft.simpan('item-harga', { tanggal: gTanggal.nilai() === 'Tanggal lain' ? inTanggal.value : '', harga: draft.harga });
+    }
+    function perbaruiTanggal() {
+      kolomTanggal.hidden = gTanggal.nilai() !== 'Tanggal lain';
+      simpanDraft();
+      // Keterangan naik/turun dibanding harga pada tanggal berlaku, jadi ikut berubah.
+      Object.keys(kolom).forEach(function (n) { if (kolom[n].perbarui) kolom[n].perbarui(); });
+    }
+    gTanggal.input.forEach(function (i) {
+      i.addEventListener('change', function () {
+        perbaruiTanggal();
+        if (gTanggal.nilai() === 'Tanggal lain' && !inTanggal.value) inTanggal.focus();
+      });
+    });
+    inTanggal.addEventListener('change', perbaruiTanggal);
+    perbaruiTanggal();
+
+    /** Baris yang diisi: [{ it, teks, harga (NaN jika salah) }]. */
+    function isian() {
+      if (!data) return [];
+      return data.item.filter(function (it) { return it.aktif; }).map(function (it) {
+        var teks = String(draft.harga[it.nama.toLowerCase()] || '').trim();
+        var a = angkaTempel(teks, 'Harga');
+        return teks ? { it: it, teks: teks, harga: a.n, galat: a.galat } : null;
+      }).filter(Boolean);
+    }
+
+    function perbaruiPenghitung() {
+      var d = isian();
+      var salah = d.filter(function (x) { return x.harga === null || isNaN(x.harga); }).length;
+      penghitung.textContent = !d.length ? 'Belum ada harga baru' : d.length + ' item' + (salah ? ', ' + salah + ' angkanya salah' : '') + '.';
+      tombolSimpan.disabled = !data || !d.length;
+    }
+
+    /** Harga pertama: item yang belum punya harga sama sekali (aturan server). */
+    function hargaPertama(it) {
+      return it.harga == null && !(it.jumlahRiwayatHarga > 0);
+    }
+
+    /** Beda dengan harga yang berlaku pada tanggal berlaku (bukan harga hari ini), sama dengan pemeriksaan server. */
+    function ketBeda(it, teks) {
+      if (!teks) return '';
+      var a = angkaTempel(teks, 'Harga');
+      if (a.galat) return a.galat.replace('"' + teks + '" bukan angka.', 'harus rupiah, misalnya 15000 atau 15.000.');
+      if (hargaPertama(it)) return 'Harga pertama, berlaku sejak awal.';
+      var t = tanggalDipilih();
+      var lain = t && t !== hariIni;
+      var p = t ? hargaPadaHp(it, t) : { harga: it.harga, tahu: true };
+      if (!p.tahu) return 'Mengganti harga yang berlaku pada ' + tanggalPendek(t) + '.';
+      if (p.harga == null) return 'Pada ' + tanggalPendek(t) + ' ' + it.nama + ' belum punya harga; harga ini berlaku mulai tanggal itu.';
+      var b = Math.round((a.n - p.harga) * 100) / 100;
+      var akhir = lain ? ' dari harga pada ' + tanggalPendek(t) + ' (' + formatRupiah(p.harga) + ').' : '.';
+      return b === 0 ? 'Sama dengan harga ' + (lain ? 'pada ' + tanggalPendek(t) : 'sekarang') + ', jadi tidak berubah.'
+        : (b > 0 ? 'Naik ' : 'Turun ') + formatRupiah(Math.abs(b)) + akhir;
+    }
+
+    function baris(it) {
+      var kecil = it.nama.toLowerCase();
+      var id = 'harga-banyak-' + (++nomorKolom);
+      var input = el('input', { class: 'isian isian-angka', id: id, inputmode: 'numeric', autocomplete: 'off',
+        'aria-describedby': id + '-ket', 'aria-label': 'Harga baru ' + it.nama + ' per ' + it.satuan });
+      input.value = draft.harga[kecil] || '';
+      var ket = el('p', { class: 'kolom-bantuan', id: id + '-ket', 'aria-live': 'polite' });
+      function perbarui() {
+        var t = input.value.trim();
+        ket.textContent = ketBeda(it, t);
+        var salah = t && !!angkaTempel(t, 'Harga').galat;
+        input.setAttribute('aria-invalid', salah ? 'true' : 'false');
+        ket.classList.toggle('nilai-masalah', !!salah);
+      }
+      input.addEventListener('input', function () {
+        if (input.value.trim()) draft.harga[kecil] = input.value;
+        else delete draft.harga[kecil];
+        simpanDraft();
+        perbarui();
+        perbaruiPenghitung();
+      });
+      perbarui();
+      input.perbarui = perbarui;
+      kolom[kecil] = input;
+      return el('div', { class: 'harga-banyak-baris' }, [
+        el('div', { class: 'harga-banyak-nama' }, [
+          el('label', { class: 'daftar-baris-judul', for: id, text: it.nama }),
+          el('span', { class: 'daftar-baris-ket', text: 'Sekarang ' + teksHargaSatuan(it.harga, it.satuan).replace('Belum punya harga', 'belum punya harga') })
+        ]),
+        el('div', { class: 'baris-angka harga-banyak-isian' }, [el('span', { class: 'satuan-tetap', 'aria-hidden': 'true', text: 'Rp' }), input]),
+        ket
+      ]);
+    }
+
+    function gambar() {
+      kosongkan(wadah);
+      kolom = {};
+      var q = kCari.input.value.trim().toLowerCase();
+      var aktif = data.item.filter(function (it) { return it.aktif; });
+      if (!aktif.length) {
+        wadah.appendChild(kotakKosong('Belum ada item aktif.', 'kotak'));
+        perbaruiPenghitung();
+        return;
+      }
+      var tampil = aktif.filter(function (it) { return !q || it.nama.toLowerCase().indexOf(q) >= 0; });
+      if (!tampil.length) wadah.appendChild(kotakKosong('Tidak ada item dengan nama itu.'));
+      var urut = (data.kategori || []).map(function (x) { return x.nama; });
+      var grup = {};
+      tampil.forEach(function (it) { (grup[it.kategori] = grup[it.kategori] || []).push(it); });
+      Object.keys(grup).sort(function (a, b) {
+        var ia = urut.indexOf(a), ib = urut.indexOf(b);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b, 'id');
+      }).forEach(function (kat) {
+        wadah.appendChild(el('section', { class: 'kartu harga-banyak-kelompok' }, [
+          el('h2', { class: 'kartu-judul', text: kat || 'Tanpa kategori' })
+        ].concat(grup[kat].map(baris))));
+      });
+      var tersembunyi = isian().filter(function (x) { return !kolom[x.it.nama.toLowerCase()]; }).length;
+      if (tersembunyi) {
+        wadah.appendChild(el('p', { class: 'kolom-bantuan', text: tersembunyi + ' harga baru yang sudah diketik tidak tampil karena pencarian; tetap ikut disimpan.' }));
+      }
+      perbaruiPenghitung();
+    }
+    kCari.input.addEventListener('input', function () { if (data) gambar(); });
+
+    function simpan() {
+      tulisPesan(pesan, '');
+      var t = tanggalDipilih();
+      if (!t) {
+        tulisPesan(pesan, 'Pilih tanggal berlaku.', 'masalah');
+        inTanggal.focus();
+        return;
+      }
+      if (t > hariIni) {
+        tulisPesan(pesan, 'Harga tidak bisa berlaku mulai tanggal yang belum tiba. Pilih hari ini atau tanggal yang sudah lewat.', 'masalah');
+        return;
+      }
+      if (!data) return;
+      var d = isian();
+      if (!d.length) return;
+      var salah = d.filter(function (x) { return x.harga === null || isNaN(x.harga); });
+      if (salah.length) {
+        kCari.input.value = '';
+        gambar();
+        tulisPesan(pesan, 'Angka harga ' + daftarNama(salah.map(function (x) { return x.it.nama; })) + ' salah. Isi rupiah tanpa pemisah ' +
+          'ribuan atau dengan titik, misalnya 15000 atau 15.000.', 'masalah');
+        var f = kolom[salah[0].it.nama.toLowerCase()];
+        if (f) f.focus();
+        return;
+      }
+      var contoh = d.slice(0, 8).map(function (x) {
+        if (hargaPertama(x.it)) return x.it.nama + ': harga pertama ' + formatRupiah(x.harga);
+        var p = hargaPadaHp(x.it, t);
+        return x.it.nama + ': ' + (p.tahu && p.harga != null ? formatRupiah(p.harga) + ' → ' : '') + formatRupiah(x.harga);
+      });
+      konfirmasi({
+        judul: 'Simpan harga ' + d.length + ' item?',
+        teks: (t === hariIni ? 'Berlaku mulai hari ini, ' : 'Berlaku mulai ') + tanggalPendek(t) + '. ' + contoh.join('; ') +
+          (d.length > contoh.length ? '; dan ' + (d.length - contoh.length) + ' item lain.' : '.'),
+        teksYa: 'Simpan harga',
+        jalankan: function () {
+          return panggilApi('gantiHargaBanyak', { berlakuMulai: t, harga: d.map(function (x) { return { nama: x.it.nama, harga: x.harga }; }) });
+        }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        var h = hasil.hargaDisimpan || {};
+        Cache.tulis('item', hasil);
+        Draft.hapus('item-harga');
+        var sama = h.sama && h.sama.length ? daftarNama(h.sama) + ' tidak berubah karena harganya sama dengan harga pada ' + tanggalPendek(t) + '.' : '';
+        if (!h.jumlah) toast('Tidak ada harga yang berubah. ' + sama, 'info');
+        else toast('Harga ' + h.jumlah + ' item tersimpan, berlaku mulai ' + tanggalPendek(t) + '.' +
+          (h.pertama && h.pertama.length ? ' ' + daftarNama(h.pertama) + ' mendapat harga pertama.' : '') +
+          (sama ? ' ' + sama : ''), sama ? 'info' : null);
+        location.hash = '#/pengaturan/item';
+      });
+    }
+
+    muatData({
+      kunciCache: 'item',
+      ambil: function () { return panggilApi('daftarItem'); },
+      gambar: function (d) {
+        data = d;
+        gambar();
+      },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(5)); },
+      galat: function (p, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(p, cobaLagi)); },
+      penanda: penanda
+    });
+  }
+
+  /** Kolom tempelan yang dikenali dari baris judul (huruf kecil, tanpa spasi berlebih). */
+  var JUDUL_TEMPEL = {
+    nama: ['nama', 'nama item', 'item', 'nama barang', 'barang'],
+    kategori: ['kategori'],
+    satuan: ['satuan', 'satuan dasar'],
+    harga: ['harga', 'harga satuan', 'harga satuan (rp)', 'harga (rp)'],
+    stokMin: ['stok minimum', 'stok min', 'minimum', 'stock minimum'],
+    stokMaks: ['stok maksimum', 'stok maks', 'maksimum', 'stock maksimum'],
+    satuanBesar: ['satuan besar'],
+    isiSatuanBesar: ['isi', 'isi satuan besar', 'isi per satuan besar'],
+    masaSimpan: ['masa simpan', 'masa simpan (hari)']
+  };
+  var URUTAN_TEMPEL = ['nama', 'kategori', 'satuan', 'harga', 'stokMin', 'stokMaks', 'satuanBesar', 'isiSatuanBesar', 'masaSimpan'];
+
+  /**
+   * Pecah tempelan menjadi baris dan sel seperti yang disalin Excel dan Google Sheets: sel yang berisi ganti baris, tab, atau tanda
+   * kutip dibungkus kutip, dan kutip di dalamnya ditulis dua kali (""). [{ awal, akhir (nomor baris teks, mulai 1), sel: [teks] }].
+   */
+  function pecahTempelan(teks, pisah) {
+    var hasil = [];
+    var sel = [];
+    var isi = '';
+    var baris = 1;
+    var awal = 1;
+    var i = 0;
+    var mulaiSel = true;
+    teks = String(teks || '').replace(/\r\n?/g, '\n');
+    while (i <= teks.length) {
+      var c = teks.charAt(i);
+      if (mulaiSel && c === '"') {
+        // Sel berkutip: sampai kutip penutup yang tidak diikuti kutip lagi.
+        var j = i + 1;
+        var buka = '';
+        while (j < teks.length) {
+          if (teks.charAt(j) === '"') {
+            if (teks.charAt(j + 1) === '"') { buka += '"'; j += 2; continue; }
+            break;
+          }
+          if (teks.charAt(j) === '\n') baris++;
+          buka += teks.charAt(j);
+          j++;
+        }
+        if (j < teks.length) {
+          isi = buka;
+          i = j + 1;
+          mulaiSel = false;
+          continue;
+        }
+        // Tanpa kutip penutup: dibaca apa adanya.
+        baris -= (buka.match(/\n/g) || []).length;
+      }
+      if (i === teks.length || c === '\n' || c === pisah) {
+        sel.push(isi);
+        isi = '';
+        mulaiSel = true;
+        if (i === teks.length || c === '\n') {
+          hasil.push({ awal: awal, akhir: baris, sel: sel });
+          sel = [];
+          baris++;
+          awal = baris;
+        }
+        i++;
+        continue;
+      }
+      isi += c;
+      mulaiSel = false;
+      i++;
+    }
+    return hasil;
+  }
+
+  /**
+   * Urai tempelan Excel atau Google Sheets: kolom dipisah tab (titik koma jika tidak ada tab). Baris berisi pertama yang
+   * judulnya dikenali (kolom nama ditambah paling sedikit satu kolom lain dari JUDUL_TEMPEL) dianggap baris judul dan memetakan
+   * kolom; tanpa itu urutan URUTAN_TEMPEL. Baris kosong dilewati. { judul: { awal, akhir } | null, baris: [{ no, akhir (nomor
+   * baris teks), sel: { kunci: teks } }] }.
+   */
+  function uraiTempelan(teks) {
+    var pisah = /\t/.test(teks) ? '\t' : ';';
+    var peta = URUTAN_TEMPEL;
+    var hasil = { judul: null, baris: [] };
+    pecahTempelan(teks, pisah).forEach(function (r) {
+      var sel = r.sel.map(function (x) { return x.replace(/\s+/g, ' ').trim(); });
+      if (!sel.some(function (x) { return x; })) return;
+      if (!hasil.baris.length && !hasil.judul) {
+        var judul = sel.map(function (x) { return x.toLowerCase(); });
+        var kunci = judul.map(function (j) {
+          return Object.keys(JUDUL_TEMPEL).filter(function (k) { return JUDUL_TEMPEL[k].indexOf(j) >= 0; })[0] || null;
+        });
+        var dikenal = kunci.filter(Boolean);
+        if (dikenal.indexOf('nama') >= 0 && dikenal.length >= 2) {
+          peta = kunci;
+          hasil.judul = { awal: r.awal, akhir: r.akhir };
+          return;
+        }
+      }
+      var isi = {};
+      peta.forEach(function (k, n) { if (k && !(k in isi)) isi[k] = sel[n] || ''; });
+      hasil.baris.push({ no: r.awal, akhir: r.akhir, sel: isi });
+    });
+    return hasil;
+  }
+
+  /**
+   * Tambah item dari tempelan Excel atau Google Sheets (`#/pengaturan/item-tempel`). Diperiksa di HP dengan aturan yang sama dengan
+   * server (server memeriksa lagi); baris yang salah ditandai dan tidak ikut. Draft per pengguna `draft:item-tempel` (teks).
+   */
+  function layarItemTempel(k) {
+    aturJudul('Tambah dari Excel/Sheets');
+    var penanda = el('span', { class: 'memperbarui', role: 'status' });
+    var wadah = el('div');
+    var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
+    var data = null;
+    var dr = Draft.baca('item-tempel');
+    var idTeks = 'item-tempel-teks';
+    var teks = el('textarea', { class: 'isian isian-catatan isian-tempel', id: idTeks, rows: 6, spellcheck: 'false',
+      autocapitalize: 'none', 'aria-describedby': idTeks + '-bantuan' });
+    teks.value = dr && dr.data ? dr.data.teks || '' : '';
+    var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
+    var tombolTambah = tombol('Tambah item', 'utama', { onclick: function () { tambah(); } });
+    var hasil = [];
+    var urai = { judul: null, baris: [] };
+
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+      tautanKembali('Item', '#/pengaturan/item'),
+      el('h1', { class: 'judul-layar', text: 'Tambah dari Excel/Sheets' }),
+      el('section', { class: 'kartu formulir' }, [
+        el('div', { class: 'kolom' }, [
+          el('label', { class: 'kolom-label', for: idTeks, text: 'Tempel baris item' }),
+          el('p', { class: 'kolom-bantuan', id: idTeks + '-bantuan', text: 'Salin baris dari Excel atau Google Sheets, lalu tempel di sini. Urutan ' +
+            'kolom: Nama, Kategori, Satuan, Harga, Stok minimum, Stok maksimum, Satuan besar, Isi satuan besar, Masa simpan (hari). ' +
+            'Hanya Nama, Kategori, dan Satuan yang wajib. Baris judul boleh ikut; urutannya lalu mengikuti judul itu.' }),
+          teks
+        ]),
+        el('p', { class: 'kolom-bantuan', text: 'Kategori dan satuan harus sudah ada di Kategori dan satuan. Harga berlaku sejak awal. ' +
+          'Stock item baru 0 sampai stok pembuka diisi di layar tiap item.' })
+      ]),
+      penanda,
+      wadah,
+      pesan,
+      el('div', { class: 'bilah-kirim' }, [penghitung, tombolTambah])
+    ]));
+
+    function cari(daftar, kunci, nilai) {
+      var kecil = String(nilai || '').trim().toLowerCase();
+      return daftar.filter(function (d) { return String(d[kunci]).toLowerCase() === kecil; })[0] || null;
+    }
+
+    /** Periksa satu baris: { no, sel, galat, nilai } (nilai siap dikirim). */
+    function periksa(r, sudah) {
+      var s = r.sel;
+      var nama = String(s.nama || '').replace(/\s+/g, ' ').trim();
+      function salah(t) { return { no: r.no, akhir: r.akhir, sel: s, nama: nama, galat: t }; }
+      if (!nama) return salah('Isi nama item.');
+      if (nama.length > 60) return salah('Nama item paling panjang 60 huruf.');
+      if (/^[=+\-@]/.test(nama)) return salah('Nama item tidak boleh diawali tanda =, +, -, atau @.');
+      var ada = cari(data.item, 'nama', nama);
+      if (ada) return salah('Item ' + ada.nama + ' sudah ada' + (ada.aktif ? '.' : ' tetapi nonaktif.'));
+      if (sudah[nama.toLowerCase()]) return salah('Nama ini tertulis dua kali.');
+      sudah[nama.toLowerCase()] = true;
+      var kat = cari(data.kategori || [], 'nama', s.kategori);
+      if (!String(s.kategori || '').trim()) return salah('Isi kategori.');
+      if (!kat) return salah('Kategori "' + s.kategori + '" tidak ada.');
+      if (!kat.aktif) return salah('Kategori ' + kat.nama + ' nonaktif.');
+      var sat = cari(data.satuan || [], 'satuan', s.satuan);
+      if (!String(s.satuan || '').trim()) return salah('Isi satuan.');
+      if (!sat) return salah('Satuan "' + s.satuan + '" tidak ada.');
+      if (!sat.aktif) return salah('Satuan ' + sat.satuan + ' nonaktif.');
+      var besar = null;
+      var isi = null;
+      if (String(s.satuanBesar || '').trim()) {
+        besar = cari(data.satuan || [], 'satuan', s.satuanBesar);
+        if (!besar) return salah('Satuan besar "' + s.satuanBesar + '" tidak ada.');
+        if (!besar.aktif) return salah('Satuan besar ' + besar.satuan + ' nonaktif.');
+        if (besar.satuan.toLowerCase() === sat.satuan.toLowerCase()) return salah('Satuan besar harus berbeda dari satuan dasar.');
+        var aIsi = angkaTempel(s.isiSatuanBesar, 'Isi satuan besar');
+        if (aIsi.galat) return salah(aIsi.galat);
+        isi = aIsi.n;
+        if (!(isi > 0)) return salah('Isi berapa ' + sat.satuan + ' dalam 1 ' + besar.satuan + ', lebih dari 0.');
+      }
+      var aHarga = angkaTempel(s.harga, 'Harga');
+      if (aHarga.galat) return salah(aHarga.galat);
+      var harga = aHarga.n;
+      var aMin = angkaTempel(s.stokMin, 'Stok minimum');
+      if (aMin.galat) return salah(aMin.galat);
+      var min = aMin.n;
+      var aMaks = angkaTempel(s.stokMaks, 'Stok maksimum');
+      if (aMaks.galat) return salah(aMaks.galat);
+      var maks = aMaks.n;
+      if (min !== null && maks !== null && maks < min) return salah('Stok maksimum harus sama dengan atau lebih besar dari stok minimum.');
+      var masa = String(s.masaSimpan || '').trim();
+      if (masa && (!/^\d+$/.test(masa) || Number(masa) > 365)) return salah('Masa simpan diisi hari bulat, 0 sampai 365.');
+      if (masa && !data.masaSimpanSiap) return salah('Masa simpan item belum bisa dicatat di server ini; kosongkan kolomnya.');
+      return {
+        no: r.no, akhir: r.akhir, sel: s, nama: nama, galat: '',
+        ket: [kat.nama, sat.satuan + (besar ? ' (1 ' + besar.satuan + ' = ' + formatAngka(isi) + ' ' + sat.satuan + ')' : ''),
+          harga != null ? formatRupiah(harga) : 'tanpa harga', min != null ? 'minimum ' + formatAngka(min) : '',
+          maks != null ? 'maksimum ' + formatAngka(maks) : '', masa ? 'masa simpan ' + masa + ' hari' : ''].filter(Boolean).join(' · '),
+        nilai: { no: r.no, nama: nama, kategori: kat.nama, satuan: sat.satuan, satuanBesar: besar ? besar.satuan : '', isiSatuanBesar: isi,
+          harga: harga, stokMin: min, stokMaks: maks, masaSimpan: masa }
+      };
+    }
+
+    function gambar() {
+      kosongkan(wadah);
+      if (!data) return;
+      var sudah = {};
+      urai = uraiTempelan(teks.value);
+      hasil = urai.baris.map(function (r) { return periksa(r, sudah); });
+      var baik = hasil.filter(function (x) { return !x.galat; });
+      var salah = hasil.length - baik.length;
+      penghitung.textContent = !hasil.length ? 'Belum ada baris' : baik.length + ' item siap' + (salah ? ', ' + salah + ' baris salah' : '') + '.';
+      tombolTambah.disabled = !baik.length;
+      tombolTambah.lastChild.textContent = baik.length ? 'Tambah ' + baik.length + ' item' : 'Tambah item';
+      if (!hasil.length) return;
+      if (hasil.length > 300) {
+        wadah.appendChild(el('p', { class: 'pesan-formulir masalah' }, [ikon('seru'), el('span', { text: 'Paling banyak 300 item sekaligus. Tempel sebagian dulu.' })]));
+        tombolTambah.disabled = true;
+      }
+      wadah.appendChild(el('section', { class: 'kartu' }, [
+        el('h2', { class: 'kartu-judul', text: 'Pratinjau' }),
+        el('div', { class: 'daftar', role: 'list' }, hasil.map(function (x) {
+          return el('div', { class: 'daftar-baris tempel-baris', role: 'listitem' }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul ket-pecah', text: 'Baris ' + x.no + ' · ' + (x.nama || '(tanpa nama)') }),
+              x.galat ? null : el('span', { class: 'daftar-baris-ket ket-pecah', text: x.ket }),
+              el('span', { class: 'tanda-deret bungkus' }, x.galat ? tandaStatus('masalah', x.galat) : tandaStatus('baik', 'Siap ditambah'))
+            ])
+          ]);
+        }))
+      ]));
+    }
+
+    teks.addEventListener('input', function () {
+      Draft.simpan('item-tempel', { teks: teks.value });
+      tulisPesan(pesan, '');
+      gambar();
+    });
+
+    function tambah() {
+      tulisPesan(pesan, '');
+      var baik = hasil.filter(function (x) { return !x.galat; });
+      var salah = hasil.filter(function (x) { return x.galat; });
+      if (!baik.length) return;
+      konfirmasi({
+        judul: 'Tambah ' + baik.length + ' item?',
+        teks: daftarNama(baik.slice(0, 8).map(function (x) { return x.nama; })) + (baik.length > 8 ? ', dan ' + (baik.length - 8) + ' item lain' : '') +
+          ' ditambahkan dan langsung aktif.' + (salah.length ? ' ' + salah.length + ' baris yang salah tidak ikut dan tetap di kotak tempel.' : ''),
+        teksYa: 'Tambah ' + baik.length + ' item',
+        jalankan: function () {
+          return panggilApi('tambahItemBanyak', { baris: baik.map(function (x) { return x.nilai; }) }).catch(function (err) {
+            // Ditolak server (misalnya item yang sama baru ditambah dari HP lain): daftar item dimuat ulang supaya pratinjau ikut benar.
+            if (!err.jaringan && !err.sesiBerakhir) muatUlang();
+            throw err;
+          });
+        }
+      }).then(function (h) {
+        if (!h) return;
+        Cache.tulis('item', h);
+        data = h;
+        var n = (h.ditambah || []).length;
+        if (salah.length) {
+          // Sisakan baris yang salah (dengan baris judul jika ada) supaya bisa dibetulkan.
+          var semua = teks.value.replace(/\r\n?/g, '\n').split('\n');
+          var nomor = {};
+          salah.concat(urai.judul ? [{ no: urai.judul.awal, akhir: urai.judul.akhir }] : []).forEach(function (x) {
+            for (var n = x.no; n <= x.akhir; n++) nomor[n] = true;
+          });
+          teks.value = semua.filter(function (b, i) { return nomor[i + 1]; }).join('\n');
+          Draft.simpan('item-tempel', { teks: teks.value });
+          gambar();
+          toast(n + ' item ditambahkan. ' + salah.length + ' baris yang salah masih di kotak tempel.', 'info');
+          return;
+        }
+        Draft.hapus('item-tempel');
+        toast(n + ' item ditambahkan. Stock-nya 0 sampai stok pembuka diisi di layar tiap item.');
+        location.hash = '#/pengaturan/item';
+      });
+    }
+
+    function muatUlang() {
+      panggilApi('daftarItem').then(function (d) {
+        Cache.tulis('item', d);
+        data = d;
+        gambar();
+      }).catch(function () {});
+    }
+
+    muatData({
+      kunciCache: 'item',
+      ambil: function () { return panggilApi('daftarItem'); },
+      gambar: function (d) {
+        data = d;
+        gambar();
+      },
+      kerangka: function () { kosongkan(wadah).appendChild(kerangkaBaris(3)); },
+      galat: function (p, cobaLagi) { kosongkan(wadah).appendChild(kotakGalat(p, cobaLagi)); },
       penanda: penanda
     });
   }

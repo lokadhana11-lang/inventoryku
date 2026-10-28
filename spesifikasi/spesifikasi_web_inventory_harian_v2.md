@@ -49,6 +49,8 @@
 > semua HP untuk form wajib yang belum lengkap (Bagian 10.1).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): Staff boleh membetulkan
 > isiannya sendiri dalam 15 menit sesudah dikirim, selama belum diperiksa (Bagian 3, 5.5, 6.2, 6.3, 7.1).
+> Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): ubah banyak item sekaligus, yaitu
+> harga beberapa item dengan satu tanggal berlaku dan item baru dari tempelan Excel/Google Sheets (Bagian 5.1).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -463,6 +465,26 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
   `Log_Perubahan`. Riwayat harga tidak bisa dihapus dari aplikasi.
 - Harga awal: saat pertama dipasang, tiap item yang sudah punya harga mendapat satu baris dengan
   Berlaku Mulai kosong, artinya berlaku sejak awal.
+
+**Ubah banyak item sekaligus** (28 Oktober 2026, khusus Pengelola):
+
+- **Ganti harga beberapa item:** satu tanggal berlaku mulai (aturan sama dengan mengganti harga
+  satu item) untuk banyak item aktif sekaligus. Harga yang sama dengan harga yang berlaku pada
+  tanggal itu dilewati. Item yang belum punya harga sama sekali mendapat harga pertama yang
+  berlaku sejak awal, seperti harga yang diisi di layar item. Satu item yang salah (tidak ada,
+  ganda, angka salah) menolak semuanya, supaya tidak ada separuh perubahan yang tersimpan.
+- **Tambah item dari tempelan Excel atau Google Sheets:** baris yang disalin dari lembar kerja
+  ditempel di aplikasi. Kolom: Nama, Kategori, Satuan, Harga, Stok minimum, Stok maksimum,
+  Satuan besar, Isi satuan besar, Masa simpan (hari); hanya tiga yang pertama wajib. Baris judul
+  boleh ikut dan menentukan urutan kolom (dikenali jika berisi judul nama dan paling sedikit satu
+  judul kolom lain). Sel berkutip dari spreadsheet (berisi ganti baris atau tanda kutip) dibaca
+  utuh. Angka yang pemisah ribuannya tidak jelas ("15,000") ditolak supaya tidak tersimpan seribu
+  kali lebih kecil. Aturannya sama dengan item baru satu per satu: nama
+  unik (juga di antara baris tempelan), kategori dan satuan harus sudah ada dan aktif (tidak
+  dibuat otomatis), harga berlaku sejak awal, item langsung aktif, stock 0 sampai stok pembuka
+  diisi. Aplikasi menandai baris yang salah sebelum menyimpan dan hanya mengirim baris yang
+  benar; server memeriksa lagi dan menolak semuanya jika ada yang salah. Paling banyak 300 item
+  sekaligus (juga untuk ganti harga).
 
 **Daftar satuan awal** (diisi `setupSpreadsheet`; Pengelola bisa menambah):
 
