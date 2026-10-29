@@ -3,6 +3,8 @@ import * as H from '../alat/harness.mjs';
 import { seed } from '../alat/seed.mjs';
 import { muatChromium } from '../alat/peramban.mjs';
 const chromium = await muatChromium();
+// Tangkapan layar untuk dilihat manusia, di folder sementara sistem (bukan di repo).
+const SHOT = (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'inventoryku-shot-'));
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 500) : ''); } };
 const s = seed();
@@ -281,7 +283,7 @@ for (const w of [1024, 1366]) {
   cek(await page.evaluate(() => document.documentElement.scrollWidth) <= w, 'tanpa gulir samping ' + w);
   const ketTelur = await page.locator('tr', { has: kunci(page, 'Telur', 'sisa') }).locator('.ket-keluar').innerText();
   cek(/Lebih dari stock/.test(ketTelur), 'ket ringkas di tabel ' + w, ketTelur);
-  await page.screenshot({ path: `shot/stock_sisa_${w}.png`, fullPage: true });
+  await page.screenshot({ path: SHOT + `/stock_sisa_${w}.png`, fullPage: true });
   await ctx.close();
 }
 // K. Server lama: tanpa pilihan Catat pemakaian, semua kategori tetap per kategori dengan keluar

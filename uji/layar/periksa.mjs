@@ -2,6 +2,8 @@ import * as H from '../alat/harness.mjs';
 import { seed } from '../alat/seed.mjs';
 import { muatChromium } from '../alat/peramban.mjs';
 const chromium = await muatChromium();
+// Tangkapan layar untuk dilihat manusia, di folder sementara sistem (bukan di repo).
+const SHOT = (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'inventoryku-shot-'));
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 300) : ''); } };
 const s = seed();
@@ -102,7 +104,7 @@ const tombolPeriksa = (page) => page.locator('.tombol-periksa-tanggal');
   const t3 = await page.locator('.toast, .pesan-singkat, [role="status"]').allInnerTexts();
   cek(t3.some((t) => /Tidak ada sinyal/.test(t)) && (await page.locator('[role="dialog"]').count()) === 0, 'tanpa sinyal: pesan, tanpa lembar', t3);
   await ctx.setOffline(false);
-  await page.screenshot({ path: 'shot/periksa_390.png', fullPage: true });
+  await page.screenshot({ path: SHOT + '/periksa_390.png', fullPage: true });
   await ctx.close();
 }
 // B. Desktop: detail kanan ikut berubah
@@ -119,7 +121,7 @@ const tombolPeriksa = (page) => page.locator('.tombol-periksa-tanggal');
   cek((await page.locator('.detail-kepala').getByRole('button', { name: 'Buka kunci' }).count()) === 1, 'detail kanan: kini Buka kunci');
   const lebar = await page.evaluate(() => document.documentElement.scrollWidth);
   cek(lebar <= 1366, 'desktop tanpa gulir samping', lebar);
-  await page.screenshot({ path: 'shot/periksa_1366.png' });
+  await page.screenshot({ path: SHOT + '/periksa_1366.png' });
   await ctx.close();
 }
 // C. Staff: tanpa tombol
@@ -163,7 +165,7 @@ for (const [w, hgt] of [[320, 568], [360, 740], [390, 844], [768, 1024], [1024, 
     return out;
   });
   cek(u.scroll <= u.vw && u.n > 0 && !u.kecil && !u.keluar && !u.tumpuk && !u.terpotong, 'ukuran ' + w + 'x' + hgt, u);
-  if (w === 320) await page.screenshot({ path: 'shot/periksa_320.png' });
+  if (w === 320) await page.screenshot({ path: SHOT + '/periksa_320.png' });
   await ctx.close();
 }
 // G. Gerak normal (tidak kurangi gerak): alur tetap jalan
