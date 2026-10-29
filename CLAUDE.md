@@ -322,6 +322,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - Nilai stock barang jadi dari resep (Code.gs v0.36, 28 Oktober 2026): `dashboard.nilaiStock` ditambah `dariResep: [{ nama, kategori,
   satuan, stock, harga, nilai }]` dan `tanpaHarga[].resepKurang`; `daftarItem.item[]` ditambah `hargaResep` (harga dari resep hari ini
   untuk item tanpa harga satuan, atau null).
+- Waste per porsi menu (Code.gs v0.37, 29 Oktober 2026; bertoken, semua role): `formWaste` ditambah `menuSiap` dan `menu: [{ nama,
+  hpp (khusus Pengelola) }]` (menu aktif, HPP per porsi pada `tanggal`); `kirimWaste.baris[]` boleh membawa `menu` (nama menu) menggantikan
+  `item`, `qty` = porsi bilangan bulat 1–1.000. `riwayat`/`detailKiriman` Waste: baris ditambah `menu: true` untuk baris menu. `hpp.pemakaian`
+  ditambah `wasteMenu: { porsi, nilai }`, `hpp.teoritis` ditambah `wastePorsi: { porsi, nilai }`.
 - Email harian (Code.gs v0.35, 28 Oktober 2026): tidak ada aksi baru. Email laporan harian ditambah bagian "Barang masuk" dan
   (sejak penjualan pernah dicatat) "Penjualan dan food cost".
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
@@ -380,6 +384,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++++++++++ | Email harian lebih lengkap (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): bagian "Barang masuk" (per pemasok, harga beli, total) dan "Penjualan dan food cost" (penjualan dan porsi hari itu, food cost bulan berjalan sampai tanggal laporan atau sementara) | Kode selesai (Code.gs v0.35; aplikasi tetap 0.34.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (27 uji server, email dirender di Chromium). Digabung dan dipasang pemilik 28 Oktober 2026 (Edge Function, Code.gs) |
 | 12+++++++++++++++++++++++++++++ | Perlu perhatian dikelompokkan (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): daftar di Dashboard dibagi "Hari ini" dan "Rutin" (bisa dilipat, terlipat selama ada butir Hari ini, pilihan diingat di HP) | Kode selesai (aplikasi 0.35.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji: kelompok, terlipat dan diingat, papan ketik, butir Rutin membuka Riwayat, hanya Rutin, hanya Hari ini, jenis baru, kosong, delapan ukuran). Digabung pemilik 28 Oktober 2026 |
 | 12++++++++++++++++++++++++++++++ | Nilai stock barang jadi dari resep (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): barang jadi tanpa harga satuan dinilai dengan harga dari resepnya pada tanggal itu di nilai stock Dashboard dan rekap bulanan (juga masuk dan penyesuaiannya), "Harga dari resep" di lembar Nilai stock, "dari resep" di Pengaturan → Item | Kode selesai (Code.gs v0.36, aplikasi 0.36.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (24 uji server dengan harga resep dihitung tangan) dan Chromium (19 uji: lembar, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
+| 12+++++++++++++++++++++++++++++++ | Waste per porsi menu (permintaan pemilik 29 Oktober 2026, dari telaah aplikasi): "Tambah menu" di form Waste untuk salah order atau makanan yang dikembalikan, dicatat per porsi dengan nilai HPP per porsi, tanpa mengurangi stock lagi (bahannya sudah tercatat keluar saat dimasak); kolom `Menu` di `Data_Waste`, Riwayat dan koreksi porsi, keterangan di layar HPP dan rekap bulanan | Kode selesai (Code.gs v0.37, aplikasi 0.37.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (44 uji server) dan Chromium (29 uji: Staff HP, desktop, Riwayat, server lama, antrean, HPP, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Menu` di `Data_Waste`), gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2932,3 +2937,35 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Perlu perhatian, daftarItem, harga bahan berganti hari ini dan kemarin tetap, rekap PDF dan data, penyesuaian barang jadi di rekap
     1 × Rp 47.125, bahan resep tanpa harga, resep nonaktif, harga satuan sendiri menang); `uji_nilai_resep_ui.mjs` 19 uji Chromium
     (lembar, membuka resep, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Uji fitur sebelumnya tetap lulus.
+
+### Waste per porsi menu (Code.gs v0.37, aplikasi 0.37.0, 29 Oktober 2026)
+
+385. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap": waste per porsi menu untuk salah order atau makanan yang dikembalikan.
+    Pemilik memilih butir ini tanpa pilihan tambahan. Spesifikasi sistem Bagian 5.4 dan 5.9; tampilan Bagian 5.3, 5.4, 5.10.
+386. **Stock tidak dikurangi** (keputusan tambahan): bahan menu yang terbuang sudah keluar dari stock saat dimasak (Stock Keluar atau
+    Hitung sisa), jadi mengurangi bahan lagi akan menghitungnya dua kali. Baris menu dicatat sebagai kerugian saja. Akibatnya food
+    cost tidak berubah (bahannya sudah di Terpakai); layar HPP dan rekap menyebutnya sebagai keterangan, dan "Seharusnya vs nyata"
+    menyebut porsi terbuang sebagai bagian dari selisih (`wastePorsi`) beserta selisih tanpa porsi terbuang.
+387. **Data** (keputusan tambahan): baris di `Data_Waste` (bukan tab baru), supaya Riwayat, koreksi, pemeriksaan, PDF, email, Sheets,
+    Dashboard, dan rekap ikut tanpa jalur baru: Item / Produk = nama menu, Qty = porsi, Satuan "porsi" (`SATUAN_PORSI`), Harga Satuan =
+    `hppMenu_` pada tanggal waste (bahan kecil % ikut; kosong jika ada bahan tanpa harga), Estimasi = `estimasiWaste_`. Kolom baru `Menu`
+    ("Ya", `KOLOM_MENU_WASTE`; kosong untuk item) di akhir kolom isian, ditambahkan `setupSpreadsheet`; sebelum itu `menuSiap` false dan
+    kiriman menu ditolak dengan petunjuk, kiriman item tetap jalan. Kategori waste tidak ditambah (Kesalahan Order terpilih lebih dulu
+    untuk menu; dikembalikan boleh Lainnya dengan alasan), supaya dropdown dan rumus Sheet per kategori tidak berubah. Porsi bilangan bulat
+    1–1.000 (`porsiWaste_`, juga di koreksi). Menu nonaktif dari antrean diterima; nama menu yang diganti tidak mengubah baris lama.
+388. **Pembaca stock melewati baris menu:** `SUMBER_STOCK` entri Data_Waste diberi `lewati: barisMenuWaste_`, dipakai `bacaGerakan_`
+    (hitung ulang stock), `transaksiItem_` (kartu stok), dan `itemBercatatan_` (ganti nama/hapus item), sehingga menu yang bernama
+    sama dengan item tidak menggerakkan stock item itu. `kirimWaste` dan `setelahKoreksi` hanya menghitung ulang stock untuk baris item.
+    `nilaiWasteTercatat_` menandai `menu`, jadi waste barang jadi di HPP tidak memuatnya. Email harian dan rekap memisahkan menu dari
+    item bernama sama (kunci `menu|`).
+389. **Aplikasi:** tombol "Tambah menu" di form Waste (hanya jika `menuSiap` dan ada menu aktif) membuka lembar daftar menu; draft baris
+    `menu: true`; kartu dan tabel memakai `infoBaris` (satuan porsi, HPP sebagai harga untuk Pengelola), label "Porsi", `inputmode=numeric`,
+    tanda `.tanda-menu`; kiriman `{ menu, kategori, qty, alasan }`. Riwayat: `b.menu` → "(menu)" di daftar, tanda Menu dan tanpa tombol
+    riwayat item di detail. `.deret-tambah` kini `flex-wrap` dengan jarak 8 px. Server lama: tombol tidak tampil.
+390. **Uji** (di luar repo): `uji_waste_menu.mjs` 44 uji server (formWaste Pengelola dan Staff, baris menu dan item dalam satu kiriman,
+    stock bahan tetap dan item turun, tanpa rekap menu, penolakan porsi pecahan/0/>1000/menu tak dikenal/Lainnya, Staff, menu nonaktif
+    dari antrean, Riwayat dan koreksi, kartu stok, menu bernama sama dengan item, hapus item, email, HPP `wasteMenu`/`wastePorsi`,
+    Dashboard, rekap, PDF, Sheet tanpa kolom lalu `setupSpreadsheet`); `uji_waste_menu_ui.mjs` 29 uji Chromium (Staff HP tanpa rupiah,
+    galat porsi, terkirim; desktop dengan HPP, menu + item; Riwayat; server lama; antrean; layar HPP; delapan ukuran). Uji fitur lain
+    tetap lulus (uji `uji_fc_sementara_ui` memakai tanggal tetap "1–27 Okt" dari 28 Oktober, jadi dua pemeriksaannya gagal karena
+    tanggal, bukan karena perubahan ini). Belum diuji di Supabase asli dan HP.

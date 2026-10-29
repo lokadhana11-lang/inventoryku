@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.36 (nilai stock barang jadi dari resep)
+// InventoryKu Code.gs v0.37 (waste per porsi menu)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -114,9 +114,12 @@
  *                        sejak penjualan pernah dicatat, penjualan, porsi, dan food cost bulan berjalan.
  * - 28 Oktober 2026    : nilai stock memakai harga dari resep untuk barang jadi tanpa harga satuan
  *                        (dashboard.nilaiStock.dariResep, tanpaHarga[].resepKurang, daftarItem.item[].hargaResep).
+ * - 29 Oktober 2026    : waste per porsi menu (salah order, dikembalikan): kirimWaste.baris[].menu, kolom Menu
+ *                        di Data_Waste (setupSpreadsheet), nilai = porsi × HPP per porsi, tanpa gerakan stock;
+ *                        formWaste.menu/menuSiap, hpp.pemakaian.wasteMenu, hpp.teoritis.wastePorsi.
  */
 
-var VERSI_KODE = 'v0.36';
+var VERSI_KODE = 'v0.37';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -2783,7 +2786,8 @@ var SUMBER_STOCK = [
   { tab: 'Data_Stock', item: 'Nama Item', isi: { masuk: 'Stock Masuk', keluar: 'Stock Keluar' } },
   { tab: 'Data_Prep', item: 'Item / Menu Prep', isi: { hasilPrep: 'Hasil' } },
   { tab: 'Data_PrepBahan', item: 'Item Bahan', isi: { dipakaiPrep: 'Qty Terpakai' } },
-  { tab: 'Data_Waste', item: 'Item / Produk', isi: { waste: 'Qty' } },
+  // Baris menu (Code.gs v0.37) tidak menggerakkan stock.
+  { tab: 'Data_Waste', item: 'Item / Produk', isi: { waste: 'Qty' }, lewati: barisMenuWaste_ },
   { tab: 'Data_Penyesuaian', item: 'Nama Item', isi: { penyesuaian: 'Selisih' } }
 ];
 
@@ -2848,7 +2852,7 @@ function bacaGerakan_(itemKecil) {
     if (!t || t.kol[s.item] === undefined || t.kol.Tanggal === undefined) return;
     t.baris.forEach(function (b) {
       var nama = rapikanTeks_(nilai_(t, b, s.item)).toLowerCase();
-      if (!itemKecil[nama]) return;
+      if (!itemKecil[nama] || (s.lewati && s.lewati(t, b))) return;
       var tanggal = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
       if (!tanggal) return;
       var perItem = hasil[nama] = hasil[nama] || {};
@@ -3287,6 +3291,43 @@ var KATEGORI_WASTE = ['Expired', 'Rusak', 'Sisa Produksi', 'Kesalahan Order', 'L
 var SHIFT = ['Pagi', 'Siang', 'Malam'];
 var URUTAN_WASTE = [['Tanggal', false], ['Item / Produk', true], ['timestamp_server', true]];
 
+/*
+ * Waste per porsi menu (Code.gs v0.37): menu yang terbuang (salah order, dikembalikan
+ * pelanggan) dicatat di Data_Waste dengan kolom Menu = "Ya", Qty = porsi, Satuan
+ * "porsi", Harga Satuan = HPP per porsi pada tanggal waste (hppMenu_). Baris menu tidak
+ * menggerakkan stock: bahannya sudah tercatat keluar saat dimasak (Stock Keluar atau
+ * Hitung sisa), jadi semua pembaca SUMBER_STOCK melewatinya (lewati).
+ */
+var KOLOM_MENU_WASTE = 'Menu';
+var TANDA_MENU_WASTE = 'Ya';
+var SATUAN_PORSI = 'porsi';
+var BATAS_PORSI_WASTE = 1000;
+
+/** Kolom Menu di Data_Waste (setupSpreadsheet) dan tab menu sudah ada. */
+function menuWasteSiap_() {
+  var t = bacaTabel_('Data_Waste');
+  return !!t && t.kol[KOLOM_MENU_WASTE] !== undefined && bacaMenu_().ada;
+}
+
+/** Baris Data_Waste yang mencatat menu (bukan item). */
+function barisMenuWaste_(t, b) {
+  return t.kol[KOLOM_MENU_WASTE] !== undefined && nilaiMenuWaste_(nilai_(t, b, KOLOM_MENU_WASTE));
+}
+
+function nilaiMenuWaste_(v) {
+  return rapikanTeks_(v).toLowerCase() === TANDA_MENU_WASTE.toLowerCase();
+}
+
+/** Porsi waste menu: bilangan bulat 1 sampai BATAS_PORSI_WASTE. */
+function porsiWaste_(nilai, label) {
+  var t = String(nilai == null ? '' : nilai).trim().replace(',', '.');
+  var n = Number(t);
+  if (t === '' || !isFinite(n) || n <= 0) throw galatPengguna_('Isi ' + label + ' lebih dari 0, misalnya 2.');
+  if (Math.floor(n) !== n) throw galatPengguna_(label + ' harus bilangan bulat, misalnya 2.');
+  if (n > BATAS_PORSI_WASTE) throw galatPengguna_(label + ' terlalu banyak. Periksa angkanya.');
+  return n;
+}
+
 /** Estimasi kerugian = Qty × Harga Satuan (yang disalin saat dicatat), dibulatkan ke rupiah; kosong jika harga kosong. */
 function estimasiWaste_(qty, harga) {
   if (harga === '' || harga == null || !isFinite(Number(harga))) return '';
@@ -3347,12 +3388,19 @@ function dataFormWaste_(tanggal) {
   var nihil = bacaBarisTanggal_('Data_Nihil', tanggal, zona, ['ID Form']).filter(function (n) {
     return rapikanTeks_(n['ID Form']).toUpperCase() === 'WASTE';
   });
+  // Waste per porsi menu (Code.gs v0.37): menu aktif dengan HPP per porsi pada tanggal waste (rupiah hanya untuk Pengelola).
+  var menuSiap = menuWasteSiap_();
+  var menu = menuSiap ? hppSemuaMenu_(tanggal, true).map(function (h) {
+    return { nama: h.nama, hpp: rupiah ? h.hpp : undefined };
+  }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); }) : [];
   return {
     tanggal: tanggal,
     kategoriWaste: KATEGORI_WASTE,
     shift: SHIFT,
     tanpaRupiah: rupiah ? undefined : true,
     item: item,
+    menuSiap: menuSiap,
+    menu: menu,
     kiriman: { jumlah: Object.keys(sid).length, terakhir: barisTerakhir_(kiriman), totalRp: rupiah ? Math.round(total) : undefined, baris: baris },
     nihil: kiriman.length ? null : barisTerakhir_(nihil)
   };
@@ -3481,9 +3529,45 @@ function aksiKirimWaste_(body, pengguna) {
   }
 
   var master = lengkapiHargaResep_(itemPadaTanggal_(tanggal));
+  var kolMenu = wajibTabel_('Data_Waste').kol[KOLOM_MENU_WASTE] !== undefined;
+  var dataMenu = null;
   var foto = [];
   var totalFoto = 0;
   var baru = masukan.map(function (b, i) {
+    if (b && rapikanTeks_(b.menu)) {
+      // Waste per porsi menu (Code.gs v0.37): tidak mengurangi stock; nilai = porsi × HPP per porsi pada tanggal waste.
+      if (!kolMenu || !(dataMenu = dataMenu || bacaMenu_()).ada) {
+        throw galatPengguna_('Waste menu belum bisa dicatat di server. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+      }
+      var mn = dataMenu.menu[rapikanTeks_(b.menu).toLowerCase()];
+      if (!mn) throw galatPengguna_('Menu ' + rapikanTeks_(b.menu) + ' tidak ada di daftar menu. Muat ulang form.');
+      var porsi = porsiWaste_(b.qty, 'Porsi ' + mn.nama);
+      var kat = String(b.kategori || '');
+      var als = rapikanTeks_(b.alasan).slice(0, 200);
+      periksaBarisWaste_(kat, als, mn.nama);
+      var h = hppMenu_(mn, master, bahanKecilPersen_(), targetFoodCost_());
+      var bm = {
+        'Tanggal': tanggalSel_(tanggal),
+        'Shift': shift,
+        'Nama Staff': pengguna.nama,
+        'Item / Produk': mn.nama,
+        'Kategori Waste': kat,
+        'Qty': porsi,
+        'Satuan': SATUAN_PORSI,
+        'Alasan / Keterangan': teksAman_(als),
+        'Harga Satuan (Rp)': h.hpp == null ? '' : h.hpp,
+        'Estimasi Kerugian (Rp)': estimasiWaste_(porsi, h.hpp),
+        'Foto Bukti': ''
+      };
+      bm[KOLOM_MENU_WASTE] = TANDA_MENU_WASTE;
+      var bmBaris = gabung_(bm, isiSistem_(konteks));
+      var fm = bacaFotoWaste_(b.foto, mn.nama);
+      if (fm) {
+        totalFoto += fm.ukuran;
+        foto.push({ baris: bmBaris, foto: fm, no: i + 1 });
+      }
+      return bmBaris;
+    }
     var m = master[rapikanTeks_(b && b.item).toLowerCase()];
     if (!m) throw galatPengguna_('Item ' + rapikanTeks_(b && b.item) + ' tidak ada di daftar item. Muat ulang form.');
     var qty = angkaIsian_(b.qty, 'Qty ' + m.nama);
@@ -3491,7 +3575,7 @@ function aksiKirimWaste_(body, pengguna) {
     var kategori = String(b.kategori || '');
     var alasan = rapikanTeks_(b.alasan).slice(0, 200);
     periksaBarisWaste_(kategori, alasan, m.nama);
-    var baris = gabung_({
+    var baris = gabung_(gabung_({
       'Tanggal': tanggalSel_(tanggal),
       'Shift': shift,
       'Nama Staff': pengguna.nama,
@@ -3503,7 +3587,7 @@ function aksiKirimWaste_(body, pengguna) {
       'Harga Satuan (Rp)': m.harga == null ? '' : m.harga,
       'Estimasi Kerugian (Rp)': estimasiWaste_(qty, m.harga),
       'Foto Bukti': ''
-    }, isiSistem_(konteks));
+    }, kolMenu ? { 'Menu': '' } : {}), isiSistem_(konteks));
     var f = bacaFotoWaste_(b.foto, m.nama);
     if (f) {
       totalFoto += f.ukuran;
@@ -3525,7 +3609,8 @@ function aksiKirimWaste_(body, pengguna) {
     }
     tambahBarisTabel_(tabel, baru);
     urutkanTabel_(tabel, URUTAN_WASTE);
-    hitungUlangStock_(baru.map(function (b) { return { item: b['Item / Produk'], dari: tanggal }; }));
+    var gerak = baru.filter(function (b) { return !nilaiMenuWaste_(b[KOLOM_MENU_WASTE]); });
+    if (gerak.length) hitungUlangStock_(gerak.map(function (b) { return { item: b['Item / Produk'], dari: tanggal }; }));
     return { sudahTerkirim: false, jumlah: baru.length, foto: foto.length - fotoGagal.length, fotoGagal: fotoGagal,
       form: dataFormWaste_(tanggal) };
   });
@@ -4503,7 +4588,19 @@ function namaDiKolom_(namaTab, judul, hasil) {
 function itemBercatatan_() {
   var hasil = {};
   namaDiKolom_('Stock_Harian', 'Nama Item', hasil);
-  SUMBER_STOCK.forEach(function (s) { namaDiKolom_(s.tab, s.item, hasil); });
+  SUMBER_STOCK.forEach(function (s) {
+    if (!s.lewati) {
+      namaDiKolom_(s.tab, s.item, hasil);
+      return;
+    }
+    // Baris yang tidak menggerakkan stock (waste menu) bukan catatan item.
+    var t = bacaTabel_(s.tab);
+    if (!t || t.kol[s.item] === undefined) return;
+    t.baris.forEach(function (b) {
+      var n = rapikanTeks_(nilai_(t, b, s.item)).toLowerCase();
+      if (n && !s.lewati(t, b)) hasil[n] = true;
+    });
+  });
   namaDiKolom_('Data_Opname', 'Nama Item', hasil);
   return hasil;
 }
@@ -6762,6 +6859,8 @@ function bandingTeoritis_(ctx, r, pakai, jual) {
   var total = Math.round(t.total);
   var nyata = pakai.total;
   var fcBisa = lengkap && jual.jumlahHari && !jual.kurang.length && jual.total > 0;
+  // Porsi yang terbuang (waste per porsi menu, Code.gs v0.37) menjelaskan sebagian selisih: bahannya terpakai, porsinya tidak terjual.
+  var wastePorsi = ada ? wasteMenuRentang_(ctx.waste, r.dari, r.sampai) : { porsi: 0, nilai: 0 };
   return {
     siap: ctx.porsi.ada,
     pernah: !!ctx.porsi.pertama,
@@ -6773,6 +6872,7 @@ function bandingTeoritis_(ctx, r, pakai, jual) {
     seharusnya: { bahan: Math.round(t.bahan), kecil: Math.round(t.kecil), total: total },
     nyata: nyata,
     selisih: lengkap ? nyata - total : null,
+    wastePorsi: wastePorsi,
     selisihPersen: lengkap && total > 0 ? Math.round((nyata - total) / total * 1000) / 10 : null,
     foodCostSeharusnya: fcBisa ? Math.round(t.total / jual.total * 1000) / 10 : null,
     bahanMenu: { seharusnya: Math.round(t.bahan), nyata: Math.round(nyataMenu) },
@@ -6809,15 +6909,31 @@ function stokPembuka_() {
   return hasil;
 }
 
-/** Estimasi kerugian yang tercatat di Data_Waste: [{ tanggal, kecil (nama item huruf kecil), rp }]. */
+/**
+ * Estimasi kerugian yang tercatat di Data_Waste: [{ tanggal, kecil (nama item atau menu huruf kecil), rp, menu, porsi }].
+ * menu: baris waste per porsi menu (Code.gs v0.37); porsi hanya untuk baris itu.
+ */
 function nilaiWasteTercatat_() {
   var t = bacaTabel_('Data_Waste');
   if (!t) return [];
   var zona = zonaSheet_();
   return t.baris.map(function (b) {
+    var menu = barisMenuWaste_(t, b);
     return { tanggal: teksTanggal_(nilai_(t, b, 'Tanggal'), zona), kecil: rapikanTeks_(nilai_(t, b, 'Item / Produk')).toLowerCase(),
-      rp: Number(nilai_(t, b, 'Estimasi Kerugian (Rp)')) || 0 };
+      rp: Number(nilai_(t, b, 'Estimasi Kerugian (Rp)')) || 0, menu: menu, porsi: menu ? Number(nilai_(t, b, 'Qty')) || 0 : 0 };
   }).filter(function (x) { return x.tanggal && x.kecil; });
+}
+
+/** Waste per porsi menu dari..sampai (hariSaja opsional): { porsi, nilai }. */
+function wasteMenuRentang_(waste, dari, sampai, hariSaja) {
+  var hasil = { porsi: 0, nilai: 0 };
+  (waste || []).forEach(function (w) {
+    if (!w.menu || w.tanggal < dari || w.tanggal > sampai || (hariSaja && !hariSaja[w.tanggal])) return;
+    hasil.porsi += w.porsi;
+    hasil.nilai += w.rp;
+  });
+  hasil.nilai = Math.round(hasil.nilai);
+  return hasil;
 }
 
 /**
@@ -6886,7 +7002,7 @@ function pemakaianBahan_(ctx, dari, sampai, hariSaja) {
   });
   hasil.total = hasil.terpakai + hasil.waste + hasil.selisihStock;
   (ctx.waste || []).forEach(function (w) {
-    if (w.tanggal >= dari && w.tanggal <= sampai && (!hariSaja || hariSaja[w.tanggal]) && !kunciBahan[w.kecil] && ctx.master[w.kecil]) {
+    if (!w.menu && w.tanggal >= dari && w.tanggal <= sampai && (!hariSaja || hariSaja[w.tanggal]) && !kunciBahan[w.kecil] && ctx.master[w.kecil]) {
       hasil.wasteBarangJadi += w.rp;
     }
   });
@@ -6908,6 +7024,8 @@ function pemakaianBahan_(ctx, dari, sampai, hariSaja) {
     cocok: Math.abs(hasil.total - cekTotal) <= 1 + nSh
   };
   ['terpakai', 'waste', 'selisihStock', 'total', 'wasteBarangJadi', 'masuk', 'stokPembuka'].forEach(function (j) { hasil[j] = Math.round(hasil[j]); });
+  // Waste per porsi menu (Code.gs v0.37): hanya dilaporkan; bahannya sudah terhitung di Terpakai saat dimasak.
+  hasil.wasteMenu = wasteMenuRentang_(ctx.waste, dari, sampai, hariSaja);
   var posisi = function (nama) {
     var u = ctx.urutKat[nama.toLowerCase()];
     return u == null ? 1e6 : u;
@@ -7007,7 +7125,7 @@ function dataHpp_(bulan) {
     bulan: bulan, nama: namaBulanId_(bulan), dari: r.dari, sampai: r.sampai, berjalan: r.berjalan, hariIni: ctx.hari,
     target: target, bahanKecilPersen: bahanKecilPersen_(n),
     pemakaian: { terpakai: p.terpakai, waste: p.waste, selisihStock: p.selisihStock, total: p.total, wasteBarangJadi: p.wasteBarangJadi,
-      stokPembuka: p.stokPembuka },
+      stokPembuka: p.stokPembuka, wasteMenu: p.wasteMenu },
     cekSilang: p.cek,
     penjualan: gabung_(x.penjualan, { terakhir: terakhir, pernah: !!ctx.jual.pertama }),
     foodCost: x.foodCost,
@@ -8811,11 +8929,14 @@ var RIWAYAT_FORM = {
     },
     periksaKoreksi: function (n) {
       periksaBarisWaste_(rapikanTeks_(n['Kategori Waste']), n['Alasan / Keterangan'], rapikanTeks_(n['Item / Produk']));
+      if (nilaiMenuWaste_(n[KOLOM_MENU_WASTE])) porsiWaste_(n['Qty'], 'Porsi ' + rapikanTeks_(n['Item / Produk']));
     },
-    // Waste mengurangi stock: rekap hari itu dan sesudahnya dihitung ulang (Bagian 5.5).
+    // Waste mengurangi stock: rekap hari itu dan sesudahnya dihitung ulang (Bagian 5.5). Waste menu tidak (Code.gs v0.37).
     setelahKoreksi: function (baris) {
+      if (nilaiMenuWaste_(baris.nilai[KOLOM_MENU_WASTE])) return;
       hitungUlangStock_([{ item: baris.nilai['Item / Produk'], dari: baris.tanggal }]);
-    }
+    },
+    menu: KOLOM_MENU_WASTE
   },
   SUHU: {
     tab: 'Data_Suhu',
@@ -9027,6 +9148,8 @@ function barisRiwayat_(def, t, b, log) {
   var tautanFoto = fotoUrl && /^https:\/\//.test(fotoUrl) && PENGGUNA_AKSI_ && PENGGUNA_AKSI_.pengelola ? fotoUrl : undefined;
   return {
     rowId: rowId,
+    // Baris waste menu (Code.gs v0.37): nama menu, bukan item (tidak membuka riwayat item).
+    menu: def.menu && t.kol[def.menu] !== undefined && nilaiMenuWaste_(nilai_(t, b, def.menu)) ? true : undefined,
     foto: def.foto ? !!fotoUrl : undefined,
     fotoUrl: tautanFoto,
     nilai: nilai,
@@ -9488,7 +9611,7 @@ function transaksiItem_(kecil, rekap) {
     var t = bacaTabel_(s.tab);
     if (!t || t.kol[s.item] === undefined || t.kol.Tanggal === undefined) return;
     t.baris.forEach(function (b) {
-      if (rapikanTeks_(nilai_(t, b, s.item)).toLowerCase() !== kecil) return;
+      if (rapikanTeks_(nilai_(t, b, s.item)).toLowerCase() !== kecil || (s.lewati && s.lewati(t, b))) return;
       var tanggal = teksTanggal_(nilai_(t, b, 'Tanggal'), zona);
       if (!tanggal || !(tanggal in awal)) return;
       var angka = function (judul) { return Number(nilai_(t, b, judul)) || 0; };
@@ -10705,7 +10828,8 @@ function ringkasWasteHari_(tanggal) {
   barisDataTanggal_('Data_Waste', tanggal).forEach(function (b) {
     var item = rapikanTeks_(b['Item / Produk']);
     var kat = rapikanTeks_(b['Kategori Waste']);
-    var k = item.toLowerCase() + '|' + kat;
+    // Menu dan item yang kebetulan bernama sama tidak dijumlah (Code.gs v0.37).
+    var k = (nilaiMenuWaste_(b[KOLOM_MENU_WASTE]) ? 'menu|' : '') + item.toLowerCase() + '|' + kat;
     var x = kumpul[k];
     if (!x) {
       x = kumpul[k] = { item: item, kategori: kat, qty: 0, satuan: rapikanTeks_(b['Satuan']), estimasi: 0 };
@@ -11515,7 +11639,7 @@ function dataRekapBulan_(bulan) {
       var kat = rapikanTeks_(nilai_(tW, b, 'Kategori Waste')) || 'Lainnya';
       var x = perKatWaste[kat.toLowerCase()] = perKatWaste[kat.toLowerCase()] || { kategori: kat, catatan: 0, nilai: 0, tanpaHarga: 0 };
       var rp = angkaAtauNull_(nilai_(tW, b, 'Estimasi Kerugian (Rp)'));
-      var k = nama.toLowerCase();
+      var k = (barisMenuWaste_(tW, b) ? 'menu|' : '') + nama.toLowerCase();
       var it = itemWaste[k] = itemWaste[k] || { item: nama, satuan: rapikanTeks_(nilai_(tW, b, 'Satuan')), qty: 0, catatan: 0, nilai: 0,
         adaNilai: false };
       it.qty = bulat_(it.qty + (Number(nilai_(tW, b, 'Qty')) || 0));
@@ -11836,6 +11960,10 @@ function isiPdfRekapHpp_(h) {
   }
   if (nLibur) catatanHpp.push('Hari libur (' + teksHariBulanSingkat_(j.libur) + ') tidak perlu catatan penjualan; pemakaian bahan pada hari itu tetap dihitung.');
   if (p.wasteBarangJadi) catatanHpp.push('Waste barang jadi ' + rupiahId_(p.wasteBarangJadi) + ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.');
+  if (p.wasteMenu && p.wasteMenu.porsi) {
+    catatanHpp.push('Waste menu ' + p.wasteMenu.porsi + ' porsi (' + rupiahId_(p.wasteMenu.nilai) + ', salah order atau dikembalikan) ' +
+      'tidak ditambahkan, karena bahannya sudah terhitung keluar saat dimasak.');
+  }
   if (p.tanpaHarga.length) catatanHpp.push(p.tanpaHarga.length + ' bahan belum punya harga pada sebagian hari dan tidak ikut dihitung: ' + daftarNamaSingkat_(p.tanpaHarga) + '.');
   if (p.stokPembuka) catatanHpp.push('Stok pembuka ' + rupiahId_(p.stokPembuka) + ' tidak dihitung sebagai selisih stock.');
   html += catatanHpp.map(function (c) { return '<p class="catatan">' + e(c) + '</p>'; }).join('');
@@ -13302,7 +13430,7 @@ var TAB_DATA = [
     kolom: [
       k_('Tanggal', 'tanggal'), k_('Shift'), k_('Nama Staff'), k_('Item / Produk'),
       k_('Kategori Waste'), k_('Qty', 'angka'), k_('Satuan'), k_('Alasan / Keterangan'),
-      k_('Harga Satuan (Rp)', 'rupiah'), k_('Estimasi Kerugian (Rp)', 'rupiah'), k_('Foto Bukti')
+      k_('Harga Satuan (Rp)', 'rupiah'), k_('Estimasi Kerugian (Rp)', 'rupiah'), k_('Foto Bukti'), k_('Menu')
     ]
   },
   {

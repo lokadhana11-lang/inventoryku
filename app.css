@@ -2723,7 +2723,24 @@ body.papan-ketik .bilah-kirim {
 
 .deret-tambah {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 16px;
+}
+
+/* Waste per porsi menu (aplikasi 0.37.0): tanda kecil di samping nama menu. */
+.tanda-menu {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--garis);
+  border-radius: 999px;
+  background: var(--baja);
+  color: var(--tinta-redup);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .deret-tambah .tombol {
