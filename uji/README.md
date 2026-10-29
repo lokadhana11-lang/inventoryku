@@ -10,7 +10,7 @@ Dari akar repo, dengan Node 22:
 
 ```
 node uji/jalankan.mjs              # semua uji server (sekitar 10 detik)
-node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (sekitar 20 menit)
+node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (sekitar 25 menit)
 node uji/jalankan.mjs libur        # hanya uji yang namanya memuat "libur" (server dan layar)
 node uji/server/pesanan.mjs        # satu berkas saja
 ```

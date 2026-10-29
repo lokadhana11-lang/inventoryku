@@ -2994,4 +2994,4 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `server/libur_rumus.mjs` kini mencetak "lulus N gagal M"; nama outlet contoh "Dapur Contoh" dan alamat email contoh berdomain
     `contoh.invalid` (repo publik: tidak ada alamat atau nama sungguhan). PIN di `seed.mjs` rekaan khusus uji.
 394. **Aturan kerja:** setiap fitur baru menambah berkas uji di `uji/server` dan/atau `uji/layar`, dan `node uji/jalankan.mjs --layar`
-    dijalankan sebelum PR. Hasil pertama: 14 berkas server (541 pemeriksaan) dan 13 berkas layar lulus.
+    dijalankan sebelum PR. Hasil pertama: 13 berkas server (536 pemeriksaan, sekitar 10 detik) dan 13 berkas layar (534 pemeriksaan, sekitar 25 menit) lulus.
