@@ -41,6 +41,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 │   ├── rakit.mjs      node supabase/rakit.mjs → functions/api/index.ts (src + Code.gs dalam satu file)
 │   ├── functions/api/index.ts   HASIL RAKITAN, ditempel tangan ke editor Edge Function; jangan diubah langsung
 │   └── PANDUAN.md     langkah pemilik untuk pindah
+├── uji/               uji otomatis: node uji/jalankan.mjs [--layar] (lihat uji/README.md)
+│   ├── alat/          harness.mjs (Code.gs di atas Spreadsheet tiruan supabase/src), seed.mjs, peramban.mjs
+│   ├── server/        uji aksi Code.gs, satu berkas per fitur
+│   └── layar/         uji alur aplikasi di Chromium (Playwright) dengan API tiruan
 ├── spesifikasi/
 │   ├── spesifikasi_web_inventory_harian_v2.md   sistem: data, role, alur, arsitektur
 │   └── spesifikasi_tampilan_ui.md               tampilan: warna, huruf, tata letak, layar, teks
@@ -385,6 +389,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12+++++++++++++++++++++++++++++ | Perlu perhatian dikelompokkan (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): daftar di Dashboard dibagi "Hari ini" dan "Rutin" (bisa dilipat, terlipat selama ada butir Hari ini, pilihan diingat di HP) | Kode selesai (aplikasi 0.35.0; Code.gs tidak berubah), diuji di Chromium dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (20 uji: kelompok, terlipat dan diingat, papan ketik, butir Rutin membuka Riwayat, hanya Rutin, hanya Hari ini, jenis baru, kosong, delapan ukuran). Digabung pemilik 28 Oktober 2026 |
 | 12++++++++++++++++++++++++++++++ | Nilai stock barang jadi dari resep (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): barang jadi tanpa harga satuan dinilai dengan harga dari resepnya pada tanggal itu di nilai stock Dashboard dan rekap bulanan (juga masuk dan penyesuaiannya), "Harga dari resep" di lembar Nilai stock, "dari resep" di Pengaturan → Item | Kode selesai (Code.gs v0.36, aplikasi 0.36.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (24 uji server dengan harga resep dihitung tangan) dan Chromium (19 uji: lembar, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 12+++++++++++++++++++++++++++++++ | Waste per porsi menu (permintaan pemilik 29 Oktober 2026, dari telaah aplikasi): "Tambah menu" di form Waste untuk salah order atau makanan yang dikembalikan, dicatat per porsi dengan nilai HPP per porsi, tanpa mengurangi stock lagi (bahannya sudah tercatat keluar saat dimasak); kolom `Menu` di `Data_Waste`, Riwayat dan koreksi porsi, keterangan di layar HPP dan rekap bulanan | Kode selesai (Code.gs v0.37, aplikasi 0.37.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (44 uji server) dan Chromium (29 uji: Staff HP, desktop, Riwayat, server lama, antrean, HPP, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Menu` di `Data_Waste`), gabungkan PR |
+| 12++++++++++++++++++++++++++++++++ | Simpan uji di repo (permintaan pemilik 29 Oktober 2026, dari telaah aplikasi): folder `uji/` berisi harness, data contoh, 13 berkas uji server, 13 berkas uji layar, dan `uji/jalankan.mjs` | Selesai (Code.gs dan aplikasi tidak berubah): `node uji/jalankan.mjs --layar` lulus semua. Menunggu pemilik: gabungkan PR (tidak perlu tempel apa pun) |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2969,3 +2974,24 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     galat porsi, terkirim; desktop dengan HPP, menu + item; Riwayat; server lama; antrean; layar HPP; delapan ukuran). Uji fitur lain
     tetap lulus (uji `uji_fc_sementara_ui` memakai tanggal tetap "1–27 Okt" dari 28 Oktober, jadi dua pemeriksaannya gagal karena
     tanggal, bukan karena perubahan ini). Belum diuji di Supabase asli dan HP.
+
+### Simpan uji di repo (29 Oktober 2026)
+
+391. **Asal:** telaah aplikasi 19 Oktober, bagian "Pelengkap": uji selama ini ditulis di luar repo (folder sementara sesi Claude Code)
+    dan hilang saat sesi berakhir, jadi tiap fitur baru tidak bisa memeriksa ulang fitur lama. Pemilik memilih butir ini tanpa
+    pilihan tambahan.
+392. **Isi** (keputusan tambahan): folder `uji/` (lihat uji/README.md) berisi `alat/harness.mjs` (Code.gs asli di atas Spreadsheet
+    tiruan `supabase/src`, jam yang bisa digeser, penampung email/PDF/Drive/jadwal, server statis dengan `config.js` tiruan),
+    `alat/seed.mjs` (data contoh 12 hari), `alat/peramban.mjs` (Playwright dari `node_modules` atau `PLAYWRIGHT_DIR`, bawaan folder
+    global Claude Code), `server/` (13 berkas: fitur 19–29 Oktober), `layar/` (13 berkas Chromium), dan `jalankan.mjs` (menjalankan
+    berkas satu per satu, membaca baris "lulus N gagal M", galat konsol, dan galat server; kode keluar 1 jika ada yang gagal).
+    Tanpa `package.json` dan tanpa `.github/workflows` (ATURAN TETAP), jadi uji dijalankan dengan tangan atau oleh Claude Code
+    sebelum PR. Yang tidak disimpan: uji pembanding dengan Code.gs versi lama (`*_banding`, butuh salinan versi lama), skrip
+    pemeriksa sekali pakai, dan uji fitur sebelum 19 Oktober (tidak tersimpan lagi). Folder ini ikut ditayangkan GitHub Pages
+    (akar repo) tetapi tidak dimuat aplikasi dan tidak masuk cache service worker.
+393. **Perubahan saat dipindah:** path repo dihitung dari letak berkas (bukan `/home/user/inventoryku`); uji layar memakai port kosong
+    mana pun (`layani(0)`), supaya bisa berjalan bersamaan; uji food cost sementara tidak lagi memakai tanggal tetap "1–27 Okt";
+    `server/libur_rumus.mjs` kini mencetak "lulus N gagal M"; nama outlet contoh "Dapur Contoh" dan alamat email contoh berdomain
+    `contoh.invalid` (repo publik: tidak ada alamat atau nama sungguhan). PIN di `seed.mjs` rekaan khusus uji.
+394. **Aturan kerja:** setiap fitur baru menambah berkas uji di `uji/server` dan/atau `uji/layar`, dan `node uji/jalankan.mjs --layar`
+    dijalankan sebelum PR. Hasil pertama: 13 berkas server (536 pemeriksaan, sekitar 10 detik) dan 13 berkas layar (534 pemeriksaan, sekitar 25 menit) lulus.
