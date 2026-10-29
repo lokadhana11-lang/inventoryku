@@ -57,6 +57,9 @@
 > masuk hari itu, dan penjualan serta food cost bulan berjalan (Bagian 10).
 > Diperbarui 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): nilai stock barang jadi tanpa harga
 > satuan memakai harga dari resepnya (Bagian 8.5).
+> Diperbarui 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): waste per porsi menu untuk salah
+> order atau makanan yang dikembalikan, dinilai dengan HPP per porsi, tanpa mengurangi stock lagi
+> (Bagian 5.4 dan 5.9).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -684,6 +687,24 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
 Waste tidak memicu email. Totalnya dimuat di laporan harian dan dashboard. Waste yang
 dikirim **langsung mengurangi stock** item itu dan tampil di kolom Waste pada Stock Inventory.
 
+**Waste per porsi menu** (29 Oktober 2026, semua role): menu yang terbuang, misalnya salah order
+atau dikembalikan pelanggan, dicatat di form yang sama lewat "Tambah menu": pilih menu aktif dari
+`M_Menu` (Bagian 5.9), jumlah **porsi** (bilangan bulat 1–1.000), kategori waste (Kesalahan Order
+terpilih lebih dulu; makanan yang dikembalikan boleh Lainnya dengan alasannya), alasan, dan foto
+bukti seperti baris item. Satu kiriman boleh berisi item dan menu.
+- Disimpan di `Data_Waste` satu baris per menu: Item / Produk = nama menu, Qty = porsi, Satuan
+  "porsi", Harga Satuan = HPP per porsi menu pada tanggal waste (termasuk bahan kecil %; kosong jika
+  ada bahan tanpa harga), Estimasi Kerugian = porsi × HPP, dan kolom **Menu** berisi "Ya" (kosong
+  untuk baris item; kolom ditambahkan `setupSpreadsheet`).
+- **Tidak mengurangi stock.** Bahan menu itu sudah keluar dari stock saat dimasak (Stock Keluar, atau
+  Hitung sisa), jadi mengurangi lagi akan menghitungnya dua kali. Baris menu tidak ikut rekap
+  `Stock_Harian`, kartu stok, dan catatan stock item (item yang bernama sama dengan menu tidak
+  terpengaruh).
+- Koreksi di Riwayat sama dengan baris item (kategori, porsi bilangan bulat, alasan; estimasi
+  dihitung ulang dari HPP yang tercatat). Nama menu di Riwayat tidak membuka riwayat item.
+- Ikut total waste di Dashboard, email, PDF, Sheets, dan rekap bulanan (satuan "porsi"). Nama menu
+  yang diganti kemudian tidak mengubah baris waste lama.
+
 **Nominal rupiah hanya untuk Pengelola** (keputusan pemilik 17 Oktober 2026). Staff tidak
 melihat harga satuan dan estimasi kerugian: layar Waste, Riwayat Waste, dan PDF Waste yang
 diunduh Staff tidak memuat kolom rupiah, dan server tidak mengirim angkanya ke Staff.
@@ -1018,6 +1039,8 @@ Semuanya khusus Pengelola dan diperiksa di server.
 - Barang jadi tidak dihitung lagi, karena biayanya terhitung saat bahannya dipakai prep. Waste
   barang jadi (estimasi yang tercatat) hanya ditampilkan sebagai keterangan. Akibatnya barang jadi
   yang masih tersisa di akhir bulan sudah dihitung sebagai pemakaian bulan itu.
+- Waste per porsi menu (Bagian 5.4, 29 Oktober 2026) juga hanya keterangan: bahannya sudah termasuk
+  di terpakai, karena tercatat keluar saat dimasak.
 - **Cek silang:** nilai stock bahan awal + nilai barang masuk + stok pembuka − nilai stock bahan
   akhir + selisih karena perubahan harga (Bagian 8.5) = pemakaian bahan. Jika berbeda (bahan tanpa
   harga pada sebagian hari), selisihnya disebut.
@@ -1066,6 +1089,8 @@ Semuanya khusus Pengelola dan diperiksa di server.
   penjualan tidak perlu (hari libur yang tetap punya penjualan lebih dari 0 perlu porsinya). Selisih = nyata −
   seharusnya; plus berarti bahan terpakai lebih banyak dari porsi yang terjual (bocor, porsi
   berlebih, waste, atau pencatatan keliru). Selisih paling banyak 2% dari seharusnya dianggap sesuai.
+  Porsi yang terbuang (waste per porsi menu, nilai HPP yang tercatat) disebut sebagai bagian dari
+  selisih, beserta selisih tanpa porsi terbuang.
   Barang jadi yang belum terjual di akhir periode ikut menambah selisih.
 - Rincian: bahan menu (seharusnya vs nyata), bahan lain yang tidak ada di menu mana pun (bumbu,
   minyak, garnish) dibanding bahan kecil %, 10 bahan dengan selisih rupiah terbesar (qty seharusnya,

@@ -38,6 +38,8 @@
 > dikelompokkan "Hari ini" dan "Rutin" (Bagian 5.6).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): barang jadi yang dinilai dari resepnya
 > di lembar Nilai stock dan Pengaturan → Item (Bagian 5.6 dan 5.7).
+> Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
+> waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -795,6 +797,15 @@ Satu-satunya layar yang sepenuhnya navy.
 - Di HP, item yang sudah selesai diisi diringkas menjadi satu baris; hanya item yang
   sedang diisi yang terbuka.
 - Geser kartu ke kiri atau ketuk ikon tempat sampah untuk menghapus baris sebelum dikirim.
+- **Tambah menu** (29 Oktober 2026, spesifikasi sistem Bagian 5.4): tombol kedua di samping Tambah
+  item, hanya jika server mengirim menu aktif. Lembar "Tambah menu waste" diawali "Untuk menu yang
+  terbuang: salah order atau dikembalikan pelanggan. Dicatat per porsi. Bahannya tidak dikurangi
+  lagi dari stock, karena sudah tercatat keluar saat dimasak.", lalu pencarian dan daftar menu
+  ("HPP Rp 15.400 per porsi" untuk Pengelola, "Menu" untuk Staff). Kartu menu: nama dengan tanda
+  kecil "Menu", kalimat yang sama tentang stock, kategori waste (Kesalahan Order terpilih), "Porsi"
+  dengan satuan "porsi" dan papan angka bulat ("Isi jumlah porsi bilangan bulat, misalnya 2."),
+  alasan, foto, dan estimasi (HPP × porsi; "HPP menu belum lengkap: ada bahan tanpa harga"). Di tabel
+  laptop/desktop nama menu bertanda "Menu" dengan "Stock bahan tidak berubah" di bawahnya.
 
 **Form kustom:**
 
@@ -817,6 +828,8 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Detail:** tata letak sama dengan layar isi form, tetapi semua nilai berupa teks.
   Baris yang pernah dikoreksi menampilkan nilai lama dicoret, diikuti nilai baru, nama
   pengoreksi, dan waktunya.
+- **Waste per porsi menu** (29 Oktober 2026): di daftar "Ayam geprek (menu): …", di detail nama menu
+  bertanda "Menu" dan tidak membuka riwayat item (menu tidak punya kartu stok).
 - **Riwayat Stock punya dua tampilan**, dipilih lewat dua tombol di atas daftar:
   "Catatan" (tiap kiriman: siapa, jam, item, masuk, keluar) dan "Rekap harian" (satu
   baris per item per hari, dikelompokkan per kategori).
@@ -1366,7 +1379,10 @@ menu `#/hpp/menu`).
   ("Bahan menu dan bahan lain", "Selisih per bahan": "Ayam · seharusnya 12,5 kg, nyata 13,5 kg
   +Rp 40.000", 10 terbesar), kalimat cara hitung, dan peringatan bahan tanpa harga, menu yang tidak
   ada lagi, atau resep yang tidak bisa dipakai. Kepala navy menulis "Seharusnya 43,9% menurut porsi
-  terjual" di bawah food cost.
+  terjual" di bawah food cost. Jika ada waste per porsi menu (29 Oktober 2026): "Termasuk di selisih:
+  3 porsi terbuang (salah order atau dikembalikan), Rp 46.200. Selisih tanpa porsi terbuang
+  −Rp 4.200." Kartu Pemakaian bahan menulis "Waste menu 3 porsi (Rp 46.200, salah order atau
+  dikembalikan) sudah termasuk di Terpakai, karena bahannya tercatat keluar saat dimasak."
 - **Per menu:** menu aktif urut food cost tertinggi. HP dan tablet: daftar (nama, "Harga jual Rp
   55.000 · HPP Rp 21.840 · 50 porsi terjual", tanda, persen di kanan); laptop/desktop: tabel (Menu,
   Terjual, Harga jual, HPP per porsi, Food cost, Margin kotor, Harga untuk 35%, Keadaan). Porsi

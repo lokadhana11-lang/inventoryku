@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.36.0';
+  var VERSI_APLIKASI = '0.37.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -4524,8 +4524,9 @@
   var SHIFT = ['Pagi', 'Siang', 'Malam'];
 
   /**
-   * Draft per pengguna: { tanggal, shift, baris: [{ id, item, kategori, qty,
-   * alasan }], terbuka (id baris yang sedang diisi), sid }.
+   * Draft per pengguna: { tanggal, shift, baris: [{ id, item, menu, kategori, qty,
+   * alasan }], terbuka (id baris yang sedang diisi), sid }. menu: true untuk waste per
+   * porsi menu (aplikasi 0.37.0; item = nama menu, qty = porsi).
    */
   function bacaDraftWaste() {
     var d = Draft.baca('waste');
@@ -4665,6 +4666,10 @@
     var pesanFoto = {}; // id baris → { teks, jenis } pesan foto di baris itu
     var tombolTambah = tombol('Tambah item', 'kedua', { 'aria-haspopup': 'dialog' });
     tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
+    // Waste per porsi menu (aplikasi 0.37.0): tampil jika server mengirim menu aktif.
+    var tombolMenu = tombol('Tambah menu', 'kedua', { 'aria-haspopup': 'dialog' });
+    tombolMenu.insertBefore(ikon('tambah'), tombolMenu.lastChild);
+    tombolMenu.hidden = true;
 
     var gTanggal = pilihanTanggalIsian({ pengelola: pengelola, tanggal: tanggal, ganti: gantiTanggal });
     var gShift = grupPilihan('Shift', SHIFT, draft.shift);
@@ -4686,7 +4691,7 @@
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
       ]),
       wadahBaris,
-      el('div', { class: 'deret-tambah' }, tombolTambah),
+      el('div', { class: 'deret-tambah' }, [tombolTambah, tombolMenu]),
       pesan,
       el('div', { class: 'bilah-kirim' }, [penghitung, tombolKirim])
     ]));
@@ -4697,25 +4702,37 @@
     }
     if (draft.waktu && draft.baris.length) catatanDraft.textContent = 'Draft tersimpan ' + jam(new Date(draft.waktu).toISOString());
 
-    function infoItem(nama) {
+    /** Item, atau menu untuk baris menu (satuan porsi, harga = HPP per porsi). */
+    function infoBaris(b) {
+      if (b.menu) {
+        var dm = data && data.menu || [];
+        for (var j = 0; j < dm.length; j++) if (dm[j].nama === b.item) return { nama: b.item, satuan: 'porsi', harga: dm[j].hpp, kategori: '' };
+        return { nama: b.item, satuan: 'porsi', harga: null, kategori: '' };
+      }
       var daftar = data && data.item || [];
-      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama === nama) return daftar[i];
-      return { nama: nama, satuan: '', harga: null, kategori: '' };
+      for (var i = 0; i < daftar.length; i++) if (daftar[i].nama === b.item) return daftar[i];
+      return { nama: b.item, satuan: '', harga: null, kategori: '' };
+    }
+
+    /** Qty lebih dari 0; porsi menu bilangan bulat sampai 1.000 (sama dengan server). */
+    function qtySah(b, qty) {
+      if (qty === null || isNaN(qty) || !(qty > 0)) return false;
+      return !b.menu || (Math.floor(qty) === qty && qty <= 1000);
     }
 
     /** Hasil pemeriksaan satu baris: { qty, salah: 'kategori' | 'qty' | 'alasan' | '' }. */
     function periksa(b) {
       var qty = bacaAngka(b.qty);
       if (KATEGORI_WASTE.indexOf(b.kategori) < 0) return { qty: qty, salah: 'kategori' };
-      if (qty === null || isNaN(qty) || !(qty > 0)) return { qty: qty, salah: 'qty' };
+      if (!qtySah(b, qty)) return { qty: qty, salah: 'qty' };
       if (b.kategori === 'Lainnya' && !String(b.alasan || '').trim()) return { qty: qty, salah: 'alasan' };
       return { qty: qty, salah: '' };
     }
 
     function teksEstimasi(b) {
-      var it = infoItem(b.item);
+      var it = infoBaris(b);
       var qty = bacaAngka(b.qty);
-      if (it.harga == null) return 'Harga satuan belum diisi Pengelola';
+      if (it.harga == null) return b.menu ? 'HPP menu belum lengkap: ada bahan tanpa harga' : 'Harga satuan belum diisi Pengelola';
       return formatRupiah(qty > 0 ? qty * it.harga : 0);
     }
 
@@ -4849,11 +4866,11 @@
 
     /** Isian satu baris; dipakai kartu (HP dan tablet) dan baris tabel (laptop dan desktop). */
     function isianBaris(b, nomor) {
-      var it = infoItem(b.item);
+      var it = infoBaris(b);
       var gKat = grupPilihan('Kategori waste', KATEGORI_WASTE, b.kategori);
       gKat.wadah.querySelector('fieldset').classList.add('pilihan-kategori-waste');
       var idQty = 'qty-waste-' + nomor;
-      var inQty = el('input', { class: 'isian isian-angka', id: idQty, type: 'text', inputmode: 'decimal', autocomplete: 'off',
+      var inQty = el('input', { class: 'isian isian-angka', id: idQty, type: 'text', inputmode: b.menu ? 'numeric' : 'decimal', autocomplete: 'off',
         'data-kunci': b.id + '|qty' });
       inQty.value = b.qty || '';
       var galatQty = el('p', { class: 'kolom-galat' });
@@ -4865,12 +4882,12 @@
 
       function perbarui() {
         var h = periksa(b);
-        var qtySalah = h.qty !== null && (isNaN(h.qty) || !(h.qty > 0));
+        var qtySalah = h.qty !== null && !qtySah(b, h.qty);
         inQty.setAttribute('aria-invalid', qtySalah ? 'true' : 'false');
         kosongkan(galatQty);
         if (qtySalah) {
           galatQty.appendChild(ikonStatus('masalah'));
-          galatQty.appendChild(el('span', { text: 'Isi angka lebih dari 0, misalnya 2,5.' }));
+          galatQty.appendChild(el('span', { text: b.menu ? 'Isi jumlah porsi bilangan bulat, misalnya 2.' : 'Isi angka lebih dari 0, misalnya 2,5.' }));
         }
         bantuanAlasan.textContent = b.kategori === 'Lainnya' ? 'Wajib diisi untuk kategori Lainnya.' : 'Tidak wajib.';
         estimasi.textContent = teksEstimasi(b);
@@ -4902,9 +4919,16 @@
         foto: bagianFoto(b, mediaDesktop.matches) };
     }
 
+    var TEKS_MENU_STOCK = 'Bahannya tidak dikurangi lagi dari stock, karena sudah tercatat keluar saat dimasak.';
+
+    /** Isi nama baris; baris menu diberi tanda "Menu". */
+    function isiNama(b) {
+      return b.menu ? [b.item, ' ', el('span', { class: 'tanda-menu', text: 'Menu' })] : b.item;
+    }
+
     /** Ringkasan satu baris (HP dan tablet): item yang sudah diisi diringkas; ketuk untuk membuka. */
     function barisRingkas(b) {
-      var it = infoItem(b.item);
+      var it = infoBaris(b);
       var h = periksa(b);
       var bagian = [b.kategori || 'Kategori belum dipilih'];
       if (h.qty > 0) bagian.push(formatAngka(h.qty) + (it.satuan ? ' ' + it.satuan : ''));
@@ -4912,9 +4936,9 @@
       if (b.foto) bagian.push('ada foto');
       var kartu = el('div', { class: 'kartu-item waste-ringkas' }, [
         el('button', { type: 'button', class: 'waste-ringkas-tombol', 'aria-expanded': 'false',
-          'aria-label': b.item + ', ' + bagian.join(', ') + (h.salah ? ', belum lengkap' : '') + '. Ketuk untuk mengubah.',
+          'aria-label': b.item + (b.menu ? ' (menu)' : '') + ', ' + bagian.join(', ') + (h.salah ? ', belum lengkap' : '') + '. Ketuk untuk mengubah.',
           onclick: function () { bukaBaris(b.id); } }, [
-          el('span', { class: 'kartu-item-nama', text: b.item }),
+          el('span', { class: 'kartu-item-nama' }, isiNama(b)),
           el('span', { class: 'waste-ringkas-ket', text: bagian.join(' · ') }),
           h.salah ? tandaStatus('tinjau', 'Belum lengkap') : null
         ]),
@@ -4927,14 +4951,15 @@
 
     function kartuTerbuka(b, nomor) {
       var x = isianBaris(b, nomor);
-      var kartu = el('article', { class: 'kartu-item', 'aria-label': b.item }, [
+      var kartu = el('article', { class: 'kartu-item', 'aria-label': b.item + (b.menu ? ' (menu)' : '') }, [
         el('div', { class: 'kartu-item-kepala' }, [
-          el('h2', { class: 'kartu-item-nama', text: b.item }),
+          el('h2', { class: 'kartu-item-nama' }, isiNama(b)),
           x.hapus
         ]),
+        b.menu ? el('p', { class: 'kolom-bantuan', text: TEKS_MENU_STOCK }) : null,
         x.gKat.wadah,
         el('div', { class: 'kolom' }, [
-          el('label', { class: 'kolom-label', for: x.idQty, text: 'Qty' }),
+          el('label', { class: 'kolom-label', for: x.idQty, text: b.menu ? 'Porsi' : 'Qty' }),
           el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]),
           x.galatQty
         ]),
@@ -4949,12 +4974,13 @@
 
     function barisTabel(b, nomor) {
       var x = isianBaris(b, nomor);
-      x.inQty.setAttribute('aria-label', 'Qty ' + b.item);
+      x.inQty.setAttribute('aria-label', (b.menu ? 'Porsi ' : 'Qty ') + b.item);
       x.kAlasan.wadah.querySelector('label').classList.add('sr');
       x.gKat.wadah.querySelector('legend').classList.add('sr');
       return el('tr', {}, [
         el('td', { class: 'angka', text: String(nomor) }),
-        el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: b.item })),
+        el('td', { class: 'nama-item' }, [el('span', { class: 'daftar-baris-judul' }, isiNama(b)),
+          b.menu ? el('span', { class: 'kolom-bantuan', text: 'Stock bahan tidak berubah' }) : null]),
         el('td', { class: 'sel-kategori-waste' }, x.gKat.wadah),
         el('td', {}, [el('div', { class: 'baris-angka' }, [x.inQty, el('span', { class: 'satuan-tetap', text: x.it.satuan })]), x.galatQty]),
         el('td', { class: 'sel-alasan' }, x.kAlasan.wadah),
@@ -5023,8 +5049,40 @@
       var lembar = bukaLembar({ judul: 'Tambah item waste', isi: [kCari.wadah, hasil], aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
     }
 
-    function tambahBaris(nama) {
-      var b = { id: buatId(), item: nama, kategori: '', qty: '', alasan: '' };
+    /** Lembar "Tambah menu": menu yang terbuang (salah order, dikembalikan pelanggan), dicatat per porsi. */
+    function bukaTambahMenu() {
+      var daftar = data && data.menu || [];
+      var kCari = kolomIsian({ label: 'Cari menu', atribut: { type: 'search', autocapitalize: 'none', spellcheck: 'false' } });
+      var hasil = el('div', { class: 'daftar daftar-pilih-item', role: 'list' });
+      function saring() {
+        var q = kCari.input.value.trim().toLowerCase();
+        kosongkan(hasil);
+        var cocok = daftar.filter(function (m) { return !q || m.nama.toLowerCase().indexOf(q) >= 0; });
+        if (!cocok.length) {
+          hasil.appendChild(kotakKosong(daftar.length ? 'Tidak ada menu dengan nama itu.' : 'Belum ada menu aktif.'));
+          return;
+        }
+        cocok.slice(0, 60).forEach(function (m) {
+          hasil.appendChild(el('button', { type: 'button', class: 'daftar-baris', role: 'listitem',
+            onclick: function () { tambahBaris(m.nama, true); lembar.tutup(); } }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul', text: m.nama }),
+              el('span', { class: 'daftar-baris-ket', text: rupiah ? (m.hpp != null ? 'HPP ' + formatRupiah(m.hpp) + ' per porsi' : 'HPP belum lengkap') : 'Menu' })
+            ]),
+            ikon('tambah')
+          ]));
+        });
+      }
+      kCari.input.addEventListener('input', saring);
+      saring();
+      var lembar = bukaLembar({ judul: 'Tambah menu waste', isi: [
+        el('p', { class: 'kartu-teks', text: 'Untuk menu yang terbuang: salah order atau dikembalikan pelanggan. Dicatat per porsi. ' + TEKS_MENU_STOCK }),
+        kCari.wadah, hasil], aksi: [{ teks: 'Tutup', jenis: 'kedua' }] });
+    }
+
+    function tambahBaris(nama, menu) {
+      var b = { id: buatId(), item: nama, kategori: menu ? 'Kesalahan Order' : '', qty: '', alasan: '' };
+      if (menu) b.menu = true;
       draft.baris.push(b);
       draft.terbuka = b.id;
       simpanDraft();
@@ -5035,6 +5093,7 @@
       }
     }
     tombolTambah.addEventListener('click', bukaTambahItem);
+    tombolMenu.addEventListener('click', bukaTambahMenu);
 
     function gambarStatus() {
       kosongkan(statusForm);
@@ -5070,6 +5129,7 @@
 
     function gambar(d) {
       data = d;
+      tombolMenu.hidden = !(d.menuSiap && (d.menu || []).length);
       gambarStatus();
       gambarBaris();
     }
@@ -5100,7 +5160,8 @@
       });
       if (salah) {
         var teks = salah.jenis === 'kategori' ? 'Pilih kategori waste untuk ' + salah.b.item + '.'
-          : (salah.jenis === 'qty' ? 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.'
+          : (salah.jenis === 'qty' ? (salah.b.menu ? 'Isi porsi ' + salah.b.item + ' dengan bilangan bulat, misalnya 2.'
+            : 'Isi Qty ' + salah.b.item + ' lebih dari 0, misalnya 2,5.')
             : 'Tulis alasan untuk ' + salah.b.item + ', karena kategorinya Lainnya.');
         if (!mediaDesktop.matches && draft.terbuka !== salah.b.id) bukaBaris(salah.b.id);
         tulisPesan(pesan, teks, 'masalah');
@@ -5111,7 +5172,8 @@
       }
       if (!draft.sid) draft.sid = buatId();
       var baris = draft.baris.map(function (b) {
-        var x = { item: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() };
+        var x = b.menu ? { menu: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() }
+          : { item: b.item, kategori: b.kategori, qty: bacaAngka(b.qty), alasan: String(b.alasan || '').trim() };
         if (b.foto) x.fotoId = b.foto.id; // foto ikut ke antrean lewat id-nya (IndexedDB)
         return x;
       });
@@ -7122,7 +7184,7 @@
   function ringkasBaris(b, kolom) {
     var nama = kolomNama(kolom);
     var isi = [];
-    if (nama) isi.push(el('span', { class: 'ringkas-nama', text: b.nilai[nama.kunci] || '–' }));
+    if (nama) isi.push(el('span', { class: 'ringkas-nama', text: (b.nilai[nama.kunci] || '–') + (b.menu ? ' (menu)' : '') }));
     var bagian = [];
     kolom.forEach(function (k) {
       if (k === nama || k.ringkas === false) return;
@@ -8036,6 +8098,8 @@
       var v = nama ? b.nilai[nama.kunci] : '';
       // Kolom nama form kustom boleh dikoreksi: nilai lamanya ditulis dicoret.
       var kor = nama && b.koreksi && b.koreksi[nama.kunci];
+      // Waste per porsi menu (aplikasi 0.37.0): nama menu, bukan item, jadi tidak membuka riwayat item.
+      if (b.menu) return el('span', { class: 'daftar-baris-judul' }, [v || '–', ' ', el('span', { class: 'tanda-menu', text: 'Menu' })]);
       if (nama && nama.jenis === 'item' && v) {
         return kor ? el('span', {}, [el('del', { class: 'nilai-lama' }, [el('span', { class: 'sr', text: 'Nilai lama ' }), kor.lama || '(kosong)']), ' ',
           tombolNamaItem(v)]) : tombolNamaItem(v);
@@ -13923,6 +13987,8 @@
         ]),
         p.wasteBarangJadi ? el('p', { class: 'kolom-bantuan', text: 'Waste barang jadi ' + formatRupiah(p.wasteBarangJadi) +
           ' tidak ditambahkan, karena bahannya sudah terhitung saat prep.' }) : null,
+        p.wasteMenu && p.wasteMenu.porsi ? el('p', { class: 'kolom-bantuan', text: 'Waste menu ' + p.wasteMenu.porsi + ' porsi (' +
+          formatRupiah(p.wasteMenu.nilai) + ', salah order atau dikembalikan) sudah termasuk di Terpakai, karena bahannya tercatat keluar saat dimasak.' }) : null,
         p.stokPembuka ? el('p', { class: 'kolom-bantuan', text: 'Stok pembuka ' + formatRupiah(p.stokPembuka) +
           ' tidak dihitung sebagai selisih stock.' }) : null
       ]);
@@ -13977,6 +14043,10 @@
         ]),
         t.foodCostSeharusnya != null ? el('p', { class: 'kolom-bantuan', text: 'Food cost seharusnya ' + formatPersen(t.foodCostSeharusnya) +
           ', nyata ' + formatPersen(h.foodCost) + '.' }) : null,
+        // Porsi terbuang (waste per porsi menu, Code.gs v0.37): bahannya terpakai tetapi porsinya tidak terjual.
+        t.wastePorsi && t.wastePorsi.porsi ? el('p', { class: 'kolom-bantuan', text: 'Termasuk di selisih: ' + t.wastePorsi.porsi +
+          ' porsi terbuang (salah order atau dikembalikan), ' + formatRupiah(t.wastePorsi.nilai) +
+          (t.selisih != null ? '. Selisih tanpa porsi terbuang ' + rupiahBertanda(t.selisih - t.wastePorsi.nilai) : '') + '.' }) : null,
         el('details', { class: 'hpp-rinci' }, [
           el('summary', { text: 'Bahan menu dan bahan lain' }),
           el('div', { class: 'daftar-nilai' }, [
