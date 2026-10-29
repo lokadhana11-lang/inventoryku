@@ -4825,6 +4825,15 @@ body.papan-ketik .bilah-kirim {
   margin-top: 8px;
 }
 
+/* Tambah item (aplikasi 0.38.0): tombol di bawah daftar kelompok; ikon hapus di baris item tambahan */
+.belanja-tambah {
+  margin-top: 4px;
+}
+
+.belanja-hapus {
+  align-self: flex-start;
+}
+
 .belanja-kelompok .pesan-formulir:empty,
 .kartu > .pesan-formulir:empty {
   display: none;

@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.37.0';
+  var VERSI_APLIKASI = '0.38.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -10203,10 +10203,17 @@
    * jika item punya), bisa diubah di layar (hanya di memori). Sejak aplikasi
    * 0.29.0 dikelompokkan per pemasok, dengan "Kirim ke WhatsApp" per kelompok
    * (yang juga mencatat pesanan) dan daftar pesanan yang belum datang. Server
-   * lama (tanpa `pemasok`): per kategori seperti dulu.
+   * lama (tanpa `pemasok`): per kategori seperti dulu. Sejak aplikasi 0.38.0
+   * (Code.gs v0.38, `itemLain`) tiap kelompok punya "Tambah item" untuk item
+   * yang stock-nya tidak di bawah minimum, dan kelompok tanpa pemasok selalu
+   * ada ("Pemasok lain") untuk pesanan ke pemasok yang belum punya kelompok.
    */
   function kartuDaftarBelanja() {
     var order = {};
+    // Item yang ditambah di layar (hanya di memori): nama pemasok kelompok ('' = tanpa pemasok) → [nama item].
+    var tambahan = {};
+    // Kelompok yang sedang digambar (kelompok server ditambah item tambahan).
+    var kelompokTampil = [];
     // Isi pesanan → submissionId, supaya ketukan berulang dengan isi yang sama tidak mencatat dua pesanan.
     var sidPesanan = {};
     // Pesanan yang menunggu di antrean HP: id → nama item, supaya Order-nya kembali kosong setelah terkirim.
@@ -10216,7 +10223,7 @@
     var wadah = el('div', { class: 'belanja' });
     var pesanKartu = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite', tabindex: '-1' });
     var catatan = el('p', { class: 'kolom-bantuan' });
-    var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: orderCetak() }; } });
+    var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: orderCetak(), tambahan: daftarTambahan() }; } });
     var kartu = el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-belanja' }, [
       el('h2', { class: 'kartu-judul', id: 'judul-belanja', text: 'Daftar belanja' }),
       pesanKartu,
@@ -10226,10 +10233,11 @@
       unduh.pesan
     ]);
     var perKelompok = function () { return data && Array.isArray(data.pemasok); };
+    var bisaTambah = function () { return perKelompok() && Array.isArray(data.itemLain); };
 
-    /** Order awal di layar: saran; kosong untuk item yang sudah dipesan dan item yang belum punya pemasok. */
+    /** Order awal di layar: saran; kosong untuk item yang sudah dipesan, item yang belum punya pemasok, dan item tambahan. */
     function orderBawaan(it, g) {
-      if (!it.saran) return '';
+      if (!it.saran || it.ditambah) return '';
       if (g && (it.dipesan || !g.nama)) return '';
       return teksIsianAngka(it.saran.jumlah);
     }
@@ -10242,11 +10250,101 @@
     function orderCetak() {
       if (!perKelompok()) return order;
       var hasil = {};
-      data.pemasok.forEach(function (g) { g.item.forEach(function (it) { hasil[it.nama] = nilaiOrder(it, g); }); });
+      kelompokTampil.forEach(function (g) { g.item.forEach(function (it) { hasil[it.nama] = nilaiOrder(it, g); }); });
       return hasil;
     }
 
-    function barisItem(it, nomor, g, gantiOrder) {
+    /** Item tambahan untuk PDF: [{ pemasok, item }]. */
+    function daftarTambahan() {
+      var hasil = [];
+      Object.keys(tambahan).forEach(function (k) { tambahan[k].forEach(function (n) { hasil.push({ pemasok: k, item: n }); }); });
+      return hasil;
+    }
+
+    function hapusTambahan(nama) {
+      Object.keys(tambahan).forEach(function (k) {
+        tambahan[k] = tambahan[k].filter(function (n) { return n !== nama; });
+        if (!tambahan[k].length) delete tambahan[k];
+      });
+    }
+
+    /**
+     * Item tambahan dirapikan dengan data server terbaru: yang tidak aktif lagi atau sekarang di bawah minimum (sudah ada di
+     * kelompok server) dibuang; yang pemasoknya tidak aktif lagi pindah ke kelompok tanpa pemasok.
+     */
+    function rapikanTambahan(d) {
+      var lain = {};
+      d.itemLain.forEach(function (it) { lain[it.nama.toLowerCase()] = it; });
+      var nama = {};
+      d.pemasok.forEach(function (g) { if (g.nama) nama[g.nama.toLowerCase()] = g.nama; });
+      (d.pilihanPemasok || []).forEach(function (p) { nama[p.nama.toLowerCase()] = nama[p.nama.toLowerCase()] || p.nama; });
+      var baru = {};
+      var sudah = {};
+      Object.keys(tambahan).forEach(function (k) {
+        var kunci = k ? (nama[k.toLowerCase()] || '') : '';
+        tambahan[k].forEach(function (n) {
+          var it = lain[n.toLowerCase()];
+          if (!it || sudah[it.nama]) return;
+          sudah[it.nama] = true;
+          (baru[kunci] = baru[kunci] || []).push(it.nama);
+        });
+      });
+      tambahan = baru;
+    }
+
+    /** Kelompok yang digambar: kelompok server dengan item tambahannya; kelompok tanpa pemasok selalu ada (paling bawah). */
+    function susunKelompok(d) {
+      var hasil = d.pemasok.map(function (g) { return Object.assign({}, g, { item: g.item.slice() }); });
+      if (!bisaTambah()) return hasil;
+      var lain = {};
+      d.itemLain.forEach(function (it) { lain[it.nama] = it; });
+      var pilihan = {};
+      (d.pilihanPemasok || []).forEach(function (p) { pilihan[p.nama] = p; });
+      var peta = {};
+      hasil.forEach(function (g) { peta[g.nama] = g; });
+      var siapkan = function (k) {
+        if (!peta[k]) {
+          var p = pilihan[k];
+          peta[k] = { nama: k, kontak: p ? p.kontak || '' : '', wa: p ? p.wa : '', item: [] };
+          hasil.push(peta[k]);
+        }
+        return peta[k];
+      };
+      Object.keys(tambahan).forEach(function (k) {
+        var g = siapkan(k);
+        tambahan[k].forEach(function (n) { g.item.push(Object.assign({}, lain[n], { ditambah: true })); });
+      });
+      siapkan('');
+      return hasil.sort(function (a, b) {
+        if (!a.nama !== !b.nama) return a.nama ? -1 : 1;
+        return a.nama.localeCompare(b.nama, 'id');
+      });
+    }
+
+    /** Lembar "Tambah item ke pesanan …": item aktif yang belum ada di daftar. */
+    function bukaTambah(g, judul) {
+      var ada = {};
+      kelompokTampil.forEach(function (x) { x.item.forEach(function (it) { ada[it.nama] = true; }); });
+      bukaPilihItem({
+        judul: g.nama ? 'Tambah item ke pesanan ' + g.nama : 'Tambah item ke ' + judul,
+        daftar: data.itemLain.filter(function (it) { return !ada[it.nama]; }),
+        kosong: 'Semua item aktif sudah ada di daftar belanja.',
+        ket: function (it) {
+          return it.kategori + ' · stock ' + formatAngka(it.stock) + ' ' + it.satuan + (it.dipesan ? ' · sudah dipesan' : '');
+        },
+        pilih: function (it) {
+          (tambahan[g.nama] = tambahan[g.nama] || []).push(it.nama);
+          delete order[it.nama];
+          // Kelompok tanpa pemasok: "Pesan ke" diisi pemasok terakhir item pertama yang ditambah.
+          if (!g.nama && !pesanKe && it.terakhir && !it.terakhir.nonaktif) pesanKe = it.terakhir.pemasok;
+          gambar(data);
+          var input = Array.prototype.filter.call(wadah.querySelectorAll('input[data-item]'), function (x) { return x.dataset.item === it.nama; })[0];
+          if (input) input.focus();
+        }
+      });
+    }
+
+    function barisItem(it, nomor, g, gantiOrder, hapus) {
       var satuanOrder = it.satuanBesar && it.isiSatuanBesar > 0 ? it.satuanBesar : it.satuan;
       var input = el('input', {
         class: 'isian isian-angka',
@@ -10254,7 +10352,8 @@
         inputmode: 'decimal',
         autocomplete: 'off',
         id: 'order-' + nomor,
-        'aria-describedby': 'order-ket-' + nomor
+        'aria-describedby': 'order-ket-' + nomor,
+        'data-item': it.nama
       });
       input.value = nilaiOrder(it, g);
       var ket = el('span', { class: 'konversi', id: 'order-ket-' + nomor });
@@ -10274,17 +10373,22 @@
         if (gantiOrder) gantiOrder();
       });
       perbarui();
-      var info = 'Stock ' + formatAngka(it.stock) + ' ' + it.satuan + ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan;
+      var info = 'Stock ' + formatAngka(it.stock) + ' ' + it.satuan +
+        (it.stokMin != null ? ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan : '');
+      var teksSaran = it.saran ? 'Saran ' + it.saran.teks : (it.ditambah ? '' : 'Tanpa saran: stok maksimum kosong');
       return el('div', { class: 'daftar-baris peristiwa tetap belanja-baris' }, [
         el('span', { class: 'daftar-baris-isi' }, [
           el('span', { class: 'daftar-baris-judul', text: it.nama }),
           el('span', { class: 'daftar-baris-ket' + (it.stock < 0 ? ' nilai-masalah' : ''), text: info }),
-          el('span', { class: 'daftar-baris-ket', text: it.saran ? 'Saran ' + it.saran.teks : 'Tanpa saran: stok maksimum kosong' }),
+          teksSaran ? el('span', { class: 'daftar-baris-ket', text: teksSaran }) : null,
           it.dipesan ? el('span', { class: 'daftar-baris-ket' }, [tandaStatus('menunggu', 'Dipesan ' + formatAngka(it.dipesan.jumlah) + ' ' +
             it.dipesan.satuanOrder), ' dari ' + it.dipesan.pemasok + ', ' + tanggalPendek(it.dipesan.tanggal)]) : null,
           g && !g.nama && it.terakhir && it.terakhir.nonaktif
             ? el('span', { class: 'daftar-baris-ket', text: 'Terakhir dari ' + it.terakhir.pemasok + ' (nonaktif)' }) : null
         ]),
+        // Ikon hapus sebelum kolom Order, supaya kolom Order tetap sejajar dengan baris lain (HP: di kanan nama item).
+        hapus ? el('button', { type: 'button', class: 'tombol-ikon belanja-hapus', 'aria-label': hapus.label, onclick: hapus.jalankan },
+          ikon('sampah')) : null,
         el('div', { class: 'belanja-order' }, [
           el('label', { class: 'kolom-label', for: input.id, text: 'Order' }),
           el('div', { class: 'baris-angka' }, [input, el('span', { class: 'satuan-tetap', text: satuanOrder })]),
@@ -10339,6 +10443,27 @@
     function kelompok(d, g, nomorAwal) {
       var tanpaPemasok = !g.nama;
       var idKel = 'belanja-kel-' + nomorAwal;
+      var adaServer = g.item.some(function (it) { return !it.ditambah; });
+      var judul = tanpaPemasok ? (adaServer ? 'Belum ada pemasok' : 'Pemasok lain') : g.nama;
+      var tombolTambah = null;
+      if (bisaTambah()) {
+        tombolTambah = tombol('Tambah item', 'kedua', { 'aria-haspopup': 'dialog', 'data-kelompok': g.nama,
+          'aria-label': 'Tambah item ke ' + (tanpaPemasok ? 'kelompok ' : 'pesanan ') + judul, onclick: function () { bukaTambah(g, judul); } });
+        tombolTambah.insertBefore(ikon('tambah'), tombolTambah.lastChild);
+      }
+      var keterangan = tanpaPemasok
+        ? el('p', { class: 'kolom-bantuan', text: adaServer
+          ? 'Item yang belum punya pemasok aktif dari barang masuk. Isi Order untuk yang dipesan, lalu pilih pemasoknya.'
+          : 'Untuk pesanan ke pemasok lain: ketuk Tambah item, isi Order, lalu pilih pemasoknya di Pesan ke.' })
+        : (g.kontak ? el('p', { class: 'kolom-bantuan', text: 'Kontak ' + g.kontak }) : null);
+      // Kelompok tanpa pemasok yang belum berisi: judul, keterangan, dan Tambah item saja.
+      if (!g.item.length) {
+        return el('section', { class: 'belanja-kelompok', 'aria-labelledby': idKel }, [
+          el('h3', { class: 'judul-sub', id: idKel, text: judul }),
+          keterangan,
+          el('div', { class: 'deret-tombol belanja-tambah' }, [tombolTambah])
+        ]);
+      }
       var link = el('a', { class: 'tombol tombol-kedua belanja-wa', target: '_blank', rel: 'noopener', 'aria-describedby': idKel + '-info' },
         el('span', { class: 'tombol-teks', text: 'Kirim ke WhatsApp' }));
       var info = el('p', { class: 'kolom-bantuan', id: idKel + '-info' });
@@ -10424,8 +10549,12 @@
           // Id hanya dipakai ulang selama pesanan ini belum tercatat (ketukan ganda); pesanan berikutnya dengan isi yang sama
           // adalah pesanan baru.
           delete sidPesanan[kunci];
-          // Item yang sudah dipesan kembali ke Order awal (kosong, karena sekarang bertanda Dipesan).
-          isi.baris.forEach(function (b) { delete order[b.nama]; });
+          // Item yang sudah dipesan kembali ke Order awal (kosong, karena sekarang bertanda Dipesan); item tambahan keluar dari
+          // daftar (tampil di Pesanan belum datang).
+          isi.baris.forEach(function (b) {
+            delete order[b.nama];
+            hapusTambahan(b.nama);
+          });
           var bagian = [h.sudahTerkirim ? 'Pesanan ke ' + t.nama + ' ini sudah tercatat.'
             : 'Pesanan ke ' + t.nama + ' dicatat (' + isi.baris.length + ' item).'];
           var lain = teksCatatPesanan(h);
@@ -10449,15 +10578,26 @@
         });
       }
 
-      var judul = tanpaPemasok ? 'Belum ada pemasok' : g.nama;
       var bagian = el('section', { class: 'belanja-kelompok', 'aria-labelledby': idKel }, [
         el('h3', { class: 'judul-sub', id: idKel, text: judul }),
-        tanpaPemasok
-          ? el('p', { class: 'kolom-bantuan', text: 'Item yang belum punya pemasok aktif dari barang masuk. Isi Order untuk yang dipesan, lalu pilih pemasoknya.' })
-          : (g.kontak ? el('p', { class: 'kolom-bantuan', text: 'Kontak ' + g.kontak }) : null),
+        keterangan,
         el('div', { class: 'daftar', role: 'group', 'aria-label': judul }, g.item.map(function (it, i) {
-          return barisItem(it, nomorAwal + i + 1, g, perbaruiGrup);
+          return barisItem(it, nomorAwal + i + 1, g, perbaruiGrup, it.ditambah ? {
+            label: 'Hapus ' + it.nama + ' dari ' + (tanpaPemasok ? 'kelompok ' : 'pesanan ') + judul,
+            jalankan: function () {
+              hapusTambahan(it.nama);
+              delete order[it.nama];
+              gambar(data);
+              // Fokus ke Tambah item kelompok itu (atau kelompok tanpa pemasok, jika kelompoknya hilang).
+              var semua = wadah.querySelectorAll('button[data-kelompok]');
+              var cari = function (k) { return Array.prototype.filter.call(semua, function (x) { return x.dataset.kelompok === k; })[0]; };
+              var t = cari(g.nama) || cari('');
+              if (t) t.focus();
+              toast(it.nama + ' dihapus dari pesanan.');
+            }
+          } : null);
         })),
+        tombolTambah ? el('div', { class: 'deret-tombol belanja-tambah' }, [tombolTambah]) : null,
         pilih ? el('div', { class: 'kolom belanja-pesan-ke' }, [el('label', { class: 'kolom-label', for: pilih.id, text: 'Pesan ke' }), pilih]) : null,
         el('div', { class: 'deret-tombol belanja-wa-deret' }, [link]),
         info,
@@ -10484,17 +10624,22 @@
       data = d;
       kosongkan(wadah);
       unduh.reset();
+      if (bisaTambah()) rapikanTambahan(d);
+      else tambahan = {};
+      kelompokTampil = perKelompok() ? susunKelompok(d) : [];
       // Jumlah yang diubah untuk item yang tidak ada lagi di daftar dibuang.
       var ada = {};
       (d.kategori || []).forEach(function (g) { g.item.forEach(function (it) { ada[it.nama] = true; }); });
+      kelompokTampil.forEach(function (g) { g.item.forEach(function (it) { ada[it.nama] = true; }); });
       Object.keys(order).forEach(function (n) { if (!ada[n]) delete order[n]; });
-      unduh.tombol.disabled = !d.jumlah;
-      catatan.hidden = !d.jumlah;
+      var jumlahTambah = daftarTambahan().length;
+      unduh.tombol.disabled = !d.jumlah && !jumlahTambah;
+      catatan.hidden = !d.jumlah && !jumlahTambah;
       var menunggu = perKelompok() ? bagianMenunggu(d) : null;
       if (!d.jumlah) {
         wadah.appendChild(kotakKosong('Semua stock di atas batas minimum.', 'centang'));
         if (menunggu) wadah.appendChild(menunggu);
-        return;
+        if (!bisaTambah()) return;
       }
       if (!perKelompok()) {
         catatan.textContent = 'Perubahan di sini hanya untuk cetakan.';
@@ -10503,11 +10648,14 @@
       }
       catatan.textContent = 'Angka Order dipakai untuk pesan WhatsApp dan PDF, dan tidak disimpan. Ketukan Kirim ke WhatsApp mencatat pesanan ' +
         'ke pemasok itu; jika pesannya tidak jadi dikirim, ketuk Tutup pesanan.';
-      wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum, dikelompokkan menurut pemasok. ' +
-        'Saran order = stok maksimum − stock akhir, dibulatkan ke atas ke satuan besar.' }));
-      if (menunggu) wadah.appendChild(menunggu);
+      if (d.jumlah) {
+        wadah.appendChild(el('p', { class: 'kartu-teks', text: d.jumlah + ' item di bawah stok minimum, dikelompokkan menurut pemasok. ' +
+          'Saran order = stok maksimum − stock akhir, dibulatkan ke atas ke satuan besar.' +
+          (bisaTambah() ? ' Item lain bisa ditambah lewat Tambah item di tiap kelompok.' : '') }));
+        if (menunggu) wadah.appendChild(menunggu);
+      }
       var nomor = 0;
-      d.pemasok.forEach(function (g) {
+      kelompokTampil.forEach(function (g) {
         wadah.appendChild(kelompok(d, g, nomor));
         nomor += g.item.length;
       });
@@ -10532,7 +10680,10 @@
       var lepas = false;
       Object.keys(diAntrean).forEach(function (id) {
         if (masih[id]) return;
-        diAntrean[id].item.forEach(function (n) { delete order[n]; });
+        diAntrean[id].item.forEach(function (n) {
+          delete order[n];
+          hapusTambahan(n);
+        });
         delete sidPesanan[diAntrean[id].kunci];
         delete diAntrean[id];
         lepas = true;

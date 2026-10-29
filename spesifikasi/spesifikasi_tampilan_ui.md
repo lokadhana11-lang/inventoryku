@@ -40,6 +40,8 @@
 > di lembar Nilai stock dan Pengaturan → Item (Bagian 5.6 dan 5.7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
+> Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
+> kelompok "Pemasok lain" (Bagian 5.9).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -1294,9 +1296,24 @@ Satu-satunya layar yang sepenuhnya navy.
   minimum, saran, dan kolom "Order". Item yang sudah dipesan memakai tanda Menunggu "Dipesan 5 kg"
   ditambah "dari Sumber Segar, 21 Okt"; item yang pemasok terakhirnya nonaktif ditulis "Terakhir
   dari Toko Lama (nonaktif)".
-- Order terisi saran, kecuali untuk item yang sudah dipesan dan item di "Belum ada pemasok" (kosong).
-  Keterangan Order kosong: "Kosong: tidak ikut dipesan." atau "Kosong: sudah dipesan, tidak ikut
-  dipesan lagi."
+- Order terisi saran, kecuali untuk item yang sudah dipesan, item di "Belum ada pemasok", dan item
+  tambahan (kosong). Keterangan Order kosong: "Kosong: tidak ikut dipesan." atau "Kosong: sudah dipesan,
+  tidak ikut dipesan lagi."
+- **Tambah item** (29 Oktober 2026; spesifikasi sistem Bagian 9.2): tombol kedua berikon tambah di bawah
+  daftar tiap kelompok (nama untuk pembaca layar "Tambah item ke pesanan Sumber Segar"). Lembar "Tambah
+  item ke pesanan Sumber Segar" berisi "Cari item" dan item aktif yang belum ada di daftar ("Protein ·
+  stock 4 kg", ditambah "· sudah dipesan" bila perlu), seperti Tambah item di form Waste. Item yang
+  dipilih masuk di bawah item kelompok itu dengan Order kosong (kolomnya langsung difokus), keterangan
+  "Stock 4 kg · minimum 3 kg" (tanpa minimum jika item tidak punya stok minimum) dan saran jika ada, serta
+  ikon tempat sampah (48 px) sebelum kolom Order, sehingga kolom Order tetap sejajar ("Hapus Daging sapi
+  dari pesanan Sumber Segar"; sesudah dihapus fokus kembali ke Tambah item dan pesan singkat "Daging sapi
+  dihapus dari pesanan."). Kalimat pembuka kartu ditambah "Item lain bisa ditambah lewat Tambah item di
+  tiap kelompok."
+- **Pemasok lain:** kelompok tanpa pemasok selalu ada paling bawah. Jika tidak berisi item di bawah
+  minimum, judulnya "Pemasok lain" dengan keterangan "Untuk pesanan ke pemasok lain: ketuk Tambah item,
+  isi Order, lalu pilih pemasoknya di Pesan ke."; selama kosong hanya berisi keterangan dan Tambah item,
+  dan "Pesan ke" serta Kirim ke WhatsApp muncul setelah ada item. "Pesan ke" yang masih kosong diisi
+  pemasok barang masuk terakhir item pertama yang ditambah.
 - Saran yang dibulatkan ke satuan besar ditulis lengkap: "2 dus (24 botol)".
 - Di bawah tiap kelompok: tombol kedua **"Kirim ke WhatsApp"** (tautan yang membuka WhatsApp di tab
   atau aplikasi baru) dan keterangan "Pesan berisi 2 item." ditambah, bila perlu, "Kontak Toko Ayam
@@ -1321,7 +1338,8 @@ Satu-satunya layar yang sepenuhnya navy.
   Kirim ke WhatsApp mencatat pesanan ke pemasok itu; jika pesannya tidak jadi dikirim, ketuk Tutup
   pesanan."
 - Tombol utama tetap satu: "Unduh PDF". Jika tidak ada item di bawah minimum: "Semua stock di atas
-  batas minimum." (pesanan yang belum datang tetap tampil di bawahnya).
+  batas minimum." (pesanan yang belum datang dan kelompok "Pemasok lain" tetap tampil di bawahnya;
+  Unduh PDF aktif setelah ada item tambahan).
 - Server lama (sebelum Code.gs v0.29): per kategori seperti dulu, tanpa WhatsApp, dengan "Perubahan
   di sini hanya untuk cetakan."
 
@@ -1518,7 +1536,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Stock semua kategori | "3 kategori terkirim.", "1 kategori tersimpan di HP. Dikirim saat ada sinyal.", galat "Bumbu: …" |
 | Hitung sisa | "Sisa sekarang", "Keluar 9 kg.", "Sisa Ayam fillet 12 kg tidak dicatat: lebih banyak dari stock tercatat 10 kg. Periksa hitungannya, atau minta Pengelola meluruskan stock.", "Hitung sisa hanya untuk hari ini." |
 | Cari item | "3 dari 11 item tampil.", "Tidak ada item dengan nama itu." |
-| Pesanan ke pemasok | "Kirim ke WhatsApp", "Pesanan ke Sumber Segar dicatat (2 item).", "Pesanan tersimpan di HP dan dicatat saat ada sinyal.", "Dipesan Budi lewat WhatsApp, 21 Okt", "Tutup pesanan", "Pesanan Sumber Segar, 21 Okt ditutup.", "Pesanan Sumber Segar sudah tidak menunggu: barangnya sudah dicatat datang, atau pesanannya sudah ditutup." |
+| Pesanan ke pemasok | "Kirim ke WhatsApp", "Pesanan ke Sumber Segar dicatat (2 item).", "Pesanan tersimpan di HP dan dicatat saat ada sinyal.", "Dipesan Budi lewat WhatsApp, 21 Okt", "Tutup pesanan", "Pesanan Sumber Segar, 21 Okt ditutup.", "Pesanan Sumber Segar sudah tidak menunggu: barangnya sudah dicatat datang, atau pesanannya sudah ditutup.", "Tambah item", "Tambah item ke pesanan Sumber Segar", "Pemasok lain", "Daging sapi dihapus dari pesanan." |
 | Isi dari pesanan | "Isi dari pesanan", "Tambah masuk Tomat diisi dari pesanan Sumber Segar. Periksa jumlah yang datang, lalu Kirim stock.", "Pesanan Tomat dari Sumber Segar tercatat datang.", "Tambah masuk Tomat tidak dicatat: pesanan Sumber Segar sudah dicatat datang oleh Rina, 22 Okt 07.10. Jika ini kiriman lain, catat lagi Tambah masuk-nya tanpa Isi dari pesanan." |
 | Laporan kekeliruan terkirim | "Laporan terkirim ke Pengelola." |
 | Menu tersimpan | "Menu tersimpan." |

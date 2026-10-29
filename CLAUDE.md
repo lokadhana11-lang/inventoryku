@@ -332,6 +332,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   ditambah `wasteMenu: { porsi, nilai }`, `hpp.teoritis` ditambah `wastePorsi: { porsi, nilai }`.
 - Email harian (Code.gs v0.35, 28 Oktober 2026): tidak ada aksi baru. Email laporan harian ditambah bagian "Barang masuk" dan
   (sejak penjualan pernah dicatat) "Penjualan dan food cost".
+- Tambah item di daftar belanja (Code.gs v0.38, 29 Oktober 2026; khusus Pengelola): `daftarBelanja` (juga `belanja` di jawaban
+  `catatPesanan` dan `tutupPesanan`) ditambah `itemLain: [item belanja + kategori, terakhir, dipesan]` (item aktif yang tidak di bawah
+  minimum, urut kategori lalu nama) dan `pilihanPemasok[].kontak`; `unduhPdfBelanja` menerima `tambahan: [{ pemasok ('' = tanpa
+  pemasok), item }]` dan tidak lagi menolak saat tidak ada item di bawah minimum jika ada item tambahan.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
@@ -390,6 +394,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 | 12++++++++++++++++++++++++++++++ | Nilai stock barang jadi dari resep (permintaan pemilik 28 Oktober 2026, dari telaah aplikasi): barang jadi tanpa harga satuan dinilai dengan harga dari resepnya pada tanggal itu di nilai stock Dashboard dan rekap bulanan (juga masuk dan penyesuaiannya), "Harga dari resep" di lembar Nilai stock, "dari resep" di Pengaturan → Item | Kode selesai (Code.gs v0.36, aplikasi 0.36.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (24 uji server dengan harga resep dihitung tangan) dan Chromium (19 uji: lembar, resep kurang, daftar dan kepala item, server lama, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, gabungkan PR |
 | 12+++++++++++++++++++++++++++++++ | Waste per porsi menu (permintaan pemilik 29 Oktober 2026, dari telaah aplikasi): "Tambah menu" di form Waste untuk salah order atau makanan yang dikembalikan, dicatat per porsi dengan nilai HPP per porsi, tanpa mengurangi stock lagi (bahannya sudah tercatat keluar saat dimasak); kolom `Menu` di `Data_Waste`, Riwayat dan koreksi porsi, keterangan di layar HPP dan rekap bulanan | Kode selesai (Code.gs v0.37, aplikasi 0.37.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (44 uji server) dan Chromium (29 uji: Staff HP, desktop, Riwayat, server lama, antrean, HPP, delapan ukuran). Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs, jalankan `setupSpreadsheet` sekali (kolom `Menu` di `Data_Waste`), gabungkan PR |
 | 12++++++++++++++++++++++++++++++++ | Simpan uji di repo (permintaan pemilik 29 Oktober 2026, dari telaah aplikasi): folder `uji/` berisi harness, data contoh, 13 berkas uji server, 13 berkas uji layar, dan `uji/jalankan.mjs` | Selesai (Code.gs dan aplikasi tidak berubah): `node uji/jalankan.mjs --layar` lulus semua. Menunggu pemilik: gabungkan PR (tidak perlu tempel apa pun) |
+| 12+++++++++++++++++++++++++++++++++ | Tambah item di daftar belanja (permintaan pemilik 29 Oktober 2026): "Tambah item" di tiap kelompok pemasok untuk item yang stock-nya tidak di bawah minimum, kelompok "Pemasok lain" yang selalu ada untuk pesanan ke pemasok tanpa kelompok, hapus item tambahan, pesan WhatsApp, pesanan tercatat, dan PDF | Kode selesai (Code.gs v0.38, aplikasi 0.38.0), diuji dengan Code.gs asli di atas Spreadsheet tiruan `supabase/src` (`uji/server/belanja_tambah.mjs`, 47 pemeriksaan) dan Chromium (`uji/layar/belanja_tambah.mjs`, 55 pemeriksaan termasuk delapan ukuran); uji lain tetap lulus. Menunggu pemilik: tempel `supabase/functions/api/index.ts` ke `rapid-action` dan Deploy, tempel Code.gs (setupSpreadsheet tidak perlu), gabungkan PR |
 | 11 | Opsional: foto bukti waste, arsip tahunan, outlet tambahan | Foto bukti waste: kode selesai (Code.gs v0.12, aplikasi 0.12.0), diuji dengan API tiruan (Code.gs di Node dengan Drive tiruan, 12 uji server) dan Chromium (13 uji alur, delapan ukuran). Unggahan ke Drive asli belum bisa diuji di sini. Menunggu pemilik: tempel Code.gs, deploy versi baru, uji dari HP (setupSpreadsheet tidak perlu). Arsip tahunan: lihat baris 12++++++++++. Outlet tambahan: belum |
 
 ## Keputusan tambahan
@@ -2995,3 +3000,34 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `contoh.invalid` (repo publik: tidak ada alamat atau nama sungguhan). PIN di `seed.mjs` rekaan khusus uji.
 394. **Aturan kerja:** setiap fitur baru menambah berkas uji di `uji/server` dan/atau `uji/layar`, dan `node uji/jalankan.mjs --layar`
     dijalankan sebelum PR. Hasil pertama: 13 berkas server (536 pemeriksaan, sekitar 10 detik) dan 13 berkas layar (534 pemeriksaan, sekitar 25 menit) lulus.
+
+### Tambah item di daftar belanja (Code.gs v0.38, aplikasi 0.38.0, 29 Oktober 2026)
+
+395. **Asal dan keputusan pemilik:** pemilik bertanya apakah daftar belanja bisa menambah atau menghapus item saat mengirim ke WhatsApp
+    tanpa melihat stock yang tercatat. Menghapus sudah bisa (Order dikosongkan); yang belum: memesan item yang stock-nya tidak di bawah
+    minimum. Pemilik menyetujui saran: item dari daftar item (bukan ketikan bebas, yang tidak bisa dicatat datang), "Tambah item" di
+    tiap kelompok pemasok, item boleh dipesan berapa pun stock-nya, keterangan stock tetap tampil kecil, dan item tambahan hanya di
+    layar. Spesifikasi sistem Bagian 9.2; tampilan Bagian 5.9 dan 7.
+396. **Kelompok "Pemasok lain"** (keputusan tambahan): tombol per kelompok tidak cukup saat tidak ada item di bawah minimum (tidak ada
+    kelompok) atau pemasok yang dituju belum punya kelompok. Karena itu kelompok tanpa pemasok (dengan "Pesan ke") selalu ada paling
+    bawah; tanpa item di bawah minimum judulnya "Pemasok lain" dan, selama kosong, hanya berisi keterangan dan Tambah item. "Pesan ke"
+    yang masih kosong diisi pemasok barang masuk terakhir item pertama yang ditambah (`pesanKe`), supaya pesanan tidak terkirim tanpa
+    dicatat karena lupa memilih. Di PDF judulnya sama (`judulKelompokBelanja_`).
+397. **Server** (`dataBelanja_`): `itemLain` = item aktif yang tidak ada di daftar, bentuknya sama dengan item kelompok (stock hari ini,
+    saran ke stok maksimum, `terakhir`, `dipesan`), dibaca dari master dan rekap yang sama dengan daftar; `pilihanPemasok[].kontak`
+    untuk kelompok yang hanya berisi item tambahan. `catatPesanan` tidak berubah (sejak v0.29 sudah menerima item apa pun di
+    `M_Item`). PDF (`tambahkanItemBelanja_`): hanya item dari `itemLain`, sekali per item, masuk kelompok pemasok itu (dibuat jika
+    pemasok aktif, selain itu kelompok tanpa pemasok), bertanda "ditambah di layar", Order kosong "–" tanpa sebab, stok minimum kosong
+    "–", tidak dihitung sebagai "jumlah order diubah"; kotak info "Item ditambah" dan satu catatan. Tanpa `tambahan`, PDF sama dengan
+    v0.37.
+398. **Aplikasi** (`kartuDaftarBelanja`): `tambahan` (nama pemasok kelompok → [nama item], hanya di memori) dan `kelompokTampil`
+    (`susunKelompok`: kelompok server dengan item tambahannya, ditambah kelompok tanpa pemasok). `rapikanTambahan` dijalankan setiap
+    data server baru digambar: item yang tidak aktif lagi atau kini di bawah minimum (sudah ada di kelompok server) dibuang, dan item yang
+    pemasoknya tidak aktif lagi pindah ke kelompok tanpa pemasok. Item tambahan keluar dari kelompok sesudah dipesan (juga dari antrean),
+    karena tampil di Pesanan belum datang. Ikon hapus ditaruh sebelum kolom Order supaya kolom Order tetap sejajar di desktop (di HP ia
+    berada di kanan nama item). Server lama (tanpa `itemLain`): tampilan 0.37.
+399. **Uji:** `uji/server/belanja_tambah.mjs` (bentuk `itemLain`, item nonaktif, PDF dengan kelompok ada/baru/tanpa pemasok/pemasok tak
+    dikenal, item ganda dan item di bawah minimum diabaikan, pesanan item di atas minimum dan datangnya, semua stock di atas minimum,
+    Staff ditolak) dan `uji/layar/belanja_tambah.mjs` (HP: lembar, cari, fokus, pesan WhatsApp, PDF, pesanan tercatat; hapus dan fokus;
+    Pesan ke terisi; data baru membuang item yang kini di bawah minimum; server lama; delapan ukuran; kelompok Pemasok lain saat semua
+    stock di atas minimum di 320 px). Belum diuji di HP asli dan WhatsApp dari PWA yang terpasang.
