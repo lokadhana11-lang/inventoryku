@@ -271,6 +271,10 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   `catatPesanan` dan `tutupPesanan`) ditambah `itemLain: [item belanja + kategori, terakhir, dipesan]` (item aktif yang tidak di bawah
   minimum, urut kategori lalu nama) dan `pilihanPemasok[].kontak`; `unduhPdfBelanja` menerima `tambahan: [{ pemasok ('' = tanpa
   pemasok), item }]` dan tidak lagi menolak saat tidak ada item di bawah minimum jika ada item tambahan.
+- Catatan resep dan stock hasil prep (Code.gs v0.39, 30 Oktober 2026): `daftarResep` ditambah `catatanSiap` (kolom `Catatan` di
+  `M_Resep` ada) dan `resep[].catatan`; `simpanResep` menerima `catatan` (paling panjang 200; tidak dikirim = tidak diubah; berisi tanpa
+  kolom ditolak); `formPrep.resep[].catatan`. `kirimPrep` (juga kiriman ulang `sudahTerkirim`) ditambah `stockHasil: [{ item, tambah,
+  akhir, satuan }]` (per item hasil yang Hasil-nya > 0, akhir = Stock Akhir pada `tanggal` sesudah dicatat) dan `tanpaResep: [nama]`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.

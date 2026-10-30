@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.38.0';
+  var VERSI_APLIKASI = '0.39.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -5921,6 +5921,20 @@
     });
   }
 
+  /**
+   * "Stock bertambah: Nasi putih +2,5 kg (sekarang 7,5 kg). …" dari stockHasil kirimPrep (Code.gs v0.39). Untuk tanggal lain:
+   * "(stock akhir 28 Okt: 7,5 kg)".
+   */
+  function teksStockHasil(daftar, tgl) {
+    var hariIni = tgl === tanggalIso(new Date());
+    return 'Stock bertambah: ' + daftar.map(function (x) {
+      var sat = x.satuan ? ' ' + x.satuan : '';
+      return x.item + ' +' + formatAngka(x.tambah) + sat + (hariIni ? ' (sekarang ' : ' (stock akhir ' + tanggalPendek(tgl) + ': ') +
+        formatAngka(x.akhir) + sat + ')';
+    }).join(', ') + '. Bahannya berkurang sesuai resep. Ini sudah tercatat di form Stock sebagai hasil prep, jadi tidak perlu diisi ' +
+      'lagi di Tambah masuk.';
+  }
+
   function layarPrep(k) {
     aturJudul('Prep list');
     var pengelola = !!k.sesi.pengguna.pengelola;
@@ -6121,6 +6135,8 @@
         x.hasil = el('p', { class: 'otomatis hasil-prep' });
         x.baik = el('p', { class: 'baik-sampai' });
         x.bahan = el('p', { class: 'otomatis bahan-prep' });
+        // Catatan resep untuk juru masak (aplikasi 0.39.0): tidak menggerakkan stock.
+        x.catatan = r.catatan ? el('p', { class: 'catatan-resep' }, [el('strong', { text: 'Catatan resep: ' }), r.catatan]) : null;
         x.peringatan = el('div', { class: 'wadah-peringatan' });
         pembaru.push(function (semua) {
           var h = periksa(b);
@@ -6201,7 +6217,7 @@
       return el('article', { class: 'kartu-item', 'aria-label': b.item }, [
         el('div', { class: 'kartu-item-kepala' }, [el('h2', { class: 'kartu-item-nama', text: b.item }), x.hapus]),
         x.isian,
-        x.hasil, x.aktual || null, x.baik || null, x.bahan || null, x.peringatan || null,
+        x.hasil, x.aktual || null, x.baik || null, x.bahan || null, x.catatan || null, x.peringatan || null,
         x.kKet.wadah
       ]);
     }
@@ -6227,7 +6243,7 @@
         el('td', { class: 'angka', text: String(nomor) }),
         el('td', { class: 'nama-item' }, el('span', { class: 'daftar-baris-judul', text: b.item })),
         el('td', { class: 'sel-jumlah-prep' }, x.isian),
-        el('td', { class: 'otomatis sel-hasil-prep' }, [x.hasil, x.bahan || null, x.peringatan || null]),
+        el('td', { class: 'otomatis sel-hasil-prep' }, [x.hasil, x.bahan || null, x.catatan || null, x.peringatan || null]),
         data.hasilAktualSiap ? el('td', { class: 'sel-aktual-prep' }, x.aktual || el('span', { class: 'otomatis', text: '–' })) : null,
         el('td', { class: 'otomatis' }, x.baik || el('span', { text: '–' })),
         el('td', { class: 'sel-alasan' }, x.kKet.wadah),
@@ -6372,9 +6388,24 @@
         var r = resepUntuk(b.item);
         return r && r.masaSimpan != null ? { item: b.item, tanggal: geserHari(tanggal, r.masaSimpan) } : null;
       }).filter(Boolean);
+      // Perkiraan stock hasil prep di HP, untuk pesan saat kiriman masuk antrean (server menghitung ulang).
+      var hasilHp = [];
+      var tanpaResepHp = [];
+      draft.baris.forEach(function (b) {
+        var h = periksa(b);
+        if (!h.resep) {
+          if (tanpaResepHp.indexOf(b.item) < 0) tanpaResepHp.push(b.item);
+          return;
+        }
+        var tambah = h.aktual != null ? h.aktual : bulat3(h.jumlah * h.resep.hasil);
+        if (tambah > 0) hasilHp.push({ item: b.item, tambah: tambah, satuan: infoItem(b.item).satuan });
+      });
       var isi = { submissionId: draft.sid, tanggal: tanggal, shift: draft.shift, waktuPerangkat: new Date().toISOString(), baris: baris };
       var entri = { id: isi.submissionId, aksi: 'kirimPrep', isi: isi, formId: 'PREP',
         judul: 'Prep list · ' + baris.length + ' item', tanggal: tanggal };
+      function teksTanpaResep(daftar) {
+        return daftar.length ? 'Tanpa resep, stock tidak bergerak: ' + daftar.join(', ') + '.' : '';
+      }
       function teksLabel(daftar) {
         return daftar.length ? 'Tulis di label wadah: ' + daftar.map(function (x) {
           return x.item + ' baik sampai ' + tanggalPendek(x.tanggal);
@@ -6391,7 +6422,15 @@
         gambarStatus();
         gambarBaris();
         toast('Tersimpan di HP. Dikirim saat ada sinyal.');
-        if (labelHp.length) tulisPesan(pesan, teksLabel(labelHp), 'info');
+        var teks = [teksLabel(labelHp)];
+        if (hasilHp.length) {
+          teks.push('Sesudah terkirim, stock bertambah: ' + hasilHp.map(function (x) {
+            return x.item + ' ' + formatAngka(x.tambah) + (x.satuan ? ' ' + x.satuan : '');
+          }).join(', ') + '.');
+        }
+        teks.push(teksTanpaResep(tanpaResepHp));
+        teks = teks.filter(Boolean);
+        if (teks.length) tulisPesan(pesan, teks.join(' '), 'info');
       }
       if (navigator.onLine === false) {
         keAntrean();
@@ -6404,8 +6443,17 @@
         Cache.tulis('prep', hasil.form);
         if (hasil.form.tanggal === tanggal) gambar(hasil.form);
         else gambarBaris();
-        toast('Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui.');
-        var teks = ['Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui.'];
+        var teks = ['Prep list terkirim.'];
+        if (Array.isArray(hasil.stockHasil)) {
+          // Code.gs v0.39: stock hasil prep sesudah dicatat, menurut resep yang dipakai server.
+          toast('Prep list terkirim.');
+          if (hasil.stockHasil.length) teks.push(teksStockHasil(hasil.stockHasil, isi.tanggal));
+          var tanpa = teksTanpaResep(hasil.tanpaResep || []);
+          if (tanpa) teks.push(tanpa);
+        } else {
+          toast('Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui.');
+          teks.push('Stock bahan dan barang jadi sudah diperbarui.');
+        }
         var label = teksLabel(hasil.baikSampai || []);
         if (label) teks.push(label);
         (hasil.peringatan || []).forEach(function (p) {
@@ -13424,7 +13472,7 @@
     ]));
 
     var data = null;
-    var isi = null; // { itemHasil, hasil, masaSimpan, bahan: [{ id, item, qty }] }
+    var isi = null; // { itemHasil, hasil, masaSimpan, catatan, bahan: [{ id, item, qty }] }
     var resepKini = null;
     var d = Draft.baca(kunciDraft);
     if (d && d.data) {
@@ -13454,6 +13502,7 @@
         itemHasil: r.itemHasil,
         hasil: String(r.hasil).replace('.', ','),
         masaSimpan: r.masaSimpan == null ? '' : String(r.masaSimpan),
+        catatan: r.catatan || '',
         bahan: r.bahan.map(function (b) { return { id: buatId(), item: b.item, qty: String(b.qty).replace('.', ',') }; })
       };
     }
@@ -13466,7 +13515,9 @@
         if (!dariHp) wadah.appendChild(kotakKosong('Resep ' + namaAwal + ' tidak ditemukan. Kembali ke daftar resep.', 'resep'));
         return;
       }
-      if (!isi) isi = baru ? { itemHasil: '', hasil: '', masaSimpan: '', bahan: [] } : dariResep(resepKini);
+      if (!isi) isi = baru ? { itemHasil: '', hasil: '', masaSimpan: '', catatan: '', bahan: [] } : dariResep(resepKini);
+      // Draft dari aplikasi sebelum 0.39.0 belum punya catatan: isi dari resep tersimpan.
+      if (isi.catatan === undefined) isi.catatan = resepKini && resepKini.catatan || '';
       gambarIsian();
     }
 
@@ -13574,6 +13625,11 @@
         });
       });
       var biaya = el('p', { class: 'biaya-resep', 'aria-live': 'polite' });
+      // Catatan resep (aplikasi 0.39.0, Code.gs v0.39): hanya jika server sudah punya kolomnya.
+      var kCatatan = data && data.catatanSiap ? kolomIsian({ label: 'Catatan untuk juru masak (tidak wajib)', maxlength: 200,
+        nilai: isi.catatan || '', bantuan: 'Tampil di Prep List di bawah bahan, misalnya takaran air atau cara masak singkat. ' +
+          'Tidak mengurangi stock apa pun.' }) : null;
+      if (kCatatan) kCatatan.input.addEventListener('input', function () { isi.catatan = kCatatan.input.value; simpanDraft(); });
 
       function perbaruiBiaya() {
         var total = 0;
@@ -13627,13 +13683,15 @@
           return;
         }
         aturTombolProses(simpan, true, 'Menyimpan…');
-        panggilApi('simpanResep', {
+        var kirim = {
           baru: baru,
           itemHasil: isi.itemHasil,
           hasil: h,
           masaSimpan: masa,
           bahan: isi.bahan.map(function (b) { return { item: b.item, qty: bacaAngka(b.qty) }; })
-        }).then(function (hasil) {
+        };
+        if (kCatatan) kirim.catatan = String(isi.catatan || '').trim();
+        panggilApi('simpanResep', kirim).then(function (hasil) {
           Draft.hapus(kunciDraft);
           Cache.tulis('resep', hasil);
           toast('Resep ' + isi.itemHasil + ' tersimpan.');
@@ -13653,6 +13711,7 @@
         el('div', {}, tambahBahan),
         biaya
       ]));
+      if (kCatatan) wadah.appendChild(el('section', { class: 'kartu formulir' }, [kCatatan.wadah]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
         baru ? null : el('p', { class: 'pesan-formulir info' }, [ikon('info'),
           el('span', { text: 'Perubahan berlaku untuk prep berikutnya. Catatan lama tidak berubah.' })]),
@@ -13714,8 +13773,14 @@
       gambar: function (hasil, dariHp) {
         // Isian yang sedang diketik tidak digambar ulang; hanya data pendukungnya diperbarui.
         if (isi && data) {
+          var munculCatatan = !data.catatanSiap && hasil.catatanSiap;
           data = hasil;
           resepKini = baru ? null : cariResep(namaAwal);
+          // Kolom catatan baru ada (data tersimpan dari server lama): isi dari resep di server, lalu gambar ulang isiannya.
+          if (munculCatatan) {
+            isi.catatan = resepKini && resepKini.catatan || '';
+            gambarIsian();
+          }
           return;
         }
         gambar(hasil, dariHp);

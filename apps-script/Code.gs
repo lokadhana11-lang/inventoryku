@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.38 (tambah item di daftar belanja)
+// InventoryKu Code.gs v0.39 (catatan resep dan stock hasil prep)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -119,9 +119,11 @@
  *                        formWaste.menu/menuSiap, hpp.pemakaian.wasteMenu, hpp.teoritis.wastePorsi.
  * - 29 Oktober 2026    : daftar belanja menerima item tambahan di luar daftar di bawah stok minimum
  *                        (daftarBelanja.itemLain, pilihanPemasok[].kontak, unduhPdfBelanja.tambahan).
+ * - 30 Oktober 2026    : catatan resep (kolom Catatan di M_Resep, setupSpreadsheet) yang tampil di Prep List;
+ *                        kirimPrep menjawab stockHasil (stock hasil prep sesudah dicatat) dan tanpaResep.
  */
 
-var VERSI_KODE = 'v0.38';
+var VERSI_KODE = 'v0.39';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -3852,9 +3854,10 @@ var URUTAN_PREP_BAHAN = [['Tanggal', false], ['Item Hasil', true], ['Item Bahan'
 
 /**
  * Resep dari M_Resep dan M_ResepBahan: { namaKecil: { itemHasil, hasil,
- * masaSimpan, aktif, nomor, bahan: [{ item, qty }] } }. Satu resep per item
+ * masaSimpan, aktif, catatan, nomor, bahan: [{ item, qty }] } }. Satu resep per item
  * hasil; bahan dihubungkan lewat kolom Item Hasil. Jika satu item hasil
- * tertulis dua kali (diisi tangan), baris yang aktif didahulukan.
+ * tertulis dua kali (diisi tangan), baris yang aktif didahulukan. catatan (Code.gs
+ * v0.39): kolom Catatan, '' jika kolomnya belum ada.
  */
 function bacaResep_() {
   var t = wajibTabel_('M_Resep');
@@ -3872,6 +3875,7 @@ function bacaResep_() {
       hasil: angkaAtauNull_(nilai_(t, b, 'Hasil per 1 Resep')),
       masaSimpan: masa == null || masa < 0 ? null : Math.round(masa),
       aktif: aktif,
+      catatan: t.kol['Catatan'] === undefined ? '' : rapikanTeks_(nilai_(t, b, 'Catatan')),
       nomor: i + 2,
       bahan: []
     };
@@ -3884,6 +3888,15 @@ function bacaResep_() {
     r.bahan.push({ item: item, qty: qty });
   });
   return peta;
+}
+
+/** Panjang catatan resep (Code.gs v0.39), sama dengan Keterangan di Prep List. */
+var PANJANG_CATATAN_RESEP = 200;
+
+/** Catatan resep bisa disimpan: kolom Catatan di M_Resep sudah dibuat setupSpreadsheet (Code.gs v0.39). */
+function catatanResepSiap_() {
+  var t = bacaTabel_('M_Resep');
+  return !!t && t.kol['Catatan'] !== undefined;
 }
 
 /** Resep aktif yang bisa dipakai prep (hasil lebih dari 0 dan punya bahan), atau null. */
@@ -3996,6 +4009,7 @@ function ringkasResep_(r, master) {
     hasil: r.hasil,
     masaSimpan: r.masaSimpan,
     aktif: r.aktif,
+    catatan: r.catatan,
     bahan: bahan,
     biaya: b.lengkap ? b.biaya : null,
     hargaPerSatuan: b.lengkap && r.hasil > 0 ? Math.round(b.biaya / r.hasil * 100) / 100 : null,
@@ -4016,7 +4030,7 @@ function dataResep_() {
     return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga, hargaDariResep: !!m.hargaDariResep, aktif: m.aktif,
       punyaResep: !!resep[k] };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
-  return { resep: daftar, item: item };
+  return { resep: daftar, item: item, catatanSiap: catatanResepSiap_() };
 }
 
 function aksiDaftarResep_() {
@@ -4050,7 +4064,9 @@ function tulisBahanResep_(kecilLama, itemHasil, bahan) {
 
 /**
  * Simpan resep (Pengaturan → Resep), khusus Pengelola. body: { baru: bool,
- * itemHasil, hasil, masaSimpan ('' = tanpa), bahan: [{ item, qty }] }.
+ * itemHasil, hasil, masaSimpan ('' = tanpa), bahan: [{ item, qty }], catatan? }.
+ * catatan (Code.gs v0.39): teks untuk juru masak, paling panjang 200 huruf, tidak
+ * menggerakkan stock; tidak dikirim (aplikasi lama) = tidak diubah.
  * Resep baru langsung aktif; item hasil yang sudah punya resep (aktif atau
  * nonaktif) diubah lewat resep itu. Item hasil resep yang sudah ada tidak bisa
  * diganti. Bahan memakai satuan dasar tiap item. Catatan prep lama tidak
@@ -4086,6 +4102,7 @@ function aksiSimpanResep_(body) {
     if (!qty) throw galatPengguna_('Jumlah ' + mb.nama + ' per 1 resep harus lebih dari 0.');
     return { item: mb.nama, qty: qty };
   });
+  var catatan = body.catatan === undefined ? null : teksMaster_(body.catatan, 'Catatan resep', PANJANG_CATATAN_RESEP);
 
   return denganKunci_(function () {
     var resep = bacaResep_();
@@ -4103,11 +4120,16 @@ function aksiSimpanResep_(body) {
     }
     var sheet = ambilTab_('M_Resep');
     var kol = posisiKolom_(sheet, { hasil: 'Item Hasil', per1: 'Hasil per 1 Resep', masa: 'Masa Simpan (hari)', aktif: 'Aktif' });
+    var kolCatatan = posisiKolomOpsional_(sheet, 'Catatan');
+    if (catatan && !kolCatatan) {
+      throw galatPengguna_('Catatan resep belum bisa disimpan. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
     var nomor = ada ? ada.nomor : barisBaruMaster_(sheet, kol.hasil, 1);
     sheet.getRange(nomor, kol.hasil).setValue(m.nama);
     sheet.getRange(nomor, kol.per1).setValue(hasil);
     sheet.getRange(nomor, kol.masa).setValue(masa === '' ? '' : Number(masa));
     sheet.getRange(nomor, kol.aktif).setValue(aktif);
+    if (catatan !== null && kolCatatan) sheet.getRange(nomor, kolCatatan).setValue(teksAman_(catatan));
     tulisBahanResep_(kecil, m.nama, bahan);
     var data = dataResep_();
     data.disimpan = m.nama;
@@ -4164,6 +4186,7 @@ function dataFormPrep_(tanggal) {
       item: master[k].nama,
       hasil: r.hasil,
       masaSimpan: r.masaSimpan,
+      catatan: r.catatan,
       bahan: r.bahan.map(function (b) {
         var mb = master[b.item.toLowerCase()];
         dipakai[b.item.toLowerCase()] = true;
@@ -4248,7 +4271,14 @@ function aksiKirimPrep_(body, pengguna) {
       throw galatPengguna_('Hasil aktual belum bisa dicatat. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
     }
     if (adaSubmission_(tabel, konteks.sid)) {
-      return { sudahTerkirim: true, jumlah: 0, form: dataFormPrep_(tanggal), baikSampai: [], peringatan: [] };
+      // Kiriman ulang dari antrean: stock hasil prep dari baris kiriman yang sudah tercatat.
+      var tercatat = tabel.baris.filter(function (b) { return String(nilai_(tabel, b, 'submission_id') || '') === konteks.sid; }).map(function (b) {
+        var jr = nilai_(tabel, b, 'Jumlah Resep');
+        return { item: rapikanTeks_(nilai_(tabel, b, 'Item / Menu Prep')), hasil: Number(nilai_(tabel, b, 'Hasil')) || 0,
+          resep: jr !== '' && jr != null };
+      });
+      return { sudahTerkirim: true, jumlah: 0, form: dataFormPrep_(tanggal), baikSampai: [], peringatan: [],
+        stockHasil: stockHasilPrep_(tercatat, tanggal, bacaItem_()), tanpaResep: tanpaResepPrep_(tercatat) };
     }
     var master = bacaItem_();
     var resep = bacaResep_();
@@ -4332,8 +4362,48 @@ function aksiKirimPrep_(body, pengguna) {
       var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
       if (akhir < 0) peringatan.push({ item: bahanKecil[k], akhir: akhir, satuan: master[k] ? master[k].satuan : '' });
     });
-    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormPrep_(tanggal), baikSampai: baikSampai, peringatan: peringatan };
+    var ditulis = baru.map(function (b) {
+      return { item: b['Item / Menu Prep'], hasil: Number(b['Hasil']) || 0, resep: b['Jumlah Resep'] !== '' };
+    });
+    return { sudahTerkirim: false, jumlah: baru.length, form: dataFormPrep_(tanggal), baikSampai: baikSampai, peringatan: peringatan,
+      stockHasil: stockHasilPrep_(ditulis, tanggal, master, rekap), tanpaResep: tanpaResepPrep_(ditulis) };
   });
+}
+
+/**
+ * Stock hasil prep sesudah dicatat (Code.gs v0.39), untuk pesan di HP: [{ item, tambah, akhir, satuan }] per item hasil
+ * (baris yang Hasil-nya lebih dari 0, dijumlah per item, urutan kiriman); akhir = Stock Akhir item itu pada tanggal prep.
+ * baris: [{ item, hasil, resep }]. rekap opsional.
+ */
+function stockHasilPrep_(baris, tanggal, master, rekap) {
+  var peta = {};
+  var urut = [];
+  baris.forEach(function (x) {
+    if (!(x.hasil > 0)) return;
+    var k = x.item.toLowerCase();
+    if (!peta[k]) {
+      peta[k] = { item: x.item, tambah: 0 };
+      urut.push(k);
+    }
+    peta[k].tambah = bulat_(peta[k].tambah + x.hasil);
+  });
+  if (!urut.length) return [];
+  rekap = rekap || bacaRekap_();
+  return urut.map(function (k) {
+    return { item: peta[k].item, tambah: peta[k].tambah, akhir: posisiStock_(rekap.item[k], tanggal).akhir,
+      satuan: master[k] ? master[k].satuan : '' };
+  });
+}
+
+/** Item prep tanpa resep dalam satu kiriman (dicatat dengan Qty, stock tidak bergerak): [nama], masing-masing sekali. */
+function tanpaResepPrep_(baris) {
+  var sudah = {};
+  return baris.filter(function (x) {
+    var k = x.item.toLowerCase();
+    if (x.resep || sudah[k]) return false;
+    sudah[k] = true;
+    return true;
+  }).map(function (x) { return x.item; });
 }
 
 /**
@@ -13611,7 +13681,8 @@ var TAB_MASTER = [
       k_('Item Hasil', 'teks', { sumber: 'M_Item!A2:A' }),
       k_('Hasil per 1 Resep', 'angka'),
       k_('Masa Simpan (hari)', 'bulat'),
-      k_('Aktif', null, { centang: true })
+      k_('Aktif', null, { centang: true }),
+      k_('Catatan')
     ]
   },
   {

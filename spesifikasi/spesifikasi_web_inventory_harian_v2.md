@@ -62,6 +62,8 @@
 > (Bagian 5.4 dan 5.9).
 > Diperbarui 29 Oktober 2026 (permintaan pemilik): daftar belanja bisa ditambah item yang stock-nya tidak
 > di bawah minimum, per kelompok pemasok, sebelum dikirim ke WhatsApp (Bagian 9.2).
+> Diperbarui 30 Oktober 2026 (permintaan pemilik): catatan resep untuk juru masak yang tampil di Prep List,
+> dan pesan stock hasil prep sesudah Prep List dikirim (Bagian 5.1 dan 5.3).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -452,7 +454,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
 | `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif, Masa Simpan dalam hari (opsional, 19 Oktober 2026) | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang, baik sampai barang masuk |
 | `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
-| `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
+| `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif, Catatan (opsional, 30 Oktober 2026) | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
 | `M_Menu` | Nama Menu, Harga Jual (Rp), Aktif | Menu yang dijual dan harganya, untuk HPP (Bagian 5.9) |
 | `M_MenuBahan` | Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih (%) | Takaran bahan satu porsi dan susutnya |
@@ -603,8 +605,10 @@ menggerakkan stock.
 | Hasil per 1 resep | Berapa banyak barang jadi dari satu resep | 5 liter |
 | Bahan per 1 resep | Daftar item bahan dan jumlahnya, masing-masing dalam satuan dasar bahan itu | Tomat 3 kg, daging giling 1 kg, bawang 0,5 kg |
 | Masa simpan (opsional) | Berapa hari barang jadi masih baik dipakai sejak dibuat | 3 hari |
+| Catatan (opsional) | 30 Oktober 2026. Teks untuk juru masak, paling panjang 200 huruf, tampil di Prep List di bawah bahan. Tidak menggerakkan stock apa pun. | Air 1,2 liter per 1 kg beras |
 
-Contoh lain: resep Nasi putih, hasil 2,2 kg nasi, bahan beras 1 kg. Angka pada contoh
+Contoh lain: resep Nasi putih, hasil 2,2 kg nasi, bahan beras 1 kg. Air tidak dicatat sebagai bahan,
+karena tidak punya stock (stock-nya akan selalu minus); takarannya ditulis di Catatan. Angka pada contoh
 hanya ilustrasi; Pengelola mengisinya dari takaran dapur sendiri.
 
 - Barang jadi boleh menjadi bahan resep lain, misalnya sauce dipakai di resep lain.
@@ -641,6 +645,12 @@ hanya ilustrasi; Pengelola mengisinya dari takaran dapur sendiri.
 
 Contoh: ½ resep Sauce bolognese menambah 2,5 liter sauce, dan mengurangi tomat 1,5 kg,
 daging giling 0,5 kg, serta bawang 0,25 kg.
+
+- **Pesan sesudah dikirim** (30 Oktober 2026): layar menyebut stock tiap item hasil sesudah dicatat
+  menurut server ("Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter)"), bahwa hasil prep
+  sudah tercatat di form Stock sehingga tidak perlu diisi lagi di Tambah masuk (supaya tidak terhitung
+  dua kali), dan item tanpa resep yang stock-nya tidak bergerak. Saat kiriman masuk antrean HP, layar
+  menulis perkiraannya ("Sesudah terkirim, stock bertambah: …").
 
 - **Item tanpa resep** tetap bisa dicatat di Prep List dengan Qty biasa. Stock tidak bergerak.
 - **Stock bahan tidak cukup menurut catatan:** layar menampilkan peringatan, tetapi prep

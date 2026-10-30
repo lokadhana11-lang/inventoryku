@@ -2648,3 +2648,33 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Staff ditolak) dan `uji/layar/belanja_tambah.mjs` (HP: lembar, cari, fokus, pesan WhatsApp, PDF, pesanan tercatat; hapus dan fokus;
     Pesan ke terisi; data baru membuang item yang kini di bawah minimum; server lama; delapan ukuran; kelompok Pemasok lain saat semua
     stock di atas minimum di 320 px). Belum diuji di HP asli dan WhatsApp dari PWA yang terpasang.
+
+### Catatan resep dan stock hasil prep (Code.gs v0.39, aplikasi 0.39.0, 30 Oktober 2026)
+
+402. **Asal dan keputusan pemilik:** catatan pemilik 29 Oktober: hasil prep (resep) supaya otomatis masuk stock barang jadi, dan
+    apakah masak nasi (beras dan air) bisa lewat Prep List. Keduanya sudah bisa: hasil prep beresep menambah stock (kolom Hasil Prep)
+    dan resep Nasi cukup berbahan beras. Pemilik menyetujui saran: tidak memindahkan hasil prep ke Stock Masuk (dipakai pembelian dan
+    cek silang HPP), dan item tanpa resep tetap tidak menggerakkan stock (prep seperti "potong ayam" tidak menambah stock ayam); yang
+    dibangun hanya dua tambahan kecil: catatan resep (untuk takaran air, yang tidak punya stock) dan pesan stock sesudah Prep List
+    dikirim. Spesifikasi sistem Bagian 5.1 dan 5.3; tampilan Bagian 5.3, 5.7, dan 7.
+403. **Catatan resep** (keputusan tambahan): kolom `Catatan` di akhir `M_Resep` (dibuat `setupSpreadsheet`; `catatanResepSiap_`), teks
+    satu baris lewat `teksMaster_` (spasi dirapikan, ganti baris ikut dirapikan), paling panjang 200 seperti Keterangan Prep, ditulis
+    `teksAman_`. `simpanResep` tanpa field `catatan` (aplikasi lama) tidak mengubahnya; catatan berisi tanpa kolom ditolak sebelum sel lain
+    ditulis. Tidak masuk Riwayat, PDF Prep, atau rekap (catatan resep adalah petunjuk, bukan catatan kejadian), dan tidak menggerakkan stock.
+    Layar ubah resep: kartu sendiri di bawah bahan, hanya jika `catatanSiap`; draft lama tanpa `catatan` diisi dari resep tersimpan, dan
+    jika data tersimpan di HP berasal dari server lama, kolomnya muncul begitu jawaban server datang (berisi catatan server, supaya
+    menyimpan tidak mengosongkannya). Prep
+    List: `.catatan-resep` (teks biasa, tidak redup) tepat di bawah baris Bahan; di tabel di kolom Hasil dan bahan.
+404. **Stock hasil prep** (keputusan tambahan): angkanya dari server (`stockHasilPrep_`, `tanpaResepPrep_`), bukan dihitung di HP, karena
+    server memakai resep yang berlaku saat kiriman diterima (resep di HP bisa basi). Per item hasil (Hasil > 0, dijumlah jika dua baris),
+    akhir = Stock Akhir pada tanggal prep sesudah dicatat; baris beresep dengan hasil aktual 0 tidak disebut dan tidak dianggap tanpa resep
+    (dibedakan dari Jumlah Resep). Kiriman ulang dengan `submissionId` yang sama menjawab dari baris yang sudah tercatat. Pesan di HP
+    (`teksStockHasil`): "(sekarang …)" untuk hari ini, "(stock akhir 28 Okt: …)" untuk tanggal lain, ditambah kalimat bahwa hasil prep sudah
+    tercatat di form Stock sehingga tidak perlu diisi lagi di Tambah masuk (sumber kebingungan di catatan pemilik). Saat masuk antrean:
+    perkiraan dari HP. Server lama (tanpa `stockHasil`): pesan lama.
+405. **Uji:** `uji/server/resep_catatan.mjs` (kolom dan bentuk, simpan/rapikan/aplikasi lama/kosongkan/201 huruf/teks berawalan =, Staff
+    ditolak, Sheet tanpa kolom lalu `setupSpreadsheet`, resep baru dengan catatan, `stockHasil` dijumlah per item dan cocok dengan Stock Akhir,
+    `tanpaResep`, kiriman ulang, hasil aktual dan hasil aktual 0, tanggal kemarin) dan `uji/layar/resep_catatan.mjs` (catatan di layar resep
+    dengan draft, kartu dan tabel Prep List, pesan sesudah kirim dari server, antrean, server lama, data tersimpan dari server lama lalu
+    server baru, delapan ukuran dengan catatan 200 huruf
+    satu kata panjang). Belum diuji di HP asli.

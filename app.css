@@ -3755,6 +3755,13 @@ body.papan-ketik .bilah-kirim {
   overflow-wrap: anywhere;
 }
 
+/* Catatan resep untuk juru masak (aplikasi 0.39.0): di bawah bahan, warna teks biasa supaya terbaca */
+.catatan-resep {
+  font-size: 14px;
+  color: var(--tinta);
+  overflow-wrap: anywhere;
+}
+
 .tabel-prep td:not(:first-child) {
   white-space: normal;
 }
