@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.39 (catatan resep dan stock hasil prep)
+// InventoryKu Code.gs v0.40 (item nonaktif: stock dinolkan, tidak tampil di PDF Stock)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -121,9 +121,12 @@
  *                        (daftarBelanja.itemLain, pilihanPemasok[].kontak, unduhPdfBelanja.tambahan).
  * - 30 Oktober 2026    : catatan resep (kolom Catatan di M_Resep, setupSpreadsheet) yang tampil di Prep List;
  *                        kirimPrep menjawab stockHasil (stock hasil prep sesudah dicatat) dan tanpaResep.
+ * - 30 Oktober 2026    : item yang dinonaktifkan stock-nya dinolkan (penyesuaian, aturItemAktif.dinolkan,
+ *                        daftarItem.nolkanSaatNonaktif); PDF Stock tanpa item nonaktif; baris nonaktif
+ *                        di tab master Sheets abu-abu (setupSpreadsheet).
  */
 
-var VERSI_KODE = 'v0.39';
+var VERSI_KODE = 'v0.40';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -3264,27 +3267,36 @@ function aksiSesuaikanStock_(body, pengguna) {
       throw galatPengguna_('Stock ' + m.nama + ' tercatat ' + teksAngka_(tercatat) + ' ' + m.satuan +
         '. Tidak ada selisih yang perlu disimpan.');
     }
-    // Nilai selisih memakai harga yang berlaku pada tanggal penyesuaian (Bagian 5.7), disalin saat dicatat.
-    var harga = hargaPada_(m, tanggal);
-    tambahBarisTabel_(tabel, [gabung_({
-      'Tanggal': tanggalSel_(tanggal),
-      'Kategori': m.kategori,
-      'Nama Item': m.nama,
-      'Stock Tercatat': tercatat,
-      'Stock Sebenarnya': sebenarnya,
-      'Selisih': selisih,
-      'Satuan': m.satuan,
-      'Nilai Selisih (Rp)': harga == null ? '' : Math.round(selisih * harga),
-      'Alasan': alasan,
-      'Catatan': catatan
-    }, isiSistem_(konteks))]);
-    urutkanTabel_(tabel, URUTAN_DATA);
-    hitungUlangStock_([{ item: m.nama, dari: tanggal }]);
+    tulisPenyesuaian_(tabel, m, tanggal, tercatat, sebenarnya, alasan, catatan, konteks);
     return {
       sudahTerkirim: false, tercatat: tercatat, selisih: selisih,
       form: dataFormStock_(tanggal), riwayatItem: dataRiwayatItem_(m.nama)
     };
   });
+}
+
+/**
+ * Satu baris Data_Penyesuaian (stock tercatat → stock sebenarnya pada tanggal itu), lalu rekap item itu dihitung
+ * ulang. Dipakai sesuaikanStock dan aturItemAktif (stock dinolkan saat item dinonaktifkan, Code.gs v0.40).
+ */
+function tulisPenyesuaian_(tabel, m, tanggal, tercatat, sebenarnya, alasan, catatan, konteks) {
+  var selisih = bulat_(sebenarnya - tercatat);
+  // Nilai selisih memakai harga yang berlaku pada tanggal penyesuaian (Bagian 5.7), disalin saat dicatat.
+  var harga = hargaPada_(m, tanggal);
+  tambahBarisTabel_(tabel, [gabung_({
+    'Tanggal': tanggalSel_(tanggal),
+    'Kategori': m.kategori,
+    'Nama Item': m.nama,
+    'Stock Tercatat': tercatat,
+    'Stock Sebenarnya': sebenarnya,
+    'Selisih': selisih,
+    'Satuan': m.satuan,
+    'Nilai Selisih (Rp)': harga == null ? '' : Math.round(selisih * harga),
+    'Alasan': alasan,
+    'Catatan': catatan
+  }, isiSistem_(konteks))]);
+  urutkanTabel_(tabel, URUTAN_DATA);
+  hitungUlangStock_([{ item: m.nama, dari: tanggal }]);
 }
 
 /* =========================================================================
@@ -4742,6 +4754,7 @@ function dataItem_() {
     riwayatHargaSiap: bacaRiwayatHarga_().ada,
     masaSimpanSiap: masaSimpanItemSiap_(),
     ubahBanyakSiap: true, // gantiHargaBanyak dan tambahItemBanyak (Code.gs v0.33)
+    nolkanSaatNonaktif: true, // aturItemAktif menolkan stock item yang dinonaktifkan (Code.gs v0.40)
     item: item,
     kategori: bacaSemuaKategori_().map(function (k) { return { nama: k.nama, aktif: k.aktif }; }),
     satuan: bacaSatuan_()
@@ -4864,13 +4877,19 @@ function aksiSimpanItem_(body, pengguna) {
   });
 }
 
+/** Catatan penyesuaian saat stock item dinolkan karena dinonaktifkan (Code.gs v0.40). */
+var CATATAN_NOLKAN_NONAKTIF = 'Stock dinolkan karena item dinonaktifkan.';
+
 /**
  * Pengaman item (Bagian 5.1): item yang masih menjadi bahan atau hasil resep
- * aktif tidak bisa dinonaktifkan. Item yang stock-nya belum nol tetap boleh
- * dinonaktifkan; peringatannya tampil di layar sebelum disimpan (stock dari
- * daftarItem). Jawaban: daftarItem ditambah diubah: { nama, aktif }.
+ * aktif tidak bisa dinonaktifkan. Sejak Code.gs v0.40 item yang dinonaktifkan
+ * dengan stock belum nol stock-nya dinolkan hari ini (penyesuaian, alasan
+ * Lainnya, CATATAN_NOLKAN_NONAKTIF), supaya item nonaktif tidak ikut nilai stock
+ * dan laporan. Menonaktifkan item yang sudah nonaktif menolkan stock sisa dari
+ * sebelum versi ini (tombol Nolkan stock). Jawaban: daftarItem ditambah
+ * diubah: { nama, aktif } dan dinolkan: { stock, satuan } atau null.
  */
-function aksiAturItemAktif_(body) {
+function aksiAturItemAktif_(body, pengguna) {
   var aktif = body.aktif === true;
   return denganKunci_(function () {
     var t = wajibTabel_('M_Item');
@@ -4894,9 +4913,21 @@ function aksiAturItemAktif_(body) {
         throw galatPengguna_('Tidak bisa dinonaktifkan: masih dipakai menu ' + menu.join(', ') + '. Ubah atau nonaktifkan menunya dulu.');
       }
     }
+    var dinolkan = null;
+    if (!aktif) {
+      var m = bacaItem_()[kecil];
+      var hari = hariIni_();
+      var tercatat = posisiStock_(bacaRekap_().item[kecil], hari).akhir;
+      if (tercatat) {
+        var konteks = { sid: Utilities.getUuid(), outlet: namaOutlet_(), kini: new Date(), waktuPerangkat: '', pengguna: pengguna };
+        tulisPenyesuaian_(wajibTabel_('Data_Penyesuaian'), m, hari, tercatat, 0, 'Lainnya', CATATAN_NOLKAN_NONAKTIF, konteks);
+        dinolkan = { stock: tercatat, satuan: m.satuan };
+      }
+    }
     tulisBarisMaster_(t, nomor, { 'Aktif': aktif });
     var data = dataItem_();
     data.diubah = { nama: nama, aktif: aktif };
+    data.dinolkan = dinolkan;
     return data;
   });
 }
@@ -10362,7 +10393,9 @@ function ringkasPengisian_(idForm, tanggal, kategori) {
 /**
  * Isi PDF Stock (Bagian 9.1 butir 2 dan 4, tata letak Harian_Stock Bagian
  * 8.3): rekap Stock_Harian tanggal itu, dikelompokkan per kategori. Item
- * tanpa gerakan menampilkan Awal = Akhir = rekap terakhir sebelumnya.
+ * tanpa gerakan menampilkan Awal = Akhir = rekap terakhir sebelumnya. Item
+ * nonaktif tidak tampil, walau bergerak hari itu (sama dengan Harian_Stock,
+ * Code.gs v0.40); jumlahnya disebut di catatan.
  * opsi.kategori: nama satu kategori aktif (PDF hanya berisi kategori itu,
  * namanya di kotak info), atau kosong untuk semua kategori. Semua kategori:
  * kategori tanpa rekap pada tanggal itu dilewati; dengan pemisah halaman
@@ -10378,12 +10411,16 @@ function isiPdfStock_(tanggal, opsi) {
   var asli = masukAsliPerHari_(tanggal, tanggal);
   var adaRekap = false;
   var perKat = {};
+  var nonaktifBergerak = 0;
   Object.keys(master).forEach(function (k) {
     var m = master[k];
     var r = (rekap.item[k] || []).filter(function (x) { return x.tanggal === tanggal; })[0];
-    if (r) adaRekap = true;
-    if (!m.aktif && !r) return; // item nonaktif hanya tampil jika bergerak hari itu
     var kat = (r && r.kategori) || m.kategori || 'Tanpa kategori';
+    if (!m.aktif) {
+      if (r && (!pilihKat || samaNama_(kat, pilihKat))) nonaktifBergerak++;
+      return;
+    }
+    if (r) adaRekap = true;
     var grup = perKat[kat.toLowerCase()] = perKat[kat.toLowerCase()] || { nama: kat, item: [], adaRekap: false };
     if (r) grup.adaRekap = true;
     grup.item.push({ m: m, pos: posisiStock_(rekap.item[k], tanggal), asli: asli[k + '|' + tanggal] || '' });
@@ -10453,6 +10490,7 @@ function isiPdfStock_(tanggal, opsi) {
   var catatan = [];
   if (adaMin) catatan.push('* Stock Akhir di bawah stok minimum.');
   catatan.push('Stock Akhir minus ditulis merah tebal. Angka dalam kurung: Stock Masuk yang diketik dalam satuan besar.');
+  if (nonaktifBergerak) catatan.push(nonaktifBergerak + ' item nonaktif yang bergerak pada tanggal ini tidak ditampilkan.');
   return {
     ada: ada,
     kategori: pilihKat,
@@ -13936,6 +13974,7 @@ function setupSpreadsheet() {
         sistem: [],
         warnaTab: WARNA_TAB.master,
         proteksi: def.proteksiKeras ? 'keras' : 'peringatan',
+        abuNonaktif: true,
         catatan: catatan
       });
     });
@@ -14225,6 +14264,21 @@ function siapkanTabTabel_(ss, sheet, def, opsi) {
   lindungi_(sheet, opsi.proteksi, [], opsi.catatan);
   sheet.setTabColor(opsi.warnaTab);
   if (opsi.pitaTanggal) pasangPitaTanggal_(sheet);
+  if (opsi.abuNonaktif && posisi['Aktif']) pasangAbuNonaktif_(sheet, posisi['Aktif']);
+}
+
+/**
+ * Tab master (Code.gs v0.40): baris yang kolom Aktif-nya tidak dicentang ditulis abu-abu, supaya item, resep, menu,
+ * atau pemasok nonaktif tidak tertukar dengan yang masih dipakai. Datanya tetap ada (riwayat dan rekap memakainya).
+ */
+function pasangAbuNonaktif_(sheet, kolomAktif) {
+  var rentang = sheet.getRange(2, 1, Math.max(1, sheet.getMaxRows() - 1), sheet.getMaxColumns());
+  var aktif = '$' + hurufKolom_(kolomAktif) + '2';
+  pasangAturanWarna_(sheet, [SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(rumusLokal_('=AND($A2<>"",' + aktif + '<>TRUE)'))
+    .setFontColor(WARNA.garisIsian)
+    .setRanges([rentang])
+    .build()]);
 }
 
 /**

@@ -61,6 +61,10 @@ cek(kirim([{ item: 'Ayam fillet', keluar: akhir('Ayam fillet') - 2 }, { item: 'A
   const d = belanja();
   cek(!d.itemLain.some((i) => i.nama === 'Daging sapi') && !semuaNama(d).includes('Daging sapi'), 'item nonaktif tidak ada');
   A('aturItemAktif', { nama: 'Daging sapi', aktif: true });
+  // Sejak Code.gs v0.40 stock-nya dinolkan saat dinonaktifkan: isi lagi supaya bagian berikut tetap di atas minimum.
+  cek(r.data.dinolkan && r.data.dinolkan.stock > 0, 'stock Daging sapi dinolkan', r.data.dinolkan);
+  A('sesuaikanStock', { submissionId: uid(), tanggal: hariIni, waktuPerangkat: new Date().toISOString(), item: 'Daging sapi',
+    stockSebenarnya: r.data.dinolkan.stock, alasan: 'Stok pembuka' });
 }
 
 // 3. PDF dengan item tambahan

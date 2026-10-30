@@ -115,9 +115,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.39, aplikasi 0.39.0 (catatan resep dan stock hasil prep, 30 Oktober 2026), menunggu pemilik
-  menempel Edge Function dan Code.gs lalu menjalankan `setupSpreadsheet`; sebelumnya Code.gs v0.38, aplikasi 0.38.0 (Tambah item di
-  daftar belanja) digabung. Riwayat tiap rilis: `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.40, aplikasi 0.40.0 (item nonaktif: stock dinolkan, tidak tampil di PDF Stock, abu-abu di tab master
+  Sheets, 30 Oktober 2026), menunggu pemilik menempel Edge Function dan Code.gs lalu menjalankan `setupSpreadsheet`; sebelumnya Code.gs
+  v0.39, aplikasi 0.39.0 (catatan resep dan stock hasil prep) digabung. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
@@ -157,7 +157,7 @@ ada di `catatan/keputusan.md`; butir baru ditulis di sana. Yang paling sering di
 - **Harga:** harga punya riwayat (`M_HargaItem`, `hargaPada_`, butir 164–168); barang jadi tanpa harga dinilai dari resepnya (butir 98,
   381); nominal rupiah waste hanya untuk Pengelola (butir 229).
 - **Master tidak dihapus**, hanya dinonaktifkan, kecuali staff nonaktif (butir 76), item nonaktif tanpa catatan (butir 233), dan hari
-  libur (butir 340).
+  libur (butir 340). Item yang dinonaktifkan stock-nya dinolkan dengan penyesuaian dan tidak tampil di PDF Stock (butir 406–409).
 - **Rumus Sheet** ditulis gaya en-US lalu diubah ke gaya file (butir 93); tanpa `XLOOKUP(1,(…)*(…))` dan tanpa nama LET yang hanya beda
   huruf besar/kecil (butir 120). Rumus tab Harian dan Dashboard hanya dipasang di Apps Script.
 - **Teks antarmuka** mengikuti Bagian 7 spesifikasi tampilan; data contoh di uji tidak memakai nama, nomor, atau alamat sungguhan (butir 393).

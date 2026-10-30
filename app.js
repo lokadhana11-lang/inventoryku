@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.39.0';
+  var VERSI_APLIKASI = '0.40.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -558,6 +558,11 @@
   /** "12,5 kg" yang tidak pernah terpisah baris. */
   function angkaSatuan(n, satuan) {
     return el('span', { class: 'angka-satuan', text: formatAngka(n) + (satuan ? ' ' + satuan : '') });
+  }
+
+  /** "12,5 kg" sebagai teks (untuk kalimat di konfirmasi dan toast), angka dan satuan dipisah spasi tak terputus. */
+  function teksAngkaSatuan(n, satuan) {
+    return formatAngka(n) + (satuan ? '\u00a0' + satuan : '');
   }
 
   /** Tanda pengenal kiriman (submission_id), dibuat di HP. */
@@ -12205,6 +12210,12 @@
           }
         } else {
           keadaan.push(el('p', { class: 'kartu-teks', text: 'Nonaktif. ' + it.nama + ' tidak tampil di form. Riwayatnya tetap tersimpan.' }));
+          // Stock sisa item yang dinonaktifkan sebelum Code.gs v0.40 (sejak itu stock dinolkan saat dinonaktifkan).
+          if (data.nolkanSaatNonaktif && it.stock) {
+            keadaan.push(el('p', { class: 'pesan-formulir tinjau' }, [ikon('info'), el('span', {
+              text: 'Stock ' + it.nama + ' masih tercatat ' + teksAngkaSatuan(it.stock, it.satuan) + ' dan masih ikut nilai stock.' })]));
+            keadaan.push(tombol('Nolkan stock', 'kedua', { onclick: nolkanStock }));
+          }
           keadaan.push(tombol('Aktifkan lagi', 'kedua', { onclick: aktifkan }));
         }
         wadah.appendChild(el('section', { class: 'kartu' }, keadaan));
@@ -12447,13 +12458,23 @@
       });
     }
 
+    /** "Stock 3 kg dinolkan." dari jawaban aturItemAktif (Code.gs v0.40), atau ''. */
+    function teksDinolkan(hasil) {
+      var d = hasil && hasil.dinolkan;
+      return d ? ' Stock ' + teksAngkaSatuan(d.stock, d.satuan) + ' dinolkan.' : '';
+    }
+
     function nonaktifkan() {
       var it = itemKini;
+      // Code.gs v0.40: stock yang belum nol dinolkan saat item dinonaktifkan. Server lama membiarkannya.
+      var sisa = it.stock ? teksAngkaSatuan(it.stock, it.satuan) : '';
       konfirmasi({
         judul: 'Nonaktifkan ' + it.nama + '?',
         teks: it.nama + ' tidak tampil lagi di form. Riwayatnya tetap tersimpan dan bisa diaktifkan lagi.',
-        peringatan: it.stock ? 'Stock ' + it.nama + ' masih tercatat ' + formatAngka(it.stock) + ' ' + it.satuan +
-          '. Stock itu tetap tercatat dan tetap ikut nilai stock.' : '',
+        peringatan: !sisa ? '' : data.nolkanSaatNonaktif
+          ? 'Stock ' + it.nama + ' masih tercatat ' + sisa + '. Stock ini dinolkan dan dicatat sebagai penyesuaian di ' +
+            'Riwayat stock, supaya tidak ikut nilai stock dan laporan.'
+          : 'Stock ' + it.nama + ' masih tercatat ' + sisa + '. Stock itu tetap tercatat dan tetap ikut nilai stock.',
         teksYa: 'Nonaktifkan',
         bahaya: true,
         jalankan: function () { return panggilApi('aturItemAktif', { nama: it.nama, aktif: false }); }
@@ -12462,7 +12483,24 @@
         Cache.tulis('item', hasil);
         isi = null;
         gambar(hasil);
-        toast(it.nama + ' dinonaktifkan.');
+        toast(it.nama + ' dinonaktifkan.' + teksDinolkan(hasil));
+      });
+    }
+
+    function nolkanStock() {
+      var it = itemKini;
+      konfirmasi({
+        judul: 'Nolkan stock ' + it.nama + '?',
+        teks: 'Stock ' + teksAngkaSatuan(it.stock, it.satuan) + ' dinolkan dan dicatat sebagai penyesuaian di Riwayat stock hari ini. ' +
+          it.nama + ' tidak lagi ikut nilai stock dan laporan.',
+        teksYa: 'Nolkan stock',
+        jalankan: function () { return panggilApi('aturItemAktif', { nama: it.nama, aktif: false }); }
+      }).then(function (hasil) {
+        if (!hasil) return;
+        Cache.tulis('item', hasil);
+        isi = null;
+        gambar(hasil);
+        toast(teksDinolkan(hasil).trim() || 'Stock ' + it.nama + ' sudah 0.');
       });
     }
 
@@ -12494,6 +12532,8 @@
         isi = null;
         gambar(hasil);
         toast(it.nama + ' aktif lagi.');
+        // Stock-nya dinolkan saat dinonaktifkan (Code.gs v0.40): tawarkan stok pembuka.
+        if (hasil.nolkanSaatNonaktif && itemKini && !itemKini.stock) tawarkanStokPembuka(itemKini);
       }).catch(function (err) {
         aturTombolProses(t, false);
         if (tanganiSesiBerakhir(err)) return;
