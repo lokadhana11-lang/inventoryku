@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.37 (waste per porsi menu)
+// InventoryKu Code.gs v0.38 (tambah item di daftar belanja)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -117,9 +117,11 @@
  * - 29 Oktober 2026    : waste per porsi menu (salah order, dikembalikan): kirimWaste.baris[].menu, kolom Menu
  *                        di Data_Waste (setupSpreadsheet), nilai = porsi × HPP per porsi, tanpa gerakan stock;
  *                        formWaste.menu/menuSiap, hpp.pemakaian.wasteMenu, hpp.teoritis.wastePorsi.
+ * - 29 Oktober 2026    : daftar belanja menerima item tambahan di luar daftar di bawah stok minimum
+ *                        (daftarBelanja.itemLain, pilihanPemasok[].kontak, unduhPdfBelanja.tambahan).
  */
 
-var VERSI_KODE = 'v0.37';
+var VERSI_KODE = 'v0.38';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -7468,11 +7470,15 @@ function itemBelanja_(m, akhir) {
  *   terakhir: { pemasok, tanggal, nonaktif } | null, dipesan: pesanan menunggu item itu | null] }]. Item masuk
  *   kelompok pemasok pesanan yang masih menunggu, lalu pemasok barang masuk terakhirnya; pemasok yang nonaktif
  *   tidak punya kelompok. Kelompok urut nama, "belum ada pemasok" paling bawah; item urut kategori lalu nama.
- * - pilihanPemasok: [{ nama, wa }] pemasok aktif; menunggu: semua pesanan yang masih menunggu (umur berapa pun).
+ * - pilihanPemasok: [{ nama, kontak, wa }] pemasok aktif; menunggu: semua pesanan yang masih menunggu (umur berapa pun).
+ * - itemLain (Code.gs v0.38): item aktif lain (stock tidak di bawah minimum, atau tanpa stok minimum), bentuknya sama
+ *   dengan item kelompok, urut kategori lalu nama; aplikasi menambahkannya ke kelompok yang dipilih Pengelola.
  */
 function dataBelanja_() {
   var hari = hariIni_();
-  var stock = ringkasStockHari_(hari);
+  var master = bacaItem_();
+  var rekap = bacaRekap_();
+  var stock = ringkasStockHari_(hari, master, rekap);
   var urut = {};
   bacaSemuaKategori_().forEach(function (k, i) { urut[k.nama.toLowerCase()] = { i: i, nama: k.nama }; });
   var namaKategori = function (m) {
@@ -7511,38 +7517,52 @@ function dataBelanja_() {
     if (!dipesan[k] || r.ms > dipesan[k].ms) dipesan[k] = r;
   });
   var kelompok = {};
+  var itemKelompok = function (m, akhir) {
+    var k = m.nama.toLowerCase();
+    var d = dipesan[k];
+    var t = terakhir[k];
+    return gabung_(itemBelanja_(m, akhir), {
+      kategori: namaKategori(m),
+      terakhir: t ? { pemasok: t.pemasok, tanggal: t.tanggal, nonaktif: !aktif[t.pemasok.toLowerCase()] } : null,
+      dipesan: d ? bentukBarisPesanan_(d, true) : null
+    });
+  };
+  var diDaftar = {};
   stock.belanja.forEach(function (x) {
     var m = x.m;
     var k = m.nama.toLowerCase();
+    diDaftar[k] = true;
     var d = dipesan[k];
     var t = terakhir[k];
     var p = (d && aktif[d.pemasok.toLowerCase()]) || (t && aktif[t.pemasok.toLowerCase()]) || null;
     var kunci = p ? p.nama.toLowerCase() : '';
     var g = kelompok[kunci] = kelompok[kunci] || { nama: p ? p.nama : '', kontak: p ? p.kontak : '', wa: p ? nomorWa_(p.kontak) : '', item: [] };
-    g.item.push(gabung_(itemBelanja_(m, x.akhir), {
-      kategori: namaKategori(m),
-      terakhir: t ? { pemasok: t.pemasok, tanggal: t.tanggal, nonaktif: !aktif[t.pemasok.toLowerCase()] } : null,
-      dipesan: d ? bentukBarisPesanan_(d, true) : null
-    }));
+    g.item.push(itemKelompok(m, x.akhir));
   });
+  var urutItem = function (a, b) {
+    return indeksKategori(a.kategori) - indeksKategori(b.kategori) || a.kategori.localeCompare(b.kategori, 'id') ||
+      a.nama.localeCompare(b.nama, 'id');
+  };
+  // Item lain yang boleh ditambah Pengelola ke pesanan (Code.gs v0.38): item aktif yang tidak ada di daftar.
+  var itemLain = Object.keys(master).filter(function (k) { return master[k].aktif && !diDaftar[k]; }).map(function (k) {
+    return itemKelompok(master[k], posisiStock_(rekap.item[k], hari).akhir);
+  }).sort(urutItem);
   var pemasok = Object.keys(kelompok).map(function (k) { return kelompok[k]; }).sort(function (a, b) {
     if (!a.nama !== !b.nama) return a.nama ? -1 : 1;
     return a.nama.localeCompare(b.nama, 'id');
   });
-  pemasok.forEach(function (g) {
-    g.item.sort(function (a, b) {
-      return indeksKategori(a.kategori) - indeksKategori(b.kategori) || a.kategori.localeCompare(b.kategori, 'id') ||
-        a.nama.localeCompare(b.nama, 'id');
-    });
-  });
+  pemasok.forEach(function (g) { g.item.sort(urutItem); });
   return {
     tanggal: hari, jumlah: stock.belanja.length, kategori: kategori,
     outlet: namaOutlet_(),
     pembelianSiap: pembelianSiap_(),
     pesananSiap: siap,
     pemasok: pemasok,
-    pilihanPemasok: daftarPemasok.filter(function (p) { return p.aktif; }).map(function (p) { return { nama: p.nama, wa: nomorWa_(p.kontak) }; }),
-    menunggu: pesananMenunggu_(pes).map(bentukPesanan_)
+    pilihanPemasok: daftarPemasok.filter(function (p) { return p.aktif; }).map(function (p) {
+      return { nama: p.nama, kontak: p.kontak, wa: nomorWa_(p.kontak) };
+    }),
+    menunggu: pesananMenunggu_(pes).map(bentukPesanan_),
+    itemLain: itemLain
   };
 }
 
@@ -7550,14 +7570,61 @@ function aksiDaftarBelanja_() {
   return dataBelanja_();
 }
 
+/** Judul kelompok daftar belanja: nama pemasok, "Belum ada pemasok", atau "Pemasok lain" (hanya item yang ditambah). */
+function judulKelompokBelanja_(g) {
+  if (g.nama) return g.nama;
+  return g.item.some(function (it) { return !it.ditambah; }) ? 'Belum ada pemasok' : 'Pemasok lain';
+}
+
+/**
+ * Item yang ditambah Pengelola di layar Daftar belanja (Code.gs v0.38): tambahan = [{ pemasok, item }]. Hanya item
+ * dari d.itemLain (item aktif yang tidak di bawah minimum), masing-masing sekali, ditandai `ditambah`; masuk kelompok
+ * pemasok itu (dibuat jika belum ada, untuk pemasok aktif), selain itu kelompok tanpa pemasok. Mengubah d; jawabannya
+ * jumlah item yang ditambahkan.
+ */
+function tambahkanItemBelanja_(d, tambahan) {
+  if (!Array.isArray(tambahan) || !tambahan.length) return 0;
+  var lain = {};
+  (d.itemLain || []).forEach(function (it) { lain[it.nama.toLowerCase()] = it; });
+  var pilihan = {};
+  (d.pilihanPemasok || []).forEach(function (p) { pilihan[p.nama.toLowerCase()] = p; });
+  var grup = {};
+  d.pemasok.forEach(function (g) { grup[g.nama.toLowerCase()] = g; });
+  var sudah = {};
+  var jumlah = 0;
+  tambahan.slice(0, 1000).forEach(function (x) {
+    var k = rapikanTeks_(x && x.item).toLowerCase();
+    if (!lain[k] || sudah[k]) return;
+    sudah[k] = true;
+    var pk = rapikanTeks_(x.pemasok).toLowerCase();
+    var p = pilihan[pk];
+    if (!grup[pk] && !p) pk = '';
+    var g = grup[pk];
+    if (!g) {
+      g = grup[pk] = { nama: p ? p.nama : '', kontak: p ? p.kontak : '', wa: p ? p.wa : '', item: [] };
+      d.pemasok.push(g);
+    }
+    g.item.push(gabung_(lain[k], { ditambah: true }));
+    jumlah++;
+  });
+  d.pemasok.sort(function (a, b) {
+    if (!a.nama !== !b.nama) return a.nama ? -1 : 1;
+    return a.nama.localeCompare(b.nama, 'id');
+  });
+  return jumlah;
+}
+
 /**
  * PDF daftar belanja (Bagian 9.2), dikelompokkan per pemasok seperti di layar. body.order: { namaItem: teks }
  * berisi jumlah Order di layar (dalam satuan order: satuan besar jika ada); aplikasi 0.29 mengirim semua item,
  * aplikasi lama hanya yang diubah. Item yang tidak ada di body.order memakai saran; teks kosong dicetak "–".
+ * body.tambahan (Code.gs v0.38): [{ pemasok ('' = kelompok tanpa pemasok), item }] item yang ditambah di layar; hanya
+ * item dari itemLain yang dipakai, masuk kelompok pemasok itu (pemasok yang tidak aktif lagi: kelompok tanpa pemasok).
  */
 function aksiUnduhPdfBelanja_(body, pengguna) {
   var d = dataBelanja_();
-  if (!d.jumlah) throw galatPengguna_('Semua stock di atas batas minimum. Tidak ada daftar belanja untuk dicetak.');
+  var jumlahTambah = tambahkanItemBelanja_(d, body.tambahan);
+  if (!d.jumlah && !jumlahTambah) throw galatPengguna_('Semua stock di atas batas minimum. Tidak ada daftar belanja untuk dicetak.');
   var order = body.order && typeof body.order === 'object' && !Array.isArray(body.order) ? body.order : {};
   var orderKecil = {};
   Object.keys(order).forEach(function (k) { orderKecil[rapikanTeks_(k).toLowerCase()] = order[k]; });
@@ -7568,30 +7635,32 @@ function aksiUnduhPdfBelanja_(body, pengguna) {
     '<th style="width:14%">Kategori</th><th style="width:14%">Stock Sekarang</th><th style="width:14%">Stok Minimum</th>' +
     '<th style="width:24%">Order</th></tr>';
   d.pemasok.forEach(function (g) {
-    tabel += '<tr class="kategori"><td colspan="6">' + escHtml_(g.nama || 'Belum ada pemasok') +
+    tabel += '<tr class="kategori"><td colspan="6">' + escHtml_(judulKelompokBelanja_(g)) +
       (g.kontak ? ' · ' + escHtml_(g.kontak) : '') + '</td></tr>';
     g.item.forEach(function (it, i) {
       var kecil = it.nama.toLowerCase();
-      // Di layar, Order kosong untuk item yang sudah dipesan dan item yang belum punya pemasok.
-      var bawaan = it.dipesan || !g.nama ? '' : (it.saran ? String(it.saran.jumlah) : '');
+      // Di layar, Order kosong untuk item yang sudah dipesan, item yang belum punya pemasok, dan item yang ditambah.
+      var bawaan = it.dipesan || !g.nama || it.ditambah ? '' : (it.saran ? String(it.saran.jumlah) : '');
       // Item yang tidak dikirim (aplikasi 0.28 hanya mengirim yang diubah): saran, seperti dulu.
       var dikirim = Object.prototype.hasOwnProperty.call(orderKecil, kecil);
-      var v = dikirim ? String(orderKecil[kecil] == null ? '' : orderKecil[kecil]).trim() : (it.saran ? String(it.saran.jumlah) : '');
+      var v = dikirim ? String(orderKecil[kecil] == null ? '' : orderKecil[kecil]).trim()
+        : (it.saran && !it.ditambah ? String(it.saran.jumlah) : '');
       var teks = v === '' ? '–' : escHtml_(teksOrder_(master[kecil] || it, angkaIsian_(v, 'Order ' + it.nama)));
-      if (dikirim && v.replace(',', '.') !== bawaan) diubah++;
+      if (dikirim && !it.ditambah && v.replace(',', '.') !== bawaan) diubah++;
       // Order kosong: sebabnya dan saran tetap tertulis kecil, supaya "–" tidak dibaca sebagai "tanpa saran".
       if (v === '') {
-        var sebab = it.dipesan ? 'sudah dipesan' : !g.nama ? 'belum ada pemasok' : '';
+        var sebab = it.dipesan ? 'sudah dipesan' : !g.nama && !it.ditambah ? 'belum ada pemasok' : '';
         var saranKecil = it.saran ? 'saran ' + it.saran.teks : 'tanpa saran';
         teks += '<br><span class="kecil">' + escHtml_(sebab ? sebab + ' · ' + saranKecil : saranKecil) + '</span>';
       }
       if (it.dipesan) adaDipesan = true;
       tabel += '<tr><td class="angka">' + (i + 1) + '</td><td>' + escHtml_(it.nama) +
+        (it.ditambah ? '<br><span class="kecil">ditambah di layar</span>' : '') +
         (it.dipesan ? '<br><span class="kecil">dipesan ' + escHtml_(teksJumlahPesanan_(it.dipesan)) + ', ' +
           escHtml_(tanggalPendekId_(it.dipesan.tanggal)) + '</span>' : '') + '</td>' +
         '<td>' + escHtml_(it.kategori) + '</td>' +
         '<td class="angka' + (it.stock < 0 ? ' masalah' : '') + '">' + angkaId_(it.stock) + ' ' + escHtml_(it.satuan) + '</td>' +
-        '<td class="angka">' + angkaId_(it.stokMin) + ' ' + escHtml_(it.satuan) + '</td>' +
+        '<td class="angka">' + (it.stokMin == null ? '–' : angkaId_(it.stokMin) + ' ' + escHtml_(it.satuan)) + '</td>' +
         '<td class="akhir">' + teks + '</td></tr>';
     });
   });
@@ -7599,12 +7668,18 @@ function aksiUnduhPdfBelanja_(body, pengguna) {
   var catatan = ['Saran order = stok maksimum dikurangi stock akhir, dibulatkan ke atas ke satuan besar jika item punya. ' +
     'Item tanpa stok maksimum tidak diberi saran. Order "–" berarti tidak ada jumlah yang diisi; sebab dan sarannya tertulis kecil di bawahnya.',
     'Item dikelompokkan menurut pemasok pesanan yang belum datang, atau pemasok barang masuk terakhirnya.'];
+  if (jumlahTambah) {
+    catatan.push(jumlahTambah + ' item bertanda "ditambah" dipilih Pengelola di layar, di luar daftar item di bawah stok minimum; ' +
+      'kelompoknya mengikuti pilihan di layar.');
+  }
   if (adaDipesan) catatan.push('Item bertanda "dipesan" sudah dipesan dan belum dicatat datang.');
   if (diubah) catatan.push(diubah + ' jumlah order diubah di layar sebelum dicetak.');
+  var info = [['Item di bawah stok minimum', String(d.jumlah)]];
+  if (jumlahTambah) info.push(['Item ditambah', String(jumlahTambah)]);
+  info.push(['Pemasok', String(d.pemasok.filter(function (g) { return g.nama; }).length)]);
   var html = htmlLaporan_('', d.tanggal, {
     judul: 'Daftar Belanja',
-    info: [['Item di bawah stok minimum', String(d.jumlah)],
-      ['Pemasok', String(d.pemasok.filter(function (g) { return g.nama; }).length)]],
+    info: info,
     tabel: tabel,
     catatan: catatan,
     bawah: [['Dicetak oleh', pengguna.nama + ', ' + waktuPendekId_(new Date())]]

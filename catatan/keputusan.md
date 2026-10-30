@@ -2618,3 +2618,33 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     yang belum atau sengaja berbeda), dan ringkasan keputusan yang paling sering dibutuhkan dengan nomor butirnya. Butir baru ditulis
     di `catatan/keputusan.md`, baris rilis di `catatan/status.md`, aksi baru di `catatan/api.md`. Hasil: 163 baris (15 KB).
 
+### Tambah item di daftar belanja (Code.gs v0.38, aplikasi 0.38.0, 29 Oktober 2026)
+
+397. **Asal dan keputusan pemilik:** pemilik bertanya apakah daftar belanja bisa menambah atau menghapus item saat mengirim ke WhatsApp
+    tanpa melihat stock yang tercatat. Menghapus sudah bisa (Order dikosongkan); yang belum: memesan item yang stock-nya tidak di bawah
+    minimum. Pemilik menyetujui saran: item dari daftar item (bukan ketikan bebas, yang tidak bisa dicatat datang), "Tambah item" di
+    tiap kelompok pemasok, item boleh dipesan berapa pun stock-nya, keterangan stock tetap tampil kecil, dan item tambahan hanya di
+    layar. Spesifikasi sistem Bagian 9.2; tampilan Bagian 5.9 dan 7.
+398. **Kelompok "Pemasok lain"** (keputusan tambahan): tombol per kelompok tidak cukup saat tidak ada item di bawah minimum (tidak ada
+    kelompok) atau pemasok yang dituju belum punya kelompok. Karena itu kelompok tanpa pemasok (dengan "Pesan ke") selalu ada paling
+    bawah; tanpa item di bawah minimum judulnya "Pemasok lain" dan, selama kosong, hanya berisi keterangan dan Tambah item. "Pesan ke"
+    yang masih kosong diisi pemasok barang masuk terakhir item pertama yang ditambah (`pesanKe`), supaya pesanan tidak terkirim tanpa
+    dicatat karena lupa memilih. Di PDF judulnya sama (`judulKelompokBelanja_`).
+399. **Server** (`dataBelanja_`): `itemLain` = item aktif yang tidak ada di daftar, bentuknya sama dengan item kelompok (stock hari ini,
+    saran ke stok maksimum, `terakhir`, `dipesan`), dibaca dari master dan rekap yang sama dengan daftar; `pilihanPemasok[].kontak`
+    untuk kelompok yang hanya berisi item tambahan. `catatPesanan` tidak berubah (sejak v0.29 sudah menerima item apa pun di
+    `M_Item`). PDF (`tambahkanItemBelanja_`): hanya item dari `itemLain`, sekali per item, masuk kelompok pemasok itu (dibuat jika
+    pemasok aktif, selain itu kelompok tanpa pemasok), bertanda "ditambah di layar", Order kosong "–" tanpa sebab, stok minimum kosong
+    "–", tidak dihitung sebagai "jumlah order diubah"; kotak info "Item ditambah" dan satu catatan. Tanpa `tambahan`, PDF sama dengan
+    v0.37.
+400. **Aplikasi** (`kartuDaftarBelanja`): `tambahan` (nama pemasok kelompok → [nama item], hanya di memori) dan `kelompokTampil`
+    (`susunKelompok`: kelompok server dengan item tambahannya, ditambah kelompok tanpa pemasok). `rapikanTambahan` dijalankan setiap
+    data server baru digambar: item yang tidak aktif lagi atau kini di bawah minimum (sudah ada di kelompok server) dibuang, dan item yang
+    pemasoknya tidak aktif lagi pindah ke kelompok tanpa pemasok. Item tambahan keluar dari kelompok sesudah dipesan (juga dari antrean),
+    karena tampil di Pesanan belum datang. Ikon hapus ditaruh sebelum kolom Order supaya kolom Order tetap sejajar di desktop (di HP ia
+    berada di kanan nama item). Server lama (tanpa `itemLain`): tampilan 0.37.
+401. **Uji:** `uji/server/belanja_tambah.mjs` (bentuk `itemLain`, item nonaktif, PDF dengan kelompok ada/baru/tanpa pemasok/pemasok tak
+    dikenal, item ganda dan item di bawah minimum diabaikan, pesanan item di atas minimum dan datangnya, semua stock di atas minimum,
+    Staff ditolak) dan `uji/layar/belanja_tambah.mjs` (HP: lembar, cari, fokus, pesan WhatsApp, PDF, pesanan tercatat; hapus dan fokus;
+    Pesan ke terisi; data baru membuang item yang kini di bawah minimum; server lama; delapan ukuran; kelompok Pemasok lain saat semua
+    stock di atas minimum di 320 px). Belum diuji di HP asli dan WhatsApp dari PWA yang terpasang.

@@ -115,14 +115,15 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.37, aplikasi 0.37.0 (waste per porsi menu, 29 Oktober 2026), semuanya digabung dan dipasang pemilik.
+- **Versi terakhir:** Code.gs v0.38, aplikasi 0.38.0 (Tambah item di daftar belanja, 29 Oktober 2026), menunggu pemilik menempel
+  Edge Function dan Code.gs; sebelumnya Code.gs v0.37, aplikasi 0.37.0 (waste per porsi menu) digabung dan dipasang pemilik.
   Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
 - **Fitur yang ada:** form Stock (Semua kategori, cari, Hitung sisa, pemasok dan harga beli, masa simpan barang masuk, pesanan), Suhu,
   Prep List (resep, hasil aktual), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
-  Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok; Dashboard (nilai
+  Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
   banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form, hari libur, outlet dan jadwal); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; keamanan login.

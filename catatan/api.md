@@ -267,6 +267,10 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   ditambah `wasteMenu: { porsi, nilai }`, `hpp.teoritis` ditambah `wastePorsi: { porsi, nilai }`.
 - Email harian (Code.gs v0.35, 28 Oktober 2026): tidak ada aksi baru. Email laporan harian ditambah bagian "Barang masuk" dan
   (sejak penjualan pernah dicatat) "Penjualan dan food cost".
+- Tambah item di daftar belanja (Code.gs v0.38, 29 Oktober 2026; khusus Pengelola): `daftarBelanja` (juga `belanja` di jawaban
+  `catatPesanan` dan `tutupPesanan`) ditambah `itemLain: [item belanja + kategori, terakhir, dipesan]` (item aktif yang tidak di bawah
+  minimum, urut kategori lalu nama) dan `pilihanPemasok[].kontak`; `unduhPdfBelanja` menerima `tambahan: [{ pemasok ('' = tanpa
+  pemasok), item }]` dan tidak lagi menolak saat tidak ada item di bawah minimum jika ada item tambahan.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.

@@ -60,6 +60,8 @@
 > Diperbarui 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): waste per porsi menu untuk salah
 > order atau makanan yang dikembalikan, dinilai dengan HPP per porsi, tanpa mengurangi stock lagi
 > (Bagian 5.4 dan 5.9).
+> Diperbarui 29 Oktober 2026 (permintaan pemilik): daftar belanja bisa ditambah item yang stock-nya tidak
+> di bawah minimum, per kelompok pemasok, sebelum dikirim ke WhatsApp (Bagian 9.2).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1565,6 +1567,16 @@ Unduh PDF tidak memakai link Drive, karena staff tidak punya akses ke folder Dri
 - Kolom Order terisi saran, **kecuali** untuk item yang sudah dipesan dan belum datang, dan untuk
   item di kelompok "Belum ada pemasok": keduanya kosong sampai diisi, supaya tidak terpesan dua kali
   atau ke pemasok yang salah. Pengelola boleh mengubah jumlah di layar; perubahan itu tidak disimpan.
+- **Tambah item** (29 Oktober 2026, permintaan pemilik): tiap kelompok bisa ditambah item aktif lain
+  yang belum ada di daftar, berapa pun stock-nya (misalnya stock masih di atas minimum, atau item tanpa
+  stok minimum), supaya ikut dipesan ke pemasok kelompok itu. Order item tambahan kosong sampai diisi,
+  dan item itu bisa dikeluarkan lagi. Kelompok tanpa pemasok selalu ada di paling bawah (berjudul
+  "Pemasok lain" jika tidak berisi item di bawah minimum), untuk pesanan ke pemasok yang belum punya
+  kelompok: item ditambah di situ, lalu pemasoknya dipilih di "Pesan ke" (otomatis pemasok barang masuk
+  terakhir item pertama yang ditambah, jika ada). Item tambahan hanya ada di layar (tidak disimpan);
+  begitu dikirim ke WhatsApp ia tercatat sebagai pesanan seperti item lain, dan ikut tercetak di PDF
+  (bertanda "ditambah di layar"). Item di luar daftar item (barang yang diketik bebas) tidak bisa
+  ditambah, karena tidak bisa dicatat datang dan tidak punya stock.
 - **Kirim ke WhatsApp** per kelompok: membuka chat WhatsApp ke nomor di Kontak pemasok (atau WhatsApp
   meminta memilih kontak jika Kontak tidak berisi nomor HP) dengan pesan berisi item yang Order-nya
   diisi. Kelompok "Belum ada pemasok" memilih pemasok di "Pesan ke"; tanpa pilihan, pesan tetap
@@ -1584,7 +1596,8 @@ Unduh PDF tidak memakai link Drive, karena staff tidak punya akses ke folder Dri
   pesanan" untuk pesanan yang tidak dikirim pemasok atau sudah dicatat tanpa pesanan. Pesanan selesai
   sendiri saat barangnya dicatat masuk (Bagian 5.5). Ganti nama item atau pemasok ikut mengganti nama
   di `Data_Pesanan`; menghapus item menutup pesanannya yang masih menunggu.
-- Bisa diunduh sebagai PDF dari menu Laporan, dikelompokkan per pemasok dengan Order seperti di layar;
+- Bisa diunduh sebagai PDF dari menu Laporan, dikelompokkan per pemasok dengan Order seperti di layar
+  (termasuk item tambahan, juga saat tidak ada item di bawah minimum);
   Order yang kosong dicetak "–" dengan sebabnya (sudah dipesan, belum ada pemasok) dan sarannya.
   Ringkasannya dan pesanan yang belum datang ikut di email harian.
 - Nomor WhatsApp diambil dari Kontak pemasok; jika Kontak berisi beberapa nomor, nomor HP didahulukan.
