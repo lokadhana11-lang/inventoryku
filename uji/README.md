@@ -44,6 +44,6 @@ yang tidak pernah ada), bukan data outlet.
   jadi pemeriksaan yang menghitung bulan berjalan (HPP, food cost sementara) bisa berbeda; jalankan
   ulang sesudah tanggal 12 jika itu yang gagal.
 - Uji fitur yang lebih tua dari arsip ini (sebelum 19 Oktober 2026) dulu tidak disimpan; daftar ujinya
-  ada di CLAUDE.md per tahap.
+  ada di catatan/status.md dan catatan/keputusan.md.
 - Uji baru: salin pola berkas yang ada (fungsi `cek` yang menghitung lulus dan gagal, lalu `console.log('lulus', n, 'gagal', m)`
   di akhir), supaya `jalankan.mjs` bisa membaca hasilnya.
