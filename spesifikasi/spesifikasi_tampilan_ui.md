@@ -42,6 +42,8 @@
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
 > kelompok "Pemasok lain" (Bagian 5.9).
+> Tambahan 30 Oktober 2026 (permintaan pemilik): catatan resep di Pengaturan → Resep dan Prep List, dan pesan
+> stock hasil prep sesudah Prep List dikirim (Bagian 5.3, 5.7, dan 7).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -780,6 +782,16 @@ Satu-satunya layar yang sepenuhnya navy.
   tebal, untuk disalin ke label wadah. Tulisan yang sama muncul lagi di pesan setelah terkirim.
 - Bahan yang stock-nya tidak cukup menurut catatan diberi tanda Perlu ditinjau:
   "Stock tomat tercatat 1 kg, resep ini butuh 1,5 kg." Prep tetap bisa dikirim.
+- **Catatan resep** (30 Oktober 2026): jika resep punya catatan, di bawah baris Bahan tampil "**Catatan
+  resep:** Air 1,2 liter per 1 kg beras." (teks biasa, tidak redup); di tabel laptop/desktop di kolom
+  Hasil dan bahan.
+- **Pesan sesudah terkirim** (30 Oktober 2026): "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5
+  liter (sekarang 7,5 liter). Bahannya berkurang sesuai resep. Ini sudah tercatat di form Stock sebagai hasil
+  prep, jadi tidak perlu diisi lagi di Tambah masuk." Untuk tanggal selain hari ini "(stock akhir 28 Okt:
+  7,5 liter)". Item tanpa resep: "Tanpa resep, stock tidak bergerak: Potong ayam." Label wadah dan
+  peringatan stock bahan tetap menyusul. Pesan singkat: "Prep list terkirim." Saat masuk antrean HP: "Sesudah
+  terkirim, stock bertambah: Sauce bolognese 2,5 liter." Server lama: pesan lama "Stock bahan dan barang
+  jadi sudah diperbarui.".
 - **Hasil aktual** (18 Oktober 2026, item beresep, tidak wajib): baris Hasil menjadi "Hasil menurut
   resep 10 liter", lalu kolom "Hasil aktual (tidak wajib)" dengan satuannya dan keterangan "Yang
   benar-benar jadi. Kosongkan jika sama dengan hasil menurut resep." Setelah diisi, keterangannya
@@ -1214,6 +1226,9 @@ Satu-satunya layar yang sepenuhnya navy.
   memakai Sauce bolognese sebagai bahan."
 - Di bawah daftar bahan tampil perkiraan biaya satu resep dan harga per satuan hasil,
   dihitung dari harga bahan.
+- Kolom "Catatan untuk juru masak (tidak wajib)" (30 Oktober 2026, paling panjang 200 huruf) di kartu
+  sendiri di bawah bahan, dengan bantuan "Tampil di Prep List di bawah bahan, misalnya takaran air atau cara
+  masak singkat. Tidak mengurangi stock apa pun." Hanya tampil jika server sudah punya kolom Catatan.
 - Mengubah resep menampilkan catatan: "Perubahan berlaku untuk prep berikutnya. Catatan
   lama tidak berubah."
 
@@ -1492,7 +1507,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Antrean berhasil dikirim | "2 isian terkirim." |
 | Gagal kirim | "Belum terkirim. Periksa sinyal, lalu ketuk Kirim ulang." |
 | Kolom wajib kosong | "Isi jumlah resep untuk Sauce bolognese." |
-| Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui." |
+| Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
