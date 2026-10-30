@@ -44,6 +44,9 @@
 > kelompok "Pemasok lain" (Bagian 5.9).
 > Tambahan 30 Oktober 2026 (permintaan pemilik): catatan resep di Pengaturan → Resep dan Prep List, dan pesan
 > stock hasil prep sesudah Prep List dikirim (Bagian 5.3, 5.7, dan 7).
+> Tambahan 30 Oktober 2026 (permintaan pemilik): menonaktifkan item menolkan stock-nya, tombol "Nolkan stock"
+> untuk item nonaktif yang masih punya stock, dan tawaran stok pembuka saat item diaktifkan lagi (Bagian 5.7
+> dan 7).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -1170,7 +1173,15 @@ Satu-satunya layar yang sepenuhnya navy.
   "Rp 45.875 per kg dari resep" tanpa tanda "Belum punya harga", dan di kepala layar item harga
   itu dengan "Dari resep". Harga satuan tetap bisa diisi; sesudah itu harga itulah yang dipakai.
 - Item baru menampilkan ajakan setelah disimpan: "Isi stok pembuka sekarang?" yang membuka
-  Sesuaikan stock dengan alasan Stok pembuka.
+  Sesuaikan stock dengan alasan Stok pembuka. Ajakan yang sama muncul saat item yang stock-nya 0
+  diaktifkan lagi (30 Oktober 2026), karena stock-nya dinolkan saat dinonaktifkan.
+- **Nonaktifkan item yang masih punya stock** (30 Oktober 2026): konfirmasi "Nonaktifkan Tomat?"
+  memuat peringatan "Stock Tomat masih tercatat 2,5 kg. Stock ini dinolkan dan dicatat sebagai
+  penyesuaian di Riwayat stock, supaya tidak ikut nilai stock dan laporan." Sesudahnya: "Tomat
+  dinonaktifkan. Stock 2,5 kg dinolkan." Item nonaktif yang stock-nya belum nol (dinonaktifkan
+  sebelum tanggal ini) menampilkan di kartu Keadaan item "Stock Tomat masih tercatat 2,5 kg dan masih
+  ikut nilai stock." dan tombol kedua "Nolkan stock" di atas "Aktifkan lagi". Server lama tidak
+  menolkan stock, jadi aplikasi memakai peringatan lama dan tidak menampilkan tombol itu.
 - Sakelar "Datang dalam kemasan besar". Jika dinyalakan, muncul dua isian: satuan besar
   dan isinya, ditulis sebagai kalimat: "1 [dus] berisi [12] botol".
 - **Hapus** (spesifikasi sistem Bagian 5.1): bagian paling bawah layar ubah item, terpisah
@@ -1532,6 +1543,8 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Hapus item | "Hapus Tomat dari daftar item? Tomat belum punya catatan, jadi tidak ada riwayat yang hilang. Riwayat harganya ikut terhapus. Tindakan ini tidak bisa dibatalkan dari aplikasi." |
 | Item dihapus | "Tomat dihapus dari daftar item." |
 | Item belum punya catatan dan masih aktif | "Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus." |
+| Nonaktifkan item yang masih punya stock | "Stock Tomat masih tercatat 2,5 kg. Stock ini dinolkan dan dicatat sebagai penyesuaian di Riwayat stock, supaya tidak ikut nilai stock dan laporan." Sesudahnya: "Tomat dinonaktifkan. Stock 2,5 kg dinolkan." |
+| Nolkan stock item nonaktif | "Nolkan stock Tomat?" dengan "Stock 2,5 kg dinolkan dan dicatat sebagai penyesuaian di Riwayat stock hari ini. Tomat tidak lagi ikut nilai stock dan laporan." Sesudahnya: "Stock 2,5 kg dinolkan." |
 | Pilihan kategori di Laporan | Label "Kategori", nilai awal "Semua kategori" |
 | Tanggal ditolak | "Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini." |
 | Tanggal sudah diarsip | "Data sebelum 1 Januari 2026 sudah dipindah ke arsip tahunan (Google Drive: Laporan Kitchen/Dapur Pusat/Arsip). Pilih tanggal yang lebih baru." |

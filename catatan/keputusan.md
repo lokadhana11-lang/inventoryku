@@ -2678,3 +2678,38 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dengan draft, kartu dan tabel Prep List, pesan sesudah kirim dari server, antrean, server lama, data tersimpan dari server lama lalu
     server baru, delapan ukuran dengan catatan 200 huruf
     satu kata panjang). Belum diuji di HP asli.
+
+### Item nonaktif tidak muncul di laporan (Code.gs v0.40, aplikasi 0.40.0, 30 Oktober 2026)
+
+406. **Asal dan keputusan pemilik:** catatan pemilik 29 Oktober: item yang sudah dinonaktifkan tidak perlu ditampilkan di laporan unduhan
+    atau di Google Sheets, agar datanya tidak bertabrakan. Contoh tangkapan layar diminta tetapi belum dikirim; pemilik meminta lanjut, jadi
+    yang dibangun adalah saran yang sudah disetujui (menolkan stock saat menonaktifkan, riwayat tetap disimpan, baris nonaktif abu-abu di
+    Sheets) ditambah PDF stock tanpa item nonaktif. Item nonaktif masih muncul karena dua hal: stock-nya belum nol (ikut nilai stock dan
+    daftar "belum punya harga" di Dashboard aplikasi, tab Dashboard, dan rekap bulanan) dan PDF stock memuat item nonaktif yang bergerak
+    hari itu. Spesifikasi sistem Bagian 5.1, 8.2, dan 9.1; tampilan Bagian 5.7 dan 7.
+407. **Stock dinolkan saat dinonaktifkan** (keputusan tambahan): bukan pilihan, karena item nonaktif tidak tampil di form, jadi stock-nya
+    tidak bisa dipakai atau dicatat lagi dan hanya mengotori nilai stock; stock yang masih nyata berarti item itu belum waktunya
+    dinonaktifkan. Dicatat sebagai penyesuaian biasa (`tulisPenyesuaian_`, yang kini juga dipakai `sesuaikanStock`) pada hari ini, alasan
+    Lainnya, catatan `CATATAN_NOLKAN_NONAKTIF`, `submission_id` dibuat server, sebelum kolom Aktif ditulis (jika gagal, item tetap aktif).
+    Dengan begitu semua angka tetap cocok (HPP, rekap bulanan, kartu stok) tanpa aturan khusus untuk item nonaktif; aturan nilai stock
+    ("item nonaktif yang stock-nya belum nol tetap dihitung", Bagian 8.5) tidak diubah. Item yang sudah nonaktif sebelum versi ini: tombol
+    "Nolkan stock" memanggil `aturItemAktif` nonaktif lagi (aksi yang sama, tidak ada aksi baru); stock 0 tidak menulis apa pun. Aktif lagi
+    dengan stock 0 menawarkan stok pembuka (ajakan yang sama dengan item baru). Server lama (tanpa `nolkanSaatNonaktif`): peringatan lama,
+    tanpa tombol dan tanpa tawaran. Kiriman antrean bertanggal sebelumnya yang masuk sesudahnya bisa membuat stock bergeser dari 0 lagi;
+    itu dibiarkan (jarang, dan tombol Nolkan stock tersedia).
+408. **PDF stock tanpa item nonaktif** (keputusan tambahan): sama dengan tab `Harian_Stock` (rumusnya sejak awal hanya item aktif), juga
+    untuk tanggal sebelum item dinonaktifkan; catatan di bawah tabel menyebut jumlah item nonaktif yang bergerak pada tanggal itu (menurut
+    kategori yang dipilih), supaya laporan lama yang diunduh ulang tidak diam-diam berkurang. Kategori yang hanya digerakkan item nonaktif
+    dilewati seperti kategori tanpa rekap. PDF waste, prep, dan rekap bulanan tidak diubah: itu catatan kejadian dan nilai rupiah, yang
+    akan salah jika baris item nonaktif dibuang. `Stock_Harian`, tab Data, dan `M_Item` tetap memuat item nonaktif (riwayat).
+409. **Abu-abu di tab master** (keputusan tambahan): format bersyarat `=AND($A2<>"",$<Aktif>2<>TRUE)` dengan warna teks Garis isian, dipasang
+    `setupSpreadsheet` (`pasangAbuNonaktif_`) di semua tab master yang punya kolom Aktif. Format bersyarat ikut bergeser saat salinan dari
+    Supabase menyisip atau menghapus baris dan tidak terhapus oleh `clearContent`, jadi tidak perlu dipasang ulang tiap salinan. Baris tidak
+    disembunyikan atau dipindah: salinan Sheets harus sama persis dengan Supabase (butir 208), dan filter yang sudah ada di tiap tab bisa
+    dipakai pemilik untuk menyembunyikannya sendiri.
+410. **Uji:** `uji/server/item_nonaktif.mjs` (dinolkan 4 kg dengan isi baris penyesuaian dan nilai stock turun, riwayat item, nonaktif lagi
+    tanpa stock, aktif lagi tetap 0, stock minus, ditolak karena resep aktif tanpa menolkan, Staff ditolak, item nonaktif lama tetap di nilai
+    stock lalu Nolkan stock, PDF stock semua kategori dan per kategori dengan catatan jumlah, aturan abu-abu di tab master yang punya kolom
+    Aktif) dan `uji/layar/item_nonaktif.mjs` (dialog dan toast, tawaran stok pembuka, Nolkan stock, server lama, delapan ukuran dengan nama
+    item panjang dan stock lima digit). `uji/server/belanja_tambah.mjs` mengisi lagi stock Daging sapi sesudah diaktifkan lagi. Warna di
+    Google Sheets asli belum diuji.

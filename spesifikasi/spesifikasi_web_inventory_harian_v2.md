@@ -64,6 +64,9 @@
 > di bawah minimum, per kelompok pemasok, sebelum dikirim ke WhatsApp (Bagian 9.2).
 > Diperbarui 30 Oktober 2026 (permintaan pemilik): catatan resep untuk juru masak yang tampil di Prep List,
 > dan pesan stock hasil prep sesudah Prep List dikirim (Bagian 5.1 dan 5.3).
+> Diperbarui 30 Oktober 2026 (permintaan pemilik): item nonaktif tidak lagi muncul di laporan. Stock item
+> yang dinonaktifkan dinolkan dengan penyesuaian, PDF stock tidak memuat item nonaktif, dan baris nonaktif
+> di tab master Google Sheets ditulis abu-abu (Bagian 5.1, 8.2, dan 9.1).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -533,7 +536,12 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
   dan tercatat di `Log_Perubahan` (Bagian 5.8).
 - Item tidak bisa dinonaktifkan selama masih menjadi bahan atau hasil resep yang aktif, atau
   bahan menu yang aktif (Bagian 5.9).
-- Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan.
+- Item yang stock-nya belum nol menampilkan peringatan saat dinonaktifkan. Sejak 30 Oktober 2026
+  stock itu **dinolkan** saat item dinonaktifkan: satu baris `Data_Penyesuaian` pada hari itu (Stock
+  Sebenarnya 0, alasan Lainnya, catatan "Stock dinolkan karena item dinonaktifkan."). Dengan begitu
+  item nonaktif tidak ikut nilai stock, daftar "belum punya harga", dan laporan, sementara riwayatnya
+  tetap utuh. Item nonaktif yang stock-nya belum nol dari sebelum tanggal itu punya tombol
+  "Nolkan stock" di layar itemnya. Mengaktifkan lagi item yang stock-nya 0 menawarkan stok pembuka.
 - Satuan dasar sebuah item tidak bisa diganti setelah item itu punya catatan stock.
 
 **Menghapus item** (17 Oktober 2026, untuk item yang salah dibuat):
@@ -1369,6 +1377,10 @@ ke file ini (Bagian 7.3).
 
 Tiap kelompok tab punya warna tab sendiri, supaya mudah dibedakan.
 
+Di tab master yang punya kolom `Aktif` (item, resep, menu, pemasok, kategori, satuan, unit, staff,
+form, dan kolom form), baris yang tidak aktif ditulis abu-abu dengan format bersyarat yang dipasang
+`setupSpreadsheet` (30 Oktober 2026). Barisnya tidak dihapus, karena riwayat dan rekap memakainya.
+
 ### 8.3 Tab Harian: satu hari, sama seperti form
 
 Satu tab per form. Tab ini menampilkan isian **satu tanggal** dengan tata letak form kertas.
@@ -1555,6 +1567,10 @@ PDF **tidak** dibuat pada setiap submit: lambat, file menumpuk, dan nama file be
      unduhan satu kategori menjadi cara untuk mendapat laporan terpisah.
    - **PDF stock satu kategori:** tata letaknya sama, hanya berisi kategori itu, dan nama
      kategorinya tertulis di kotak info.
+   - **Item nonaktif** (30 Oktober 2026) tidak dimuat di PDF stock, sama dengan tab
+     `Harian_Stock`, walau item itu bergerak pada tanggal laporan. Jika ada, catatan di bawah
+     tabel menyebut jumlahnya: "2 item nonaktif yang bergerak pada tanggal ini tidak ditampilkan."
+     Gerakannya tetap ada di `Stock_Harian` dan tab Data.
    - PDF harian otomatis (ke Drive dan lampiran email) tetap satu file Stock berisi semua
      kategori, supaya lampiran email tidak bertambah banyak.
 5. **Lokasi di Drive:**

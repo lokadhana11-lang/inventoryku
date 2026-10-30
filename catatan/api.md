@@ -275,6 +275,10 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   `M_Resep` ada) dan `resep[].catatan`; `simpanResep` menerima `catatan` (paling panjang 200; tidak dikirim = tidak diubah; berisi tanpa
   kolom ditolak); `formPrep.resep[].catatan`. `kirimPrep` (juga kiriman ulang `sudahTerkirim`) ditambah `stockHasil: [{ item, tambah,
   akhir, satuan }]` (per item hasil yang Hasil-nya > 0, akhir = Stock Akhir pada `tanggal` sesudah dicatat) dan `tanpaResep: [nama]`.
+- Item nonaktif (Code.gs v0.40, 30 Oktober 2026): `aturItemAktif` dengan `aktif: false` menolkan stock item hari ini jika belum nol
+  (satu baris `Data_Penyesuaian`, alasan Lainnya, catatan "Stock dinolkan karena item dinonaktifkan."), juga untuk item yang sudah
+  nonaktif (tombol Nolkan stock); jawabannya ditambah `dinolkan: { stock, satuan }` (stock sebelum dinolkan) atau `null`.
+  `daftarItem` (dan semua jawaban yang memuatnya) ditambah `nolkanSaatNonaktif: true`. `unduhPdf` form Stock tidak memuat item nonaktif.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
