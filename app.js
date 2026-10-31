@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.40.0';
+  var VERSI_APLIKASI = '0.41.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -452,6 +452,7 @@
     kotak: '<path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>',
     label: '<path d="M3.5 12.5v-8h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.5"/>',
     titikTiga: '<path d="M12 5.5v.01M12 12v.01M12 18.5v.01" stroke-width="3"/>',
+    pegangan: '<path d="M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01" stroke-width="3"/>',
     segitiga: '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.5h.01"/>',
     naik: '<path d="M7 17 17 7M9.5 7H17v7.5"/>',
     turun: '<path d="M7 7l10 10M17 9.5V17H9.5"/>',
@@ -15034,9 +15035,115 @@
   }
 
   /**
-   * Daftar semua form dalam urutan Beranda: nama, tanda Bawaan/Kustom, sakelar
-   * tampil/sembunyi, tombol naik/turun (lalu "Simpan urutan"). Form kustom yang
-   * dihapus tampil di bawah dengan "Pulihkan".
+   * Seret untuk mengubah urutan (tampilan Bagian 5.7, Pengaturan → Form; aplikasi 0.41.0). Tiap baris (li anak daftar,
+   * dengan data-id) punya tombol .pegangan-urut. Pointer Events untuk jari, pena, dan tetikus; hanya pegangan yang
+   * ber-touch-action none, jadi gulir halaman di tempat lain tetap milik browser. Selama diseret baris mengikuti jari
+   * lewat transform (masukan langsung) dan baris lain bergeser memberi tempat (transisi CSS, mati saat "kurangi gerak");
+   * dekat tepi atas atau bawah layar halaman ikut bergulir. Dilepas, atau panah atas/bawah pada pegangan: selesai(id, ke,
+   * papanKetik) dengan ke = urutan baru (0 = paling atas); dilepas tanpa pindah: selesai(null). aktif() benar selama
+   * seretan berlangsung, supaya daftar tidak digambar ulang di tengahnya.
+   */
+  function pasangSeretUrut(daftar, selesai) {
+    var AMBANG = 4; // px sebelum tekanan pada pegangan dianggap seretan
+    var TEPI = 48; // px dari tepi layar tempat halaman ikut bergulir
+    var s = null;
+
+    function batasLayar() {
+      // Bar navy di atas (lengket) dan menu bawah yang mengambang di HP menutupi tepi layar.
+      var bar = document.querySelector('.bar');
+      var rb = bar ? bar.getBoundingClientRect() : null;
+      var menu = document.querySelector('.menu');
+      var rm = menu ? menu.getBoundingClientRect() : null;
+      return {
+        atas: rb && rb.bottom > 0 && rb.bottom < innerHeight / 2 ? rb.bottom : 0,
+        bawah: rm && rm.height && rm.top > innerHeight / 2 ? rm.top : innerHeight
+      };
+    }
+    function perbarui() {
+      var dy = Math.max(s.minDy, Math.min(s.maksDy, s.y + window.scrollY - s.yAwal));
+      var tengah = s.tengah[s.dari] + dy;
+      var ke = 0;
+      s.tengah.forEach(function (t, j) { if (j !== s.dari && t < tengah) ke++; });
+      s.ke = ke;
+      s.li.style.transform = 'translateY(' + dy + 'px)';
+      s.semua.forEach(function (r, j) {
+        if (j === s.dari) return;
+        var geser = s.dari < ke && j > s.dari && j <= ke ? -s.tinggi : (ke < s.dari && j >= ke && j < s.dari ? s.tinggi : 0);
+        r.style.transform = geser ? 'translateY(' + geser + 'px)' : '';
+      });
+    }
+    function gulir() {
+      if (!s) return;
+      if (s.bergerak) {
+        var b = batasLayar();
+        var v = s.y < b.atas + TEPI ? -Math.ceil((b.atas + TEPI - s.y) / 4) : (s.y > b.bawah - TEPI ? Math.ceil((s.y - b.bawah + TEPI) / 4) : 0);
+        var sebelum = window.scrollY;
+        if (v) window.scrollBy(0, v);
+        if (window.scrollY !== sebelum) perbarui();
+      }
+      s.bingkai = requestAnimationFrame(gulir);
+    }
+    function akhiri(jadi) {
+      var g = s;
+      if (!g) return;
+      s = null;
+      cancelAnimationFrame(g.bingkai);
+      if (g.p.hasPointerCapture && g.p.hasPointerCapture(g.id)) g.p.releasePointerCapture(g.id);
+      daftar.classList.remove('sedang-diseret');
+      g.li.classList.remove('diseret');
+      g.semua.forEach(function (r) { r.style.transform = ''; });
+      if (jadi && g.bergerak && g.ke !== g.dari) selesai(g.li.getAttribute('data-id'), g.ke, false);
+      else selesai(null);
+    }
+
+    daftar.addEventListener('pointerdown', function (e) {
+      var p = e.target.closest ? e.target.closest('.pegangan-urut') : null;
+      if (!p || s || !e.isPrimary || e.button > 0) return;
+      e.preventDefault(); // tanpa seleksi teks dan tanpa gulir
+      var li = p.closest('li');
+      var semua = Array.prototype.slice.call(daftar.children);
+      var kotak = semua.map(function (r) { return r.getBoundingClientRect(); });
+      var i = semua.indexOf(li);
+      s = {
+        id: e.pointerId, p: p, li: li, semua: semua, dari: i, ke: i, bergerak: false,
+        y: e.clientY, yAwal: e.clientY + window.scrollY, tinggi: kotak[i].height,
+        tengah: kotak.map(function (b) { return b.top + window.scrollY + b.height / 2; }),
+        minDy: kotak[0].top - kotak[i].top, maksDy: kotak[kotak.length - 1].bottom - kotak[i].bottom
+      };
+      if (p.setPointerCapture) p.setPointerCapture(e.pointerId);
+      s.bingkai = requestAnimationFrame(gulir);
+    });
+    daftar.addEventListener('pointermove', function (e) {
+      if (!s || e.pointerId !== s.id) return;
+      s.y = e.clientY;
+      if (!s.bergerak) {
+        if (Math.abs(e.clientY + window.scrollY - s.yAwal) < AMBANG) return;
+        s.bergerak = true;
+        daftar.classList.add('sedang-diseret');
+        s.li.classList.add('diseret');
+      }
+      perbarui();
+    });
+    daftar.addEventListener('pointerup', function (e) { if (s && e.pointerId === s.id) akhiri(true); });
+    daftar.addEventListener('pointercancel', function (e) { if (s && e.pointerId === s.id) akhiri(false); });
+    daftar.addEventListener('lostpointercapture', function (e) { if (s && e.pointerId === s.id) akhiri(false); });
+    daftar.addEventListener('keydown', function (e) {
+      var p = e.target.closest ? e.target.closest('.pegangan-urut') : null;
+      if (!p || s || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      var li = p.closest('li');
+      var semua = Array.prototype.slice.call(daftar.children);
+      var ke = semua.indexOf(li) + (e.key === 'ArrowUp' ? -1 : 1);
+      if (ke >= 0 && ke < semua.length) selesai(li.getAttribute('data-id'), ke, true);
+    });
+    return { aktif: function () { return !!s; } };
+  }
+
+  /**
+   * Daftar semua form dalam urutan Beranda: pegangan seret (aplikasi 0.41.0; dulu
+   * tombol naik/turun), nama, tanda Bawaan/Kustom, sakelar tampil/sembunyi; urutan
+   * baru disimpan dengan "Simpan urutan". Form kustom yang dihapus tampil di bawah
+   * dengan "Pulihkan".
    */
   function layarFormDaftar(k) {
     aturJudul('Form');
@@ -15046,18 +15153,23 @@
     var ketBatas = el('p', { class: 'kolom-bantuan' });
     var tambah = el('a', { class: 'tombol tombol-utama', href: '#/pengaturan/form-baru' }, el('span', { class: 'tombol-teks', text: 'Buat form' }));
     var pesanSiap = el('p', { class: 'pesan-formulir', role: 'status' });
+    var umumkan = el('p', { class: 'sr', 'aria-live': 'polite' });
     k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
       tautanKembali('Pengaturan', '#/pengaturan'),
       el('div', { class: 'kepala-isi' }, [el('h1', { class: 'judul-layar', text: 'Form' }), tambah]),
       el('p', { class: 'kartu-teks', text: 'Urutan ini dipakai tiket di Beranda. Form yang disembunyikan tidak tampil di Beranda, tetapi isian lamanya tetap ada di Riwayat.' }),
+      el('p', { class: 'kolom-bantuan', id: 'bantuan-seret-form', text: 'Untuk mengubah urutan, tahan pegangan di kiri nama form lalu seret ke atas atau ke bawah. Dengan papan ketik: pilih pegangannya, lalu tekan panah atas atau bawah.' }),
       pesanSiap,
       penanda,
+      umumkan,
       wadah,
       ketBatas,
       wadahArsip
     ]));
     var data = null;
     var urutan = null;
+    var seret = null;
+    var tundaGambar = false; // data baru datang di tengah seretan: digambar sesudah dilepas
 
     function cari(id) {
       return (data.form || []).filter(function (f) { return f.id === id; })[0];
@@ -15083,25 +15195,33 @@
       gambarArsip();
     }
 
+    /** Form id dipindah ke urutan ke (0 = paling atas) dari urutan yang sedang tampil (ids). */
+    function pindahkan(ids, id, ke) {
+      var baru = ids.filter(function (x) { return x !== id; });
+      baru.splice(ke, 0, id);
+      // Data yang datang di tengah seretan bisa berisi form lain: urutan hanya dipakai jika daftarnya sama.
+      var kini = (data.form || []).map(function (f) { return f.id; });
+      if (baru.slice().sort().join('\n') !== kini.slice().sort().join('\n')) return false;
+      urutan = baru;
+      var f = cari(id);
+      umumkan.textContent = (f ? f.nama : id) + ' dipindah ke urutan ' + (ke + 1) + ' dari ' + baru.length + '.';
+      return true;
+    }
+
     function gambarDaftar() {
+      if (seret && seret.aktif()) {
+        tundaGambar = true;
+        return;
+      }
+      tundaGambar = false;
       kosongkan(wadah);
       var semua = data.form || [];
       var ids = urutan || semua.map(function (f) { return f.id; });
       var berubah = !!urutan && urutan.join('\n') !== semua.map(function (f) { return f.id; }).join('\n');
-      var daftar = el('ol', { class: 'daftar daftar-urut', 'aria-label': 'Urutan form di Beranda' });
-      ids.forEach(function (id, i) {
+      var daftar = el('ol', { class: 'daftar daftar-urut daftar-seret', 'aria-label': 'Urutan form di Beranda' });
+      ids.forEach(function (id) {
         var f = cari(id);
         if (!f) return;
-        function geser(arah) {
-          var baru = ids.slice();
-          baru[i] = baru[i + arah];
-          baru[i + arah] = id;
-          urutan = baru;
-          gambarDaftar();
-          var t = wadah.querySelector('[data-urut="' + (arah < 0 ? 'naik' : 'turun') + '-' + (i + arah) + '"]');
-          if (!t || t.disabled) t = wadah.querySelector('[data-urut="' + (arah < 0 ? 'turun' : 'naik') + '-' + (i + arah) + '"]');
-          if (t) t.focus();
-        }
         var s = sakelarTampil({
           nilai: f.aktif,
           labelSr: 'Tampilkan ' + f.nama + ' di Beranda',
@@ -15118,7 +15238,9 @@
             });
           }
         });
-        daftar.appendChild(el('li', { class: 'baris-urut baris-form' + (f.aktif ? '' : ' nonaktif') }, [
+        daftar.appendChild(el('li', { class: 'baris-urut baris-form' + (f.aktif ? '' : ' nonaktif'), 'data-id': f.id }, [
+          el('button', { type: 'button', class: 'tombol-ikon pegangan-urut', 'aria-label': 'Geser ' + f.nama,
+            'aria-describedby': 'bantuan-seret-form' }, ikon('pegangan')),
           el('div', { class: 'baris-form-isi' }, [
             el('a', { class: 'baris-urut-nama', href: hrefFormUbah(f.id) }, el('span', { class: 'daftar-baris-isi' }, [
               el('span', { class: 'daftar-baris-judul', text: f.nama }),
@@ -15126,12 +15248,17 @@
               el('span', { class: 'daftar-baris-ket', text: f.jenis === 'kustom' ? teksJadwal(f) + ' · ' + f.jumlahKolom + ' kolom' : 'Kolom terkunci' })
             ])),
             s.wadah
-          ]),
-          el('button', { type: 'button', class: 'tombol-ikon', 'data-urut': 'naik-' + i, 'aria-label': 'Naikkan ' + f.nama, disabled: i === 0,
-            onclick: function () { geser(-1); } }, ikon('atas')),
-          el('button', { type: 'button', class: 'tombol-ikon', 'data-urut': 'turun-' + i, 'aria-label': 'Turunkan ' + f.nama, disabled: i === ids.length - 1,
-            onclick: function () { geser(1); } }, ikon('bawah'))
+          ])
         ]));
+      });
+      seret = pasangSeretUrut(daftar, function (id, ke, papanKetik) {
+        var pindah = id != null && pindahkan(ids, id, ke);
+        if (pindah || tundaGambar) gambarDaftar();
+        // Papan ketik: fokus tetap di pegangan baris itu, supaya panah berikutnya memindahnya lagi.
+        if (pindah && papanKetik) {
+          var p = wadah.querySelector('[data-id="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"] .pegangan-urut');
+          if (p) p.focus({ preventScroll: true });
+        }
       });
       wadah.appendChild(semua.length ? daftar : kotakKosong('Belum ada form. Ketuk Buat form untuk membuat form pertama.', 'tiket'));
       if (berubah) {

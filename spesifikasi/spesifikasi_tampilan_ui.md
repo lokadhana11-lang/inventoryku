@@ -47,6 +47,8 @@
 > Tambahan 30 Oktober 2026 (permintaan pemilik): menonaktifkan item menolkan stock-nya, tombol "Nolkan stock"
 > untuk item nonaktif yang masih punya stock, dan tawaran stok pembuka saat item diaktifkan lagi (Bagian 5.7
 > dan 7).
+> Tambahan 31 Oktober 2026 (permintaan pemilik): urutan form di Pengaturan → Form diubah dengan menyeret pegangan,
+> menggantikan tombol naik/turun (Bagian 5.7, 7, dan 8).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -1247,6 +1249,20 @@ Satu-satunya layar yang sepenuhnya navy.
 
 - Daftar semua form, bawaan dan kustom, dalam urutan Beranda. Tiap baris: nama form,
   tanda "Bawaan" atau "Kustom", sakelar tampil/sembunyi, dan pegangan untuk menggeser urutan.
+- **Pegangan seret** (31 Oktober 2026): tombol ikon 48 px bergambar enam titik di kiri nama form,
+  berlabel "Geser Stock". Di atas daftar: "Untuk mengubah urutan, tahan pegangan di kiri nama form lalu
+  seret ke atas atau ke bawah. Dengan papan ketik: pilih pegangannya, lalu tekan panah atas atau bawah."
+  - Jari, pena, dan tetikus. Hanya pegangan yang menahan gulir; menyentuh bagian lain baris tetap
+    menggulir halaman. Ketukan tanpa seretan (kurang dari 4 px) tidak mengubah apa pun.
+  - Selama diseret, baris terangkat (latar Kertas, bayangan tiket) dan mengikuti jari. Baris lain
+    bergeser memberi tempat, dan tempat yang ditinggalkan tampak sebagai celah Baja. Baris tidak bisa
+    keluar dari daftar. Dekat tepi atas (di bawah bar navy) atau tepi bawah (di atas menu bawah),
+    halaman ikut bergulir, makin cepat makin dekat ke tepi.
+  - Dilepas: urutan baru tampil, pembaca layar mendengar "Waste dipindah ke urutan 2 dari 6.", lalu
+    muncul "Batal" dan "Simpan urutan" seperti sebelumnya. Urutan baru tersimpan hanya lewat
+    "Simpan urutan".
+  - Panah atas/bawah pada pegangan memindah satu langkah, dan fokus tetap di pegangan baris itu.
+  - Data yang datang dari server di tengah seretan baru digambar sesudah baris dilepas.
 - Tombol "Buat form" membuka layar susun form:
 
 ```
@@ -1544,6 +1560,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Item dihapus | "Tomat dihapus dari daftar item." |
 | Item belum punya catatan dan masih aktif | "Item ini belum punya catatan. Nonaktifkan dulu untuk bisa menghapus." |
 | Nonaktifkan item yang masih punya stock | "Stock Tomat masih tercatat 2,5 kg. Stock ini dinolkan dan dicatat sebagai penyesuaian di Riwayat stock, supaya tidak ikut nilai stock dan laporan." Sesudahnya: "Tomat dinonaktifkan. Stock 2,5 kg dinolkan." |
+| Bantuan seret urutan form | "Untuk mengubah urutan, tahan pegangan di kiri nama form lalu seret ke atas atau ke bawah. Dengan papan ketik: pilih pegangannya, lalu tekan panah atas atau bawah." Sesudah dipindah (pembaca layar): "Waste dipindah ke urutan 2 dari 6." |
 | Nolkan stock item nonaktif | "Nolkan stock Tomat?" dengan "Stock 2,5 kg dinolkan dan dicatat sebagai penyesuaian di Riwayat stock hari ini. Tomat tidak lagi ikut nilai stock dan laporan." Sesudahnya: "Stock 2,5 kg dinolkan." |
 | Pilihan kategori di Laporan | Label "Kategori", nilai awal "Semua kategori" |
 | Tanggal ditolak | "Staff hanya bisa mengisi untuk hari ini dan kemarin. Minta Pengelola mengisi tanggal ini." |
@@ -1618,6 +1635,7 @@ saat perangkat diatur "kurangi gerak".
 | Menu | Pindah menu | Bar bawah: pil Navy Lapis dan garis amber bergeser ke menu baru, ikonnya melonjak sedikit. Bar atas: pil memudar di menu baru, garis amber bergeser | Pil 320 ms; garis 200 ms; ikon 380 ms |
 | Lembar bawah dan dialog | Dibuka atau ditutup | Lembar naik dari bawah; dialog memudar | Buka 200 ms, tutup 150 ms |
 | Pesan singkat dan pita sinyal | Muncul atau hilang | Bergeser 8 px sambil memudar | 200 ms |
+| Seret urutan form | Pegangan di Pengaturan → Form diseret | Baris terangkat dan mengikuti jari (masukan langsung, bukan animasi); baris lain bergeser memberi tempat | Geser baris lain 150 ms ease-out; saat "kurangi gerak" baris lain langsung pindah, baris yang diseret tetap mengikuti jari |
 | Titik PIN | Tiap angka PIN diketuk | Titik amber muncul dengan memudar | 100 ms |
 | PIN salah | PIN ditolak | Enam titik PIN bergoyang ke kiri dan kanan sekali | 300 ms |
 | Kerangka memuat | Menunggu data pertama | Kerangka abu-abu berdenyut pelan | 1,2 detik per denyut; berhenti saat data tiba |

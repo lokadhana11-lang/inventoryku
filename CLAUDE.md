@@ -115,9 +115,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.40, aplikasi 0.40.0 (item nonaktif: stock dinolkan, tidak tampil di PDF Stock, abu-abu di tab master
-  Sheets, 30 Oktober 2026), menunggu pemilik menempel Edge Function dan Code.gs lalu menjalankan `setupSpreadsheet`; sebelumnya Code.gs
-  v0.39, aplikasi 0.39.0 (catatan resep dan stock hasil prep) digabung. Riwayat tiap rilis: `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.40, aplikasi 0.41.0 (urutan form di Pengaturan → Form dengan menyeret, 31 Oktober 2026; Code.gs tidak
+  berubah), menunggu pemilik menggabungkan PR; sebelumnya Code.gs v0.40, aplikasi 0.40.0 (item nonaktif: stock dinolkan, tidak tampil di
+  PDF Stock, abu-abu di tab master Sheets) digabung. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
@@ -125,10 +125,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Prep List (resep dengan catatan, hasil aktual, pesan stock hasil prep), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
-  banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form, hari libur, outlet dan jadwal); notifikasi ke HP;
+  banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; keamanan login.
-- **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional); urutan form dengan tombol naik/turun,
-  bukan pegangan geser; PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
+- **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
   selalu berhalaman); menu Laporan punya tiga tombol utama; rekap bulanan memakai unit dan jadwal form sekarang. Hasil rumus dan grafik
   di Google Sheets tidak bisa diuji di sini.
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).

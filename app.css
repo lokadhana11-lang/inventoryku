@@ -5082,6 +5082,56 @@ body.papan-ketik .bilah-kirim {
   color: var(--tinta-redup);
 }
 
+/* Seret urutan form (aplikasi 0.41.0): pegangan di kiri nama form. Hanya pegangan yang menahan gulir sentuh. */
+.daftar-seret .baris-urut {
+  padding-left: 0;
+  background: var(--kertas);
+}
+
+/* Selama diseret, tempat yang ditinggalkan baris tampak sebagai celah Baja. */
+.daftar-seret.sedang-diseret {
+  background: var(--baja);
+}
+
+.daftar-seret .baris-form-isi .baris-urut-nama {
+  padding-left: 4px;
+}
+
+.pegangan-urut {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pegangan-urut:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: -2px;
+}
+
+.sedang-diseret {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.sedang-diseret .baris-urut:not(.diseret) {
+  transition: transform 150ms ease-out;
+}
+
+.baris-urut.diseret {
+  position: relative;
+  z-index: 2;
+  border-bottom-color: transparent;
+  border-radius: 10px;
+  background: var(--kertas);
+  box-shadow: var(--bayang-tiket);
+}
+
+.baris-urut.diseret .pegangan-urut {
+  cursor: grabbing;
+  color: var(--tinta);
+}
+
 .tanda-jenis {
   display: inline-flex;
   align-items: center;

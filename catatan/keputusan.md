@@ -879,8 +879,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     - ~~Waste: "geser kartu ke kiri" untuk menghapus baris (tampilan 5.3) tidak dibangun; yang ada ikon tempat sampah. Kartu yang
       mengikuti jari butuh gerak yang dihitung JavaScript tiap bingkai, yang dilarang Bagian 8.2 butir 1.~~ Beres di aplikasi
       0.11.1 (butir 153).
-    - Pengaturan → Form: urutan diubah dengan tombol naik/turun lalu "Simpan urutan" (butir 137), bukan pegangan geser (tampilan
-      5.7), dengan alasan yang sama dan supaya bisa dipakai dengan papan ketik.
+    - ~~Pengaturan → Form: urutan diubah dengan tombol naik/turun lalu "Simpan urutan" (butir 137), bukan pegangan geser (tampilan
+      5.7), dengan alasan yang sama dan supaya bisa dipakai dengan papan ketik.~~ Beres di aplikasi 0.41.0 (butir 411).
     - ~~Pengaturan → Staff: "sakelar Aktif/Nonaktif" (tampilan 5.7) berupa tombol "Nonaktifkan" (dengan konfirmasi) / "Aktifkan
       lagi" (butir 76).~~ Beres di aplikasi 0.11.1 (butir 152).
     - PDF stock semua kategori satu halaman per kategori (sistem 9.1) baru berlaku setelah pemilik menjalankan
@@ -2713,3 +2713,33 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Aktif) dan `uji/layar/item_nonaktif.mjs` (dialog dan toast, tawaran stok pembuka, Nolkan stock, server lama, delapan ukuran dengan nama
     item panjang dan stock lima digit). `uji/server/belanja_tambah.mjs` mengisi lagi stock Daging sapi sesudah diaktifkan lagi. Warna di
     Google Sheets asli belum diuji.
+
+### Urutan form dengan menyeret (aplikasi 0.41.0, 31 Oktober 2026)
+
+411. **Asal dan keputusan pemilik:** sesudah kelima catatan 29 Oktober selesai, pemilik memilih "urutan form di Beranda dengan
+    menyeret" dari daftar yang belum dibangun. Spesifikasi tampilan Bagian 5.7 sejak awal meminta "pegangan untuk menggeser urutan" di
+    Pengaturan → Form; yang dibangun dulu tombol naik/turun (butir 137), karena Bagian 8.2 butir 1 waktu itu melarang gerak yang dihitung
+    JavaScript. Larangan itu dicabut 17 Oktober (butir 243). Urutan tetap diatur di Pengaturan → Form (bukan dengan menyeret tiket di
+    Beranda, yang juga dipakai Staff untuk membuka form). Code.gs tidak berubah: aksi `urutForm` dan "Simpan urutan" tetap.
+412. **Cara seret** (keputusan tambahan, `pasangSeretUrut(daftar, selesai)`): Pointer Events untuk jari, pena, dan tetikus, dimulai dari
+    tombol `.pegangan-urut` (ikon `pegangan`, enam titik) di kiri nama form. Pegangan ber-`touch-action: none`, jadi gulir di tempat lain
+    tetap milik browser, dan tidak perlu tahan lama. Seretan dimulai setelah 4 px. Posisi dihitung dalam koordinat halaman (clientY +
+    scrollY), jadi halaman yang ikut bergulir tidak menggeser hitungan. Urutan baru = jumlah baris lain yang titik tengahnya di atas titik
+    tengah baris yang diseret. Baris lain bergeser setinggi baris itu lewat `transform` dengan transisi 150 ms (mati saat "kurangi gerak"
+    lewat aturan umum). Baris yang diseret tetap mengikuti jari walau "kurangi gerak", karena itu masukan langsung, bukan animasi.
+    Halaman ikut bergulir lewat `requestAnimationFrame` saat jari di 48 px dari tepi atas (di bawah `.bar`) atau tepi bawah (di atas
+    `.menu` di HP). Kecepatannya seperempat kedalaman jari di dalam tepi itu, paling cepat 12 px per bingkai. `pointercancel` dan
+    hilangnya pointer capture membatalkan seretan. Panah atas/bawah pada pegangan memindah satu langkah dan fokus tetap di pegangan. Sesudah
+    seretan dengan jari atau tetikus fokus tidak dipindah, supaya tidak muncul cincin fokus. Jawaban server yang datang di tengah seretan
+    ditunda (`tundaGambar`) dan digambar sesudah dilepas; urutan dari seretan hanya dipakai jika daftar formnya masih sama. Tombol
+    naik/turun dihapus, karena pegangan dengan papan ketik sudah menggantikannya.
+413. **Uji:** `uji/layar/form_seret.mjs`:
+    - Seret dengan tetikus di HP, Simpan urutan, lalu tiket Beranda mengikuti.
+    - Panah atas/bawah, baris pertama tidak bisa naik, Batal, dan ketuk tanpa seret.
+    - Sentuhan lewat CDP: halaman tidak bergulir.
+    - 14 form di 320×568: baris terakhir diseret ke tepi atas, halaman ikut bergulir sampai baris itu paling atas, lalu disimpan.
+    - Gerak dengan dan tanpa "kurangi gerak" (transisi 150 ms atau 0).
+    - Jawaban server yang lambat datang di tengah seretan.
+    - Delapan ukuran.
+
+    Belum diuji di HP asli.
