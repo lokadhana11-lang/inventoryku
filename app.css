@@ -6671,6 +6671,39 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
   .login-merek { padding-top: 0; }
 }
 
+/* Laptop berlayar pendek (tinggi 700–919 px, misalnya 1.366 × 768): panel dirapatkan supaya langkah
+   PIN sampai "Pulihkan akses Pengelola" dan versi terlihat tanpa digulir (butir 417) */
+@media (min-width: 1024px) and (min-height: 700px) and (max-height: 919px) {
+  .login {
+    gap: 16px;
+    margin: 24px auto;
+    padding: 28px 32px 16px;
+  }
+  .login-kiri { gap: 12px; }
+  .login .titik-grup { padding: 0; }
+  /* Panel kini naik ke rel tiket; tiket keempat digeser supaya tidak terlihat menembus panel di 1.024 px */
+  .latar-tiket:nth-child(4) { left: 75%; }
+  /* "Pulihkan akses Pengelola" dan versi dalam satu baris */
+  .login-bawah {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    column-gap: 16px;
+  }
+}
+
+/* Tinggi di bawah 800 px: tombol angka 56 px */
+@media (min-width: 1024px) and (min-height: 700px) and (max-height: 799px) {
+  .login { margin: 16px auto 8px; }
+  .login .tombol-angka { min-height: 56px; }
+}
+
+/* Tinggi di bawah 760 px: sapaan tanpa lingkaran inisial, seperti HP pendek */
+@media (min-width: 1024px) and (min-height: 700px) and (max-height: 759px) {
+  .login-sapa-inisial { display: none; }
+}
+
 @keyframes cahaya-hangat {
   from { transform: translate3d(0, 0, 0); }
   to { transform: translate3d(-35%, -25%, 0); }
