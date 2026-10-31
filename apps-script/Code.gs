@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.40 (item nonaktif: stock dinolkan, tidak tampil di PDF Stock)
+// InventoryKu Code.gs v0.41 (pengingat penjualan juga memeriksa bulan lalu)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -124,9 +124,11 @@
  * - 30 Oktober 2026    : item yang dinonaktifkan stock-nya dinolkan (penyesuaian, aturItemAktif.dinolkan,
  *                        daftarItem.nolkanSaatNonaktif); PDF Stock tanpa item nonaktif; baris nonaktif
  *                        di tab master Sheets abu-abu (setupSpreadsheet).
+ * - 31 Oktober 2026    : pengingat penjualan dan porsi yang belum dicatat di Dashboard juga memeriksa bulan lalu, jadi
+ *                        "Penjualan kemarin belum dicatat" muncul juga pada tanggal 1.
  */
 
-var VERSI_KODE = 'v0.40';
+var VERSI_KODE = 'v0.41';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -6234,11 +6236,16 @@ function perhatianDashboard_(d) {
   }
   if (d.hpp && d.hpp.penjualanKurang.length) {
     var kurang = d.hpp.penjualanKurang;
+    // Sejak Code.gs v0.41 daftarnya bisa memuat hari bulan lalu: bulannya disebut ("Food cost Oktober dan bulan ini ...").
+    var bulanKurang = [];
+    kurang.forEach(function (t) { if (bulanKurang.indexOf(t.slice(0, 7)) < 0) bulanKurang.push(t.slice(0, 7)); });
     tambah('penjualan', 'menunggu', kurang.length === 1 && kurang[0] === d.hpp.kemarin ? 'Penjualan kemarin belum dicatat'
       : 'Penjualan ' + kurang.length + ' hari belum dicatat',
-      (kurang.length > 5 ? 'Antara lain tanggal ' + teksHariBulan_(kurang.slice(-4)) : 'Tanggal ' + teksHariBulan_(kurang)) +
-      ((d.hpp.porsiKurang || []).length ? ' (porsi per menu tanggal ' + teksHariBulan_(d.hpp.porsiKurang.slice(-4)) + ')' : '') +
-      '. Food cost bulan ini dihitung setelah semua hari tercatat.', { tanggal: kurang[kurang.length - 1] });
+      (kurang.length > 5 ? 'Antara lain tanggal ' + teksTanggalKurang_(kurang.slice(-4)) : 'Tanggal ' + teksTanggalKurang_(kurang)) +
+      ((d.hpp.porsiKurang || []).length ? ' (porsi per menu tanggal ' + teksTanggalKurang_(d.hpp.porsiKurang.slice(-4)) + ')' : '') +
+      '. Food cost ' + bulanKurang.map(function (b) {
+        return b === d.hpp.bulan ? 'bulan ini' : BULAN_ID[Number(b.slice(5, 7)) - 1];
+      }).join(' dan ') + ' dihitung setelah semua hari tercatat.', { tanggal: kurang[kurang.length - 1] });
   }
   if (d.nilai.tanpaHarga.length) {
     tambah('tanpaHarga', 'menunggu', d.nilai.tanpaHarga.length + ' item belum punya harga',
@@ -7250,22 +7257,27 @@ function aksiHpp_(body) {
 /**
  * Ringkasan HPP untuk Dashboard: food cost bulan ini, penjualan yang belum
  * dicatat sejak penjualan pertama (untuk pengingat), dan menu di atas target.
+ * Pengingat memeriksa bulan lalu dan bulan ini sampai kemarin (Code.gs v0.41):
+ * pada tanggal 1 "kemarin" ada di bulan lalu, dan food cost bulan lalu baru
+ * lengkap setelah semua harinya tercatat.
  */
 function ringkasHppDashboard_(tanggal) {
   var ctx = konteksHpp_();
   var bulan = ctx.hari.slice(0, 7);
   var x = foodCostBulan_(ctx, bulan);
   var n = bacaKonfigurasi_().nilai;
+  var dari = bulanLalu_(ctx.hari) + '-01';
+  var sampai = geserTanggal_(ctx.hari, -1);
   var kurang = [];
   if (ctx.jual.pertama) {
-    var mulai = ctx.jual.pertama > x.rentang.dari ? ctx.jual.pertama : x.rentang.dari;
-    if (mulai <= x.rentang.sampai) kurang = penjualanRentang_(ctx.jual, mulai, x.rentang.sampai).kurang;
+    var mulai = ctx.jual.pertama > dari ? ctx.jual.pertama : dari;
+    if (mulai <= sampai) kurang = penjualanRentang_(ctx.jual, mulai, sampai).kurang;
   }
   // Porsi per menu (sejak dipakai): hari yang belum punya porsi ikut diingatkan.
   var porsiKurang = [];
   if (ctx.porsi.pertama) {
-    var mulaiPorsi = ctx.porsi.pertama > x.rentang.dari ? ctx.porsi.pertama : x.rentang.dari;
-    if (mulaiPorsi <= x.rentang.sampai) porsiKurang = porsiKurang_(ctx.porsi, ctx.jual, mulaiPorsi, x.rentang.sampai);
+    var mulaiPorsi = ctx.porsi.pertama > dari ? ctx.porsi.pertama : dari;
+    if (mulaiPorsi <= sampai) porsiKurang = porsiKurang_(ctx.porsi, ctx.jual, mulaiPorsi, sampai);
   }
   var sudahKurang = {};
   kurang.forEach(function (t) { sudahKurang[t] = true; });
@@ -12076,6 +12088,19 @@ function teksHariBulanSingkat_(tanggal) {
 }
 
 /** "3, 7, dan 12" (atau "5 dan 20") dari tanggal-tanggal satu bulan. */
+/**
+ * Tanggal pengingat (Code.gs v0.41): satu bulan seperti teksHariBulan_ ("3, 4, dan 5"); dua bulan dengan nama bulannya
+ * ("30 dan 31 Oktober serta 1 November").
+ */
+function teksTanggalKurang_(tanggal) {
+  var bulan = [];
+  tanggal.forEach(function (t) { if (bulan.indexOf(t.slice(0, 7)) < 0) bulan.push(t.slice(0, 7)); });
+  if (bulan.length < 2) return teksHariBulan_(tanggal);
+  return bulan.map(function (b) {
+    return teksHariBulan_(tanggal.filter(function (t) { return t.slice(0, 7) === b; })) + ' ' + BULAN_ID[Number(b.slice(5, 7)) - 1];
+  }).join(' serta ');
+}
+
 function teksHariBulan_(tanggal) {
   var n = tanggal.map(function (t) { return String(Number(t.slice(8, 10))); });
   if (n.length < 2) return n.join('');

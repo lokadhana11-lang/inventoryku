@@ -67,6 +67,8 @@
 > Diperbarui 30 Oktober 2026 (permintaan pemilik): item nonaktif tidak lagi muncul di laporan. Stock item
 > yang dinonaktifkan dinolkan dengan penyesuaian, PDF stock tidak memuat item nonaktif, dan baris nonaktif
 > di tab master Google Sheets ditulis abu-abu (Bagian 5.1, 8.2, dan 9.1).
+> Diperbarui 31 Oktober 2026 (perbaikan): pengingat penjualan di Dashboard juga memeriksa bulan lalu, supaya
+> "Penjualan kemarin belum dicatat" tetap muncul pada tanggal 1 (Bagian 5.9).
 > Diperbarui 18 Oktober 2026 (keputusan pemilik, dari usulan fitur INV-07, INV-09, RPT-02): pemasok
 > dan harga beli. Daftar pemasok (`M_Pemasok`), pemasok dan harga beli tidak wajib saat barang
 > masuk, harga beli yang berbeda dari harga satuan ditinjau Pengelola, dan bagian Pembelian di
@@ -1087,9 +1089,14 @@ Semuanya khusus Pengelola dan diperiksa di server.
   kasir. Hari ini atau tanggal yang sudah lewat; masa depan ditolak. Butuh sinyal.
 - Menyimpan tanggal yang sudah punya catatan menimpa angkanya; perubahannya tercatat di
   `Log_Perubahan`.
-- Pengingat di Dashboard ("Perlu perhatian", Menunggu): hari bulan ini yang belum punya catatan
-  penjualan, dihitung mulai penjualan pertama yang pernah dicatat, supaya tidak ada pengingat
-  sebelum fitur ini dipakai. Hari libur tanpa catatan penjualan tidak diingatkan.
+- Pengingat di Dashboard ("Perlu perhatian", Menunggu): hari bulan lalu dan bulan ini sampai kemarin
+  yang belum punya catatan penjualan, dihitung mulai penjualan pertama yang pernah dicatat, supaya
+  tidak ada pengingat sebelum fitur ini dipakai. Hari libur tanpa catatan penjualan tidak diingatkan.
+  Bulan lalu ikut diperiksa (31 Oktober 2026): pada tanggal 1 "kemarin" ada di bulan lalu, dan food
+  cost bulan lalu baru lengkap setelah semua harinya tercatat. Hari dua bulan lalu atau lebih tidak
+  diingatkan lagi. Jika daftar memuat dua bulan, tanggal dan kalimat food cost menyebut nama
+  bulannya: "Tanggal 31 Oktober serta 1 dan 2 November. Food cost Oktober dan bulan ini dihitung
+  setelah semua hari tercatat."
 - Kasir outlet buatan sendiri; angkanya diketik dari laporan kasir harian.
 
 **Penjualan per menu dan pemakaian seharusnya** (keputusan pemilik 17 Oktober 2026):
@@ -1116,7 +1123,8 @@ Semuanya khusus Pengelola dan diperiksa di server.
   minyak, garnish) dibanding bahan kecil %, 10 bahan dengan selisih rupiah terbesar (qty seharusnya,
   nyata, selisih), food cost seharusnya, dan porsi terjual per menu.
 - Pengingat penjualan di Dashboard ikut menyebut hari yang belum punya porsi per menu, dihitung
-  mulai porsi pertama yang pernah dicatat.
+  mulai porsi pertama yang pernah dicatat, untuk rentang yang sama (bulan lalu dan bulan ini sampai
+  kemarin).
 - Menu yang diganti nama membawa catatan porsinya. Porsi menu yang sudah tidak ada di `M_Menu`
   (diubah tangan di Sheet) tidak dihitung dan namanya disebut.
 
