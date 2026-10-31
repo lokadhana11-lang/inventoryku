@@ -53,6 +53,8 @@
 > dan menyebut nama bulan jika tanggalnya ada di dua bulan (Bagian 5.9).
 > Tambahan 31 Oktober 2026 (perbaikan, permintaan pemilik): panel Login di laptop berlayar pendek (tinggi 700–919 px, misalnya
 > 1.366 × 768) dirapatkan supaya langkah PIN sampai "Pulihkan akses Pengelola" terlihat tanpa digulir (Bagian 5.1).
+> Tambahan 31 Oktober 2026 (permintaan pemilik): Pengaturan dua panel di laptop dan desktop, yaitu daftar bagian di kiri dan isi
+> bagian di kanan (Bagian 4.3, 5.7, 6, 8.5, dan 11).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -332,6 +334,11 @@ Aturan untuk semua lebar layar ada di Bagian 4.6.
 
 Di bawah bar atas, kepala navy layar itu (Bagian 4.7) melebar selebar layar, dengan isinya
 di tengah selebar isi layar.
+
+**Panel samping** (tambahan 31 Oktober 2026) hanya di Pengaturan: setiap layar di dalam Pengaturan, kecuali
+daftar Pengaturan sendiri, tampil dua panel. Rinciannya di Bagian 5.7. Menu utama tetap di bar atas; aplikasi
+tidak memakai sidebar untuk seluruh menu, karena menunya hanya tiga sampai lima dan tabel Stock serta Riwayat
+butuh lebar layar.
 
 ### 4.7 Kepala navy setiap layar
 
@@ -1055,6 +1062,21 @@ Satu-satunya layar yang sepenuhnya navy.
   dan satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
   food cost, bahan kecil), dan Hari libur (22 Oktober 2026).
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
+- **Dua panel di laptop dan desktop** (tambahan 31 Oktober 2026, permintaan pemilik). Pada lebar 1.024 px ke atas:
+  - Layar Pengaturan sendiri tetap berupa daftar bagian dengan keterangannya, satu kolom, seperti di HP.
+  - Setiap layar di dalamnya (misalnya Item, ubah item, Tambah resep, Hari libur) tampil dua panel. Di kiri, **panel
+    samping** selebar 260 px berisi semua bagian (ikon dan nama, berurutan seperti daftar). Di kanan, isi bagian itu
+    selebar layar sempit seperti sebelumnya. Keduanya berada di tengah layar, lebar total paling banyak 1.012 px.
+  - Panel samping berupa kartu (Kertas, garis rambut, bayangan kartu) yang lengket 16 px di bawah bar atas saat isi
+    digulir; jika layar terlalu pendek, panel bergulir di dalam.
+  - Bagian yang sedang dibuka ditandai latar Menunggu, teks dan ikon Biru Malam tebal, dan garis Biru Malam 3 px di
+    tepi kiri. Tanda ini juga dipakai di layar yang lebih dalam (ubah item menandai Item). Amber tidak dipakai, karena
+    hanya untuk permukaan navy.
+  - "Staff dan PIN" membawa tanda Perlu ditinjau "1 permintaan reset PIN" di bawah namanya, seperti di daftar.
+  - Judul, tautan kembali, dan ringkasan di kepala navy sejajar dengan kolom isi. Tautan kembali tetap ada.
+  - Mengetuk bagian lain di panel langsung membuka bagian itu, tanpa kembali ke daftar Pengaturan.
+  - Di HP dan tablet (di bawah 1.024 px) panel samping tidak tampil dan tata letaknya tidak berubah. Tablet yang
+    dimiringkan ke 1.024 px langsung menampilkannya.
 - Reset PIN meminta konfirmasi: "Reset PIN Rina? PIN lama langsung tidak berlaku."
 - Staff yang meminta reset PIN diberi tanda Perlu ditinjau di daftar Staff.
 - Staff yang terkunci diberi tanda Masalah "Terkunci" di daftar, dan di kartu PIN layar ubah
@@ -1527,6 +1549,7 @@ Lembar (dialog di desktop) dari menu nama pengguna → "Notifikasi" (spesifikasi
 | Pesan singkat (toast) | Di atas bar navigasi, hilang setelah 4 detik. |
 | Lembar bawah | Untuk filter, riwayat per item, laporkan kekeliruan, dan tambah kolom form di HP. Di tablet lebarnya maksimal 600 px, di tengah. Di desktop menjadi dialog. |
 | Tabel lebar | Bergulir ke samping di dalam bingkainya sendiri; kolom pertama tetap diam (Bagian 4.6). |
+| Panel samping | Hanya di Pengaturan, lebar 1.024 px ke atas: kartu 260 px berisi bagian Pengaturan, lengket di bawah bar atas; baris 44 px dengan ikon dan nama; bagian yang dibuka berlatar Menunggu dengan garis Biru Malam di kiri (Bagian 5.7). |
 | Grafik kecil | Digambar dengan SVG tanpa library, dengan ringkasan teks di atasnya (Bagian 5.6). |
 | Sakelar | Untuk tampil/sembunyi form dan tanda wajib. Selalu disertai kata keadaannya ("Tampil" / "Disembunyikan"). |
 | Keadaan memuat | Server bisa butuh beberapa detik. Layar menampilkan data yang tersimpan di HP lebih dulu, dengan tulisan kecil "Memperbarui…". Jika belum ada data tersimpan, tampil kerangka abu-abu berbentuk kartu, bukan layar kosong. |
@@ -1726,6 +1749,8 @@ indikator putar.
   - **Ganti:** selain itu (misalnya Dashboard → Stock opname pada kedalaman sama): memudar.
   - Bar navigasi (bawah di HP dan tablet, atas di desktop) tidak ikut bergerak; pil menu tetap
     bergeser seperti Bagian 8.1.
+  - Panel samping Pengaturan (Bagian 5.7) juga tidak ikut bergeser atau memudar; tanda bagiannya langsung
+    pindah.
   - Tidak ada perpindahan mulus untuk layar pertama sesudah login, layar yang digambar ulang di alamat
     yang sama, browser tanpa View Transitions (memakai gerak "ganti layar" lama), dan "kurangi gerak".
 - **Angka berhitung:** angka utama yang muncul bersama isi pertama layar (0,9 detik pertama) berhitung
@@ -1791,5 +1816,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Perpindahan layar dan angka berhitung (17 Oktober 2026) | Keduanya dipakai; angka berhitung dengan kecepatan sedang (0,9 detik). Larangan library animasi dan library grafik dicabut (Bagian 8.2 dan 8.5). |
+| Pengaturan dua panel (31 Oktober 2026) | Di laptop dan desktop, layar di dalam Pengaturan memakai panel samping berisi semua bagian di kiri dan isi di kanan; daftar Pengaturan sendiri tetap satu kolom; menu utama tetap di bar atas (Bagian 4.3 dan 5.7) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

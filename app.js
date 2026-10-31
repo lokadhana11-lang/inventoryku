@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.41.1';
+  var VERSI_APLIKASI = '0.42.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1457,6 +1457,7 @@
     aturMenuAktif(rute.menu);
     rute.layar({ wadah: main, cocok: cocok, sesi: sesi });
     $('#aplikasi').classList.toggle('ada-kepala', pasangKepalaLayar(main));
+    if (rute.menu === 'pengaturan') pasangPanelPengaturan(main, jalur);
     tempatkanPita();
     aturSinyal();
     window.scrollTo(0, 0);
@@ -10802,104 +10803,81 @@
     return el('a', { class: 'tautan-kembali', href: href }, [ikon('kiri'), el('span', { text: teks })]);
   }
 
+  /**
+   * Bagian Pengaturan (tampilan Bagian 5.7), berurutan. Dipakai daftar di layar Pengaturan dan panel samping
+   * di laptop dan desktop. id: bagian alamat sesudah #/pengaturan/.
+   */
+  var BAGIAN_PENGATURAN = [
+    { id: 'staff', ikon: 'staff', judul: 'Staff dan PIN', ket: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan, hapus.' },
+    { id: 'penerima', ikon: 'email', judul: 'Penerima email', ket: 'Alamat yang menerima laporan harian.' },
+    { id: 'form', ikon: 'tiket', judul: 'Form', ket: 'Urutan dan tampil di Beranda, ganti nama, buat dan susun form kustom.' },
+    { id: 'item', ikon: 'kotak', judul: 'Item', ket: 'Nama, kategori, satuan, kemasan besar, harga, stok minimum dan maksimum.' },
+    { id: 'resep', ikon: 'resep', judul: 'Resep', ket: 'Barang jadi, hasil per resep, bahan, dan masa simpan untuk Prep List.' },
+    { id: 'menu', ikon: 'label', judul: 'Menu', ket: 'Harga jual dan takaran bahan per porsi untuk menghitung HPP.' },
+    { id: 'unit', ikon: 'termometer', judul: 'Unit', ket: 'Chiller dan freezer untuk form Suhu.' },
+    { id: 'pemasok', ikon: 'truk', judul: 'Pemasok', ket: 'Daftar pemasok untuk barang masuk, dan pembelian bulan ini.' },
+    { id: 'kategori', ikon: 'label', judul: 'Kategori dan satuan', ket: 'Kategori stock beserta urutannya, dan daftar satuan.' },
+    { id: 'outlet', ikon: 'jam', judul: 'Outlet dan jadwal',
+      ket: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis, target food cost.' },
+    { id: 'libur', ikon: 'kalender', judul: 'Hari libur',
+      ket: 'Tanggal dapur tutup: form tidak ditagih, email harian dan pengingat cek suhu tidak dikirim.' }
+  ];
+
+  /** Jumlah permintaan reset PIN dari data Beranda yang tersimpan di HP. */
+  function jumlahResetPin() {
+    var beranda = Cache.baca('beranda');
+    return beranda && beranda.data.permintaanReset ? beranda.data.permintaanReset.length : 0;
+  }
+
   function layarPengaturan(k) {
     aturJudul('Pengaturan');
-    var beranda = Cache.baca('beranda');
-    var jumlahReset = beranda && beranda.data.permintaanReset ? beranda.data.permintaanReset.length : 0;
+    var jumlahReset = jumlahResetPin();
     k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
       el('h1', { class: 'judul-layar', text: 'Pengaturan' }),
-      el('nav', { class: 'daftar', 'aria-label': 'Bagian pengaturan' }, [
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/staff' }, [
-          ikon('staff'),
+      el('nav', { class: 'daftar', 'aria-label': 'Bagian pengaturan' }, BAGIAN_PENGATURAN.map(function (b) {
+        return el('a', { class: 'daftar-baris', href: '#/pengaturan/' + b.id }, [
+          ikon(b.ikon),
           el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Staff dan PIN' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan, hapus.' }),
-            jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
+            el('span', { class: 'daftar-baris-judul', text: b.judul }),
+            el('span', { class: 'daftar-baris-ket', text: b.ket }),
+            b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
           ]),
           ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/penerima' }, [
-          ikon('email'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Penerima email' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Alamat yang menerima laporan harian.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/form' }, [
-          ikon('tiket'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Form' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Urutan dan tampil di Beranda, ganti nama, buat dan susun form kustom.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/item' }, [
-          ikon('kotak'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Item' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Nama, kategori, satuan, kemasan besar, harga, stok minimum dan maksimum.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/resep' }, [
-          ikon('resep'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Resep' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Barang jadi, hasil per resep, bahan, dan masa simpan untuk Prep List.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/menu' }, [
-          ikon('label'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Menu' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Harga jual dan takaran bahan per porsi untuk menghitung HPP.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/unit' }, [
-          ikon('termometer'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Unit' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Chiller dan freezer untuk form Suhu.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/pemasok' }, [
-          ikon('truk'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Pemasok' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Daftar pemasok untuk barang masuk, dan pembelian bulan ini.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/kategori' }, [
-          ikon('label'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Kategori dan satuan' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Kategori stock beserta urutannya, dan daftar satuan.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/outlet' }, [
-          ikon('jam'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Outlet dan jadwal' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis, target food cost.' })
-          ]),
-          ikon('kanan')
-        ]),
-        el('a', { class: 'daftar-baris', href: '#/pengaturan/libur' }, [
-          ikon('kalender'),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: 'Hari libur' }),
-            el('span', { class: 'daftar-baris-ket', text: 'Tanggal dapur tutup: form tidak ditagih, email harian dan pengingat cek suhu tidak dikirim.' })
-          ]),
-          ikon('kanan')
-        ])
-      ])
+        ]);
+      }))
     ]));
+  }
+
+  /**
+   * Pengaturan dua panel (tampilan Bagian 5.7, tambahan 31 Oktober 2026). Dipanggil router sesudah kepala navy
+   * dipasang, untuk setiap layar di dalam Pengaturan kecuali daftar Pengaturan sendiri: isi layar dibungkus
+   * bersama panel samping berisi semua bagian, dan bagian yang sedang dibuka ditandai (aria-current "page" di
+   * layar bagian itu, "true" di layar yang lebih dalam seperti ubah item). Di lebar 1.024 px ke atas panel tampil
+   * di kiri dan lengket saat isi digulir; di bawahnya CSS menyembunyikannya, jadi memutar tablet tidak perlu
+   * menggambar ulang.
+   */
+  function pasangPanelPengaturan(main, jalur) {
+    var m = jalur.match(/^\/pengaturan\/([a-z]+)/);
+    var isi = main.querySelector(':scope > .layar-isi');
+    if (!m || !isi) return;
+    var jumlahReset = jumlahResetPin();
+    var panel = el('nav', { class: 'panel-samping', 'aria-label': 'Bagian pengaturan' }, BAGIAN_PENGATURAN.map(function (b) {
+      var a = el('a', { class: 'panel-samping-baris', href: '#/pengaturan/' + b.id }, [
+        ikon(b.ikon),
+        el('span', { class: 'panel-samping-isi' }, [
+          el('span', { class: 'panel-samping-judul', text: b.judul }),
+          b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
+        ])
+      ]);
+      if (b.id === m[1]) a.setAttribute('aria-current', jalur === '/pengaturan/' + b.id ? 'page' : 'true');
+      return a;
+    }));
+    var wadah = el('div', { class: 'dua-panel' });
+    main.insertBefore(wadah, isi);
+    wadah.appendChild(panel);
+    wadah.appendChild(isi);
+    var kepala = main.querySelector(':scope > .kepala-layar .kepala-layar-isi');
+    if (kepala) kepala.classList.add('kepala-dua-panel');
   }
 
   /* ---------- Outlet dan jadwal (spesifikasi tampilan Bagian 5.7) ---------- */

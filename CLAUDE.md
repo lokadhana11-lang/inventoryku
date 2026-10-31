@@ -115,9 +115,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.41, aplikasi 0.41.1 (Login muat di laptop berlayar pendek seperti 1.366 × 768, 31 Oktober 2026;
-  Code.gs tidak berubah), menunggu pemilik menggabungkan PR; sebelumnya Code.gs v0.41 (pengingat penjualan juga memeriksa bulan
-  lalu) menunggu pemilik menempel Edge Function dan Code.gs. Riwayat tiap rilis: `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.41, aplikasi 0.42.0 (Pengaturan dua panel di laptop dan desktop, dan Login muat di laptop berlayar
+  pendek seperti 1.366 × 768, 31 Oktober 2026; Code.gs tidak berubah), menunggu pemilik menggabungkan PR; sebelumnya Code.gs v0.41
+  (pengingat penjualan juga memeriksa bulan lalu) menunggu pemilik menempel Edge Function dan Code.gs. Riwayat tiap rilis:
+  `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
@@ -125,7 +126,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Prep List (resep dengan catatan, hasil aktual, pesan stock hasil prep), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
-  banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal); notifikasi ke HP;
+  banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; keamanan login.
 - **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
   selalu berhalaman); menu Laporan punya tiga tombol utama; rekap bulanan memakai unit dan jadwal form sekarang. Hasil rumus dan grafik

@@ -2801,3 +2801,42 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     - Delapan ukuran: tanpa gulir ke samping, papan angka dan "Lupa PIN?" terlihat.
 
     Belum diuji di laptop asli.
+
+### Pengaturan dua panel di laptop dan desktop (aplikasi 0.42.0, 31 Oktober 2026)
+
+420. **Asal:** telaah desain 31 Oktober 2026 tentang navbar, sidebar, dan menu bar. Menu utama tetap di bar atas (desktop) dan bar
+    bawah (HP), karena menunya hanya tiga sampai lima, dan sidebar untuk seluruh aplikasi memakan lebar yang dibutuhkan tabel Stock dan
+    Riwayat. Pengaturan punya 11 bagian. Di 1.366 px semuanya tampil sebagai satu kolom selebar 720 px, dan setiap bagian dibuka di
+    halaman baru lalu harus kembali ke daftar. Pemilik meminta Pengaturan dua panel di desktop.
+421. **Rancangan** (keputusan tambahan, spesifikasi tampilan Bagian 5.7):
+    - Daftar Pengaturan sendiri tetap satu kolom berketerangan. Ia menjadi halaman ringkasan; mengulang daftar yang sama di panel
+      samping hanya menggandakannya. Pola ini sama dengan halaman pengaturan yang punya beranda ringkasan lalu dua panel.
+    - Setiap layar di dalam Pengaturan memakai dua panel: panel samping 260 px (kartu lengket) dan isi selebar layar sempit (672 px),
+      lebar total 1.012 px di tengah, jadi tidak ada layar Pengaturan yang menyempit (di 1.024 px pun isinya tetap 672 px).
+    - Tanda bagian aktif memakai latar Menunggu dan garis Biru Malam, bukan amber (amber hanya di atas navy, Bagian 2). aria-current
+      "page" di layar bagian itu sendiri, "true" di layar yang lebih dalam (ubah item, Tambah resep, staff, tanggal libur).
+    - Tautan kembali di kepala navy tetap ada (ke daftar Pengaturan, atau ke daftar bagian dari layar yang lebih dalam).
+    - Panel tidak dipakai di bawah 1.024 px. Titik lebar tetap dua (600 dan 1.024 px, Bagian 4.3).
+422. **Cara kerja:**
+    - `BAGIAN_PENGATURAN` di app.js menjadi satu-satunya daftar bagian (nama, ikon, keterangan), dipakai `layarPengaturan` dan
+      panel samping. Bagian baru cukup ditambahkan di sana.
+    - `pasangPanelPengaturan` dipanggil router sesudah `pasangKepalaLayar` untuk rute menu `pengaturan`. Fungsi itu membungkus
+      `.layar-isi` bersama `nav.panel-samping` di `div.dua-panel`. Bagian aktif dibaca dari alamat: kata pertama sesudah
+      `/pengaturan/`, jadi `item-baru`, `item-harga`, dan `item/<nama>` menandai Item.
+    - Panel selalu ada di DOM; CSS menyembunyikannya di bawah 1.024 px (`display: none`, tidak terbaca pembaca layar). Jadi memutar
+      tablet tidak perlu menggambar ulang, dan layar Pengaturan tidak berubah sama sekali di HP.
+    - Tanda permintaan reset PIN di panel memakai data Beranda yang tersimpan di HP (`jumlahResetPin`), sama dengan daftar Pengaturan.
+    - View Transitions: panel diberi nama `panel-pengaturan` seperti bar atas, jadi tidak ikut bergeser atau memudar saat pindah
+      bagian.
+423. **Uji:** `uji/layar/pengaturan_panel.mjs` (46 pemeriksaan):
+    - Daftar Pengaturan tanpa panel. Panel berisi 11 bagian berurutan dengan Item aktif.
+    - Panel di kiri dan isi di kanan, judul kepala sejajar kolom isi, panel lengket 16 px di bawah bar sesudah digulir.
+    - Tanda reset PIN muncul, dan hilang sesudah PIN Andi dibuat.
+    - Pindah bagian dari panel. Ubah item menandai Item ("true").
+    - Sembilan alamat lain menandai bagian induknya.
+    - HP dan tablet tegak tanpa panel. Tablet yang diputar ke 1.024 px menampilkan panel, dan diputar kembali menyembunyikannya.
+    - Fokus papan ketik terlihat dan Enter membuka bagian.
+    - Dengan gerak: satu panel, lalu kembali ke daftar tanpa panel.
+    - Delapan ukuran.
+
+    Belum diuji di laptop asli.
