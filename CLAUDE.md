@@ -115,10 +115,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.41, aplikasi 0.42.0 (Pengaturan dua panel di laptop dan desktop, dan Login muat di laptop berlayar
-  pendek seperti 1.366 × 768, 31 Oktober 2026; Code.gs tidak berubah), menunggu pemilik menggabungkan PR; sebelumnya Code.gs v0.41
-  (pengingat penjualan juga memeriksa bulan lalu) menunggu pemilik menempel Edge Function dan Code.gs. Riwayat tiap rilis:
-  `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.41, aplikasi 0.42.0 (Pengaturan dua panel di laptop dan desktop, 31 Oktober 2026; Code.gs tidak
+  berubah), menunggu pemilik menggabungkan PR; sebelumnya aplikasi 0.41.1 (Login muat di laptop berlayar pendek seperti 1.366 × 768)
+  digabung lewat PR #64, dan Code.gs v0.41 (pengingat penjualan juga memeriksa bulan lalu) menunggu pemilik menempel Edge Function
+  dan Code.gs. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
