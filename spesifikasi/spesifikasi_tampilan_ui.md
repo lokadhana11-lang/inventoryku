@@ -51,6 +51,8 @@
 > menggantikan tombol naik/turun (Bagian 5.7, 7, dan 8).
 > Tambahan 31 Oktober 2026 (perbaikan): pengingat "Penjualan kemarin belum dicatat" juga muncul pada tanggal 1
 > dan menyebut nama bulan jika tanggalnya ada di dua bulan (Bagian 5.9).
+> Tambahan 31 Oktober 2026 (perbaikan, permintaan pemilik): panel Login di laptop berlayar pendek (tinggi 700–919 px, misalnya
+> 1.366 × 768) dirapatkan supaya langkah PIN sampai "Pulihkan akses Pengelola" terlihat tanpa digulir (Bagian 5.1).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -512,6 +514,14 @@ Satu-satunya layar yang sepenuhnya navy.
   Latar navy tetap memenuhi layar. Di laptop dan desktop (lebar 1.024 px ke atas, tinggi
   700 px ke atas) isinya berada di **panel** Navy Lapis tembus 72%, bersudut 24 px, bertepi
   Garis Navy, lebar maksimal 460 px, dengan bayangan dalam (versi 1.8).
+- **Laptop berlayar pendek** (tambahan 31 Oktober 2026). Pada lebar 1.024 px ke atas dengan tinggi 700–919 px (misalnya
+  1.366 × 768, 1.280 × 720, 1.536 × 864), panel itu dirapatkan supaya seluruh langkah PIN, termasuk "Pulihkan akses
+  Pengelola" dan versi, terlihat tanpa digulir:
+  - Panel berjarak 24 px dari tepi atas, dengan jarak dalam dan jarak antarbagian yang lebih rapat. "Pulihkan akses
+    Pengelola" di kiri dan versi di kanan, dalam satu baris.
+  - Tinggi di bawah 800 px: panel berjarak 16 px dari tepi atas dan tombol angka 56 px.
+  - Tinggi di bawah 760 px: lingkaran inisial tidak tampil, seperti di HP pendek.
+  - Tempat pesan di bawah titik PIN tetap disisakan, jadi panel tidak bergeser saat "PIN salah" muncul.
 - **Suasana Login** (versi 1.8, permintaan pemilik 12 Oktober 2026 supaya Login tidak
   sederhana dan monoton). Di belakang isi, hiasan yang tidak bisa disentuh dan tidak dibaca
   pembaca layar:

@@ -2772,3 +2772,32 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 
     `uji/server/libur.mjs` kembali lulus. Belum diuji di HP asli.
 
+
+### Login muat di laptop berlayar pendek (aplikasi 0.41.1, 31 Oktober 2026)
+
+417. **Asal:** telaah desain 31 Oktober 2026. Di 1.366 × 768, ukuran laptop Windows yang paling umum, halaman Login bergulir
+    126 px pada langkah PIN, jadi "Pulihkan akses Pengelola" dan versi tersembunyi di bawah layar. Panel desktop (Bagian 5.1)
+    setinggi sekitar 800 px, ditambah jarak atas dan bawah 6vh. Hal yang sama terjadi di 1.024 × 768, 1.280 × 720, 1.280 × 800,
+    1.440 × 900, dan 1.536 × 864. Pemilik meminta perbaikannya.
+418. **Perbaikan** (keputusan tambahan, hanya CSS, untuk lebar 1.024 px ke atas dengan tinggi 700–919 px):
+    - Panel berjarak 24 px dari tepi atas. Jarak dalam 28/32/16 px, jarak antarbagian 16 px, jarak di dalam bagian kiri 12 px, dan
+      titik PIN tanpa jarak tambahan. "Pulihkan akses Pengelola" dan versi dalam satu baris.
+    - Tinggi di bawah 800 px: jarak atas 16 px (bawah 8 px) dan tombol angka 56 px. Angka 56 dipilih di antara 64 px (Login
+      biasa) dan 48 px (layar setinggi di bawah 500 px), dan tetap di atas batas 48 px Bagian 4.4.
+    - Tinggi di bawah 760 px: lingkaran inisial tidak tampil, aturan yang sama dengan HP setinggi di bawah 620 px.
+    - Tempat pesan di bawah titik PIN tetap disisakan, supaya panel tidak bergeser saat "PIN salah" muncul.
+    - Tiket keempat di rel hiasan digeser dari 71% ke 75%, karena panel yang kini naik ke rel membuatnya tampak menembus sudut
+      panel di lebar 1.024 px.
+    - Tinggi 920 px ke atas, HP, dan tablet tidak berubah. Di HP 360 × 740 dan 320 × 568, "Pulihkan akses Pengelola" masih di
+      bawah layar pada langkah PIN, sedangkan papan angka dan "Lupa PIN?" tetap terlihat. Itu tidak termasuk perbaikan ini.
+419. **Uji:** `uji/layar/login_laptop.mjs` (77 pemeriksaan):
+    - Sebelas ukuran laptop dan desktop dari 1.024 × 768 sampai 1.920 × 1.080, termasuk batas 700, 760, 800, 919, dan 920 px. Pada
+      langkah nama dan langkah PIN, panel utuh tanpa gulir. Ukuran tombol angka, lingkaran inisial, dan baris Pulihkan/versi
+      sesuai tingginya.
+    - 1.920 × 1.080 tetap berjarak 6vh.
+    - "PIN salah" tidak menggeser panel, dan PIN dari papan ketik laptop tetap masuk.
+    - Keterangan keluar otomatis (dua baris) tetap muat di 1.366 × 768 dan 1.280 × 720.
+    - Dengan gerak.
+    - Delapan ukuran: tanpa gulir ke samping, papan angka dan "Lupa PIN?" terlihat.
+
+    Belum diuji di laptop asli.
