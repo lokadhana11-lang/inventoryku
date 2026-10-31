@@ -2743,3 +2743,32 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     - Delapan ukuran.
 
     Belum diuji di HP asli.
+
+### Pengingat penjualan juga memeriksa bulan lalu (Code.gs v0.41, 31 Oktober 2026)
+
+414. **Asal:** uji lengkap pada 31 Oktober gagal di `uji/server/libur.mjs` ("kemarin tanpa penjualan"). Uji itu memajukan jam satu hari,
+    dan kebetulan baru dijalankan pada hari terakhir bulan. Pengingat penjualan di Dashboard (`ringkasHppDashboard_`) hanya memeriksa
+    rentang bulan berjalan (`rentangHpp_`). Pada tanggal 1 rentang itu kosong, jadi penjualan hari terakhir bulan lalu yang belum dicatat
+    tidak diingatkan, padahal food cost bulan itu (rekap bulanan) bergantung padanya. Ini sudah begitu sejak pengingat dibangun dan
+    bukan akibat PR urutan form. Pemilik meminta perbaikannya.
+415. **Perbaikan** (keputusan tambahan):
+    - Rentang pengingat penjualan dan porsi per menu kini dari tanggal 1 bulan lalu (`bulanLalu_`) sampai kemarin, tetap dimulai dari
+      penjualan atau porsi pertama yang pernah dicatat.
+    - Bulan lalu dipilih, bukan hanya "kemarin", supaya hari bulan lalu yang kosong tidak hilang dari pengingat pada tanggal 2. Hari dua
+      bulan lalu atau lebih tidak diingatkan, supaya pengingat tidak menagih selamanya.
+    - Judul tetap "Penjualan kemarin belum dicatat" (satu hari, yaitu kemarin) atau "Penjualan n hari belum dicatat".
+    - Rincian: `teksTanggalKurang_` menulis nama bulan hanya jika tanggalnya ada di dua bulan ("31 Oktober serta 1 dan 2 November").
+      Kalimat food cost menyebut bulannya ("Food cost Oktober dan bulan ini …"). Jika semuanya di bulan ini, teksnya sama dengan sebelum
+      v0.41.
+    - Food cost bulan ini (`foodCostBulan_`) tidak berubah.
+416. **Uji:** `uji/server/pengingat_penjualan.mjs` memindah jam uji ke tanggal 1 bulan berikut, jadi hasilnya sama apa pun tanggal uji
+    dijalankan. Yang diperiksa:
+    - Tanggal 1: penjualan kemarin, tautan ke tanggalnya, dan nama bulan lalu.
+    - Tanggal 3: tiga hari di dua bulan.
+    - Hari terakhir bulan lalu tercatat tanpa porsi.
+    - Bulan lalu lengkap: teks lama.
+    - Semua tercatat: tanpa butir.
+    - Tanggal 1 bulan sesudahnya: hari dua bulan lalu tidak disebut.
+
+    `uji/server/libur.mjs` kembali lulus. Belum diuji di HP asli.
+

@@ -49,6 +49,8 @@
 > dan 7).
 > Tambahan 31 Oktober 2026 (permintaan pemilik): urutan form di Pengaturan → Form diubah dengan menyeret pegangan,
 > menggantikan tombol naik/turun (Bagian 5.7, 7, dan 8).
+> Tambahan 31 Oktober 2026 (perbaikan): pengingat "Penjualan kemarin belum dicatat" juga muncul pada tanggal 1
+> dan menyebut nama bulan jika tanggalnya ada di dua bulan (Bagian 5.9).
 > Tambahan 20 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): form Stock punya pilihan "Semua
 > kategori", kotak "Cari item", dan pilihan "Catat pemakaian: Tambah keluar / Hitung sisa"; layar Stock
 > opname punya kotak "Cari item" (Bagian 5.3, 5.8, dan 7).
@@ -963,7 +965,10 @@ Satu-satunya layar yang sepenuhnya navy.
   lembar ditutup.
 - Perlu perhatian bertambah dua jenis: "n menu di atas target food cost 35%" (Perlu ditinjau,
   membuka HPP bagian Per menu) dan "Penjualan kemarin belum dicatat" / "Penjualan n hari belum
-  dicatat" (Menunggu, membuka lembar Catat penjualan).
+  dicatat" (Menunggu, membuka lembar Catat penjualan). Sejak 31 Oktober 2026 pengingat ini juga
+  memeriksa bulan lalu, jadi muncul juga pada tanggal 1; jika tanggalnya ada di dua bulan,
+  rinciannya "Tanggal 31 Oktober serta 1 dan 2 November. Food cost Oktober dan bulan ini dihitung
+  setelah semua hari tercatat."
 - Di bawahnya daftar "Perlu perhatian", diurutkan dari yang paling mendesak.
 - **Hari ini dan Rutin** (28 Oktober 2026): daftar dibagi dua kelompok, masing-masing tetap urut dari
   yang paling mendesak. "Hari ini" (subjudul kecil) berisi yang perlu ditangani hari itu: suhu di luar

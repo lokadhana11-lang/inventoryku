@@ -279,6 +279,9 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   (satu baris `Data_Penyesuaian`, alasan Lainnya, catatan "Stock dinolkan karena item dinonaktifkan."), juga untuk item yang sudah
   nonaktif (tombol Nolkan stock); jawabannya ditambah `dinolkan: { stock, satuan }` (stock sebelum dinolkan) atau `null`.
   `daftarItem` (dan semua jawaban yang memuatnya) ditambah `nolkanSaatNonaktif: true`. `unduhPdf` form Stock tidak memuat item nonaktif.
+- Pengingat penjualan (Code.gs v0.41, 31 Oktober 2026): `dashboard.hpp.penjualanKurang` dan `porsiKurang` memuat hari bulan lalu dan
+  bulan ini sampai kemarin (dulu hanya bulan ini), sehingga butir `perhatian` jenis `penjualan` muncul juga pada tanggal 1; `ket` menyebut
+  nama bulan jika tanggalnya ada di dua bulan.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
