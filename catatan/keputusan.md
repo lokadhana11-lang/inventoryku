@@ -2947,4 +2947,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     galat satu langkah dilaporkan di salinan berikutnya lalu hilang, email 2 jam dikirim dari Gmail dan email 4 hari dicatat gagal
     dengan subjek, salinan 2 jam lalu → Beranda dan Dashboard, jawaban `__berkas`/`__sinkron` tidak berubah, Beranda 12 ms). Hasil
     rakitan lolos pemeriksaan sintaks. Juga: `uji/README` kini menyebut tanggal 14 ke atas untuk `UJI_JAM` (pada tanggal 13
-    `fc_sementara` memang berbeda, ditemukan saat telaah). Belum diuji di Supabase, Apps Script, dan HP asli.
+    `fc_sementara` memang berbeda, ditemukan saat telaah). `node uji/jalankan.mjs --layar` pada 2 November: 38 berkas, 1.563
+    pemeriksaan lulus (server 18 berkas 712, layar 20 berkas 851), 0 gagal. Belum diuji di Supabase, Apps Script, dan HP asli.
