@@ -2875,6 +2875,8 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     - Baris `grup` yang tidak terpakai (berisi "Oktober") di `layar/periksa.mjs` dihapus.
     - uji/README menjelaskan jam tetap, `UJI_JAM`, dan aturan untuk uji baru: tanpa nama bulan atau tanggal tetap, dan jam dimajukan
       lebih dulu sebelum mencatat tanggal yang belum datang.
-427. **Hasil:** uji server 17 berkas, 658 pemeriksaan lulus (juga dengan `UJI_JAM` 25 Desember 2026); `layar/fc_sementara` lulus
-    29 pemeriksaan (pada 2 November dengan jam sebenarnya berhenti di awal). Code.gs, aplikasi, dan `supabase/` tidak berubah, jadi
+427. **Hasil:** `node uji/jalankan.mjs --layar` pada 2 November: 36 berkas, 1.478 pemeriksaan lulus (server 17 berkas 658, layar
+    19 berkas 820), 0 gagal. Uji server juga lulus semua dengan `UJI_JAM` 25 Desember 2026. Pembanding pada hari yang sama dengan jam
+    sebenarnya (sebelum perbaikan): server 42 gagal; layar `fc_sementara` berhenti di awal dan `periksa2` gagal satu ("Oktober"
+    pada tanggal 2 November), 17 berkas layar lain lulus. Code.gs, aplikasi, dan `supabase/` tidak berubah, jadi
     tidak ada versi yang naik dan tidak ada yang perlu ditempel.
