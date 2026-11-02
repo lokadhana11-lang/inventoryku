@@ -2,6 +2,7 @@
 import * as H from '../alat/harness.mjs';
 import { seed } from '../alat/seed.mjs';
 import { muatChromium } from '../alat/peramban.mjs';
+import { namaBulan } from '../alat/jam.mjs';
 const chromium = await muatChromium();
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 400) : ''); } };
@@ -107,7 +108,7 @@ const permintaan = (page) => { const r = []; page.on('request', (q) => { const d
   await tombolPeriksa(page).click();
   await page.waitForTimeout(400);
   const isi2 = (await page.locator('[role="dialog"]').innerText()).replace(/\s+/g, ' ');
-  cek(/\d+ Oktober yang belum diperiksa ditandai/.test(isi2) && !/filter/.test(isi2), 'tanpa filter: kalimat biasa', isi2);
+  cek(new RegExp('\\d+ ' + namaBulan(hari(0)) + ' yang belum diperiksa ditandai').test(isi2) && !/filter/.test(isi2), 'tanpa filter: kalimat biasa', isi2);
   await page.locator('[role="dialog"]').getByRole('button', { name: 'Batal' }).click();
   await page.waitForTimeout(300);
   await ctx.close();

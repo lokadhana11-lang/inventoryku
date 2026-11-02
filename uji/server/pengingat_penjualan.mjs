@@ -38,6 +38,8 @@ const D0 = tgl(0); // seed mencatat penjualan sampai kemarin
 const B1 = awalBulanBerikut(D0); // tanggal 1 bulan berikut
 const AKHIR = new Date(Date.parse(B1) - HARI_MS).toISOString().slice(0, 10); // hari terakhir bulan D0
 // Semua hari sampai sebelum hari terakhir bulan itu tercatat, jadi hanya hari terakhir yang kosong.
+// Jam dipindah dulu ke hari terakhir itu, karena penjualan tanggal yang belum datang ditolak.
+keTanggal(AKHIR);
 for (let d = D0; d < AKHIR; d = new Date(Date.parse(d) + HARI_MS).toISOString().slice(0, 10)) jual(d);
 
 // 1. Tanggal 1: kemarin (hari terakhir bulan lalu) belum dicatat → "Penjualan kemarin belum dicatat"

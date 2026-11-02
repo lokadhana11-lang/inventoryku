@@ -56,7 +56,6 @@ const tombolPeriksa = (page) => page.locator('.tombol-periksa-tanggal');
   const { ctx, page } = await buka(390, 844, 'Budi');
   const teks = await tombolPeriksa(page).allTextContents();
   cek(teks.length >= 6, 'tombol per tanggal tampil', teks);
-  const grup = page.locator('section.kelompok', { has: page.locator('.kelompok-judul', { hasText: /\d+ Oktober/ }) });
   const judulLapor = await page.evaluate((tg) => {
     const d = new Date(tg + 'T12:00:00+07:00');
     return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Jakarta' }).replace('.', '');

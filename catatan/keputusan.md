@@ -2840,3 +2840,41 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     - Delapan ukuran.
 
     Belum diuji di laptop asli.
+
+### Jam uji tetap (2 November 2026)
+
+424. **Asal:** telaah aplikasi oleh Claude (2 November 2026), dipilih pemilik ("Perbaiki uji yang gagal karena tanggal"). Pada
+    2 November `node uji/jalankan.mjs` menghasilkan 595 pemeriksaan lulus dan 42 gagal di empat berkas server (`email_harian`,
+    `fc_sementara`, `libur`, `pengingat_penjualan`), dan `layar/fc_sementara` berhenti di awal. Aplikasi, Code.gs, dan Supabase tidak
+    salah. Penyebabnya di uji:
+    - Data contoh 12 hari dibuat mundur dari hari ini, jadi pada tanggal 1–12 sebagian jatuh di bulan lalu (dulu dicatat di
+      uji/README sebagai "jalankan ulang sesudah tanggal 12").
+    - Nama bulan "Oktober" dan "September" ditulis tetap di `server/email_harian` dan `layar/fc_sementara`, `layar/periksa2` sejak uji
+      ditulis pada bulan Oktober.
+    - `server/pengingat_penjualan` mencatat penjualan sampai akhir bulan sebelum jamnya dimajukan, sehingga tanggal yang belum datang
+      ditolak. Uji itu lulus pada 31 Oktober hanya karena hari itu hari terakhir bulan.
+425. **Jam uji tetap** (keputusan tambahan): `uji/alat/jam.mjs` mengganti `Date` di Node dengan jam yang dimulai Selasa 20 Oktober 2026
+    pukul 14.00 WIB lalu berjalan seperti biasa (timer tetap memakai jam sebenarnya). Berkas itu diimpor paling awal oleh
+    `harness.mjs`, jadi data contoh, berkas uji, dan Code.gs (lewat `Date` harness, yang tetap bisa digeser `aturGeser`) memakai jam yang
+    sama. Tiap berkas uji adalah proses sendiri, jadi tiap berkas mulai tepat di jam itu.
+    - Tanggal 20 dipilih supaya data contoh (8–19 Oktober) utuh di satu bulan. Tanggal lampau dipilih supaya jam uji tidak pernah
+      mendahului jam sebenarnya.
+    - `peramban.mjs` memasang selisih yang sama di setiap halaman Chromium dengan `addInitScript`. `ctx.clock` dari Playwright tidak
+      dipakai: jam itu dihitung dari `Date.now()` di Node, yang sudah diganti, sehingga halaman tetap di jam sebenarnya dan sesi dari
+      server dianggap sudah berakhir.
+    - `UJI_JAM=<waktu ISO>` menjalankan uji pada tanggal lain; `UJI_JAM=sekarang` memakai jam sebenarnya seperti sebelumnya.
+    - Tidak dipilih: membuat setiap uji benar di tanggal berapa pun (data contoh harus selalu jatuh di bulan yang sama, jadi banyak
+      angka harapan berubah), atau mengubah `aturGeser` menjadi relatif terhadap tanggal dasar (banyak uji menghitung geser dari
+      `Date.now()`).
+426. **Perbaikan uji:**
+    - `server/pengingat_penjualan` memajukan jam ke hari terakhir bulan lebih dulu, baru mencatat penjualan hari-hari sebelumnya.
+      Kini lulus juga dengan `UJI_JAM` 1 November, 2 November, 31 Desember, dan 28 Februari 2027.
+    - Nama bulan dihitung dari tanggal uji (`namaBulan` di `jam.mjs`) di `server/email_harian`, `layar/fc_sementara`, dan
+      `layar/periksa2`.
+    - Bulan lalu di `server/email_harian` dihitung dari tanggal uji, bukan 30 September.
+    - Baris `grup` yang tidak terpakai (berisi "Oktober") di `layar/periksa.mjs` dihapus.
+    - uji/README menjelaskan jam tetap, `UJI_JAM`, dan aturan untuk uji baru: tanpa nama bulan atau tanggal tetap, dan jam dimajukan
+      lebih dulu sebelum mencatat tanggal yang belum datang.
+427. **Hasil:** uji server 17 berkas, 658 pemeriksaan lulus (juga dengan `UJI_JAM` 25 Desember 2026); `layar/fc_sementara` lulus
+    29 pemeriksaan (pada 2 November dengan jam sebenarnya berhenti di awal). Code.gs, aplikasi, dan `supabase/` tidak berubah, jadi
+    tidak ada versi yang naik dan tidak ada yang perlu ditempel.

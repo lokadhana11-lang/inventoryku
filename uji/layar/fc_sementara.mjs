@@ -2,6 +2,7 @@
 import * as H from '../alat/harness.mjs';
 import { seed } from '../alat/seed.mjs';
 import { muatChromium } from '../alat/peramban.mjs';
+import { namaBulan } from '../alat/jam.mjs';
 const chromium = await muatChromium();
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 700) : ''); } };
@@ -77,7 +78,7 @@ cek(S && h.foodCost === null, 'data uji punya food cost sementara', S);
   const { ctx, page } = await buka(390, 844, 'Budi', { rute: '#/dashboard' });
   await page.waitForTimeout(1200);
   const t = await teks(page);
-  cek(new RegExp('Oktober ' + persen(S.foodCost).replace('.', '\\.') + ' sementara · target 35%').test(t), 'dashboard: sementara', t.slice(0, 1500));
+  cek(new RegExp(namaBulan(hariIni) + ' ' + persen(S.foodCost).replace('.', '\\.') + ' sementara · target 35%').test(t), 'dashboard: sementara', t.slice(0, 1500));
   await ctx.close();
 }
 // B. Layar HPP
@@ -97,7 +98,7 @@ cek(S && h.foodCost === null, 'data uji punya food cost sementara', S);
     aria: document.querySelector('.grafik-fc').getAttribute('aria-label')
   }));
   cek(g.sem === 1 && g.nilai[5][1].includes('sementara') && g.nilai[5][0] !== '–', 'grafik: batang dan angka sementara', g);
-  cek(/Oktober 2026 [\d,]+% sementara/.test(g.aria), 'grafik: uraian pembaca layar', g.aria);
+  cek(new RegExp(namaBulan(hariIni) + ' ' + hariIni.slice(0, 4) + ' [\\d,]+% sementara').test(g.aria), 'grafik: uraian pembaca layar', g.aria);
   await ctx.close();
 }
 // C. Server lama: seperti dulu
@@ -110,7 +111,7 @@ cek(S && h.foodCost === null, 'data uji punya food cost sementara', S);
   await ctx.close();
   const b = await buka(390, 844, 'Budi', { rute: '#/dashboard', serverLama: true });
   await b.page.waitForTimeout(1200);
-  cek(/Oktober: penjualan belum lengkap/.test(await teks(b.page)), 'server lama: dashboard seperti dulu');
+  cek(new RegExp(namaBulan(hariIni) + ': penjualan belum lengkap').test(await teks(b.page)), 'server lama: dashboard seperti dulu');
   await b.ctx.close();
 }
 // D. Delapan ukuran

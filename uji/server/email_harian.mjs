@@ -1,6 +1,7 @@
 // Uji server: email harian dengan barang masuk, penjualan, dan food cost (Code.gs v0.35).
 import * as H from '../alat/harness.mjs';
 import { seed } from '../alat/seed.mjs';
+import { namaBulan } from '../alat/jam.mjs';
 let lulus = 0, gagal = 0;
 function cek(label, k, info) { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, info !== undefined ? JSON.stringify(info).slice(0, 1200) : ''); } }
 const tgl = (n) => new Date(Date.now() + H.geserWaktu + n * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
@@ -35,7 +36,7 @@ const hpp = A('hpp', { bulan: HARI.slice(0, 7) }).data;
 cek('penjualan belum dicatat', /Penjualan hari ini belum dicatat\. Catat dari Dashboard → HPP dan food cost\./.test(pj), pj);
 cek('tanpa baris porsi saat penjualan belum dicatat', !/porsi/.test(pj), pj);
 const jHari = Number(HARI.slice(8));
-cek('food cost sementara sampai hari ini', new RegExp('Food cost Oktober sampai ' + pendek(HARI) + ': sementara <b>' + persen(hpp.foodCostSementara.foodCost).replace('.', '\\.') +
+cek('food cost sementara sampai hari ini', new RegExp('Food cost ' + namaBulan(HARI) + ' sampai ' + pendek(HARI) + ': sementara <b>' + persen(hpp.foodCostSementara.foodCost).replace('.', '\\.') +
   '</b> \\(penjualan baru tercatat ' + hpp.foodCostSementara.hari + ' dari ' + jHari + ' hari; target 35%\\)').test(pj), [pj, hpp.foodCostSementara]);
 cek('urutan: Penjualan sebelum Untuk Head Kitchen', h1.html.indexOf('>Penjualan dan food cost</h2>') < h1.html.indexOf('>Untuk Head Kitchen dan Manager</h2>'));
 
@@ -53,7 +54,7 @@ const bm3 = bagian(h3, 'Barang masuk');
 cek('tanggal lalu: satu pemasok', /<b>Total Rp 432\.000<\/b><\/p>/.test(bm3) && /Toko Ayam Jaya<\/b>: Ayam fillet 8 kg × Rp 54\.000/.test(bm3), bm3);
 const pj3 = bagian(h3, 'Penjualan dan food cost');
 cek('tanggal lalu: penjualan dan porsi', /Penjualan hari ini <b>Rp 980\.000<\/b>/.test(pj3) && /37 porsi terjual: Ayam geprek 25, Telur balado 12/.test(pj3), pj3);
-cek('tanggal lalu: food cost sampai tanggal itu', new RegExp('Food cost Oktober sampai ' + pendek(t3) + ': sementara').test(pj3), pj3);
+cek('tanggal lalu: food cost sampai tanggal itu', new RegExp('Food cost ' + namaBulan(t3) + ' sampai ' + pendek(t3) + ': sementara').test(pj3), pj3);
 // Tanpa barang masuk.
 cek('tanpa barang masuk', /Tidak ada barang masuk tercatat\./.test(bagian(lapor(tgl(-1)).html, 'Barang masuk')));
 // Barang masuk tanpa harga beli sama sekali.
@@ -71,12 +72,12 @@ A('simpanOutletJadwal', { targetFoodCost: 35 });
 A('hpp', { bulan: HARI.slice(0, 7) }).data.penjualan.kurang.forEach((t) => A('simpanPenjualan', { tanggal: t, penjualan: 0, catatan: '', submissionId: sid() }));
 const pj5 = bagian(lapor(HARI).html, 'Penjualan dan food cost');
 const fc = H.fungsi('foodCostBulan_', Object.assign(H.fungsi('konteksHpp_'), { hari: tgl(1) }), HARI.slice(0, 7));
-cek('lengkap: food cost tetap sampai hari ini', fc.foodCost != null && pj5.includes('Food cost Oktober sampai ' + pendek(HARI) + ': <b>' + persen(fc.foodCost) + '</b> (target 35%)') && !/sementara/.test(pj5), [pj5, fc.foodCost]);
+cek('lengkap: food cost tetap sampai hari ini', fc.foodCost != null && pj5.includes('Food cost ' + namaBulan(HARI) + ' sampai ' + pendek(HARI) + ': <b>' + persen(fc.foodCost) + '</b> (target 35%)') && !/sementara/.test(pj5), [pj5, fc.foodCost]);
 
-// Hari terakhir bulan: rentang sampai akhir bulan.
-const akhirSep = HARI.slice(0, 4) + '-09-30';
-const pjS = bagian(lapor(akhirSep).html, 'Penjualan dan food cost');
-cek('bulan lalu tanpa penjualan', /Food cost September sampai 30 Sep: belum dihitung, belum ada penjualan tercatat\./.test(pjS), pjS);
+// Hari terakhir bulan lalu: rentang sampai akhir bulan; data contoh 12 hari ada di bulan ini (butir 424).
+const akhirLalu = new Date(Date.parse(HARI.slice(0, 7) + '-01T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+const pjS = bagian(lapor(akhirLalu).html, 'Penjualan dan food cost');
+cek('bulan lalu tanpa penjualan', pjS.includes('Food cost ' + namaBulan(akhirLalu) + ' sampai ' + pendek(akhirLalu) + ': belum dihitung, belum ada penjualan tercatat.'), pjS);
 
 // Outlet yang tidak pernah mencatat penjualan: tanpa bagian.
 const sh = H.ss.getSheetByName('Data_Penjualan');
