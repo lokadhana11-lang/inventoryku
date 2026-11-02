@@ -1,4 +1,5 @@
 // Server uji: Code.gs asli di atas Spreadsheet tiruan supabase/src, di memori.
+import './jam.mjs'; // paling awal: jam uji tetap (butir 424)
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';

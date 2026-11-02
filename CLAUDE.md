@@ -42,7 +42,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 │   ├── functions/api/index.ts   HASIL RAKITAN, ditempel tangan ke editor Edge Function; jangan diubah langsung
 │   └── PANDUAN.md     langkah pemilik untuk pindah
 ├── uji/               uji otomatis: node uji/jalankan.mjs [--layar] (lihat uji/README.md)
-│   ├── alat/          harness.mjs (Code.gs di atas Spreadsheet tiruan supabase/src), seed.mjs, peramban.mjs
+│   ├── alat/          jam.mjs (jam uji tetap 20 Oktober 2026), harness.mjs (Code.gs di atas Spreadsheet tiruan supabase/src),
+│   │                  seed.mjs, peramban.mjs
 │   ├── server/        uji aksi Code.gs, satu berkas per fitur
 │   └── layar/         uji alur aplikasi di Chromium (Playwright) dengan API tiruan
 ├── spesifikasi/
@@ -132,6 +133,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   selalu berhalaman); menu Laporan punya tiga tombol utama; rekap bulanan memakai unit dan jadwal form sekarang. Hasil rumus dan grafik
   di Google Sheets tidak bisa diuji di sini.
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
+- **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
+  tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md).
 
 ## Keputusan tambahan
 
