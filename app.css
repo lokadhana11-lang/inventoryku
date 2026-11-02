@@ -909,6 +909,51 @@ body.papan-ketik .layar {
   gap: 16px;
 }
 
+/* Versi dan salinan di Pengaturan → Outlet dan jadwal (aplikasi 0.43.0): label di atas nilai di HP sempit, dua kolom mulai 480 px. */
+.kartu.status-sistem {
+  display: grid;
+  gap: 12px;
+}
+
+.kartu.status-sistem .kartu-judul {
+  margin-bottom: 0;
+}
+
+.status-sistem-daftar {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.status-sistem-daftar > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.status-sistem-daftar dt {
+  font-size: 14px;
+  color: var(--tinta-redup);
+}
+
+.status-sistem-daftar dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 480px) {
+  .status-sistem-daftar > div {
+    grid-template-columns: minmax(0, 13em) minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+  }
+
+  .status-sistem-daftar dt {
+    font-size: 16px;
+  }
+}
+
 .kolom {
   display: grid;
   gap: 6px;

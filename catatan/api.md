@@ -282,6 +282,15 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
 - Pengingat penjualan (Code.gs v0.41, 31 Oktober 2026): `dashboard.hpp.penjualanKurang` dan `porsiKurang` memuat hari bulan lalu dan
   bulan ini sampai kemarin (dulu hanya bulan ini), sehingga butir `perhatian` jenis `penjualan` muncul juga pada tanggal 1; `ket` menyebut
   nama bulan jika tanggalnya ada di dua bulan.
+- Pemantauan pemasangan (Code.gs v0.42, aplikasi 0.43.0, 2 November 2026; khusus Pengelola): `beranda.peringatanPemasangan: [{ jenis,
+  tingkat: masalah | tinjau, judul, ket }]` (jenis `salinanBerhenti`, `surelTertahan`, `salinanGagal`, `versi`, `susunan`; terpisah dari
+  `peringatanSistem` supaya tidak diberi akhiran "Rinciannya di tab M_Konfigurasi"); `dashboard.perhatian` ditambah butir jenis
+  `pemasangan` (`data.kode` = jenis di atas; masalah sesudah butir `sistem`, tinjau sesudah `jadwal`); `bacaOutletJadwal` (dan
+  `simpanOutletJadwal`) ditambah `statusSistem: { versiServer, diSupabase, appsScript: { versi ('' = sebelum v0.42), salinan (ISO),
+  galat, berhenti } | null, surel: { menunggu, sejak (ISO) | null, lewatGmail } | null, susunan: { lengkap, kurang: [teks] } | null,
+  peringatan: [seperti beranda] }`. Aksi pemilik dari Apps Script (diawali `__`) kini membawa `versiKode` (semua panggilan) dan
+  `__berkas` membawa `galatSalinan` (hasil salinan sebelumnya, '' = berhasil); jawabannya tidak berubah. `__surel` menandai email yang
+  lebih dari 3 hari belum terkirim sebagai gagal dan mencatatnya di `laporan_terakhir`/`rekap_terakhir`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.

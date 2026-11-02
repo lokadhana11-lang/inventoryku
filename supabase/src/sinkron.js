@@ -349,6 +349,17 @@ export async function berkasTersalin(sql, body) {
 
 /* ---------- Email lewat Gmail pemilik (jika Brevo tidak dipasang) ---------- */
 
+/**
+ * Email yang lebih dari 3 hari belum terkirim (salinan Apps Script berhenti selama itu) ditandai gagal, tidak lagi dibuang tanpa
+ * catatan (Code.gs v0.42). Mengembalikan [{ asal, subjek }] untuk dicatat di M_Konfigurasi.
+ */
+export const PESAN_SUREL_KEDALUWARSA = 'tertahan lebih dari 3 hari karena salinan Apps Script tidak berjalan';
+export async function surelKedaluwarsa(sql) {
+  return sql`update inventoryku.surel_keluar set galat = ${PESAN_SUREL_KEDALUWARSA}
+    where terkirim is null and galat is null and dibuat <= now() - interval '3 days'
+    returning asal, isi ->> 'subject' as subjek`;
+}
+
 export async function surelUntukGmail(sql) {
   const r = await sql`select id, isi from inventoryku.surel_keluar
     where terkirim is null and galat is null and dibuat > now() - interval '3 days' order by id limit 5`;

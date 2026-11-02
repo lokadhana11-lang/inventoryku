@@ -32,7 +32,10 @@ export function buatPenyimpanan() {
    * Postgres menjalankan kedua perintah berurutan dan, pada read committed, bacaan memakai keadaan sesudah kunci didapat.
    * Tanpa parameter, karena dengan prepare: false query berparameter butuh dua kali bolak-balik dan postgres.js tidak
    * mengirim query beruntun di dalam transaksi.
-   * → { metas: [{ nama, urutan, meta, versi }], props: { kunci: nilai }, info: { kunci: nilai }, tabAksi: [nama] }
+   * Juga email yang belum terkirim (Code.gs v0.42): jumlah dan waktu yang tertua, untuk peringatan di Beranda Pengelola. Tabelnya
+   * kecil (satu sampai tiga baris sehari) dan kolom isi (lampiran) tidak dibaca.
+   * → { metas: [{ nama, urutan, meta, versi }], props: { kunci: nilai }, info: { kunci: nilai }, tabAksi: [nama],
+   *     surel: { menunggu, sejak } }
    */
   async function muatAwal(tx, aksi, kunciTulis) {
     if (kunciTulis != null && !Number.isInteger(kunciTulis)) throw new Error('Kunci tulis harus bilangan bulat.');
@@ -41,13 +44,17 @@ export function buatPenyimpanan() {
       coalesce((select json_agg(json_build_object('nama', nama, 'urutan', urutan, 'meta', meta, 'versi', versi) order by urutan, nama)
         from inventoryku.tab_meta), '[]') as metas,
       coalesce((select json_object_agg(kunci, nilai) from inventoryku.properti), '{}') as props,
-      coalesce((select json_object_agg(kunci, nilai) from inventoryku.info), '{}') as info` + (tabAksi ? '' : `,
+      coalesce((select json_object_agg(kunci, nilai) from inventoryku.info), '{}') as info,
+      (select json_build_object('menunggu', count(*), 'sejak', min(dibuat)) from inventoryku.surel_keluar
+        where terkirim is null and galat is null) as surel` + (tabAksi ? '' : `,
       coalesce((select json_object_agg(aksi, tab) from (select aksi, json_agg(tab) as tab from inventoryku.aksi_tab group by aksi) a),
         '{}') as tab_aksi`));
     const r = kunci ? hasil[1] : hasil;
     if (!tabAksi) tabAksi = r[0].tab_aksi;
     const tab = Object.prototype.hasOwnProperty.call(tabAksi, aksi) ? tabAksi[aksi].slice() : [];
-    return { metas: r[0].metas, props: r[0].props, info: r[0].info, tabAksi: tab };
+    const s = r[0].surel || {};
+    return { metas: r[0].metas, props: r[0].props, info: r[0].info, tabAksi: tab,
+      surel: { menunggu: Number(s.menunggu) || 0, sejak: s.sejak ? new Date(s.sejak).toISOString() : null } };
   }
 
   function barisTab(r) {

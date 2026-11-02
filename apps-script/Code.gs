@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.41 (pengingat penjualan juga memeriksa bulan lalu)
+// InventoryKu Code.gs v0.42 (pemantauan salinan Apps Script, versi, email, dan susunan Sheet)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -126,9 +126,14 @@
  *                        di tab master Sheets abu-abu (setupSpreadsheet).
  * - 31 Oktober 2026    : pengingat penjualan dan porsi yang belum dicatat di Dashboard juga memeriksa bulan lalu, jadi
  *                        "Penjualan kemarin belum dicatat" muncul juga pada tanggal 1.
+ * - 2 November 2026    : pemantauan (cekPemasangan_): salinan Apps Script yang berhenti atau gagal, versi Code.gs yang
+ *                        berbeda, email yang tertahan, dan susunan tab/kolom yang belum dibuat setupSpreadsheet
+ *                        (M_Konfigurasi susunan_sheet); beranda.peringatanPemasangan, butir Dashboard pemasangan,
+ *                        bacaOutletJadwal.statusSistem, notifikasi Pengelola saat laporan harian tertahan. Apps Script
+ *                        mengirim versiKode di setiap panggilan ke Supabase dan galatSalinan (salinan sebelumnya).
  */
 
-var VERSI_KODE = 'v0.41';
+var VERSI_KODE = 'v0.42';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -1468,6 +1473,8 @@ function berandaBaru_(tanggal, body, pengguna) {
     });
     hasil.pemeriksaan = ringkasPemeriksaan_();
     hasil.peringatanSistem = peringatanSistem_();
+    // Salinan Apps Script, versi, email tertahan, susunan Sheet (Code.gs v0.42); aplikasi lama mengabaikannya.
+    hasil.peringatanPemasangan = cekPemasangan_();
     // Pengingat stock opname (Bagian 5.7, Tahap 8).
     hasil.opname = statusOpname_();
     simpanAlamatAplikasi_(body.alamatAplikasi);
@@ -5875,7 +5882,9 @@ function dataOutletJadwal_() {
     jamPengingatStock: jamPengingat_(n, PENGINGAT_STOCK),
     pengingatClosingMenit: menitPengingatClosing_(n),
     notifikasiTersedia: notifikasiTersedia_(),
-    perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || ''))
+    perluPasangTrigger: /^Perlu/.test(String(n.pasang_trigger || '')),
+    // Versi dan salinan (Code.gs v0.42).
+    statusSistem: statusSistem_()
   };
 }
 
@@ -6188,6 +6197,10 @@ function perhatianDashboard_(d) {
     if (/^Jadwal:/.test(p)) return; // ditulis sebagai butir Perlu ditinjau di bawah
     tambah('sistem', 'masalah', 'Perlu perhatian', p + ' Rinciannya di tab M_Konfigurasi.');
   });
+  // Pemasangan (Code.gs v0.42): salinan Apps Script berhenti atau gagal, email tertahan; versi dan susunan di bawah.
+  (d.pemasangan || []).forEach(function (p) {
+    if (p.tingkat === 'masalah') tambah('pemasangan', 'masalah', p.judul, p.ket, { kode: p.jenis });
+  });
   if (d.pemeriksaan.dilaporkan) {
     tambah('dilaporkan', 'tinjau', d.pemeriksaan.dilaporkan + ' baris dilaporkan keliru', 'Periksa dan koreksi dari Riwayat.',
       { formId: d.pemeriksaan.formDilaporkan, dari: d.pemeriksaan.dari, sampai: d.pemeriksaan.sampai });
@@ -6215,6 +6228,9 @@ function perhatianDashboard_(d) {
   }
   d.peringatan.forEach(function (p) {
     if (/^Jadwal:/.test(p)) tambah('jadwal', 'tinjau', 'Jadwal belum dipasang ulang', p.replace(/^Jadwal:\s*/, ''));
+  });
+  (d.pemasangan || []).forEach(function (p) {
+    if (p.tingkat !== 'masalah') tambah('pemasangan', 'tinjau', p.judul, p.ket, { kode: p.jenis });
   });
   if (d.opname && d.opname.lewat) {
     tambah('opname', 'tinjau', teksPengingatOpname_(d.opname).replace(/\.$/, ''), 'Jadwal ' + d.opname.jadwal + '. Hitung barang nyata ' +
@@ -6288,6 +6304,7 @@ function aksiDashboard_(body) {
     }),
     terkunci: akunTerkunci_().filter(function (a) { return a.sampai; }),
     peringatan: peringatanSistem_(),
+    pemasangan: cekPemasangan_(),
     opname: statusOpname_(),
     hpp: ringkasHppDashboard_(tanggal),
     hargaBeli: hargaBeliBerbeda_(tanggal, master)
@@ -11007,6 +11024,187 @@ function peringatanSistem_() {
   return hasil;
 }
 
+/* ---------- Pemantauan pemasangan (Code.gs v0.42) ----------
+ * Sejak pindah ke Supabase, email lewat Gmail, salinan berkas ke Drive, dan salinan ke Google Sheets dikerjakan Apps Script
+ * tiap 5 menit (sinkronDariSupabase). Jika salinan itu berhenti, tidak ada yang gagal di Supabase, jadi Beranda dulu tetap
+ * tenang. Supabase kini mencatat kontak terakhir Apps Script dan versinya (server.js, info appsScript), dan menghitung email
+ * yang belum terkirim (penyimpanan.js); keduanya sampai ke Code.gs lewat SUPABASE_.statusSistem.
+ */
+
+var BATAS_SALINAN_MENIT = 30; // salinan tiap 5 menit: 6 kali terlewat dianggap berhenti
+var BATAS_SUREL_MENIT = 60; // email yang belum terkirim selama ini dianggap tertahan
+var KETERANGAN_SUSUNAN = 'Tab dan kolom yang belum dibuat setupSpreadsheet ("Lengkap" jika tidak ada). Diperiksa otomatis ' +
+  'setiap laporan harian dan setiap setupSpreadsheet.';
+
+/** { appsScript: { versi, salinan (ISO), galat } | null, surel: { menunggu, sejak (ISO) }, brevo } di Supabase; null di Apps Script. */
+function statusSupabase_() {
+  if (!DI_SUPABASE_ || typeof SUPABASE_ === 'undefined' || !SUPABASE_ || !SUPABASE_.statusSistem) return null;
+  return SUPABASE_.statusSistem;
+}
+
+/** 'v0.41' → [0, 41]; urutan dua versi: negatif jika a lebih lama. */
+function bandingVersi_(a, b) {
+  var x = String(a || '').replace(/^v/, '').split('.').map(Number);
+  var y = String(b || '').replace(/^v/, '').split('.').map(Number);
+  for (var i = 0; i < Math.max(x.length, y.length); i++) {
+    var d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/** "45 menit", "3 jam", "2 hari" dari lama dalam milidetik. */
+function lamaId_(ms) {
+  var menit = Math.max(1, Math.floor(ms / 60000));
+  if (menit < 60) return menit + ' menit';
+  var jam = Math.floor(menit / 60);
+  return jam < 48 ? jam + ' jam' : Math.floor(jam / 24) + ' hari';
+}
+
+/**
+ * Tab dan kolom yang seharusnya dibuat setupSpreadsheet tetapi belum ada: ["tab Data_PenjualanMenu", "M_Resep: kolom Catatan"].
+ * Judul dibandingkan seperti pastikanJudul_ (dipangkas). Tab Harian dan Dashboard tidak diperiksa (di Supabase tidak dipakai),
+ * begitu juga tab form kustom (dibuat saat form disimpan). Memuat semua tab Data, jadi hanya dijalankan dari laporan harian dan
+ * setupSpreadsheet (keduanya memang memuat semua tab), lalu hasilnya disimpan (catatSusunan_).
+ */
+function periksaSusunan_() {
+  var ss = bukaSpreadsheet_();
+  var kurang = [];
+  TAB_DATA.map(function (d) { return { def: d, sistem: d.sistem || KOLOM_SISTEM }; })
+    .concat(TAB_MASTER.map(function (d) { return { def: d, sistem: [] }; }), [{ def: TAB_LOG, sistem: [] }])
+    .forEach(function (x) {
+      var sh = ss.getSheetByName(x.def.nama);
+      if (!sh) {
+        kurang.push('tab ' + x.def.nama);
+        return;
+      }
+      var lebar = sh.getLastColumn();
+      var ada = {};
+      (lebar ? sh.getRange(1, 1, 1, lebar).getValues()[0] : []).forEach(function (j) { ada[String(j).trim()] = true; });
+      var hilang = x.def.kolom.concat(x.sistem).map(function (k) { return k.nama; }).filter(function (n) { return !ada[n]; });
+      if (hilang.length) kurang.push(x.def.nama + ': kolom ' + hilang.join(', '));
+    });
+  return kurang;
+}
+
+/** Menyimpan hasil periksaSusunan_ di M_Konfigurasi susunan_sheet (hanya jika berubah). Kegagalan hanya dicatat di log. */
+function catatSusunan_() {
+  try {
+    var kurang = periksaSusunan_();
+    var teks = kurang.length ? 'Kurang: ' + kurang.join('; ') : 'Lengkap';
+    if (String(bacaKonfigurasi_().nilai.susunan_sheet || '') !== teks) catatStatusSistem_('susunan_sheet', teks, KETERANGAN_SUSUNAN);
+    return kurang;
+  } catch (err) {
+    console.error('Susunan Sheet tidak bisa diperiksa: ' + (err && err.stack ? err.stack : err));
+    return null;
+  }
+}
+
+/**
+ * Salinan Apps Script yang berhenti: { sejak: Date, lama: ms } jika kontak terakhir lebih dari BATAS_SALINAN_MENIT lalu,
+ * selain itu null. Kontak yang belum pernah tercatat (Edge Function baru diperbarui) tidak dianggap berhenti.
+ */
+function salinanBerhenti_(st) {
+  var waktu = st && st.appsScript && st.appsScript.salinan ? Date.parse(st.appsScript.salinan) : NaN;
+  if (!isFinite(waktu)) return null;
+  var lama = Date.now() - waktu;
+  return lama > BATAS_SALINAN_MENIT * 60000 ? { sejak: new Date(waktu), lama: lama } : null;
+}
+
+/**
+ * Peringatan pemasangan untuk Pengelola, urut dari yang paling mendesak: [{ jenis, tingkat: masalah | tinjau, judul, ket }].
+ * jenis: salinanBerhenti, surelTertahan, salinanGagal, versi, susunan. Di Apps Script (belum pindah) hanya susunan.
+ */
+function cekPemasangan_() {
+  var hasil = [];
+  function tambah(jenis, tingkat, judul, ket) {
+    hasil.push({ jenis: jenis, tingkat: tingkat, judul: judul, ket: ket });
+  }
+  var st = statusSupabase_();
+  if (st) {
+    var as = st.appsScript || null;
+    var surel = st.surel || {};
+    var menunggu = Number(surel.menunggu) || 0;
+    var berhenti = salinanBerhenti_(st);
+    var eksekusi = 'Pemilik Sheet perlu melihat menu Eksekusi di editor Apps Script.';
+    if (berhenti) {
+      tambah('salinanBerhenti', 'masalah', 'Salinan ke Google Sheets berhenti',
+        'Terakhir berjalan ' + waktuPendekId_(berhenti.sejak) + ' (' + lamaId_(berhenti.lama) + ' lalu). Selama berhenti, ' +
+        (st.brevo ? '' : 'email laporan tidak terkirim, ') + 'PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak ' +
+        'diperbarui.' + (menunggu ? ' ' + menunggu + ' email menunggu dikirim.' : '') + ' Pemilik Sheet perlu menjalankan ' +
+        'pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana.');
+    } else {
+      var sejak = surel.sejak ? Date.parse(surel.sejak) : NaN;
+      if (menunggu && isFinite(sejak) && Date.now() - sejak > BATAS_SUREL_MENIT * 60000) {
+        tambah('surelTertahan', 'masalah', menunggu + ' email belum terkirim',
+          'Menunggu sejak ' + waktuPendekId_(new Date(sejak)) + '. ' + (st.brevo ? '' : 'Email dikirim dari Gmail pemilik Sheet ' +
+          'oleh salinan Apps Script tiap 5 menit. ') + eksekusi);
+      }
+      if (as && as.galat) {
+        tambah('salinanGagal', 'masalah', 'Salinan ke Google Sheets gagal', String(as.galat).replace(/[\s.]+$/, '') + '. ' + eksekusi);
+      }
+    }
+    if (as && as.salinan && as.versi !== VERSI_KODE) {
+      var lebihBaru = as.versi && bandingVersi_(as.versi, VERSI_KODE) > 0;
+      tambah('versi', 'tinjau', 'Versi Code.gs berbeda', lebihBaru
+        ? 'Supabase masih ' + VERSI_KODE + ', sedangkan Apps Script ' + as.versi + '. Pemilik Sheet perlu menempel ' +
+          'supabase/functions/api/index.ts ke Edge Function di Supabase, lalu Deploy.'
+        : 'Apps Script masih ' + (as.versi || 'memakai Code.gs sebelum v0.42') + ', sedangkan Supabase ' + VERSI_KODE +
+          '. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script.');
+    }
+  }
+  var sus = String(bacaKonfigurasi_().nilai.susunan_sheet || '');
+  if (/^Kurang/.test(sus)) {
+    tambah('susunan', 'tinjau', 'Susunan Sheet belum lengkap', sus.replace(/^Kurang:\s*/, 'Belum ada: ').replace(/[\s.]+$/, '') +
+      '. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script.');
+  }
+  return hasil;
+}
+
+/**
+ * Untuk Pengaturan → Outlet dan jadwal (bacaOutletJadwal.statusSistem): versi server, kontak terakhir Apps Script, email yang
+ * menunggu, susunan tab dan kolom, dan peringatan yang sama dengan Beranda. appsScript dan surel null di Apps Script; appsScript
+ * juga null selama Supabase belum pernah dihubungi Apps Script. susunan null selama belum pernah diperiksa.
+ */
+function statusSistem_() {
+  var st = statusSupabase_();
+  var sus = String(bacaKonfigurasi_().nilai.susunan_sheet || '');
+  var as = st && st.appsScript && st.appsScript.salinan ? st.appsScript : null;
+  return {
+    versiServer: VERSI_KODE,
+    diSupabase: DI_SUPABASE_,
+    appsScript: as ? { versi: as.versi || '', salinan: as.salinan, galat: as.galat || '', berhenti: !!salinanBerhenti_(st) } : null,
+    surel: st ? { menunggu: Number(st.surel && st.surel.menunggu) || 0, sejak: (st.surel && st.surel.sejak) || null, lewatGmail: !st.brevo }
+      : null,
+    susunan: /^Lengkap/.test(sus) ? { lengkap: true, kurang: [] }
+      : /^Kurang/.test(sus) ? { lengkap: false, kurang: sus.replace(/^Kurang:\s*/, '').split('; ') } : null,
+    peringatan: cekPemasangan_()
+  };
+}
+
+/**
+ * Sesudah laporan harian dari jadwal (juga pada hari libur): susunan Sheet diperiksa, dan HP Pengelola diberi tahu jika
+ * salinan Apps Script berhenti, karena email laporan yang baru dibuat tidak akan terkirim (atau, dengan Brevo, Google Sheets
+ * dan Drive tidak diperbarui). Sekali sehari, di saat yang paling berpengaruh.
+ */
+function pantauSesudahLaporan_(hasil) {
+  catatSusunan_();
+  var st = statusSupabase_();
+  var berhenti = salinanBerhenti_(st);
+  if (!berhenti) return;
+  var tertahan = !st.brevo && hasil && hasil.terkirim;
+  try {
+    kirimNotifikasi_('pengelola', {
+      judul: tertahan ? 'Email laporan harian tertahan' : 'Salinan ke Google Sheets berhenti',
+      isi: 'Salinan Apps Script tidak berjalan sejak ' + waktuPendekId_(berhenti.sejak) +
+        (tertahan ? ', jadi email laporan belum terkirim.' : '.') + ' Ketuk untuk melihat.',
+      url: '#/pengaturan/outlet', tag: 'salinan'
+    });
+  } catch (err) {
+    console.error('Notifikasi salinan berhenti gagal: ' + err);
+  }
+}
+
 /* ---------- Email laporan harian (Bagian 10) ---------- */
 
 /** Saran order (Bagian 9.2): Stok Maksimum − Stock Akhir, dibulatkan ke atas ke satuan besar. */
@@ -11487,7 +11685,10 @@ function kirimLaporanHarian() {
   SS_ = null;
   var jam = Number(Utilities.formatDate(new Date(), zonaWaktu_(), 'H'));
   var tanggal = jam < 6 ? geserTanggal_(hariIni_(), -1) : hariIni_();
-  return jalankanLaporanHarian_({ tanggal: tanggal });
+  var hasil = jalankanLaporanHarian_({ tanggal: tanggal });
+  // Susunan Sheet dan salinan Apps Script yang berhenti (Code.gs v0.42).
+  pantauSesudahLaporan_(hasil);
+  return hasil;
 }
 
 /**
@@ -12916,12 +13117,14 @@ var PROP_SUDAH_PINDAH = 'SUDAH_PINDAH';
 var PROP_SINKRON_VERSI = 'SINKRON_VERSI';
 var PROP_TIMPA_SUPABASE = 'TIMPA_SUPABASE';
 var PROP_SINKRON_PENUH = 'SINKRON_PENUH'; // tanggal salinan penuh terakhir
+// Kegagalan salinan 5 menit terakhir ('' jika berhasil), dilaporkan ke Supabase di panggilan pertama salinan berikutnya (v0.42).
+var PROP_SALINAN_GALAT = 'SALINAN_GALAT';
 var JAM_SINKRON_PENUH = 2; // sekali sehari sesudah jam ini semua tab disalin penuh (memperbaiki ketikan langsung di Sheet)
 var BARIS_PER_KIRIMAN_IMPOR = 2000;
 var MENIT_SINKRON = 5;
 // Property yang tidak ikut pindah: milik Apps Script saja.
 var PROP_TIDAK_DIPINDAH = [PROP_SUPABASE_API, PROP_RAHASIA_SINKRON, PROP_SUDAH_PINDAH, PROP_SINKRON_VERSI,
-  PROP_TIMPA_SUPABASE, PROP_SINKRON_PENUH, 'SPREADSHEET_ID'];
+  PROP_TIMPA_SUPABASE, PROP_SINKRON_PENUH, PROP_SALINAN_GALAT, 'SPREADSHEET_ID'];
 
 /** true di Apps Script setelah pindahKeSupabase berhasil. */
 function sudahPindah_() {
@@ -12942,7 +13145,8 @@ function panggilSupabase_(aksi, isi) {
     throw new Error('Isi dulu Script Properties SUPABASE_API (alamat Edge Function, diawali https://) dan RAHASIA_SINKRON ' +
       '(sama dengan secret RAHASIA_SINKRON di Supabase): Project Settings → Script Properties.');
   }
-  var body = { action: aksi, rahasia: rahasia };
+  // versiKode (v0.42): Supabase mencatat versi Code.gs di Apps Script, untuk peringatan versi yang berbeda.
+  var body = { action: aksi, rahasia: rahasia, versiKode: VERSI_KODE };
   Object.keys(isi || {}).forEach(function (k) { body[k] = isi[k]; });
   var r = UrlFetchApp.fetch(url, {
     method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify(body), muteHttpExceptions: true
@@ -13329,6 +13533,13 @@ function sinkronDariSupabase() {
         galat.push(l[0] + ': ' + (err && err.message ? err.message : err));
       }
     });
+    // Dilaporkan ke Supabase di awal salinan berikutnya (salinBerkasKeDrive_), supaya tampil di Beranda Pengelola.
+    var props = PropertiesService.getScriptProperties();
+    var teks = galat.join(' | ').slice(0, 500);
+    if (String(props.getProperty(PROP_SALINAN_GALAT) || '') !== teks) {
+      if (teks) props.setProperty(PROP_SALINAN_GALAT, teks);
+      else props.deleteProperty(PROP_SALINAN_GALAT);
+    }
   } finally {
     kunci.releaseLock();
   }
@@ -13347,7 +13558,10 @@ function folderDariJalur_(jalur) {
 function salinBerkasKeDrive_() {
   var mulai = Date.now();
   for (var putaran = 0; putaran < 10 && Date.now() - mulai < 90 * 1000; putaran++) {
-    var d = panggilSupabase_('__berkas', {});
+    // Panggilan pertama setiap salinan membawa hasil salinan sebelumnya ('' = berhasil), v0.42.
+    var d = panggilSupabase_('__berkas', putaran ? {} : {
+      galatSalinan: String(PropertiesService.getScriptProperties().getProperty(PROP_SALINAN_GALAT) || '')
+    });
     var salin = [];
     d.salin.forEach(function (b) {
       try {
@@ -14038,6 +14252,9 @@ function setupSpreadsheet() {
 
     if (DI_SUPABASE_) {
       aturUrutanTab_(ss);
+      // Peringatan "Susunan Sheet belum lengkap" di Beranda hilang begitu setupSpreadsheet selesai (Code.gs v0.42).
+      var kurangSusunan = catatSusunan_();
+      if (kurangSusunan && kurangSusunan.length) catatan.push('Peringatan: susunan belum lengkap: ' + kurangSusunan.join('; '));
       console.log('InventoryKu ' + VERSI_KODE + ' setupSpreadsheet di Supabase:\n- ' +
         (catatan.length ? catatan.join('\n- ') : 'tidak ada yang berubah'));
       return VERSI_KODE;
@@ -14071,6 +14288,8 @@ function setupSpreadsheet() {
 
     // 6. Baca kembali semua sel berumus dan catat yang galat.
     periksaSelRumus_(ss, catatan);
+    // Sebelum pindah ke Supabase, Sheet ini sumber datanya: hasil pemeriksaan susunan disimpan di sini (Code.gs v0.42).
+    if (!pindah) catatSusunan_();
   } finally {
     kunci.releaseLock();
   }

@@ -2880,3 +2880,71 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     sebenarnya (sebelum perbaikan): server 42 gagal; layar `fc_sementara` berhenti di awal dan `periksa2` gagal satu ("Oktober"
     pada tanggal 2 November), 17 berkas layar lain lulus. Code.gs, aplikasi, dan `supabase/` tidak berubah, jadi
     tidak ada versi yang naik dan tidak ada yang perlu ditempel.
+
+### Pemantauan salinan Apps Script, versi, email, dan susunan Sheet (Code.gs v0.42, aplikasi 0.43.0, 2 November 2026)
+
+428. **Asal:** telaah aplikasi oleh Claude (2 November 2026), butir 3 yang dipilih pemilik ("Kerjakan butir 3 pemantauan dulu").
+    Sejak pindah ke Supabase, email lewat Gmail, salinan PDF dan foto ke Drive, dan salinan ke Google Sheets dikerjakan Apps Script
+    tiap 5 menit (`sinkronDariSupabase`). Tiga celah: (a) jika salinan itu berhenti (izin Google dicabut, pemicunya hilang, kuota 90
+    menit habis), tidak ada yang gagal di Supabase, dan `laporan_terakhir` tetap "Terkirim" karena ditulis saat email masuk antrean;
+    (b) `surelUntukGmail` hanya mengambil email 3 hari terakhir, jadi email yang lebih tua dibuang tanpa catatan; (c) versi Code.gs di
+    Supabase dan di Apps Script tidak terlihat dari aplikasi, dan `setupSpreadsheet` yang belum dijalankan baru ketahuan saat fiturnya
+    dipakai. Spesifikasi sistem Bagian 4.5, 5.1, 10, 10.1; tampilan Bagian 5.2, 5.6, 5.7, 7.
+429. **Supabase** (`supabase/src`): `server.js` `catatAppsScript` menulis `info.appsScript` = `{ versi, salinan, galat }` (gabung
+    `jsonb ||`) untuk setiap aksi pemilik yang lolos `RAHASIA_SINKRON`: `versi` dari `body.versiKode` (hanya bentuk `v0.42`/`v0.8.1`),
+    `salinan` = waktu sekarang hanya untuk panggilan salinan (`PANGGILAN_SALINAN`: `__berkas`, `__sinkron`, `__surel`), `galat` dari
+    `__berkas.galatSalinan` (dipotong 500). `__fungsi` dari editor hanya mencatat versi, supaya menjalankan `setupSpreadsheet` tidak
+    menyembunyikan salinan yang berhenti. Kegagalan mencatat hanya masuk log. Apps Script lama (tanpa `versiKode`) tetap tercatat
+    waktunya. `penyimpanan.js` `muatAwal` menambah `surel: { menunggu, sejak }` (email dengan `terkirim` dan `galat` kosong) di
+    query yang sama (tetap satu kali bolak-balik; kolom isi tidak dibaca). `runtime.js` memberi Code.gs `SUPABASE_.statusSistem =
+    { appsScript, surel, brevo }`.
+430. **Email kedaluwarsa** (`sinkron.js` `surelKedaluwarsa`): pada setiap `__surel`, email yang lebih dari 3 hari belum terkirim
+    ditandai `galat` "tertahan lebih dari 3 hari karena salinan Apps Script tidak berjalan" dan dicatat lewat `catatSurelGagal_`
+    bersama subjeknya ("Gagal …: email tidak terkirim (tertahan … : Laporan harian Dapur, Kamis)."), sehingga tampil di Beranda
+    seperti email gagal lain. Batas 3 hari tetap (keputusan tambahan): email laporan yang sudah sebasi itu tidak dikirim lagi.
+431. **Apps Script** (Code.gs): `panggilSupabase_` mengirim `versiKode` di setiap panggilan. `sinkronDariSupabase` menyimpan
+    kegagalan salinan di Script Property `SALINAN_GALAT` (hanya jika berubah; dihapus jika berhasil, tidak ikut pindah) dan
+    `salinBerkasKeDrive_` mengirimnya sebagai `galatSalinan` di panggilan pertama salinan berikutnya, jadi kegagalan tampil sekitar 5
+    menit kemudian tanpa panggilan tambahan (keputusan tambahan: panggilan HTTP tambahan setiap 5 menit memakan kuota waktu Apps
+    Script). Salinan tetap melempar galat seperti dulu (Google tetap mengirim ringkasan kegagalan ke pemilik).
+432. **Peringatan** (`cekPemasangan_`, Code.gs v0.42), urut: `salinanBerhenti` (Masalah) jika salinan terakhir lebih dari
+    `BATAS_SALINAN_MENIT` = 30 menit lalu (6 kali terlewat), dengan waktu, lama, akibatnya (email hanya jika lewat Gmail), jumlah
+    email yang menunggu, dan petunjuk `pasangTrigger` (yang memasang ulang salinan 5 menit) lalu menu Eksekusi; `surelTertahan`
+    (Masalah) jika email tertua belum terkirim lebih dari `BATAS_SUREL_MENIT` = 60 menit; `salinanGagal` (Masalah) dengan pesan
+    galatnya. Keduanya tidak ditulis selama salinan berhenti (sudah tercakup). `versi` (Perlu ditinjau) hanya jika waktu salinan
+    sudah tercatat: Apps Script lebih lama ("Apps Script masih v0.41" atau "memakai Code.gs sebelum v0.42") meminta Code.gs ditempel,
+    Apps Script lebih baru meminta Edge Function di-Deploy (`bandingVersi_` per angka, jadi v0.8.1 < v0.42). `susunan` (Perlu
+    ditinjau) dari `M_Konfigurasi` `susunan_sheet`. Kontak yang belum pernah tercatat tidak dianggap berhenti (keputusan tambahan:
+    tidak ada peringatan palsu dalam 5 menit sesudah Edge Function diperbarui); salinan yang sudah mati sebelum itu tetap ketahuan
+    dari email yang menunggu lebih dari 60 menit. Di Apps Script (belum pindah) hanya `susunan`.
+433. **Susunan tab dan kolom** (`periksaSusunan_`, `catatSusunan_`): tab dan judul kolom (dipangkas, seperti `pastikanJudul_`) dari
+    `TAB_DATA` (dengan kolom sistemnya), `TAB_MASTER`, dan `TAB_LOG`; tab Harian/Dashboard dan tab form kustom tidak diperiksa.
+    Hasilnya "Lengkap" atau "Kurang: tab Data_PenjualanMenu; M_Resep: kolom Catatan" di `susunan_sheet` (baris baru, ditulis hanya
+    jika berubah). Diperiksa di `kirimLaporanHarian` (juga hari libur) dan di akhir `setupSpreadsheet` (Supabase, atau Apps Script yang
+    belum pindah), karena keduanya sudah memuat semua tab; Beranda hanya membaca baris itu (keputusan tambahan: memeriksa langsung dari
+    Beranda atau Outlet dan jadwal berarti memuat semua tab Data setiap kali, dekat batas 2 detik CPU Edge Function). Langkah
+    `setupSpreadsheet` yang hanya mengubah tampilan Google Sheets (warna abu-abu v0.40, rumus) tidak terlihat dari sini.
+434. **Tampilan:** Beranda Pengelola `peringatanPemasangan` dalam grup "Server dan salinan" (tanda Masalah/Perlu ditinjau, ketuk
+    membuka `#/pengaturan/outlet`), terpisah dari `peringatanSistem` yang selalu diberi akhiran "Rinciannya di tab M_Konfigurasi".
+    Dashboard: butir jenis `pemasangan` (Masalah sesudah butir `sistem`, Perlu ditinjau sesudah `jadwal`), ubin segitiga, masuk "Hari
+    ini". Outlet dan jadwal: kartu "Versi dan salinan" paling atas (`kartuStatusSistem`, `.status-sistem-daftar`: label di atas nilai,
+    dua kolom mulai 480 px). Server lama tidak mengirim `statusSistem`/`peringatanPemasangan`, jadi kartu dan grup tidak tampil;
+    aplikasi lama mengabaikan field baru dan menampilkan butir Dashboard `pemasangan` tanpa tautan (ikon bawaan).
+435. **Notifikasi** (`pantauSesudahLaporan_`): sesudah `kirimLaporanHarian` dari jadwal (juga hari libur), jika salinan berhenti,
+    satu notifikasi ke HP Pengelola: "Email laporan harian tertahan" (email laporan dibuat dan lewat Gmail) atau "Salinan ke Google
+    Sheets berhenti", isi "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk
+    melihat.", tag `salinan`, membuka Outlet dan jadwal. Sekali sehari pada saat yang paling berpengaruh; tidak ada jadwal baru, jadi
+    `pasangTrigger` tidak perlu (keputusan tambahan; tidak dipilih: pemeriksaan tiap jam, yang butuh jadwal pg_cron baru).
+436. **Uji:** `uji/server/pemantauan.mjs` (54 pemeriksaan: tanpa runtime, ambang 29/30 menit dan 30/60 menit, teks lengkap, Brevo,
+    lama dalam menit/jam/hari, versi lebih lama/tanpa/lebih baru/bertingkat, tanpa kontak, Beranda Staff/Pengelola, Dashboard dan
+    urutannya, susunan tab dan kolom yang hilang lalu `setupSpreadsheet`, baris konfigurasi tidak bertambah, notifikasi Gmail/Brevo/
+    tanpa email/hari libur); `uji/layar/pemantauan.mjs` (31 pemeriksaan: Beranda → Outlet dan jadwal, kartu dan urutannya, simpan,
+    Dashboard 1.366 px, Staff, semua berjalan, belum tercatat, Brevo, susunan, server lama, delapan ukuran dengan teks terpanjang dan
+    baris ≥ 44 px, gerak menyala di desktop dua panel). Di luar repo (butuh Postgres): Postgres 16 lokal dengan `skema.sql`,
+    `server.js`/`runtime.js`/`penyimpanan.js`/`sinkron.js` asli sebagai server HTTP, dan Apps Script tiruan (Code.gs asli dengan
+    `DI_SUPABASE` false, Sheet tiruan, `UrlFetchApp` lewat curl) yang menjalankan `sinkronDariSupabase`: 33 pemeriksaan (Apps Script
+    lama tanpa versi, `versiKode` tidak sah, galat dipotong, `__fungsi` hanya versi, salinan v0.42 mencatat versi dan galat kosong,
+    galat satu langkah dilaporkan di salinan berikutnya lalu hilang, email 2 jam dikirim dari Gmail dan email 4 hari dicatat gagal
+    dengan subjek, salinan 2 jam lalu → Beranda dan Dashboard, jawaban `__berkas`/`__sinkron` tidak berubah, Beranda 12 ms). Hasil
+    rakitan lolos pemeriksaan sintaks. Juga: `uji/README` kini menyebut tanggal 14 ke atas untuk `UJI_JAM` (pada tanggal 13
+    `fc_sementara` memang berbeda, ditemukan saat telaah). Belum diuji di Supabase, Apps Script, dan HP asli.

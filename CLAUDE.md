@@ -116,10 +116,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.41, aplikasi 0.42.0 (Pengaturan dua panel di laptop dan desktop, 31 Oktober 2026; Code.gs tidak
-  berubah), digabung lewat PR #65; sebelumnya aplikasi 0.41.1 (Login muat di laptop berlayar pendek seperti 1.366 × 768) digabung
-  lewat PR #64. Code.gs v0.41 (pengingat penjualan juga memeriksa bulan lalu) sudah ditempel pemilik ke Edge Function `rapid-action`
-  dan Apps Script (31 Oktober 2026). Riwayat tiap rilis: `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.42, aplikasi 0.43.0 (pemantauan salinan Apps Script, versi, email, dan susunan Sheet, 2 November
+  2026, butir 428–436), menunggu pemilik: tempel Edge Function dan Code.gs, `setupSpreadsheet` sekali, gabungkan PR. Sebelumnya
+  aplikasi 0.42.0 (Pengaturan dua panel, PR #65) dan Code.gs v0.41 (sudah ditempel pemilik ke Edge Function `rapid-action` dan Apps
+  Script, 31 Oktober 2026); semua 68 PR sampai 2 November sudah digabung. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
@@ -128,13 +128,16 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
   banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
-  arsip tahunan; cadangan dan pemulihan; keamanan login.
+  arsip tahunan; cadangan dan pemulihan; keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
+  susunan Sheet; kartu "Versi dan salinan" di Outlet dan jadwal).
 - **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
   selalu berhalaman); menu Laporan punya tiga tombol utama; rekap bulanan memakai unit dan jadwal form sekarang. Hasil rumus dan grafik
   di Google Sheets tidak bisa diuji di sini.
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
-  tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md).
+  tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
+  v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436). Saran lain yang belum dipilih: perkiraan "cukup untuk n hari" dari
+  rata-rata pemakaian, saran prep, tempel porsi terjual dari laporan kasir, foto nota di Tambah masuk, outlet tambahan.
 
 ## Keputusan tambahan
 

@@ -22,6 +22,8 @@ export const surel = [];
 export const logs = [];
 export const pdfHtml = [];
 export const opsiUji = { vapid: '', push: [] };
+// SUPABASE_ untuk Code.gs; uji pemantauan mengisi statusSistem (bentuknya seperti runtime.js, Code.gs v0.42).
+export const supabaseUji = {};
 export const driveUji = () => drive;
 export const jadwalUji = () => jadwal;
 export let geserWaktu = 0; // ms
@@ -40,7 +42,7 @@ function kode() {
     perluTab: ss.perluTab
   };
   const G = buatLayanan(k);
-  G.DI_SUPABASE = true; G.SUPABASE_ = {}; G.Date = D;
+  G.DI_SUPABASE = true; G.SUPABASE_ = supabaseUji; G.Date = D;
   props.SPREADSHEET_ID = props.SPREADSHEET_ID || 'supabase';
   return pembuat(G);
 }
