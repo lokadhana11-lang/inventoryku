@@ -116,8 +116,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.44, aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), menunggu pemilik: tempel Edge
-  Function dan Code.gs, gabungkan PR (tanpa setupSpreadsheet/pasangTrigger). Sebelumnya Code.gs v0.43, aplikasi 0.44.0 (cukup untuk
+- **Versi terakhir:** Code.gs v0.44, aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), digabung lewat PR #71 dan
+  terpasang (4 November 2026: Edge Function `rapid-action` dan Apps Script v0.44; kartu "Versi dan salinan" menunjukkan v0.44). Sebelumnya Code.gs v0.43, aplikasi 0.44.0 (cukup untuk
   berapa hari dan hampir habis, butir 437–443), digabung lewat PR #70 dan terpasang (4 November 2026; kartu "Versi dan salinan"
   menunjukkan v0.43). Sebelumnya Code.gs v0.42 dan aplikasi 0.43.0 (pemantauan, butir 428–436, PR #69, terpasang dengan
   `setupSpreadsheet`). Kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal adalah cara memeriksa apa yang terpasang. Riwayat
@@ -133,14 +133,16 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
   susunan Sheet; kartu "Versi dan salinan" di Outlet dan jadwal).
-- **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
+- **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional; pemilik memutuskan tidak dikerjakan,
+  butir 449); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
   selalu berhalaman); menu Laporan punya tiga tombol utama; rekap bulanan memakai unit dan jadwal form sekarang. Hasil rumus dan grafik
   di Google Sheets tidak bisa diuji di sini.
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
-  (butir 444–448). Saran lain yang belum dipilih: tempel porsi terjual dari laporan kasir, foto nota di Tambah masuk, outlet tambahan.
+  (butir 444–448). Tiga saran lain (tempel porsi terjual dari laporan kasir, foto nota di Tambah masuk, outlet tambahan) diputuskan
+  pemilik tidak dikerjakan (4 November 2026, butir 449); jangan ditawarkan lagi kecuali pemilik memintanya.
 
 ## Keputusan tambahan
 

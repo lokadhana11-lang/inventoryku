@@ -112,6 +112,8 @@
 > beresep yang pemakaiannya tercatat diberi saran jumlah resep untuk hari ini: cukup untuk 2 hari pemakaian rata-rata
 > (paling lama sampai masa simpan resep) dikurangi stock, dibulatkan ke atas ke ½ resep (Bagian 5.3, 12).
 >
+> Diperbarui 4 November 2026 (keputusan pemilik): outlet tambahan (Tahap 11) tidak dikerjakan (Bagian 13).
+>
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
 >
@@ -1985,7 +1987,8 @@ otomatis, role, maupun PWA, dan hasilnya harus dibuang saat pindah ke aplikasi.
    Riwayat, Laporan, PDF, serta email harian
 10. **Tahap 10 — Rekap bulanan:** PDF rekap bulanan, trigger tanggal 1, email, dan unduhan
     dari menu Laporan
-11. **Tahap 11 (opsional):** foto bukti waste, arsip data tahunan, penambahan outlet
+11. **Tahap 11 (opsional):** foto bukti waste, arsip data tahunan, penambahan outlet (4 November 2026: pemilik
+    memutuskan penambahan outlet tidak dikerjakan; aplikasi tetap untuk satu outlet)
 12. **HPP dan food cost** (17 Oktober 2026): Pengaturan → Menu, layar HPP dan food cost dari
     Dashboard, penjualan harian, bagian HPP di rekap bulanan
 13. **Penjualan per menu** (17 Oktober 2026): porsi terjual per menu di lembar Catat penjualan,
