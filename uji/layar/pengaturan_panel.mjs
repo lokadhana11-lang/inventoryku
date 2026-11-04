@@ -77,7 +77,8 @@ const BAGIAN = ['Staff dan PIN', 'Penerima email', 'Form', 'Item', 'Resep', 'Men
   cek(m.tampil && JSON.stringify(m.baris.map((t) => t.replace(/\d+ permintaan reset PIN/, '').trim())) === JSON.stringify(BAGIAN), 'panel samping 11 bagian berurutan', m.baris);
   cek(m.aktif.length === 1 && m.aktif[0] === 'Item' && m.aktifJenis[0] === 'page', 'Item ditandai aktif (page)', m);
   cek(m.panel.kanan + 24 <= m.isi.kiri + 1 && m.isi.lebar >= 640, 'panel di kiri, isi di kanan selebar layar sempit', m);
-  cek(Math.abs(m.judul.kiri - m.isi.kiri) <= 1, 'judul di kepala navy sejajar kolom isi', { judul: m.judul, isi: m.isi });
+  // Sejak aplikasi 0.46.0 (butir 451): judul di garis kiri yang sama dengan panel samping (dan merek di bar atas).
+  cek(Math.abs(m.judul.kiri - m.panel.kiri) <= 1, 'judul di kepala navy sejajar panel samping', { judul: m.judul, panel: m.panel });
   cek(m.posisi === 'sticky' && m.gulirSamping <= 0, 'panel lengket, tanpa gulir ke samping', m);
   cek(/Pengaturan/.test(m.kembali), 'tautan kembali ke Pengaturan tetap ada', m.kembali);
   cek(/1 permintaan reset PIN/.test(m.baris[0]), 'tanda permintaan reset PIN di Staff dan PIN', m.baris[0]);

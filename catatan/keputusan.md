@@ -3030,3 +3030,58 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dari laporan kasir, foto nota di Tambah masuk, dan outlet tambahan (Tahap 11, opsional; aplikasi tetap untuk satu outlet). Telaah
     itu selesai dengan pemantauan (butir 428–436), cukup untuk berapa hari (butir 437–443), dan saran prep (butir 444–448). Ketiganya
     tidak ditawarkan lagi kecuali pemilik memintanya. Spesifikasi sistem Bagian 13.
+
+### Perbaikan jarak kartu Saran prep (aplikasi 0.45.1, 4 November 2026)
+
+450. **Asal:** telaah desain oleh Claude (4 November 2026). Di Prep List, kartu "Saran prep" (butir 447) menempel pada kotak info tanpa
+    jarak, karena isi di bawah kotak info biasanya memberi jarak sendiri (`.grid-item` 16 px) dan kartu baru tidak. Perbaikan:
+    `.kartu.saran-prep` diberi `margin-top: 16px`. Uji: `uji/layar/saran_prep.mjs` memeriksa jarak 16 px (32 pemeriksaan), dan
+    `uji/layar/resep_catatan.mjs` tetap lulus. Code.gs tidak berubah.
+
+### Tata letak ringkas: kepala navy, bar bawah, kotak info (aplikasi 0.46.0, 4 November 2026)
+
+451. **Asal dan kepala ringkas.** Telaah desain 4 November 2026; pemilik memilih butir 1–3 ("Kerjakan butir 1 sampai 3 dulu").
+    Semua layar ber-kepala navy kecuali Beranda (kepala sendiri) dan Dashboard (kepala gantung) memakai kepala ringkas:
+    `.kepala-layar:not(.gantung)` dengan judul 26 px (HP dan tablet) / 28 px (laptop) dan jarak lebih kecil. Layar tanpa tautan
+    kembali (Riwayat, Laporan, daftar Pengaturan) menaruh judul dan status sinyal dalam satu baris: `pasangKepalaLayar` membuat
+    `.kepala-layar-atas.tanpa-kembali` berisi judul dan `.sinyal`; Dashboard tetap memakai susunan lama. Hasilnya di HP: 66 px
+    (sebelumnya 112), dengan tautan kembali 97 px (sebelumnya 112); di laptop 63 px (sebelumnya 80) dan 97 px (sebelumnya 128).
+    Tautan kembali tetap 44 px untuk diketuk, di laptop dengan margin −6 px supaya tidak menambah tinggi. Ringkasan di kepala (ubah
+    item, HPP, ubah menu) tetap, hanya judulnya ikut kecil.
+452. **Satu garis kiri.** Sebelumnya judul melompat antar menu di laptop (1366 px: Riwayat 107, Laporan 347, layar dalam Pengaturan
+    493) dan merek di bar atas 24 px lebih kiri dari isi. Kini semuanya mulai di tepi kiri wadah 1.200 px ditambah jarak tepi:
+    `.layar-sempit` dan `.kepala-layar-isi.layar-sempit` memakai `margin-left: max(0px, calc((100% - 1200px) / 2))` (tidak lagi di
+    tengah), `.bar-isi`, `.beranda-kepala-isi`, `.tiket-grid`, dan `.beranda-bawah` (wadah berbantalan luar) selebar
+    `calc(1200px - 2 * var(--tepi))` di 1.024 px ke atas, dan Pengaturan dua panel (`.dua-panel`, `.kepala-dua-panel`, tetap 1.012 px)
+    mulai dari garis yang sama dengan judul di atas panel samping. Ini mengganti sebagian butir 420 ("judul sejajar kolom isi"):
+    judul kini sejajar panel, sedangkan tombol di kepala (Tambah) tetap sejajar tepi kanan kolom isi karena kepala dan panel sama-sama
+    1.012 px. Diukur di 1024, 1366, dan 1920 px: merek, judul, isi pertama, panel, dan tanggal Beranda sama kiri dan kanannya.
+    Konsekuensi: layar sempit di laptop menyisakan ruang kosong di kanan (Laporan dua kolom adalah butir 6 telaah, belum dipilih).
+453. **Bar bawah hanya di layar menu.** Di bawah 1.024 px bar navigasi bawah tidak tampil di layar yang punya tautan kembali (form
+    isian dan layar dalam), supaya bar menu dan bilah Kirim tidak bertumpuk (sekitar 150 px). Router (`gambarRute`) memanggil
+    `aturMenuBawah` sesudah kepala dipasang; kelas `tanpa-menu-bawah` dipasang di `<html>` karena `--ruang-menu` dihitung di `:root`:
+    `:root.tanpa-menu-bawah { --tinggi-menu: 0px }` sehingga bilah Kirim, toast, `scroll-padding`, dan jarak bawah layar ikut turun;
+    `--jarak-menu` tetap 8 px, jadi bilah Kirim mengambang 8 px dari bawah seperti bar menu tadi. Kelas juga dipasang di desktop
+    (tanpa efek) supaya jendela yang dikecilkan langsung benar. Saat bar tampil lagi penanda menu diletakkan ulang tanpa gerak
+    (`letakkanPenanda(true)`, karena lebarnya 0 selama bar tidak tampil); keluar melepas kelasnya.
+454. **Kotak info ringkas.** `lipatKotakInfo(kotak, bagian)` menambah baris ringkasan `.kotak-ringkas` (teks + tombol tautan
+    "Ubah"/"Tutup" dengan `aria-expanded`, `aria-controls` ke kolom yang dilipat, dan `aria-describedby` ke ringkasan) di awal kotak
+    info Stock, Waste, Suhu, Prep, dan form kustom. Di bawah 600 px kolom `.bisa-lipat` tidak tampil sampai Ubah diketuk: Tanggal di
+    semua form; Kategori, Catat pemakaian, dan Pemasok di Stock (pemasok hanya disebut jika dipilih). Ringkasan dibaca dari kolom yang
+    tampil (radio terpilih, tanggal lain sebagai "18 Okt", pilihan select), diperbarui pada `change`/`input` dan lewat
+    `MutationObserver` (isi select dari server, kolom yang dimunculkan), jadi tidak perlu dipanggil dari setiap tempat yang mengubah
+    kolom. Satu kolom saja ditulis dengan labelnya ("Tanggal: Hari ini"). Kolom lipatan yang baru menampilkan galat dibuka sekali;
+    jika ditutup lagi tetap tertutup. Sesudah Tutup pesanan, fokus yang dulu ke pilihan Kategori pindah ke tombol Ubah jika Kategori
+    sedang terlipat. Di laptop (1.024 px ke atas) kotak info kelima form tiga kolom (4fr 3fr 3fr, jarak 16/24 px) dan sel status tidak
+    lagi selebar penuh, tetapi di sel ketiga dengan `margin-top: 26px` (tinggi label) dan `min-height: 48px`, sejajar tombol di
+    barisnya. Di 1366×768 kotak info Stock 238 px (sebelumnya sekitar 400) dan baris item pertama terlihat tanpa digulir. Kotak info
+    form diberi `margin-bottom: 16px` (sebelumnya kartu "Belum ada item waste" menempel padanya). Opname, pratinjau form, dan
+    Riwayat tidak memakai lipatan.
+455. **Uji:** `uji/layar/desain_ringkas.mjs` (456 pemeriksaan): delapan ukuran × 11 layar (tanpa gulir samping, menu tampil atau
+    tidak, kepala satu atau dua baris, tinggi kepala, satu garis kiri di desktop, Beranda sejajar merek, bilah Kirim 8 px dari bawah
+    di HP dan menempel di desktop, baris item pertama Stock terlihat di laptop); ringkasan Stock di HP, Ubah/Tutup, ringkasan ikut
+    Kemarin/Protein/pemasok dan dari draft; Waste/Prep/Suhu hanya Tanggal; tablet dua kolom, desktop tiga kolom dengan status sejajar;
+    menu dan penanda kembali sesudah layar dalam (Pengelola dan Staff); gerak menyala. `uji/layar/pengaturan_panel.mjs` kini memeriksa
+    judul sejajar panel samping. `stock`, `pesanan`, `pesanan2`, dan `saran_prep` membuka kotak info dengan Ubah sebelum memilih
+    Tanggal, Kategori, Catat pemakaian, atau Pemasok di HP (`bukaKotak`). Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
+    pada 4 November: 43 berkas, 2.158 pemeriksaan lulus (server 20 berkas 781, layar 23 berkas 1.377), 0 gagal. Belum diuji di HP asli.
