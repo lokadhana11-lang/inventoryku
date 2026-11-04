@@ -3083,4 +3083,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Kemarin/Protein/pemasok dan dari draft; Waste/Prep/Suhu hanya Tanggal; tablet dua kolom, desktop tiga kolom dengan status sejajar;
     menu dan penanda kembali sesudah layar dalam (Pengelola dan Staff); gerak menyala. `uji/layar/pengaturan_panel.mjs` kini memeriksa
     judul sejajar panel samping. `stock`, `pesanan`, `pesanan2`, dan `saran_prep` membuka kotak info dengan Ubah sebelum memilih
-    Tanggal, Kategori, Catat pemakaian, atau Pemasok di HP (`bukaKotak`). Code.gs tidak berubah.
+    Tanggal, Kategori, Catat pemakaian, atau Pemasok di HP (`bukaKotak`). Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
+    pada 4 November: 43 berkas, 2.158 pemeriksaan lulus (server 20 berkas 781, layar 23 berkas 1.377), 0 gagal. Belum diuji di HP asli.
