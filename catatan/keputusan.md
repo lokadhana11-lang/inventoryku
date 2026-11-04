@@ -3023,3 +3023,10 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     saran turun, Kemarin tanpa kartu, server lama, delapan ukuran dengan tombol ≥ 44 px, gerak menyala). `node uji/jalankan.mjs
     --layar` pada 4 November: 42 berkas, 1.701 pemeriksaan lulus (server 20 berkas 781, layar 22 berkas 920), 0 gagal. Belum diuji di
     Supabase, Apps Script, dan HP asli.
+
+### Saran telaah yang tidak dikerjakan (4 November 2026)
+
+449. **Keputusan pemilik:** tiga saran dari telaah aplikasi 2 November 2026 yang belum dipilih tidak dikerjakan: tempel porsi terjual
+    dari laporan kasir, foto nota di Tambah masuk, dan outlet tambahan (Tahap 11, opsional; aplikasi tetap untuk satu outlet). Telaah
+    itu selesai dengan pemantauan (butir 428–436), cukup untuk berapa hari (butir 437–443), dan saran prep (butir 444–448). Ketiganya
+    tidak ditawarkan lagi kecuali pemilik memintanya. Spesifikasi sistem Bagian 13.
