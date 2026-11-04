@@ -298,6 +298,9 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   `daftarBelanja` (item kelompok dan `itemLain`, juga di jawaban `catatPesanan`/`tutupPesanan`) ditambah `pakaiHarian` dan
   `cukupHari`. `dashboard.perhatian` ditambah butir jenis `hampirHabis` (tinjau, sesudah `bawahMinimum`; `data.item: [{ nama, stock,
   satuan, stokMin, cukupHari, pakaiHarian }]`), dan `data.item` butir `bawahMinimum` ditambah `cukupHari` dan `pakaiHarian`.
+- Saran prep (Code.gs v0.44, aplikasi 0.45.0, 4 November 2026): `formPrep.resep[]` (juga `form` di jawaban `kirimPrep`) ditambah
+  `saran: { jumlahResep (kelipatan ½; 0 = belum perlu), targetHari, target, stock, pakaiHarian, cukupHari } | null` (null tanpa
+  rata-rata pemakaian atau tanpa pemakaian), dihitung terhadap `tanggal`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.

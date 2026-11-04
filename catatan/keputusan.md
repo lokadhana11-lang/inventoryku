@@ -2992,3 +2992,34 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tidak lagi menulis versi tetap (memakai `VERSI_KODE` dan `VERSI_APLIKASI`). `node uji/jalankan.mjs --layar` pada 4 November: 40
     berkas, 1.652 pemeriksaan lulus (server 19 berkas 763, layar 21 berkas 889), 0 gagal. Belum diuji di Supabase, Apps Script, dan
     HP asli.
+
+### Saran prep (Code.gs v0.44, aplikasi 0.45.0, 4 November 2026)
+
+444. **Asal:** telaah aplikasi oleh Claude (2 November 2026), butir "saran prep" yang dipilih pemilik sesudah cukup untuk berapa hari
+    ("kerjakan saran prep dulu"): di Prep List, untuk barang jadi beresep, jumlah resep yang disarankan hari ini dari stock sekarang
+    dan rata-rata pemakaian. Spesifikasi sistem Bagian 5.3, 12; tampilan Bagian 5.3 dan 7.
+445. **Hitungan** (`saranPrep_`, keputusan tambahan): target = rata-rata pemakaian per hari (`pemakaianHarian_`, butir 438) ×
+    `HARI_SARAN_PREP` = 2 hari, karena prep biasanya harian dan stock cukup untuk hari ini dan besok menyisakan cadangan satu hari;
+    tidak lebih lama dari masa simpan resep (paling sedikit 1 hari, juga untuk masa simpan 0). Saran = (target − stock) ÷ hasil per 1
+    resep, dibulatkan ke atas ke ½ resep (tombol cepat dan aturan Jumlah Resep memakai ½), dengan pembulatan 3 angka lebih dulu
+    supaya kekurangan yang tepat 1 resep tidak menjadi 1½. Stock minus dihitung 0 (catatannya belum lurus). Saran 0 = belum perlu.
+    Tidak ada rata-rata (kurang dari 3 hari buka) atau pemakaian 0: tanpa saran, karena barang jadi yang keluarnya tidak pernah
+    dicatat akan tampak tidak pernah dipakai. Tidak dipilih: memakai porsi terjual per menu untuk barang jadi (bisa ditambah jika
+    pemilik ingin; sekarang hanya pemakaian yang tercatat), dan memakai Stok Maksimum sebagai par level (bercampur dengan saran order).
+446. **Data:** `formPrep.resep[].saran` (null tanpa saran), dihitung terhadap `tanggal` dari rekap yang sudah dimuat. Stock pada tanggal
+    itu sudah termasuk prep yang dikirim hari itu, jadi sesudah kirim saran turun tanpa perlu menghitung draft. Tidak ada tab, kolom,
+    atau jadwal baru.
+447. **Tampilan:** kartu "Saran prep" (`gambarSaran`) hanya untuk hari ini (tanggal lain: saran untuk hari yang sudah lewat tidak
+    berguna) dan jika server mengirim `saran`; digambar ulang setiap daftar baris berubah (`gambarBaris`), sehingga "Sudah di daftar"
+    langsung menggantikan Tambahkan. Tambahkan memakai `tambahBaris(nama, { jumlah, ketik })`: ½/1/1½/2 sebagai tombol cepat, lainnya
+    di kolom "Lain" ("2,5"); fokus tidak dipindah supaya kartu tetap di tempatnya, dan pesan singkat menyebut yang ditambahkan.
+    `teksJumlahResep` menulis "½", "1½", "2½". Daftar di dalam kartu tanpa bayangan dan tanpa jarak samping sendiri; di bawah 420 px
+    Tambahkan turun ke bawah selebar baris (sentuh ≥ 44 px). Pilihan Tambah item ditambah "· saran ½ resep".
+448. **Uji:** `uji/alat/seed_prep.mjs` (empat barang jadi beresep: Saus kacang ½ resep, Bumbu kuning ½ resep untuk 1 hari karena masa
+    simpan, Saus tomat 2½ resep dari stock habis, Kaldu ayam belum perlu; Sambal dasar dari seed tanpa saran);
+    `uji/server/saran_prep.mjs` (18 pemeriksaan: hitungan, pembulatan tepat dan ke atas, stock minus, masa simpan 0/1/5, tanpa
+    rata-rata, formPrep untuk semua keadaan, sesudah kirim, tanggal kemarin); `uji/layar/saran_prep.mjs` (31 pemeriksaan: urutan dan
+    teks kartu, Tambahkan dengan tombol cepat dan dengan "Lain", Sudah di daftar, pesan singkat, pilihan Tambah item, kirim lalu
+    saran turun, Kemarin tanpa kartu, server lama, delapan ukuran dengan tombol ≥ 44 px, gerak menyala). `node uji/jalankan.mjs
+    --layar` pada 4 November: 42 berkas, 1.701 pemeriksaan lulus (server 20 berkas 781, layar 22 berkas 920), 0 gagal. Belum diuji di
+    Supabase, Apps Script, dan HP asli.

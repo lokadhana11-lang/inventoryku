@@ -1188,6 +1188,42 @@ body.papan-ketik .layar {
   gap: 4px;
 }
 
+/* Saran prep di Prep List (aplikasi 0.45.0): Tambahkan di kanan; di HP sempit pindah ke bawah selebar baris. */
+.kartu.saran-prep {
+  display: grid;
+  gap: 10px;
+}
+
+.kartu.saran-prep .kartu-judul {
+  margin-bottom: 0;
+}
+
+.kartu.saran-prep .daftar {
+  box-shadow: none;
+  border-radius: 0;
+  border-top: 1px solid var(--garis-halus);
+}
+
+.kartu.saran-prep .daftar-baris {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.saran-prep-baris > .tombol,
+.saran-prep-ada {
+  flex: none;
+}
+
+@media (max-width: 419px) {
+  .saran-prep-baris {
+    flex-wrap: wrap;
+  }
+
+  .saran-prep-baris > .tombol {
+    flex: 1 1 100%;
+  }
+}
+
 .daftar-baris-judul {
   font-weight: 600;
   overflow-wrap: anywhere;

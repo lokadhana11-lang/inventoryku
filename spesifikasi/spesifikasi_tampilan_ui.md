@@ -43,6 +43,8 @@
 > dan 7).
 > Tambahan 4 November 2026 (keputusan pemilik, dari telaah aplikasi): "Cukup ± 2 hari" di form Stock, riwayat per
 > item, dan Daftar belanja, dan butir "hampir habis" di Dashboard (Bagian 5.3, 5.4, 5.6, 5.9, dan 7).
+> Tambahan 4 November 2026 (keputusan pemilik, dari telaah aplikasi): kartu "Saran prep" di Prep List (Bagian 5.3
+> dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -801,6 +803,19 @@ Satu-satunya layar yang sepenuhnya navy.
   diisi dua kali.
 
 **Prep List:**
+
+- **Kartu "Saran prep"** (4 November 2026; spesifikasi sistem Bagian 5.3), di bawah kotak info dan di atas
+  daftar item, hanya untuk hari ini dan jika server mengirim saran. Judul "Saran prep", lalu satu baris per barang
+  jadi yang perlu dibuat, urut dari yang paling cepat habis: nama dan jumlah tebal ("Saus kacang **½ resep**"),
+  keterangan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari" (ditambah "· untuk 1 hari (masa simpan)" bila
+  masa simpan resep lebih pendek dari 2 hari), dan tombol kedua "Tambahkan" (di kanan; di bawah selebar baris
+  pada HP di bawah 420 px). Tambahkan memasang baris item itu di daftar dengan jumlah resep terisi (tombol cepat
+  ½, 1, 1½, atau 2, selain itu diketik di "Lain", misalnya "2,5"), tanpa memindah fokus, dengan pesan singkat
+  "Saus kacang ½ resep ditambahkan ke daftar."; sesudahnya tombol diganti "Sudah di daftar". Tanpa item yang
+  perlu dibuat: "Belum ada yang perlu dibuat hari ini." (Baik). Di bawahnya "Belum perlu: Kaldu ayam (cukup ± 6
+  hari)." dan "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form
+  Stock, dipakai di resep lain, atau waste).", lalu keterangan cara hitung. Daftar di dalam kartu tanpa bayangan
+  sendiri. Pilihan Tambah item juga menyebut "· saran ½ resep".
 
 ```
 ┌──────────────────────────────┐
@@ -1619,6 +1634,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
+| Saran prep (4 November 2026) | Judul "Saran prep", baris "Saus kacang ½ resep" dengan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari", tombol "Tambahkan" lalu "Sudah di daftar", pesan "Saus kacang ½ resep ditambahkan ke daftar.", "Belum ada yang perlu dibuat hari ini.", "Belum perlu: Kaldu ayam (cukup ± 6 hari).", "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).", "Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep." |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |

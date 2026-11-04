@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.44.0';
+  var VERSI_APLIKASI = '0.45.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -5937,6 +5937,13 @@
    * Form Prep List (spesifikasi sistem Bagian 5.3, tampilan Bagian 5.3)
    * ===================================================================== */
 
+  /** "½", "1", "1½", "2½" untuk jumlah resep kelipatan ½ (saran prep, aplikasi 0.45.0). */
+  function teksJumlahResep(n) {
+    var utuh = Math.floor(n + 1e-9);
+    var setengah = n - utuh > 0.25;
+    return ((utuh ? String(utuh) : '') + (setengah ? '½' : '')) || '0';
+  }
+
   var JUMLAH_RESEP_CEPAT = [{ nilai: '0.5', label: '½' }, { nilai: '1', label: '1' }, { nilai: '1.5', label: '1½' }, { nilai: '2', label: '2' }];
 
   /**
@@ -5995,6 +6002,7 @@
     var catatanDraft = el('p', { class: 'catatan-draft', 'aria-live': 'polite' });
     var penanda = el('span', { class: 'memperbarui', role: 'status' });
     var statusForm = el('div', { class: 'status-form' });
+    var wadahSaran = el('div');
     var wadahBaris = el('div');
     var pesan = el('p', { class: 'pesan-formulir', role: 'alert' });
     var penghitung = el('span', { class: 'penghitung', 'aria-live': 'polite' });
@@ -6021,6 +6029,7 @@
         gShift.wadah,
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
       ]),
+      wadahSaran,
       wadahBaris,
       el('div', { class: 'deret-tambah' }, tombolTambah),
       pesan,
@@ -6299,7 +6308,70 @@
       ]);
     }
 
+    /** Saran resep satu item untuk hari ini (aplikasi 0.45.0); null untuk tanggal lain, server lama, atau tanpa saran. */
+    function saranUntuk(r) {
+      return r && r.saran && tanggal === tanggalIso(new Date()) ? r.saran : null;
+    }
+
+    /**
+     * Kartu Saran prep (aplikasi 0.45.0, Code.gs v0.44): hanya untuk hari ini dan jika server mengirim `saran`. Item yang perlu
+     * dibuat (urut dari yang paling cepat habis) dengan Tambahkan, lalu yang belum perlu dan yang belum punya saran.
+     */
+    function gambarSaran() {
+      kosongkan(wadahSaran);
+      if (!data || tanggal !== tanggalIso(new Date())) return;
+      var resep = (data.resep || []).filter(function (r) { return Object.prototype.hasOwnProperty.call(r, 'saran'); });
+      if (!resep.length) return;
+      var perlu = resep.filter(function (r) { return r.saran && r.saran.jumlahResep > 0; }).sort(function (x, y) {
+        return (x.saran.cukupHari || 0) - (y.saran.cukupHari || 0) || x.item.localeCompare(y.item, 'id');
+      });
+      var belum = resep.filter(function (r) { return r.saran && !(r.saran.jumlahResep > 0); });
+      var tanpa = resep.filter(function (r) { return !r.saran; });
+      var diDaftar = {};
+      draft.baris.forEach(function (x) { diDaftar[String(x.item).toLowerCase()] = true; });
+      var isi = [el('h2', { class: 'kartu-judul', id: 'judul-saran-prep', text: 'Saran prep' })];
+      if (perlu.length) {
+        isi.push(el('div', { class: 'daftar', role: 'group', 'aria-labelledby': 'judul-saran-prep' }, perlu.map(function (r) {
+          var sr = r.saran;
+          var satuan = infoItem(r.item).satuan;
+          var jumlah = teksJumlahResep(sr.jumlahResep) + ' resep';
+          var ket = 'Stock ' + teksAngkaSatuan(sr.stock, satuan) + ' · ' + ketCukup(sr.cukupHari) + ' · pakai ' +
+            teksAngkaSatuan(sr.pakaiHarian, satuan) + ' per hari' + (sr.targetHari < 2 ? ' · untuk ' + sr.targetHari + ' hari (masa simpan)' : '');
+          var aksi = diDaftar[r.item.toLowerCase()]
+            ? el('span', { class: 'kolom-bantuan saran-prep-ada', text: 'Sudah di daftar' })
+            : tombol('Tambahkan', 'kedua', { 'aria-label': 'Tambahkan ' + r.item + ' ' + jumlah, onclick: function () {
+              var nilai = String(sr.jumlahResep);
+              var cepat = JUMLAH_RESEP_CEPAT.some(function (p) { return p.nilai === nilai; });
+              tambahBaris(r.item, { jumlah: cepat ? nilai : nilai.replace('.', ','), ketik: !cepat });
+              toast(r.item + ' ' + jumlah + ' ditambahkan ke daftar.');
+            } });
+          return el('div', { class: 'daftar-baris peristiwa tetap saran-prep-baris' }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              el('span', { class: 'daftar-baris-judul' }, [r.item + ' ', el('strong', { text: jumlah })]),
+              el('span', { class: 'daftar-baris-ket', text: ket })
+            ]),
+            aksi
+          ]);
+        })));
+      } else if (belum.length) {
+        isi.push(el('p', { class: 'pesan-formulir baik' }, [ikon('centang'), el('span', { text: 'Belum ada yang perlu dibuat hari ini.' })]));
+      }
+      if (belum.length) {
+        isi.push(el('p', { class: 'kolom-bantuan', text: 'Belum perlu: ' + daftarNama(belum.map(function (r) {
+          return r.item + ' (' + ketCukup(r.saran.cukupHari) + ')';
+        })) + '.' }));
+      }
+      if (tanpa.length) {
+        isi.push(el('p', { class: 'kolom-bantuan', text: 'Belum ada saran untuk ' + daftarNama(tanpa.map(function (r) { return r.item; })) +
+          ': pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).' }));
+      }
+      isi.push(el('p', { class: 'kolom-bantuan', text: 'Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama ' +
+        'sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep.' }));
+      wadahSaran.appendChild(el('section', { class: 'kartu saran-prep', 'aria-labelledby': 'judul-saran-prep' }, isi));
+    }
+
     function gambarBaris() {
+      gambarSaran();
       kosongkan(wadahBaris);
       pembaru = [];
       tulisPesan(pesan, '');
@@ -6325,12 +6397,13 @@
       perbaruiSemua();
     }
 
-    function tambahBaris(nama) {
-      var b = { id: buatId(), item: nama, jumlah: '', ketik: false, qty: '', keterangan: '', aktual: '' };
+    /** awal (saran prep): { jumlah, ketik } yang sudah terisi; fokus tidak dipindah supaya daftar saran tetap di tempatnya. */
+    function tambahBaris(nama, awal) {
+      var b = { id: buatId(), item: nama, jumlah: awal ? awal.jumlah : '', ketik: !!(awal && awal.ketik), qty: '', keterangan: '', aktual: '' };
       draft.baris.push(b);
       simpanDraft();
       gambarBaris();
-      if (!apakahSentuh()) {
+      if (!awal && !apakahSentuh()) {
         var kolom = wadahBaris.querySelector('[data-kunci="' + b.id + '|' + (resepUntuk(nama) ? 'jumlah' : 'qty') + '"]');
         if (kolom) kolom.focus();
       }
@@ -6344,7 +6417,9 @@
         kosong: 'Daftar item belum termuat. Periksa sinyal, lalu buka lagi.',
         ket: function (it) {
           var r = resepUntuk(it.nama);
-          return [it.kategori, it.satuan, r ? 'resep: hasil ' + formatAngka(r.hasil) + ' ' + it.satuan : 'tanpa resep'].filter(Boolean).join(' · ');
+          var sr = saranUntuk(r);
+          return [it.kategori, it.satuan, r ? 'resep: hasil ' + formatAngka(r.hasil) + ' ' + it.satuan : 'tanpa resep',
+            sr && sr.jumlahResep > 0 ? 'saran ' + teksJumlahResep(sr.jumlahResep) + ' resep' : ''].filter(Boolean).join(' · ');
         },
         pilih: function (it) { tambahBaris(it.nama); }
       });
