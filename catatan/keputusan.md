@@ -3020,4 +3020,6 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `uji/server/saran_prep.mjs` (18 pemeriksaan: hitungan, pembulatan tepat dan ke atas, stock minus, masa simpan 0/1/5, tanpa
     rata-rata, formPrep untuk semua keadaan, sesudah kirim, tanggal kemarin); `uji/layar/saran_prep.mjs` (31 pemeriksaan: urutan dan
     teks kartu, Tambahkan dengan tombol cepat dan dengan "Lain", Sudah di daftar, pesan singkat, pilihan Tambah item, kirim lalu
-    saran turun, Kemarin tanpa kartu, server lama, delapan ukuran dengan tombol ≥ 44 px, gerak menyala).
+    saran turun, Kemarin tanpa kartu, server lama, delapan ukuran dengan tombol ≥ 44 px, gerak menyala). `node uji/jalankan.mjs
+    --layar` pada 4 November: 42 berkas, 1.701 pemeriksaan lulus (server 20 berkas 781, layar 22 berkas 920), 0 gagal. Belum diuji di
+    Supabase, Apps Script, dan HP asli.
