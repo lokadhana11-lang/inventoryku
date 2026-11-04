@@ -116,8 +116,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.44, aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), digabung lewat PR #71; menunggu
-  pemilik: tempel Edge Function dan Code.gs (tanpa setupSpreadsheet/pasangTrigger). Sebelumnya Code.gs v0.43, aplikasi 0.44.0 (cukup untuk
+- **Versi terakhir:** Code.gs v0.44, aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), digabung lewat PR #71 dan
+  terpasang (4 November 2026: Edge Function `rapid-action` dan Apps Script v0.44; kartu "Versi dan salinan" menunjukkan v0.44). Sebelumnya Code.gs v0.43, aplikasi 0.44.0 (cukup untuk
   berapa hari dan hampir habis, butir 437–443), digabung lewat PR #70 dan terpasang (4 November 2026; kartu "Versi dan salinan"
   menunjukkan v0.43). Sebelumnya Code.gs v0.42 dan aplikasi 0.43.0 (pemantauan, butir 428–436, PR #69, terpasang dengan
   `setupSpreadsheet`). Kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal adalah cara memeriksa apa yang terpasang. Riwayat
