@@ -61,6 +61,9 @@ const ukur = (page) => page.evaluate(() => {
 {
   const { ctx, page, kirim } = await buka(390, 844);
   cek(await kartu(page).count() === 1, 'kartu Saran prep tampil');
+  const jarak = await page.evaluate(() => Math.round(document.querySelector('.saran-prep').getBoundingClientRect().top -
+    document.querySelector('.kotak-info').getBoundingClientRect().bottom));
+  cek(jarak === 16, 'jarak kartu dari kotak info 16 px (aplikasi 0.45.1)', jarak);
   const judul = (await kartu(page).locator('.saran-prep-baris .daftar-baris-judul').allInnerTexts()).map(rapi);
   cek(JSON.stringify(judul) === JSON.stringify(['Saus tomat 2½ resep', 'Bumbu kuning ½ resep', 'Saus kacang ½ resep']), 'urutan dari yang paling cepat habis', judul);
   const ket = async (nama) => rapi(await baris(page, nama).locator('.daftar-baris-ket').innerText());

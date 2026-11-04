@@ -3030,3 +3030,10 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dari laporan kasir, foto nota di Tambah masuk, dan outlet tambahan (Tahap 11, opsional; aplikasi tetap untuk satu outlet). Telaah
     itu selesai dengan pemantauan (butir 428–436), cukup untuk berapa hari (butir 437–443), dan saran prep (butir 444–448). Ketiganya
     tidak ditawarkan lagi kecuali pemilik memintanya. Spesifikasi sistem Bagian 13.
+
+### Perbaikan jarak kartu Saran prep (aplikasi 0.45.1, 4 November 2026)
+
+450. **Asal:** telaah desain oleh Claude (4 November 2026). Di Prep List, kartu "Saran prep" (butir 447) menempel pada kotak info tanpa
+    jarak, karena isi di bawah kotak info biasanya memberi jarak sendiri (`.grid-item` 16 px) dan kartu baru tidak. Perbaikan:
+    `.kartu.saran-prep` diberi `margin-top: 16px`. Uji: `uji/layar/saran_prep.mjs` memeriksa jarak 16 px (32 pemeriksaan), dan
+    `uji/layar/resep_catatan.mjs` tetap lulus. Code.gs tidak berubah.

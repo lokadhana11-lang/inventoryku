@@ -1192,6 +1192,8 @@ body.papan-ketik .layar {
 .kartu.saran-prep {
   display: grid;
   gap: 10px;
+  /* Jarak dari kotak info sama dengan daftar item di bawahnya (.grid-item), aplikasi 0.45.1. */
+  margin-top: 16px;
 }
 
 .kartu.saran-prep .kartu-judul {
