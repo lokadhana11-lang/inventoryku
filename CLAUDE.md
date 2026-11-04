@@ -117,9 +117,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 ## Status sekarang
 
 - **Versi terakhir:** Code.gs v0.42, aplikasi 0.43.0 (pemantauan salinan Apps Script, versi, email, dan susunan Sheet, 2 November
-  2026, butir 428–436), menunggu pemilik: tempel Edge Function dan Code.gs, `setupSpreadsheet` sekali, gabungkan PR. Sebelumnya
-  aplikasi 0.42.0 (Pengaturan dua panel, PR #65) dan Code.gs v0.41 (sudah ditempel pemilik ke Edge Function `rapid-action` dan Apps
-  Script, 31 Oktober 2026); semua 68 PR sampai 2 November sudah digabung. Riwayat tiap rilis: `catatan/status.md`.
+  2026, butir 428–436), digabung lewat PR #69 dan terpasang (4 November 2026): Edge Function `rapid-action` dan Apps Script v0.42,
+  `setupSpreadsheet` sudah dijalankan; kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal menunjukkan semua v0.42 dan susunan
+  Lengkap. Kartu itu kini cara memeriksa apa yang terpasang. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
