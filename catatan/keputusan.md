@@ -2989,4 +2989,6 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     teks, stock 0 "habis", item di bawah minimum tidak diulang, Daftar belanja, pengingat stock, email harian); `uji/layar/
     cukup_hari.mjs` (38 pemeriksaan: kartu HP ikut isian sampai minus dan masuk, tabel laptop dan letak tanda, Dashboard dan lembar,
     riwayat item dari Pengaturan → Item, Daftar belanja dan Tambah item, server lama, delapan ukuran, gerak menyala). Uji pemantauan
-    tidak lagi menulis versi tetap (memakai `VERSI_KODE` dan `VERSI_APLIKASI`).
+    tidak lagi menulis versi tetap (memakai `VERSI_KODE` dan `VERSI_APLIKASI`). `node uji/jalankan.mjs --layar` pada 4 November: 40
+    berkas, 1.652 pemeriksaan lulus (server 19 berkas 763, layar 21 berkas 889), 0 gagal. Belum diuji di Supabase, Apps Script, dan
+    HP asli.
