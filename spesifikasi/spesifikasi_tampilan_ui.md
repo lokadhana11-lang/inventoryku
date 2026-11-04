@@ -41,6 +41,8 @@
 > Tambahan 2 November 2026 (keputusan pemilik, dari telaah aplikasi): peringatan "Server dan salinan" di Beranda
 > dan Dashboard Pengelola, dan kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal (Bagian 5.2, 5.6, 5.7,
 > dan 7).
+> Tambahan 4 November 2026 (keputusan pemilik, dari telaah aplikasi): "Cukup ± 2 hari" di form Stock, riwayat per
+> item, dan Daftar belanja, dan butir "hampir habis" di Dashboard (Bagian 5.3, 5.4, 5.6, 5.9, dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -732,6 +734,12 @@ Satu-satunya layar yang sepenuhnya navy.
 - Stock akhir minus: angka dan kartu diberi tanda Masalah dengan tulisan
   "Stock akhir minus. Periksa angka yang diketik, atau minta Pengelola meluruskan stock."
 - Stock akhir di bawah stok minimum: tanda Perlu ditinjau "Perlu reorder".
+- **Cukup untuk berapa hari** (4 November 2026; spesifikasi sistem Bagian 5.5), semua role: satu baris kecil
+  Tinta Redup (14 px) tepat di bawah angka Stock akhir, rata kanan di kartu: "Cukup ± 2 hari" atau "Cukup
+  kurang dari 1 hari"; di tabel laptop "cukup ± 2 hari" di bawah angka, boleh turun baris supaya kolom
+  tidak melebar, dan tanda "Perlu reorder" atau minus di baris berikutnya. Ikut berubah saat Tambah masuk,
+  Tambah keluar, atau Sisa sekarang diketik. Tidak tampil saat Stock akhir minus atau 0, untuk item yang
+  tidak terpakai, dan untuk item yang rata-ratanya belum ada. "± 2 hari" memakai spasi tak terputus.
 - **Pemasok dan harga beli** (18 Oktober 2026, tidak wajib, semua role): kotak info punya
   `<select>` "Pemasok (tidak wajib)" berisi "Tanpa pemasok" dan pemasok aktif, dengan keterangan
   "Berlaku untuk semua item yang masuk di kiriman ini."; sejak 21 Oktober 2026 pilihannya kembali
@@ -895,6 +903,10 @@ Satu-satunya layar yang sepenuhnya navy.
   Penyesuaian, Akhir). Hari dengan Stock Akhir minus diberi tanda Masalah. Stock Masuk
   yang diketik dalam satuan besar menampilkan angka aslinya: "24 botol (2 dus)". Di HP
   tabel ini digulir ke samping di dalam lembar, dengan kolom tanggal tetap diam (Bagian 4.6).
+  Di bawah "Stock tercatat hari ini" (4 November 2026) satu kalimat keterangan: "Cukup ± 2 hari. Pemakaian
+  rata-rata 2,3 kg per hari (keluar, dipakai prep, dan waste; 12 hari buka terakhir).", atau "Tidak
+  terpakai dalam 14 hari terakhir.", atau "Rata-rata pemakaian dihitung setelah 3 hari buka (baru 2
+  hari)."
 - **Kartu stok** (18 Oktober 2026): di atas isi lembar riwayat per item ada dua tombol
   "Rekap harian" (bawaan, tabel di atas) dan "Transaksi". Tanggal di tabel rekap bisa diketuk
   dan membuka Transaksi pada tanggal itu. Transaksi dikelompokkan per tanggal dengan judul
@@ -994,10 +1006,17 @@ Satu-satunya layar yang sepenuhnya navy.
   memeriksa bulan lalu, jadi muncul juga pada tanggal 1; jika tanggalnya ada di dua bulan,
   rinciannya "Tanggal 31 Oktober serta 1 dan 2 November. Food cost Oktober dan bulan ini dihitung
   setelah semua hari tercatat."
+- **Hampir habis** (4 November 2026; spesifikasi sistem Bagian 5.5): butir Perlu ditinjau berubin kotak,
+  tepat di bawah "n item di bawah stok minimum": "2 item hampir habis", keterangan "Cukup kurang dari 3 hari
+  menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." (urut dari yang
+  paling cepat habis). Ketuk membuka lembar item seperti di bawah stok minimum, dengan kalimat pembuka
+  tambahan tentang Daftar belanja dan stok minimum, dan keterangan baris "Stock tercatat 6,5 kg · minimum
+  5 kg · cukup ± 2 hari · pakai 2,292 kg per hari". Lembar "n item di bawah stok minimum" juga menyebut
+  "· cukup kurang dari 1 hari" atau "· habis".
 - Di bawahnya daftar "Perlu perhatian", diurutkan dari yang paling mendesak.
 - **Hari ini dan Rutin** (28 Oktober 2026): daftar dibagi dua kelompok, masing-masing tetap urut dari
   yang paling mendesak. "Hari ini" (subjudul kecil) berisi yang perlu ditangani hari itu: suhu di luar
-  standar, stock minus, di bawah stok minimum, lewat masa simpan, habis besok, laporan atau jadwal
+  standar, stock minus, di bawah stok minimum, hampir habis (4 November 2026), lewat masa simpan, habis besok, laporan atau jadwal
   yang gagal, salinan ke Google Sheets, email, versi Code.gs, dan susunan Sheet (2 November 2026; ubin
   segitiga, ketuk membuka Outlet dan jadwal), baris dilaporkan keliru, reset PIN, akun terkunci, form belum
   lengkap, dan penjualan belum dicatat; tanpa butir: "Tidak ada yang mendesak hari ini." "Rutin" berisi pekerjaan berkala:
@@ -1387,6 +1406,11 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.9 Daftar belanja (Pengelola)
 
+- **Cukup untuk berapa hari** (4 November 2026): keterangan tiap baris ditambah "· cukup ± 2 hari",
+  "· cukup kurang dari 1 hari", atau "· habis" ("Stock 0,3 kg · minimum 2 kg · cukup kurang dari 1 hari"),
+  dan pilihan Tambah item ditambah yang sama ("Protein · stock 6,5 kg · cukup ± 2 hari"); tidak ditulis
+  untuk item yang tidak terpakai atau belum punya rata-rata.
+
 - Daftar item di bawah stok minimum, dikelompokkan **per pemasok** (21 Oktober 2026; spesifikasi
   sistem Bagian 9.2). Tiap kelompok berjudul nama pemasok (h3) dengan "Kontak …" di bawahnya;
   kelompok "Belum ada pemasok" paling bawah, dengan keterangan "Item yang belum punya pemasok aktif
@@ -1595,6 +1619,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
+| Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
 | Seharusnya vs nyata | "Terpakai lebih banyak dari porsi terjual" / "Sesuai porsi terjual" |

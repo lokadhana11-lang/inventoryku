@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.42 (pemantauan salinan Apps Script, versi, email, dan susunan Sheet)
+// InventoryKu Code.gs v0.43 (cukup untuk berapa hari menurut rata-rata pemakaian 14 hari)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -131,9 +131,13 @@
  *                        (M_Konfigurasi susunan_sheet); beranda.peringatanPemasangan, butir Dashboard pemasangan,
  *                        bacaOutletJadwal.statusSistem, notifikasi Pengelola saat laporan harian tertahan. Apps Script
  *                        mengirim versiKode di setiap panggilan ke Supabase dan galatSalinan (salinan sebelumnya).
+ * - 4 November 2026    : cukup untuk berapa hari (pemakaianHarian_, cukupHari_): rata-rata Keluar + Dipakai Prep + Waste
+ *                        14 hari terakhir per hari buka; formStock.item[].pakaiHarian, riwayatItem.pakai/cukupHari,
+ *                        daftarBelanja item cukupHari/pakaiHarian, butir Dashboard hampirHabis, pengingat stock dan
+ *                        email harian "Hampir habis".
  */
 
-var VERSI_KODE = 'v0.42';
+var VERSI_KODE = 'v0.43';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -2859,6 +2863,59 @@ function posisiStock_(rekapItem, tanggal) {
   return gabung_(gerakanKosong_(), { awal: awal, akhir: awal });
 }
 
+/*
+ * Cukup untuk berapa hari (keputusan pemilik 4 November 2026, telaah aplikasi butir 1): pemakaian = Stock Keluar + Dipakai
+ * Prep + Waste dari rekap Stock_Harian (penyesuaian dan opname tidak dihitung). Rata-rata per hari buka dalam 14 hari sebelum
+ * tanggal itu (tanggal itu sendiri belum selesai), mulai dari rekap pertama item itu jika lebih baru; hari libur tidak
+ * dihitung sebagai hari. Kurang dari 3 hari buka: belum ada rata-rata.
+ */
+var HARI_RATA_PAKAI = 14;
+var HARI_PAKAI_MIN = 3;
+var BATAS_HAMPIR_HABIS_HARI = 3; // Dashboard, pengingat stock, email: cukup kurang dari sekian hari
+
+/**
+ * Pemakaian harian per item: { namaKecil: { total, hari, rata } } (rata null jika hari < HARI_PAKAI_MIN). Item tanpa rekap
+ * sebelum tanggal itu tidak ada di hasil. rekap: hasil bacaRekap_ (atau { item: { namaKecil: [...] } }).
+ */
+function pemakaianHarian_(rekap, tanggal) {
+  var libur = bacaLibur_().hari;
+  var dari = geserTanggal_(tanggal, -HARI_RATA_PAKAI);
+  var buka = [];
+  for (var i = HARI_RATA_PAKAI; i >= 1; i--) {
+    var t = geserTanggal_(tanggal, -i);
+    if (!libur[t]) buka.push(t);
+  }
+  var hasil = {};
+  Object.keys(rekap.item || {}).forEach(function (k) {
+    var pertama = null;
+    var total = 0;
+    rekap.item[k].forEach(function (r) {
+      if (r.tanggal >= tanggal) return;
+      if (!pertama || r.tanggal < pertama) pertama = r.tanggal;
+      if (r.tanggal >= dari) total += r.keluar + r.dipakaiPrep + r.waste;
+    });
+    if (!pertama) return;
+    var hari = buka.filter(function (t) { return t >= pertama; }).length;
+    hasil[k] = { total: bulat_(total), hari: hari, rata: hari >= HARI_PAKAI_MIN ? bulat_(total / hari) : null };
+  });
+  return hasil;
+}
+
+/** Stock cukup untuk berapa hari (satu angka di belakang koma, dibulatkan ke bawah): null tanpa rata-rata atau tanpa pemakaian; 0 jika habis. */
+function cukupHari_(akhir, pakai) {
+  if (!pakai || pakai.rata == null || !(pakai.rata > 0)) return null;
+  if (akhir <= 0) return 0;
+  return Math.floor(akhir / pakai.rata * 10) / 10;
+}
+
+/** "± 2 hari", "kurang dari 1 hari", atau "habis" (tampilan Bagian 7). */
+function teksCukup_(cukup) {
+  if (cukup == null) return '';
+  if (cukup <= 0) return 'habis';
+  if (cukup < 1) return 'kurang dari 1 hari';
+  return '± ' + Math.floor(cukup) + ' hari';
+}
+
 /** Gerakan per item per tanggal dari semua sumber, hanya untuk item yang diminta. */
 function bacaGerakan_(itemKecil) {
   var zona = zonaSheet_();
@@ -2984,6 +3041,7 @@ function dataFormStock_(tanggal) {
   var namaKategori = {};
   kategori.forEach(function (k) { namaKategori[k.nama.toLowerCase()] = k.nama; });
   var rekap = bacaRekap_();
+  var pakai = pemakaianHarian_(rekap, tanggal);
   var dipakai = {};
   var item = [];
   Object.keys(master).forEach(function (k) {
@@ -2998,7 +3056,9 @@ function dataFormStock_(tanggal) {
       satuanBesar: m.satuanBesar,
       isiSatuanBesar: m.isiSatuanBesar,
       stokMin: m.stokMin,
-      masaSimpan: m.masaSimpan
+      masaSimpan: m.masaSimpan,
+      // Rata-rata pemakaian per hari (Code.gs v0.43); aplikasi menghitung cukup untuk berapa hari dari Stock Akhir yang diketik.
+      pakaiHarian: pakai[k] && pakai[k].rata != null ? pakai[k].rata : null
     }, posisiStock_(rekap.item[k], tanggal)));
   });
   item.sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
@@ -5734,6 +5794,12 @@ function isiPengingatStock_(tanggal) {
     judul.push(bawah.length + ' di bawah minimum');
     baris.push('Di bawah minimum: ' + daftarNamaSingkat_(bawah) + '.');
   }
+  // Hampir habis menurut rata-rata pemakaian (Code.gs v0.43), sama dengan Dashboard.
+  var hampir = (stock.hampirHabis || []).map(function (x) { return x.m.nama + ' ' + teksCukup_(x.cukup); });
+  if (hampir.length) {
+    judul.push(hampir.length + ' hampir habis');
+    baris.push('Hampir habis: ' + daftarNamaSingkat_(hampir) + '.');
+  }
   if (lewat.length) {
     judul.push(lewat.length + ' lewat masa simpan');
     baris.push('Lewat masa simpan: ' + daftarNamaSingkat_(lewat) + '.');
@@ -6216,7 +6282,17 @@ function perhatianDashboard_(d) {
   if (d.stock.belanja.length) {
     tambah('bawahMinimum', 'tinjau', d.stock.belanja.length + ' item di bawah stok minimum',
       daftarNamaSingkat_(d.stock.belanja.map(function (x) { return x.m.nama; })) + '.',
-      { item: d.stock.belanja.map(function (x) { return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan, stokMin: x.m.stokMin, saran: x.saran }; }) });
+      { item: d.stock.belanja.map(function (x) {
+        return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan, stokMin: x.m.stokMin, saran: x.saran, cukupHari: x.cukup,
+          pakaiHarian: x.pakai ? x.pakai.rata : null };
+      }) });
+  }
+  // Hampir habis (Code.gs v0.43): menurut rata-rata pemakaian, untuk item yang tidak di bawah stok minimum.
+  if (d.stock.hampirHabis && d.stock.hampirHabis.length) {
+    tambah('hampirHabis', 'tinjau', d.stock.hampirHabis.length + ' item hampir habis',
+      'Cukup kurang dari ' + BATAS_HAMPIR_HABIS_HARI + ' hari menurut pemakaian ' + HARI_RATA_PAKAI + ' hari terakhir: ' +
+      daftarNamaSingkat_(d.stock.hampirHabis.map(function (x) { return x.m.nama + ' ' + teksCukup_(x.cukup); })) + '.',
+      { item: d.stock.hampirHabis.map(itemHampirHabis_) });
   }
   if (d.hargaBeli && d.hargaBeli.length) {
     tambah('hargaBeli', 'tinjau', d.hargaBeli.length + ' harga beli berbeda dari harga satuan',
@@ -7583,12 +7659,15 @@ function teksOrder_(m, jumlah) {
 }
 
 /** Satu item daftar belanja: { nama, satuan, satuanBesar, isiSatuanBesar, stock, stokMin, stokMaks, saran | null }. */
-function itemBelanja_(m, akhir) {
+function itemBelanja_(m, akhir, pakai) {
   var s = saranOrderAngka_(m, akhir);
   return {
     nama: m.nama, satuan: m.satuan, satuanBesar: m.satuanBesar, isiSatuanBesar: m.isiSatuanBesar,
     stock: akhir, stokMin: m.stokMin, stokMaks: m.stokMaks,
-    saran: s ? { jumlah: s.jumlah, satuan: s.satuan, dasar: s.dasar, teks: teksOrder_(m, s.jumlah) } : null
+    saran: s ? { jumlah: s.jumlah, satuan: s.satuan, dasar: s.dasar, teks: teksOrder_(m, s.jumlah) } : null,
+    // Cukup untuk berapa hari (Code.gs v0.43); null tanpa rata-rata pemakaian.
+    pakaiHarian: pakai && pakai.rata != null ? pakai.rata : null,
+    cukupHari: cukupHari_(akhir, pakai || null)
   };
 }
 
@@ -7623,7 +7702,7 @@ function dataBelanja_() {
   stock.belanja.forEach(function (x) {
     var nama = namaKategori(x.m);
     var g = grup[nama.toLowerCase()] = grup[nama.toLowerCase()] || { nama: nama, i: indeksKategori(nama), item: [] };
-    g.item.push(itemBelanja_(x.m, x.akhir));
+    g.item.push(itemBelanja_(x.m, x.akhir, x.pakai));
   });
   var kategori = Object.keys(grup).map(function (k) { return grup[k]; }).sort(function (a, b) {
     return a.i - b.i || a.nama.localeCompare(b.nama, 'id');
@@ -7651,7 +7730,7 @@ function dataBelanja_() {
     var k = m.nama.toLowerCase();
     var d = dipesan[k];
     var t = terakhir[k];
-    return gabung_(itemBelanja_(m, akhir), {
+    return gabung_(itemBelanja_(m, akhir, stock.pakai[k]), {
       kategori: namaKategori(m),
       terakhir: t ? { pemasok: t.pemasok, tanggal: t.tanggal, nonaktif: !aktif[t.pemasok.toLowerCase()] } : null,
       dipesan: d ? bentukBarisPesanan_(d, true) : null
@@ -9785,13 +9864,20 @@ function dataRiwayatItem_(namaItem) {
     return a.tanggal < b.tanggal ? 1 : (a.tanggal > b.tanggal ? -1 : 0);
   }).slice(0, 7);
   var asli = tujuh.length ? masukAsliPerHari_(tujuh[tujuh.length - 1].tanggal, tujuh[0].tanggal) : {};
+  var satu = {};
+  satu[kecil] = semua;
+  var pakai = pemakaianHarian_({ item: satu }, hari)[kecil] || null;
+  var tercatat = posisiStock_(semua, hari).akhir;
   return {
     item: {
       nama: m.nama, kategori: m.kategori, satuan: m.satuan, satuanBesar: m.satuanBesar,
       isiSatuanBesar: m.isiSatuanBesar, stokMin: m.stokMin, aktif: m.aktif
     },
     hariIni: hari,
-    tercatat: posisiStock_(semua, hari).akhir,
+    tercatat: tercatat,
+    // Cukup untuk berapa hari (Code.gs v0.43): pakai null jika belum ada rekap sebelum hari ini.
+    pakai: pakai ? { total: pakai.total, hari: pakai.hari, rata: pakai.rata, jendela: HARI_RATA_PAKAI, hariMin: HARI_PAKAI_MIN } : null,
+    cukupHari: cukupHari_(tercatat, pakai),
     rekap: tujuh.map(function (r) { return barisRekap_(r, master, asli); }),
     transaksi: transaksiItem_(kecil, tujuh)
   };
@@ -11289,23 +11375,47 @@ function teksMasaSimpan_(x, lewat) {
     (x.baikSampai ? ' (baik sampai ' + Number(p[2]) + ' ' + BULAN_ID[Number(p[1]) - 1].slice(0, 3) + ')' : '') + '.';
 }
 
-/** Stock pada akhir tanggal itu: item minus dan item di bawah stok minimum (item aktif). master dan rekap opsional. */
+/**
+ * Stock pada akhir tanggal itu (item aktif): item minus, item di bawah stok minimum, dan (Code.gs v0.43) item hampir habis:
+ * Stock Akhir 0 atau lebih, tidak di bawah stok minimum (sudah ada di daftar belanja), dan cukup kurang dari
+ * BATAS_HAMPIR_HABIS_HARI hari menurut rata-rata pemakaian; urut dari yang paling cepat habis. Tiap item belanja dan hampir
+ * habis membawa pakai ({ total, hari, rata } | null) dan cukup (cukupHari_). pakai: peta pemakaianHarian_ untuk semua item.
+ * master dan rekap opsional.
+ */
 function ringkasStockHari_(tanggal, master, rekap) {
   master = master || bacaItem_();
   rekap = rekap || bacaRekap_();
+  var pakai = pemakaianHarian_(rekap, tanggal);
   var minus = [];
   var belanja = [];
+  var hampir = [];
   Object.keys(master).sort().forEach(function (k) {
     var m = master[k];
     if (!m.aktif) return;
     var akhir = posisiStock_(rekap.item[k], tanggal).akhir;
+    var p = pakai[k] || null;
+    var cukup = cukupHari_(akhir, p);
     if (akhir < 0) minus.push({ m: m, akhir: akhir });
-    if (m.stokMin != null && akhir < m.stokMin) belanja.push({ m: m, akhir: akhir, saran: saranOrder_(m, akhir) });
+    if (m.stokMin != null && akhir < m.stokMin) {
+      belanja.push({ m: m, akhir: akhir, saran: saranOrder_(m, akhir), pakai: p, cukup: cukup });
+    } else if (akhir >= 0 && cukup != null && cukup < BATAS_HAMPIR_HABIS_HARI) {
+      hampir.push({ m: m, akhir: akhir, pakai: p, cukup: cukup });
+    }
   });
   var urut = function (a, b) {
     return a.m.kategori.localeCompare(b.m.kategori, 'id') || a.m.nama.localeCompare(b.m.nama, 'id');
   };
-  return { minus: minus.sort(urut), belanja: belanja.sort(urut) };
+  return {
+    minus: minus.sort(urut), belanja: belanja.sort(urut),
+    hampirHabis: hampir.sort(function (a, b) { return a.cukup - b.cukup || a.m.nama.localeCompare(b.m.nama, 'id'); }),
+    pakai: pakai
+  };
+}
+
+/** Bentuk satu item hampir habis untuk jawaban API (Dashboard). */
+function itemHampirHabis_(x) {
+  return { nama: x.m.nama, stock: x.akhir, satuan: x.m.satuan, stokMin: x.m.stokMin, cukupHari: x.cukup,
+    pakaiHarian: x.pakai ? x.pakai.rata : null };
 }
 
 /**
@@ -11428,11 +11538,24 @@ function htmlEmailHarian_(d) {
     stock.push('<p style="margin:6px 0 2px"><b>Daftar belanja: ' + d.stock.belanja.length + ' item di bawah stok minimum</b></p>' +
       daftar(d.stock.belanja.map(function (x) {
         return escHtml_(x.m.nama) + ': ' + angkaId_(x.akhir) + ' ' + escHtml_(x.m.satuan) +
-          ' (minimum ' + angkaId_(x.m.stokMin) + ')' + (x.saran ? ', saran order ' + escHtml_(x.saran) : ', tanpa saran (stok maksimum kosong)');
+          ' (minimum ' + angkaId_(x.m.stokMin) + (x.cukup != null && x.cukup > 0 ? ', cukup ' + escHtml_(teksCukup_(x.cukup)) : '') + ')' +
+          (x.saran ? ', saran order ' + escHtml_(x.saran) : ', tanpa saran (stok maksimum kosong)');
       })) +
       '<p style="margin:4px 0 0;color:' + w.tintaRedup + ';font-size:12px">Daftar lengkap dan PDF-nya ada di menu Laporan aplikasi.</p>');
   }
   if (!stock.length) stock.push('<p style="margin:0">Tidak ada Stock Akhir minus dan semua stock di atas batas minimum.</p>');
+  if (d.stock.hampirHabis && d.stock.hampirHabis.length) {
+    // Hampir habis menurut rata-rata pemakaian (Code.gs v0.43): item yang tidak di bawah stok minimum.
+    stock.push('<p style="margin:6px 0 2px"><b>Hampir habis: ' + d.stock.hampirHabis.length + ' item cukup kurang dari ' +
+      BATAS_HAMPIR_HABIS_HARI + ' hari</b></p>' +
+      daftar(d.stock.hampirHabis.map(function (x) {
+        return escHtml_(x.m.nama) + ': ' + angkaId_(x.akhir) + ' ' + escHtml_(x.m.satuan) + ', ' +
+          (x.cukup > 0 ? 'cukup ' : '') + escHtml_(teksCukup_(x.cukup)) + ' (pemakaian ' + angkaId_(x.pakai.rata) + ' ' +
+          escHtml_(x.m.satuan) + ' per hari)';
+      })) +
+      '<p style="margin:4px 0 0;color:' + w.tintaRedup + ';font-size:12px">Menurut rata-rata pemakaian ' + HARI_RATA_PAKAI +
+      ' hari terakhir. Tambahkan dari Daftar belanja jika perlu dipesan.</p>');
+  }
   if (d.pesanan && d.pesanan.length) {
     // Pesanan ke pemasok yang belum dicatat datang (Code.gs v0.29).
     stock.push('<p style="margin:6px 0 2px"><b>Pesanan belum datang (' + d.pesanan.length + ')</b></p>' +

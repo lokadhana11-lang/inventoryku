@@ -102,6 +102,12 @@
 > Code.gs berbeda, atau setupSpreadsheet perlu dijalankan; email yang tertahan lebih dari 3 hari dicatat
 > gagal (Bagian 4.5, 5.1, 10, 10.1).
 >
+> Diperbarui 4 November 2026 (keputusan pemilik, dari telaah aplikasi): cukup untuk berapa hari. Dari rata-rata
+> pemakaian (keluar, dipakai prep, dan waste) 14 hari terakhir, tiap item menunjukkan stock-nya cukup untuk berapa
+> hari di form Stock, riwayat per item, dan Daftar belanja; item yang cukup kurang dari 3 hari dan belum di bawah
+> stok minimum menjadi "hampir habis" di Dashboard, pengingat stock, dan email harian (Bagian 5.5, 6.1, 9.2, 10,
+> 10.1, 12).
+>
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
 >
@@ -869,6 +875,19 @@ dengan menghitung sisa (lihat "Hitung sisa" di bawah).
   dicatat, atau stock yang perlu diluruskan. Isian tetap bisa dikirim, dan barisnya
   ditandai di Riwayat.
 - Item dengan Stock Akhir di bawah Stok Minimum (`M_Item`) ditandai "perlu reorder".
+- **Cukup untuk berapa hari** (4 November 2026, keputusan pemilik). Pemakaian satu hari = Stock Keluar
+  + Dipakai Prep + Waste dari rekap `Stock_Harian`; penyesuaian dan stock opname tidak dihitung. Rata-rata
+  pemakaian = jumlah pemakaian dalam 14 hari sebelum tanggal itu (tanggal itu sendiri belum selesai) dibagi
+  jumlah hari buka dalam rentang itu, mulai dari rekap pertama item itu jika lebih baru; hari libur
+  (Bagian 5.8) tidak dihitung sebagai hari. Kurang dari 3 hari buka: belum ada rata-rata. Cukup untuk =
+  Stock Akhir ÷ rata-rata, ditampilkan "± 2 hari" (dibulatkan ke bawah), "kurang dari 1 hari", atau
+  "habis"; tidak tampil jika item tidak terpakai. Di form Stock angkanya ikut Stock Akhir sementara yang
+  diketik, di bawah Stock Akhir; tidak tampil saat Stock Akhir minus.
+- **Hampir habis:** item aktif yang Stock Akhir-nya 0 atau lebih, tidak di bawah stok minimum (yang itu
+  sudah masuk Daftar belanja), dan cukup kurang dari 3 hari. Tampil sebagai butir Perlu ditinjau di
+  Dashboard ("2 item hampir habis", urut dari yang paling cepat habis), di pengingat stock (Bagian 10.1),
+  dan di email harian (Bagian 10). Item ini tidak otomatis masuk Daftar belanja: Pengelola menambahkannya
+  di sana, atau mengatur stok minimumnya.
 - Form kertas tidak punya kolom staff atau shift, dan form web juga tidak menampilkannya.
   Siapa yang mengisi tetap tercatat otomatis di `submitted_by`.
 
@@ -1192,6 +1211,8 @@ menemukan kekeliruan pengisian inventory.
   - **Riwayat per item:** ketuk satu item untuk melihat tabel 7 rekap terakhir item itu
     (Awal, Masuk, Hasil Prep, Keluar, Dipakai Prep, Waste, Penyesuaian, Akhir), sehingga
     hari yang janggal langsung terlihat. Dari sini Pengelola bisa menekan "Sesuaikan stock".
+    Di bawah stock hari ini (4 November 2026): cukup untuk berapa hari dan rata-rata pemakaiannya
+    (Bagian 5.5), atau "Tidak terpakai dalam 14 hari terakhir.", atau kapan rata-ratanya mulai dihitung.
   - **Kartu stok** (18 Oktober 2026): di riwayat per item yang sama, setiap catatan yang
     menggerakkan stock item itu pada hari-hari tersebut (Stock masuk/keluar, hasil prep, bahan
     dipakai prep, waste, penyesuaian, stock opname), urut jam diterima server, dengan siapa yang
@@ -1617,7 +1638,8 @@ Unduh PDF tidak memakai link Drive, karena staff tidak punya akses ke folder Dri
   (21 Oktober 2026, keputusan pemilik): pemasok pesanan item itu yang masih menunggu, lalu pemasok
   barang masuk terakhirnya (Bagian 5.5). Item tanpa keduanya, atau yang pemasoknya sudah nonaktif,
   masuk kelompok "Belum ada pemasok". Di tiap kelompok item urut kategori, lalu nama.
-- Tiap baris: nama item, stock sekarang, stok minimum, dan **saran order**.
+- Tiap baris: nama item, stock sekarang, stok minimum, cukup untuk berapa hari (4 November 2026, Bagian 5.5),
+  dan **saran order**. Pilihan Tambah item juga menyebut cukup untuk berapa hari.
 - Saran order = Stok Maksimum − Stock Akhir. Jika item punya satuan besar, saran
   dibulatkan ke atas ke satuan besar, misalnya butuh 20 botol menjadi 2 dus.
 - Jika Stok Maksimum kosong, item tetap masuk daftar tanpa saran jumlah.
@@ -1722,7 +1744,9 @@ Keterangan di bawah ini untuk laporan harian.
     nihil, atau **belum diisi**. Bagian ini adalah pengingat pengisian form.
   - Kejadian suhu di luar standar hari itu, beserta tindakan korektifnya
   - Total waste hari itu (qty dan estimasi Rp)
-  - Ringkasan daftar belanja: item di bawah stok minimum dan saran ordernya
+  - Ringkasan daftar belanja: item di bawah stok minimum, cukup untuk berapa hari, dan saran ordernya
+  - Hampir habis (4 November 2026, Bagian 5.5): item yang cukup kurang dari 3 hari, dengan stock dan
+    rata-rata pemakaiannya
   - Pesanan ke pemasok yang belum datang (21 Oktober 2026)
   - Barang masuk hari itu (28 Oktober 2026): per pemasok (tanpa pemasok paling bawah), jumlah dan
     harga beli per item, nilai per pemasok dan totalnya dari harga beli yang dicatat, dan jumlah baris
@@ -1771,7 +1795,7 @@ Apps Script tidak bisa mengirimnya.
 | "Rina meminta reset PIN" | HP Pengelola | Saat Lupa PIN menghasilkan permintaan baru |
 | "Rina terkunci karena PIN salah" | HP Pengelola | Saat akun terkunci (15 menit atau 24 jam, Bagian 7.2) |
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif, kecuali pada hari libur (Bagian 5.8) |
-| "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
+| "Stock hari ini: 1 minus, 3 di bawah minimum, 2 hampir habis, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026; hampir habis sejak 4 November 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
 | "Closing 21.30: 3 form belum diisi" dan nama formnya (28 Oktober 2026) | Semua HP yang menyala | Sekian menit sebelum jam closing, hanya jika ada form wajib hari itu yang belum diisi atau belum lengkap (Bagian 5.8), kecuali pada hari libur |
 | "Email laporan harian tertahan" (atau "Salinan ke Google Sheets berhenti" jika tidak ada email laporan atau email lewat Brevo) dan sejak kapan (2 November 2026) | HP Pengelola | Sesudah laporan harian dari jadwal, juga pada hari libur, hanya jika salinan Apps Script tidak berjalan lebih dari 30 menit (Bagian 4.5) |
 
@@ -1846,6 +1870,9 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 
 - [ ] **Jadwal stock opname bawaan adalah mingguan.** Bisa diganti bulanan di Pengaturan.
 - [ ] **Saran order** = Stok Maksimum − Stock Akhir, dibulatkan ke satuan besar.
+- [ ] **Cukup untuk berapa hari** (4 November 2026) memakai rata-rata 14 hari terakhir per hari buka,
+      menghitung waste sebagai pemakaian, baru tampil setelah 3 hari buka, dan "hampir habis" berarti
+      cukup kurang dari 3 hari.
 - [ ] **Masa simpan diperkirakan**, bukan dilacak per wadah atau per kiriman: yang datang atau
       dibuat lebih dulu dianggap dipakai lebih dulu.
 - [ ] **Hasil prep mengikuti resep, kecuali hasil aktual diisi** (Bagian 5.3, 18 Oktober 2026);

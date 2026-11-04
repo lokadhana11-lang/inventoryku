@@ -22,7 +22,7 @@ const jenis = (daftar) => daftar.map((p) => p.jenis);
 const konf = (k) => { const r = H.ss.getSheetByName('M_Konfigurasi').getDataRange().getValues().find((x) => x[0] === k); return r ? r[1] : undefined; };
 
 // 1. Runtime tanpa statusSistem (atau Apps Script): tanpa peringatan, susunan lengkap sesudah setupSpreadsheet.
-cek('versi kode v0.42', VERSI === 'v0.42', VERSI);
+cek('versi kode v0.42 atau lebih baru', /^v0\.(4[2-9]|[5-9]\d)/.test(VERSI), VERSI);
 cek('tanpa statusSistem: tidak ada peringatan', cekP().length === 0, cekP());
 cek('susunan_sheet Lengkap sesudah setupSpreadsheet', konf('susunan_sheet') === 'Lengkap', konf('susunan_sheet'));
 let o = A('bacaOutletJadwal', {});
@@ -80,9 +80,9 @@ cek('Apps Script lebih lama', p.length === 1 && p[0].jenis === 'versi' && p[0].t
 status({ salinan: lalu(2) });
 p = cekP();
 cek('Apps Script sebelum v0.42 (tanpa versi)', p.length === 1 && /^Apps Script masih memakai Code\.gs sebelum v0\.42, sedangkan Supabase /.test(p[0].ket), p);
-status({ versi: 'v0.43', salinan: lalu(2) });
+status({ versi: 'v9.0', salinan: lalu(2) });
 p = cekP();
-cek('Supabase lebih lama', p.length === 1 && p[0].ket === 'Supabase masih ' + VERSI + ', sedangkan Apps Script v0.43. Pemilik Sheet perlu menempel supabase/functions/api/index.ts ke Edge Function di Supabase, lalu Deploy.', p);
+cek('Supabase lebih lama', p.length === 1 && p[0].ket === 'Supabase masih ' + VERSI + ', sedangkan Apps Script v9.0. Pemilik Sheet perlu menempel supabase/functions/api/index.ts ke Edge Function di Supabase, lalu Deploy.', p);
 status({ versi: 'v0.8.1', salinan: lalu(2) });
 cek('banding versi bertingkat (v0.8.1 lebih lama)', /^Apps Script masih v0\.8\.1,/.test(cekP()[0].ket), cekP());
 status(null);

@@ -2949,3 +2949,44 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     rakitan lolos pemeriksaan sintaks. Juga: `uji/README` kini menyebut tanggal 14 ke atas untuk `UJI_JAM` (pada tanggal 13
     `fc_sementara` memang berbeda, ditemukan saat telaah). `node uji/jalankan.mjs --layar` pada 2 November: 38 berkas, 1.563
     pemeriksaan lulus (server 18 berkas 712, layar 20 berkas 851), 0 gagal. Belum diuji di Supabase, Apps Script, dan HP asli.
+
+### Cukup untuk berapa hari dan hampir habis (Code.gs v0.43, aplikasi 0.44.0, 4 November 2026)
+
+437. **Asal:** telaah aplikasi oleh Claude (2 November 2026), butir 1 yang dipilih pemilik sesudah pemantauan ("kerjakan butir 1
+    dulu"): perkiraan "cukup untuk ± n hari" dari rata-rata pemakaian di Stock, Dashboard, dan Daftar belanja. Saran order tetap Stok
+    Maksimum − Stock Akhir (Bagian 9.2); angka baru hanya membantu memutuskan. Spesifikasi sistem Bagian 5.5, 6.1, 9.2, 10, 10.1, 12;
+    tampilan Bagian 5.3, 5.4, 5.6, 5.9, 7.
+438. **Hitungan** (`pemakaianHarian_`, keputusan tambahan): pemakaian = Stock Keluar + Dipakai Prep + Waste dari rekap
+    `Stock_Harian` (penyesuaian dan opname tidak, karena itu pelurusan, bukan pemakaian; waste ikut, karena barangnya tetap
+    berkurang). Jendela 14 hari sebelum tanggal itu (`HARI_RATA_PAKAI`), tanpa tanggal itu sendiri karena harinya belum selesai.
+    Pembagi = hari buka di jendela (hari libur `M_HariLibur` tidak dihitung) mulai dari rekap pertama item itu jika lebih baru, jadi
+    item baru tidak tampak jarang terpakai; hari stok pembuka ikut dihitung. Kurang dari 3 hari buka (`HARI_PAKAI_MIN`): belum ada
+    rata-rata. Rata-rata dibulatkan 3 angka (`bulat_`). Tidak dipilih: rata-rata tertimbang atau per hari dalam minggu (lebih sulit
+    dijelaskan), dan memasukkan porsi terjual (barang jadi tidak bergerak karena penjualan).
+439. **Cukup untuk** (`cukupHari_`, `teksCukup_`; `hitungCukup`, `teksCukup`, `ketCukup` di app.js dengan aturan yang sama): Stock
+    Akhir ÷ rata-rata, satu angka di belakang koma dibulatkan ke bawah (2,8 → "± 2 hari": angka yang lebih aman untuk memesan),
+    "kurang dari 1 hari" di bawah 1, "habis" untuk 0 atau minus; null (tidak ditulis) tanpa rata-rata atau tanpa pemakaian. "± 2
+    hari" memakai spasi tak terputus. Angka besar tidak dibatasi ("± 148 hari").
+440. **Hampir habis** (`ringkasStockHari_.hampirHabis`): item aktif dengan Stock Akhir 0 atau lebih (minus sudah butir sendiri),
+    tidak di bawah stok minimum (sudah di Daftar belanja, jadi tidak diulang), dan cukup kurang dari `BATAS_HAMPIR_HABIS_HARI` = 3
+    hari; urut dari yang paling cepat habis lalu nama. Dipakai butir Dashboard `hampirHabis` (Perlu ditinjau, sesudah
+    `bawahMinimum`, masuk "Hari ini"), pengingat stock pagi ("2 hampir habis", sama dengan Dashboard seperti aturan Bagian 10.1), dan
+    blok "Hampir habis" di email harian (sesudah ringkasan daftar belanja; kalimat "Tidak ada Stock Akhir minus dan semua stock di
+    atas batas minimum." tetap ditulis bila benar). Item hampir habis tidak otomatis masuk Daftar belanja (keputusan tambahan:
+    daftar itu tetap "di bawah stok minimum"); lembarnya mengarahkan ke Tambah item atau ke stok minimum di Pengaturan → Item.
+441. **Tampilan:** form Stock (semua role) menghitung di HP dari `pakaiHarian` dan Stock akhir sementara, jadi angkanya ikut isian;
+    `.stock-cukup` di bawah angka (kartu: rata kanan; tabel: baris sendiri dan boleh turun baris, karena sel angka `nowrap` membuat
+    kolom Stock akhir melebar di 1.024 px), tidak tampil saat minus atau 0. Tanda di sel tabel kini blok (`.tabel-stock
+    .wadah-peringatan:not(:empty)`) supaya tetap di baris sendiri tanpa `<br>`. Lembar riwayat item: `teksPakai` (cukup, rata-rata,
+    dan berapa hari buka; "Tidak terpakai dalam 14 hari terakhir."; atau kapan rata-rata mulai). Daftar belanja dan pilihan Tambah
+    item: "· cukup ± 2 hari" / "· habis". Server lama tidak mengirim field ini, jadi tidak ada yang tampil.
+442. **Data:** `formStock.item[].pakaiHarian`, `riwayatItem.pakai`/`cukupHari`, `daftarBelanja` item `pakaiHarian`/`cukupHari`, butir
+    Dashboard `hampirHabis` dan `bawahMinimum.data.item[].cukupHari` (catatan/api.md). Tidak ada tab, kolom, atau jadwal baru, jadi
+    `setupSpreadsheet` dan `pasangTrigger` tidak perlu. Hitungan memakai rekap yang sudah dimuat setiap aksi itu.
+443. **Uji:** `uji/server/cukup_hari.mjs` (51 pemeriksaan: teks dan pembulatan, Ayam 27,5 kg ÷ 12 hari buka = 2,292 kg sehari, Tomat
+    dari dipakai prep dan waste, tidak terpakai, tanpa rekap, minus, form Stock termasuk tanggal kemarin, gerakan hari ini tidak ikut
+    rata-rata, hari libur, batas jendela 14/15 hari dan rekap pertama di luar jendela, kurang dari 3 hari buka, Dashboard urutan dan
+    teks, stock 0 "habis", item di bawah minimum tidak diulang, Daftar belanja, pengingat stock, email harian); `uji/layar/
+    cukup_hari.mjs` (38 pemeriksaan: kartu HP ikut isian sampai minus dan masuk, tabel laptop dan letak tanda, Dashboard dan lembar,
+    riwayat item dari Pengaturan → Item, Daftar belanja dan Tambah item, server lama, delapan ukuran, gerak menyala). Uji pemantauan
+    tidak lagi menulis versi tetap (memakai `VERSI_KODE` dan `VERSI_APLIKASI`).
