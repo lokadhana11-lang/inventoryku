@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.43 (cukup untuk berapa hari menurut rata-rata pemakaian 14 hari)
+// InventoryKu Code.gs v0.44 (saran prep menurut rata-rata pemakaian)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -135,9 +135,11 @@
  *                        14 hari terakhir per hari buka; formStock.item[].pakaiHarian, riwayatItem.pakai/cukupHari,
  *                        daftarBelanja item cukupHari/pakaiHarian, butir Dashboard hampirHabis, pengingat stock dan
  *                        email harian "Hampir habis".
+ * - 4 November 2026    : saran prep (saranPrep_): formPrep.resep[].saran = jumlah resep untuk 2 hari pemakaian (paling
+ *                        lama masa simpan resep) dikurangi stock, dibulatkan ke atas ke ½ resep.
  */
 
-var VERSI_KODE = 'v0.43';
+var VERSI_KODE = 'v0.44';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -2908,6 +2910,29 @@ function cukupHari_(akhir, pakai) {
   return Math.floor(akhir / pakai.rata * 10) / 10;
 }
 
+/*
+ * Saran prep (keputusan pemilik 4 November 2026, telaah aplikasi): untuk barang jadi beresep, stock dibuat cukup untuk
+ * HARI_SARAN_PREP hari pemakaian rata-rata (pemakaianHarian_), tetapi tidak lebih lama dari masa simpan resepnya.
+ */
+var HARI_SARAN_PREP = 2;
+
+/**
+ * Saran prep satu resep: { jumlahResep (kelipatan ½; 0 = belum perlu), targetHari, target, stock, pakaiHarian, cukupHari },
+ * atau null tanpa rata-rata pemakaian atau tanpa pemakaian. Stock minus dihitung 0 (catatannya belum lurus, barangnya
+ * tidak minus).
+ */
+function saranPrep_(r, stock, pakai) {
+  if (!r || !(r.hasil > 0) || !pakai || pakai.rata == null || !(pakai.rata > 0)) return null;
+  var hari = HARI_SARAN_PREP;
+  if (r.masaSimpan != null && r.masaSimpan !== '' && Number(r.masaSimpan) < hari) hari = Math.max(1, Number(r.masaSimpan));
+  var target = bulat_(pakai.rata * hari);
+  var kurang = bulat_(target - Math.max(stock, 0));
+  return {
+    jumlahResep: kurang > 0 ? Math.ceil(bulat_(kurang / r.hasil * 2)) / 2 : 0,
+    targetHari: hari, target: target, stock: stock, pakaiHarian: pakai.rata, cukupHari: cukupHari_(stock, pakai)
+  };
+}
+
 /** "± 2 hari", "kurang dari 1 hari", atau "habis" (tampilan Bagian 7). */
 function teksCukup_(cukup) {
   if (cukup == null) return '';
@@ -4258,6 +4283,7 @@ function dataFormPrep_(tanggal) {
   var master = bacaItem_();
   var resep = bacaResep_();
   var rekap = bacaRekap_();
+  var pakai = pemakaianHarian_(rekap, tanggal);
   var dipakai = {};
   var daftarResep = [];
   Object.keys(resep).forEach(function (k) {
@@ -4268,6 +4294,8 @@ function dataFormPrep_(tanggal) {
       hasil: r.hasil,
       masaSimpan: r.masaSimpan,
       catatan: r.catatan,
+      // Saran prep (Code.gs v0.44); null tanpa rata-rata pemakaian.
+      saran: saranPrep_(r, posisiStock_(rekap.item[k], tanggal).akhir, pakai[k] || null),
       bahan: r.bahan.map(function (b) {
         var mb = master[b.item.toLowerCase()];
         dipakai[b.item.toLowerCase()] = true;

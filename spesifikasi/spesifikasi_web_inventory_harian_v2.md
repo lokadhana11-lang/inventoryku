@@ -108,6 +108,10 @@
 > stok minimum menjadi "hampir habis" di Dashboard, pengingat stock, dan email harian (Bagian 5.5, 6.1, 9.2, 10,
 > 10.1, 12).
 >
+> Diperbarui 4 November 2026 (keputusan pemilik, dari telaah aplikasi): saran prep. Di Prep List, tiap barang jadi
+> beresep yang pemakaiannya tercatat diberi saran jumlah resep untuk hari ini: cukup untuk 2 hari pemakaian rata-rata
+> (paling lama sampai masa simpan resep) dikurangi stock, dibulatkan ke atas ke ½ resep (Bagian 5.3, 12).
+>
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
 >
@@ -691,6 +695,13 @@ daging giling 0,5 kg, serta bawang 0,25 kg.
   dua kali), dan item tanpa resep yang stock-nya tidak bergerak. Saat kiriman masuk antrean HP, layar
   menulis perkiraannya ("Sesudah terkirim, stock bertambah: …").
 
+- **Saran prep** (4 November 2026, keputusan pemilik), untuk hari ini dan semua role: untuk tiap barang jadi
+  beresep, target = rata-rata pemakaian per hari (Bagian 5.5, cukup untuk berapa hari) × 2 hari, tetapi tidak
+  lebih lama dari masa simpan resep (paling sedikit 1 hari). Saran = (target − stock sekarang) ÷ hasil per 1
+  resep, dibulatkan ke atas ke ½ resep; stock minus dihitung 0. Saran 0 berarti belum perlu dibuat. Barang jadi
+  yang pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste)
+  tidak punya saran. Stock sekarang sudah termasuk prep yang dikirim hari itu, jadi saran turun sesudah dikirim.
+  Saran hanya bantuan: jumlah resep tetap dipilih staff.
 - **Item tanpa resep** tetap bisa dicatat di Prep List dengan Qty biasa. Stock tidak bergerak.
 - **Stock bahan tidak cukup menurut catatan:** layar menampilkan peringatan, tetapi prep
   tetap bisa dikirim. Stock Akhir bahan itu menjadi minus dan ditandai di Riwayat.
@@ -1873,6 +1884,8 @@ Butir-butir berikut adalah pilihan yang diambil dokumen ini saat menafsirkan kep
 - [ ] **Cukup untuk berapa hari** (4 November 2026) memakai rata-rata 14 hari terakhir per hari buka,
       menghitung waste sebagai pemakaian, baru tampil setelah 3 hari buka, dan "hampir habis" berarti
       cukup kurang dari 3 hari.
+- [ ] **Saran prep** (4 November 2026) membuat stock barang jadi cukup untuk 2 hari (paling lama sampai masa
+      simpan resep) dan dibulatkan ke atas ke ½ resep.
 - [ ] **Masa simpan diperkirakan**, bukan dilacak per wadah atau per kiriman: yang datang atau
       dibuat lebih dulu dianggap dipakai lebih dulu.
 - [ ] **Hasil prep mengikuti resep, kecuali hasil aktual diisi** (Bagian 5.3, 18 Oktober 2026);
