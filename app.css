@@ -7523,3 +7523,141 @@ hr.pemisah {
   .harga-banyak-baris { grid-template-columns: minmax(0, 1fr); }
 }
 .isian-tempel { font-family: inherit; min-height: 9rem; white-space: pre; overflow-x: auto; }
+
+/* =========================================================================
+ * Tambahan 4 November 2026 (aplikasi 0.46.0, butir 451–454; spesifikasi tampilan
+ * Bagian 4.6, 4.7, 5.2, 5.3): kepala navy ringkas, satu garis kiri, bar menu bawah tidak
+ * tampil di layar dalam, kotak info form ringkas.
+ * ========================================================================= */
+
+/* Kepala ringkas (butir 451): semua layar berkepala navy kecuali Dashboard (kepala gantung).
+   Beranda memakai kepalanya sendiri. Layar tanpa tautan kembali menaruh judul dan Online
+   dalam satu baris (app.js pasangKepalaLayar). */
+.kepala-layar:not(.gantung) .kepala-layar-isi {
+  gap: 2px;
+  padding-bottom: 14px;
+}
+
+.kepala-layar:not(.gantung) .judul-layar {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.kepala-layar-atas.tanpa-kembali > .judul-layar,
+.kepala-layar-atas.tanpa-kembali > .kepala-isi {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .kepala-layar:not(.gantung) .kepala-layar-isi {
+    padding-top: 14px;
+    padding-bottom: 18px;
+  }
+  .kepala-layar:not(.gantung) .judul-layar {
+    font-size: 28px;
+  }
+  /* Tautan kembali tetap 44 px untuk jari, tetapi tidak menambah tinggi kepala */
+  .kepala-layar:not(.gantung) .kepala-layar-atas .tautan-kembali {
+    margin-top: -6px;
+    margin-bottom: -6px;
+  }
+  .kepala-layar .kepala-layar-atas.tanpa-kembali {
+    display: flex;
+    min-height: 0;
+  }
+}
+
+/* Satu garis kiri (butir 451): layar sempit (720 px) tidak lagi di tengah, tetapi mulai dari
+   garis kiri yang sama dengan layar lebar, merek di bar atas, dan judul kepala navy. */
+.layar-sempit,
+.kepala-layar-isi.layar-sempit {
+  margin-left: max(0px, calc((100% - 1200px) / 2));
+  margin-right: auto;
+}
+
+@media (min-width: 1024px) {
+  /* Merek dan menu bar atas, dan isi Beranda, sejajar isi layar lain. Wadah ini memakai bantalan
+     di luar (bukan di dalam) lebar 1.200 px, jadi lebarnya dikurangi dua bantalan tepi. */
+  .bar-isi,
+  .beranda-kepala-isi,
+  .tiket-grid,
+  .beranda-bawah {
+    max-width: calc(1200px - 2 * var(--tepi));
+  }
+  /* Pengaturan dua panel: panel di garis kiri, judul kepala navy di atas panel; tombol di kepala
+     (misalnya Tambah) tetap sejajar tepi kanan kolom isi */
+  .dua-panel,
+  .kepala-layar-isi.kepala-dua-panel {
+    margin-left: max(0px, calc((100% - 1200px) / 2));
+    margin-right: auto;
+  }
+  .kepala-layar-isi.kepala-dua-panel {
+    padding-left: var(--pad-kiri);
+  }
+}
+
+/* Bar menu bawah tidak tampil di layar isian dan layar dalam (butir 452; app.js aturMenuBawah).
+   Bilah Kirim, toast, dan jarak bawah ikut turun karena --ruang-menu memakai --tinggi-menu. */
+@media (max-width: 1023px) {
+  :root.tanpa-menu-bawah {
+    --tinggi-menu: 0px;
+  }
+  .tanpa-menu-bawah .menu {
+    display: none;
+  }
+}
+
+/* Kotak info form (butir 453). HP: kolom yang jarang diganti dilipat menjadi satu baris
+   ringkasan dengan tombol Ubah (app.js lipatKotakInfo). Desktop: tiga kolom rapat. */
+.kotak-ringkas {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .kotak-info.bisa-dilipat .kotak-ringkas {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -8px 0;
+  }
+  .kotak-info.bisa-dilipat:not(.terbuka) > .bisa-lipat {
+    display: none;
+  }
+}
+
+.kotak-ringkas-teks {
+  min-width: 0;
+  margin: 0;
+  color: var(--tinta);
+  overflow-wrap: anywhere;
+}
+
+.kotak-ringkas-teks strong {
+  font-weight: 600;
+}
+
+.kotak-ringkas-tombol {
+  flex: none;
+}
+
+/* Jarak kotak info ke kartu di bawahnya (misalnya "Belum ada item waste") */
+.layar-form .kotak-info {
+  margin-bottom: 16px;
+}
+
+@media (min-width: 1024px) {
+  .kotak-info.bisa-dilipat {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
+    gap: 16px 24px;
+  }
+  /* Status kiriman di sel ketiga, sejajar tombol dan kotak isian (di bawah label kolom: 26 px) */
+  .kotak-info.bisa-dilipat > .lebar-penuh {
+    grid-column: auto;
+    align-self: start;
+    align-content: center;
+    min-height: 48px;
+    margin-top: 26px;
+  }
+}

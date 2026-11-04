@@ -45,6 +45,10 @@
 > item, dan Daftar belanja, dan butir "hampir habis" di Dashboard (Bagian 5.3, 5.4, 5.6, 5.9, dan 7).
 > Tambahan 4 November 2026 (keputusan pemilik, dari telaah aplikasi): kartu "Saran prep" di Prep List (Bagian 5.3
 > dan 7).
+> Tambahan 4 November 2026 (keputusan pemilik, telaah desain butir 1–3): kepala navy ringkas di semua layar kecuali
+> Beranda dan Dashboard, satu garis kiri untuk merek, judul, dan isi di laptop, bar navigasi bawah tidak tampil di
+> layar isian dan layar dalam, dan kotak info form yang ringkas: satu baris dengan "Ubah" di HP, tiga kolom di
+> laptop (Bagian 4.2, 4.3, 4.7, 5.3, 5.7, dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -282,6 +286,13 @@ Dashboard memuat tombol Stock opname. Jumlah menu utama tetap lima.
 Bar navigasi navy di **bawah**, supaya terjangkau ibu jari. Kepala layar navy di atas
 (Bagian 4.7). Tablet ikut aturan ini karena sama-sama dipakai dengan jari.
 
+**Bar bawah hanya di layar menu** (tambahan 4 November 2026): bar navigasi bawah tampil di
+Beranda, Riwayat, Laporan, Dashboard, dan daftar Pengaturan. Layar yang punya tautan kembali,
+yaitu form isian (Stock, Suhu, Prep, Waste, form kustom) dan layar dalam (misalnya Pengaturan →
+Item, Stock opname, HPP, rincian Riwayat), tidak menampilkannya; jalan keluarnya tautan kembali di
+kepala navy. Bilah Kirim lalu mengambang 8 px di atas jarak aman bawah, di tempat bar tadi, sehingga
+di layar isian tidak ada lagi dua bar bertumpuk.
+
 ```
 ┌──────────────────────────────┐
 │▓ ‹ Pengaturan       ● Online ▓│  kepala navy: kembali + status sinyal
@@ -342,6 +353,13 @@ Aturan untuk semua lebar layar ada di Bagian 4.6.
 Di bawah bar atas, kepala navy layar itu (Bagian 4.7) melebar selebar layar, dengan isinya
 di tengah selebar isi layar.
 
+**Satu garis kiri** (tambahan 4 November 2026): merek di bar atas, judul kepala navy, isi Beranda,
+dan isi setiap layar mulai di garis kiri yang sama, yaitu tepi kiri wadah 1.200 px ditambah jarak
+tepi (24 px); tepi kanannya juga sama. Layar sempit (672 px, misalnya Laporan dan daftar Pengaturan)
+tidak lagi di tengah, tetapi mulai dari garis itu, sehingga judul tidak melompat saat berpindah menu.
+Pengaturan dua panel ikut garis yang sama: panel samping di garis kiri dan judul kepala navy di
+atasnya.
+
 **Panel samping** (tambahan 31 Oktober 2026) hanya di Pengaturan: setiap layar di dalam Pengaturan, kecuali
 daftar Pengaturan sendiri, tampil dua panel. Rinciannya di Bagian 5.7. Menu utama tetap di bar atas; aplikasi
 tidak memakai sidebar untuk seluruh menu, karena menunya hanya tiga sampai lima dan tabel Stock serta Riwayat
@@ -352,6 +370,13 @@ butuh lebar layar.
 - Setiap layar dibuka dengan kepala navy (permukaan navy dengan cahaya dan butiran, Bagian 2):
   tautan kembali (jika ada) dan, di HP dan tablet, status sinyal; judul layar 34 px; lalu
   ringkasan layar itu jika ada. Beranda memakai kepalanya sendiri (Bagian 5.2).
+- **Kepala ringkas** (tambahan 4 November 2026): semua layar kecuali Beranda dan Dashboard memakai
+  kepala yang lebih pendek. Judul 26 px di HP dan tablet, 28 px di laptop. Layar tanpa tautan
+  kembali (Riwayat, Laporan, daftar Pengaturan) menaruh judul dan status sinyal dalam satu baris
+  (tinggi kepala sekitar 66 px di HP). Layar dengan tautan kembali memakai dua baris: tautan kembali
+  dan sinyal, lalu judul (sekitar 97 px; sebelumnya 112–128 px). Di laptop tautan kembali tetap
+  setinggi 44 px untuk diketuk, tetapi tidak menambah tinggi kepala. Ringkasan di kepala (di bawah)
+  tetap seperti biasa. Dashboard tetap memakai kepala tinggi dengan kotak yang menggantung.
 - **Ringkasan di kepala**, hanya untuk angka yang memang utama di layar itu:
   - Pengaturan → Item (ubah): kategori, satuan, dan keadaan sebagai chip, lalu dua angka
     berdampingan: "Stock hari ini" dan "Harga sekarang" (dengan "sejak 7 Okt").
@@ -364,8 +389,8 @@ butuh lebar layar.
     porsi" dan "Food cost" berdampingan; keduanya berubah saat isian diketik.
   - Layar lain: judul saja. Tombol "Tambah" di layar daftar ikut di kepala, di kanan judul.
 - Di HP dan tablet kepala ini menggantikan judul di bar atas dan ikut bergulir bersama isi;
-  bar navigasi bawah tetap. Di laptop dan desktop bar atas tetap di tempatnya dan kepala
-  berada di bawahnya.
+  bar navigasi bawah tetap di layar menu (Bagian 4.2). Di laptop dan desktop bar atas tetap di
+  tempatnya dan kepala berada di bawahnya.
 - **Kotak yang menggantung.** Di Dashboard, ubin angka ringkas menumpuk sebagian di tepi
   bawah kepala navy, seperti tiket di rel Beranda, dengan bayangan tiket.
 - Pita sinyal (offline) tampil di atas kepala navy.
@@ -653,6 +678,18 @@ Satu-satunya layar yang sepenuhnya navy.
 **Pola umum (semua form):**
 
 - Kepala form: judul, lalu kotak info (tanggal, dan shift atau kategori bila ada).
+- **Kotak info ringkas** (tambahan 4 November 2026). Di HP (di bawah 600 px), kolom yang jarang
+  diganti dilipat menjadi satu baris ringkasan dengan tombol tautan "Ubah" di kanannya; tanggalnya
+  ditebalkan. Yang dilipat: Tanggal di semua form, ditambah Kategori, Catat pemakaian, dan Pemasok di
+  Stock. Contoh: "**Hari ini** · Semua kategori · Tambah keluar" (pemasok disebut hanya jika dipilih,
+  misalnya "· Toko Ayam Jaya"), atau "Tanggal: **Hari ini**" di form yang hanya melipat Tanggal.
+  "Ubah" membuka kolomnya di tempat dan berganti menjadi "Tutup"; ringkasan ikut berubah saat kolom
+  diganti, dan kolom yang menampilkan galat terbuka sendiri. Cari item, Shift, kolom kepala form
+  kustom, dan status kiriman tetap tampil. Di tablet tidak ada yang dilipat (dua kolom). Di laptop
+  kotak info memakai tiga kolom rapat (lebar 4 : 3 : 3): di Stock, Tanggal, Kategori, dan Cari item
+  di baris pertama, lalu Catat pemakaian, Pemasok, dan status kiriman di baris kedua, sehingga baris
+  item pertama terlihat tanpa digulir di layar 1366×768. Status kiriman sejajar tombol dan kotak
+  isian di barisnya. Waste dan Prep: Tanggal, Shift, status dalam satu baris; Suhu: Tanggal dan status.
 - Di HP tiap baris form menjadi **satu kartu**. Di tablet kartu berjajar dua kolom. Di
   laptop/desktop menjadi tabel seperti form kertas.
 - Nilai yang dihitung otomatis tampil sebagai teks biasa berwarna Tinta Redup, bukan kolom
@@ -1109,14 +1146,17 @@ Satu-satunya layar yang sepenuhnya navy.
   - Layar Pengaturan sendiri tetap berupa daftar bagian dengan keterangannya, satu kolom, seperti di HP.
   - Setiap layar di dalamnya (misalnya Item, ubah item, Tambah resep, Hari libur) tampil dua panel. Di kiri, **panel
     samping** selebar 260 px berisi semua bagian (ikon dan nama, berurutan seperti daftar). Di kanan, isi bagian itu
-    selebar layar sempit seperti sebelumnya. Keduanya berada di tengah layar, lebar total paling banyak 1.012 px.
+    selebar layar sempit seperti sebelumnya. Lebar total paling banyak 1.012 px; sejak 4 November 2026 keduanya
+    mulai dari garis kiri yang sama dengan merek dan layar lain (Bagian 4.3), tidak lagi di tengah layar.
   - Panel samping berupa kartu (Kertas, garis rambut, bayangan kartu) yang lengket 16 px di bawah bar atas saat isi
     digulir; jika layar terlalu pendek, panel bergulir di dalam.
   - Bagian yang sedang dibuka ditandai latar Menunggu, teks dan ikon Biru Malam tebal, dan garis Biru Malam 3 px di
     tepi kiri. Tanda ini juga dipakai di layar yang lebih dalam (ubah item menandai Item). Amber tidak dipakai, karena
     hanya untuk permukaan navy.
   - "Staff dan PIN" membawa tanda Perlu ditinjau "1 permintaan reset PIN" di bawah namanya, seperti di daftar.
-  - Judul, tautan kembali, dan ringkasan di kepala navy sejajar dengan kolom isi. Tautan kembali tetap ada.
+  - Judul, tautan kembali, dan ringkasan di kepala navy mulai di garis kiri, sejajar panel samping (sejak 4 November
+    2026; sebelumnya sejajar kolom isi). Tombol di kepala, misalnya "Tambah", tetap sejajar tepi kanan kolom isi.
+    Tautan kembali tetap ada.
   - Mengetuk bagian lain di panel langsung membuka bagian itu, tanpa kembali ke daftar Pengaturan.
   - Di HP dan tablet (di bawah 1.024 px) panel samping tidak tampil dan tata letaknya tidak berubah. Tablet yang
     dimiringkan ke 1.024 px langsung menampilkannya.
@@ -1635,6 +1675,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Saran prep (4 November 2026) | Judul "Saran prep", baris "Saus kacang ½ resep" dengan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari", tombol "Tambahkan" lalu "Sudah di daftar", pesan "Saus kacang ½ resep ditambahkan ke daftar.", "Belum ada yang perlu dibuat hari ini.", "Belum perlu: Kaldu ayam (cukup ± 6 hari).", "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).", "Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep." |
+| Kotak info ringkas (4 November 2026) | Baris ringkasan di HP: "**Hari ini** · Semua kategori · Tambah keluar" (pemasok ikut disebut jika dipilih, tanggal lain ditulis "18 Okt"), atau "Tanggal: **Hari ini**"; tombol tautan "Ubah", menjadi "Tutup" saat kolomnya terbuka |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
@@ -1879,5 +1920,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Perpindahan layar dan angka berhitung (17 Oktober 2026) | Keduanya dipakai; angka berhitung dengan kecepatan sedang (0,9 detik). Larangan library animasi dan library grafik dicabut (Bagian 8.2 dan 8.5). |
 | Pengaturan dua panel (31 Oktober 2026) | Di laptop dan desktop, layar di dalam Pengaturan memakai panel samping berisi semua bagian di kiri dan isi di kanan; daftar Pengaturan sendiri tetap satu kolom; menu utama tetap di bar atas (Bagian 4.3 dan 5.7) |
+| Tata letak ringkas (4 November 2026, telaah desain butir 1–3) | Kepala navy ringkas kecuali Beranda dan Dashboard; satu garis kiri untuk merek, judul, dan isi di laptop; bar navigasi bawah hanya di layar menu; kotak info form satu baris dengan "Ubah" di HP dan tiga kolom di laptop (Bagian 4.2, 4.3, 4.7, dan 5.3) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

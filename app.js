@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.45.1';
+  var VERSI_APLIKASI = '0.46.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1198,6 +1198,19 @@
   }
 
   /**
+   * Bar menu bawah (HP dan tablet) tidak tampil di layar yang punya tautan kembali: form isian dan layar
+   * dalam (butir 452). Kelasnya di <html>, karena --ruang-menu (bilah Kirim, toast, jarak bawah) dihitung
+   * di :root. Desktop tidak terpengaruh: menunya di bar atas. Saat bar tampil lagi, penanda menu diletakkan
+   * ulang tanpa gerak (sebelumnya lebarnya 0 karena bar tidak tampil).
+   */
+  function aturMenuBawah(sembunyi) {
+    var akar = document.documentElement;
+    if (akar.classList.contains('tanpa-menu-bawah') === sembunyi) return;
+    akar.classList.toggle('tanpa-menu-bawah', sembunyi);
+    if (!sembunyi) letakkanPenanda(true);
+  }
+
+  /**
    * Garis amber dan pil menu aktif digeser dengan transform (bukan left) supaya ringan.
    * Pil hanya di bar bawah (HP dan tablet), tempat semua menu sama lebar, jadi lebarnya
    * tidak ikut bergerak; di desktop pil tiap menu memudar di tempat (app.css).
@@ -1268,12 +1281,18 @@
     var judul = anak('kepala-isi') || anak('judul-layar');
     if (!judul) judul = el('h1', { class: 'judul-layar', 'data-dari-bar': '', text: $('#bar-judul').textContent });
     var ringkas = anak('kepala-ringkas');
+    var gantung = isi.classList.contains('kepala-gantung');
+    // Kepala ringkas (butir 451): layar tanpa tautan kembali (Riwayat, Laporan, Pengaturan) menaruh judul
+    // dan tanda Online dalam satu baris. Dashboard (kepala gantung) tetap memakai susunan lama.
+    var satuBaris = !kembali && !gantung;
     var kepalaIsi = el('div', { class: 'kepala-layar-isi' + (isi.classList.contains('layar-sempit') ? ' layar-sempit' : '') }, [
-      el('div', { class: 'kepala-layar-atas' }, [kembali || el('span'), el('span', { class: 'sinyal' })]),
-      judul,
+      satuBaris
+        ? el('div', { class: 'kepala-layar-atas tanpa-kembali' }, [judul, el('span', { class: 'sinyal' })])
+        : el('div', { class: 'kepala-layar-atas' }, [kembali || el('span'), el('span', { class: 'sinyal' })]),
+      satuBaris ? null : judul,
       ringkas
     ]);
-    main.insertBefore(el('header', { class: 'kepala-layar' + (isi.classList.contains('kepala-gantung') ? ' gantung' : '') }, kepalaIsi), isi);
+    main.insertBefore(el('header', { class: 'kepala-layar' + (gantung ? ' gantung' : '') }, kepalaIsi), isi);
     return true;
   }
 
@@ -1481,6 +1500,7 @@
     aturMenuAktif(rute.menu);
     rute.layar({ wadah: main, cocok: cocok, sesi: sesi });
     $('#aplikasi').classList.toggle('ada-kepala', pasangKepalaLayar(main));
+    aturMenuBawah(!!main.querySelector('.kepala-layar .tautan-kembali'));
     if (rute.menu === 'pengaturan') pasangPanelPengaturan(main, jalur);
     tempatkanPita();
     aturSinyal();
@@ -1718,6 +1738,7 @@
     tutupMenuPengguna();
     kosongkanLayar();
     menuAktif = null;
+    document.documentElement.classList.remove('tanpa-menu-bawah');
     mulaiMasuk(pesan, keterangan);
   }
 
@@ -3585,14 +3606,17 @@
       if (tanggalLain.value && tanggalLain.value <= hariIni) gantiTanggal(tanggalLain.value);
     });
 
-    var kotakInfo = el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+    var kolomKategori = el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'pilih-kategori', text: 'Kategori' }), pilihKategori]);
+    var kotakInfo = lipatKotakInfo(el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
       gTanggal.wadah,
-      el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'pilih-kategori', text: 'Kategori' }), pilihKategori]),
+      kolomKategori,
       el('div', { class: 'kolom kolom-cari' }, [el('label', { class: 'kolom-label', for: 'cari-item-stock', text: 'Cari item' }), inCari, infoCari]),
       gCara.wadah,
       kolomPemasok,
       el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
-    ]);
+    ]), [gTanggal.wadah, kolomKategori, gCara.wadah, { wadah: kolomPemasok, teks: function () {
+      return pilihPemasok.value && pilihPemasok.selectedIndex >= 0 ? pilihPemasok.options[pilihPemasok.selectedIndex].text : '';
+    } }]);
 
     k.wadah.appendChild(el('div', { class: 'layar-isi layar-form' }, [
       tautanKembali('Beranda', '#/'),
@@ -4298,7 +4322,9 @@
         toast(h.ditutup === 0
           ? 'Pesanan ' + p.pemasok + ' sudah tidak menunggu (barangnya sudah dicatat datang, atau pesanannya sudah ditutup).'
           : 'Pesanan ' + p.pemasok + ' ditutup.' + (tertaut.length ? ' Tambah masuk ' + daftarNama(tertaut) + ' dikosongkan.' : ''));
-        var berikut = wadahPesanan.querySelector('button') || pilihKategori;
+        // Kategori terlipat di HP (butir 453): fokus ke tombol Ubah, supaya tidak jatuh ke halaman.
+        var berikut = wadahPesanan.querySelector('button') ||
+          (pilihKategori.getClientRects().length ? pilihKategori : kotakInfo.querySelector('.kotak-ringkas-tombol'));
         if (berikut && document.activeElement === document.body) berikut.focus();
       });
     }
@@ -4557,6 +4583,80 @@
     return g;
   }
 
+  /**
+   * Kotak info ringkas di HP (butir 453). Di bawah 600 px, kolom yang jarang diganti (Tanggal; di Stock juga
+   * Kategori, Catat pemakaian, dan Pemasok) dilipat menjadi satu baris ringkasan, misalnya
+   * "Hari ini · Semua kategori · Tambah keluar", dengan tombol Ubah. Kolom lain (Cari item, Shift, kolom kepala
+   * form kustom, status kiriman) tetap tampil. Ringkasan dibaca dari kolom yang tampil, jadi ikut berubah saat isinya
+   * diganti dari kode (draft, data dari server). Kolom lipatan yang menampilkan galat dibuka sendiri.
+   * Di 600 px ke atas baris ringkasan tidak tampil dan tidak ada yang dilipat (app.css).
+   * bagian: [{ wadah, teks?: function () → teks ringkas ('' = tidak disebut) }] atau elemen wadah saja.
+   */
+  function lipatKotakInfo(kotak, bagian) {
+    var id = 'lipat-' + (++nomorKolom);
+    bagian = bagian.map(function (b, i) {
+      var x = b.nodeType ? { wadah: b } : b;
+      x.wadah.classList.add('bisa-lipat');
+      if (!x.wadah.id) x.wadah.id = id + '-' + i;
+      return x;
+    });
+    var teks = el('p', { class: 'kotak-ringkas-teks', id: id + '-teks' });
+    var tombolUbah = tombol('Ubah', 'tautan', { class: 'kotak-ringkas-tombol', 'aria-expanded': 'false',
+      'aria-controls': bagian.map(function (b) { return b.wadah.id; }).join(' '), 'aria-describedby': id + '-teks' });
+    kotak.insertBefore(el('div', { class: 'kotak-ringkas' }, [teks, tombolUbah]), kotak.firstChild);
+    kotak.classList.add('bisa-dilipat');
+
+    function buka(b) {
+      kotak.classList.toggle('terbuka', b);
+      tombolUbah.setAttribute('aria-expanded', b ? 'true' : 'false');
+      tombolUbah.querySelector('.tombol-teks').textContent = b ? 'Tutup' : 'Ubah';
+    }
+    tombolUbah.addEventListener('click', function () { buka(!kotak.classList.contains('terbuka')); });
+
+    function teksKolom(w) {
+      var r = w.querySelector('input[type="radio"]:checked');
+      if (r) {
+        var tgl = w.querySelector('input[type="date"]');
+        if (tgl && !tgl.hidden && tgl.value) return tanggalPendek(tgl.value);
+        return r.nextElementSibling ? r.nextElementSibling.textContent : r.value;
+      }
+      var s = w.querySelector('select');
+      return s && s.selectedIndex >= 0 ? s.options[s.selectedIndex].text : '';
+    }
+    function labelKolom(w) {
+      var l = w.querySelector('legend, label.kolom-label');
+      return l ? l.textContent : '';
+    }
+    var terakhir = null;
+    var galatTadi = false;
+    function perbarui() {
+      var bagianTampil = bagian.filter(function (b) { return !b.wadah.hidden; });
+      var isi = bagianTampil.map(function (b) { return b.teks ? b.teks() : teksKolom(b.wadah); });
+      var label = bagianTampil.length === 1 ? labelKolom(bagianTampil[0].wadah) : '';
+      var kunci = label + '|' + isi.join('|');
+      if (kunci !== terakhir) {
+        terakhir = kunci;
+        kosongkan(teks);
+        if (label) teks.appendChild(document.createTextNode(label + ': '));
+        isi.filter(Boolean).forEach(function (t, i) {
+          if (i) teks.appendChild(document.createTextNode(' · '));
+          teks.appendChild(i === 0 ? el('strong', { text: t }) : document.createTextNode(t));
+        });
+      }
+      // Dibuka sekali saat galat muncul; jika pengguna menutupnya lagi, tetap tertutup.
+      var adaGalat = bagian.some(function (b) { return !!b.wadah.querySelector('.kolom-galat:not(:empty)'); });
+      if (adaGalat && !galatTadi) buka(true);
+      galatTadi = adaGalat;
+    }
+    kotak.addEventListener('change', perbarui);
+    kotak.addEventListener('input', perbarui);
+    if (window.MutationObserver) {
+      new MutationObserver(perbarui).observe(kotak, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    }
+    perbarui();
+    return kotak;
+  }
+
   /** Tanggal draft yang masih boleh dipakai: kemarin untuk semua, tanggal lama hanya Pengelola; selebihnya hari ini. */
   function tanggalDraft(tanggal, pengelola) {
     var hariIni = tanggalIso(new Date());
@@ -4733,11 +4833,11 @@
       tautanKembali('Beranda', '#/'),
       el('h1', { class: 'judul-layar', text: 'Pencatatan Waste' }),
       catatanDraft,
-      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      lipatKotakInfo(el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
         gTanggal.wadah,
         gShift.wadah,
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
-      ]),
+      ]), [gTanggal.wadah]),
       wadahBaris,
       el('div', { class: 'deret-tambah' }, [tombolTambah, tombolMenu]),
       pesan,
@@ -5399,10 +5499,10 @@
       tautanKembali('Beranda', '#/'),
       el('h1', { class: 'judul-layar', text: 'Pengecekan Suhu' }),
       catatanDraft,
-      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      lipatKotakInfo(el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
         gTanggal.wadah,
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
-      ]),
+      ]), [gTanggal.wadah]),
       gWaktu.wadah,
       wadahUnit,
       pesan,
@@ -6024,11 +6124,11 @@
       tautanKembali('Beranda', '#/'),
       el('h1', { class: 'judul-layar', text: 'Prep List' }),
       catatanDraft,
-      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      lipatKotakInfo(el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
         gTanggal.wadah,
         gShift.wadah,
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
-      ]),
+      ]), [gTanggal.wadah]),
       wadahSaran,
       wadahBaris,
       el('div', { class: 'deret-tambah' }, tombolTambah),
@@ -7003,11 +7103,11 @@
       judul,
       keterangan,
       catatanDraft,
-      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      lipatKotakInfo(el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
         gTanggal.wadah,
         wadahKepala,
         el('div', { class: 'lebar-penuh' }, [penanda, statusForm])
-      ]),
+      ]), [gTanggal.wadah]),
       wadahBaris,
       pesan,
       el('div', { class: 'bilah-kirim' }, [penghitung, el('div', { class: 'deret-tombol bilah-kirim-tombol' }, [tombolTambah, tombolKirim])])

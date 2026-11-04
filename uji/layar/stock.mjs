@@ -7,6 +7,12 @@ const chromium = await muatChromium();
 const SHOT = (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'inventoryku-shot-'));
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 500) : ''); } };
+// Kotak info di HP terlipat (aplikasi 0.46.0, butir 453): buka dengan Ubah sebelum memilih Tanggal, Kategori, Catat pemakaian,
+// atau Pemasok, seperti pengguna.
+const bukaKotak = async (page) => {
+  const t = page.locator('#layar .kotak-ringkas-tombol');
+  if (await t.isVisible() && await t.getAttribute('aria-expanded') === 'false') { await t.click(); await page.waitForTimeout(150); }
+};
 const s = seed();
 const T = s.token;
 const hari = (n) => new Date(Date.now() + n * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
@@ -103,12 +109,14 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
   // Ganti cara ditolak selama ada angka Tambah keluar; angka tidak diubah
   const aDaging = akhirServer('Daging sapi');
   await kunci(page, 'Daging sapi', 'keluar').fill('1');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).click();
   await page.waitForTimeout(300);
   const galatCara = (await page.locator('.kotak-info .kolom-galat').allInnerTexts()).join(' ');
   cek(/Kirim atau kosongkan dulu angka Tambah keluar yang sudah diketik \(1 item\)\./.test(galatCara), 'ganti cara ditolak', galatCara);
   cek(await page.locator('label.pilihan', { hasText: 'Tambah keluar' }).locator('input').isChecked() && await kunci(page, 'Daging sapi', 'keluar').inputValue() === '1', 'tetap Tambah keluar, angka utuh');
   await kunci(page, 'Daging sapi', 'keluar').fill('');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).click();
   await page.waitForTimeout(300);
   cek(await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).locator('input').isChecked() && await kunci(page, 'Daging sapi', 'sisa').count() === 1, 'sesudah dikosongkan: Hitung sisa');
@@ -166,6 +174,7 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
   cek(await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).locator('input').isChecked(), 'cara tersimpan di draft');
   // Kemarin: Hitung sisa tidak berlaku, sisa hari ini tidak ikut terkirim, tetap di draft
   await kunci(page, 'Telur', 'sisa').fill('50');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Kemarin' }).click();
   await page.waitForTimeout(1500);
   const bantu = await page.locator('.kotak-info').innerText();
@@ -177,6 +186,7 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
   await page.getByRole('button', { name: 'Kirim stock' }).click();
   await page.waitForTimeout(1500);
   cek(permintaan.length === n1 + 1 && permintaan[n1].tanggal === hari(-1) && permintaan[n1].baris.every((b) => !('sisa' in b)), 'kemarin: kiriman tanpa sisa', permintaan[n1]);
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hari ini' }).click();
   await page.waitForTimeout(1500);
   cek(await kunci(page, 'Telur', 'sisa').inputValue() === '50', 'hari ini lagi: sisa Telur masih ada');
@@ -208,6 +218,7 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
 // D4. Antrean: sisa yang lebih banyak saat sampai di server tidak membuat antrean macet; barang masuk tetap tercatat
 {
   const { ctx, page, permintaan } = await buka(390, 844, 'Rina');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).click();
   await page.waitForTimeout(300);
   const aD = akhirServer('Daging sapi');
@@ -231,6 +242,7 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
 // H. Tanpa sinyal: dua kategori ke antrean, lalu terkirim
 {
   const { ctx, page, permintaan } = await buka(390, 844, 'Rina');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Tambah keluar' }).click();
   await page.waitForTimeout(200);
   await kunci(page, 'Telur', 'keluar').fill('3');
@@ -267,6 +279,7 @@ const pesanForm = (page) => page.locator('.layar-form > .pesan-formulir').innerT
 // J. Desktop: tabel per kategori, kolom Sisa Sekarang, muat tanpa digeser
 for (const w of [1024, 1366]) {
   const { ctx, page } = await buka(w, 900, 'Rina');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).click();
   await page.waitForTimeout(300);
   const tabel = page.locator('.stock-kelompok table.tabel-stock');
@@ -299,6 +312,7 @@ for (const w of [1024, 1366]) {
 // L. Galat pada item yang disembunyikan pencarian: pencarian dikosongkan, fokus ke kolomnya
 {
   const { ctx, page } = await buka(390, 844, 'Rina');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Tambah keluar' }).click();
   await page.waitForTimeout(200);
   await kunci(page, 'Tomat', 'masuk').fill('2x');
@@ -348,6 +362,7 @@ for (const [w, h] of [[320, 568], [360, 740], [390, 844], [430, 932], [768, 1024
     const { ctx, page } = await buka(w, h, 'Budi', { rute });
     const panjang = w === 320 ? 'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrs' : 'a';
     if (rute === '#/stock') {
+      await bukaKotak(page);
       await page.locator('label.pilihan', { hasText: 'Hitung sisa' }).click();
       await page.waitForTimeout(200);
       await kunci(page, 'Ayam fillet', 'sisa').fill('99999');

@@ -5,6 +5,12 @@ import { muatChromium } from '../alat/peramban.mjs';
 const chromium = await muatChromium();
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 600) : ''); } };
+// Kotak info di HP terlipat (aplikasi 0.46.0, butir 453): buka dengan Ubah sebelum memilih Tanggal, Kategori, Catat pemakaian,
+// atau Pemasok, seperti pengguna.
+const bukaKotak = async (page) => {
+  const t = page.locator('#layar .kotak-ringkas-tombol');
+  if (await t.isVisible() && await t.getAttribute('aria-expanded') === 'false') { await t.click(); await page.waitForTimeout(150); }
+};
 const s = seed();
 const T = s.token;
 const hari = (n) => new Date(Date.now() + n * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
@@ -158,6 +164,7 @@ let idSumber;
   await kunci(page, 'Telur', 'masuk').fill('');
   await page.waitForTimeout(100);
   // Pilih kategori Sayur dan cari: Isi dari pesanan kembali ke Semua kategori dan mengosongkan pencarian
+  await bukaKotak(page);
   await page.selectOption('#pilih-kategori', 'Sayur');
   await page.fill('#cari-item-stock', 'tom');
   await page.waitForTimeout(200);
@@ -270,6 +277,7 @@ let idSumber;
   await page.reload();
   await page.waitForTimeout(2000);
   cek(await page.locator('.pesanan-stock').count() === 1, 'kartu hari ini');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Kemarin' }).click();
   await page.waitForTimeout(1500);
   cek(await page.locator('.pesanan-stock').count() === 0, 'Kemarin tanpa kartu');

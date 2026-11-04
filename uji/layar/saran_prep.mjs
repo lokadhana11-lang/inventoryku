@@ -8,6 +8,12 @@ import { muatChromium } from '../alat/peramban.mjs';
 const chromium = await muatChromium();
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 700) : ''); } };
+// Kotak info di HP terlipat (aplikasi 0.46.0, butir 453): buka dengan Ubah sebelum memilih Tanggal, Kategori, Catat pemakaian,
+// atau Pemasok, seperti pengguna.
+const bukaKotak = async (page) => {
+  const t = page.locator('#layar .kotak-ringkas-tombol');
+  if (await t.isVisible() && await t.getAttribute('aria-expanded') === 'false') { await t.click(); await page.waitForTimeout(150); }
+};
 const s = seed();
 seedPrep(s.token);
 
@@ -118,6 +124,7 @@ const ukur = (page) => page.evaluate(() => {
 {
   const { ctx, page } = await buka(390, 844, { nama: 'Budi', pin: '482915' });
   cek(await kartu(page).count() === 1, 'Pengelola hari ini: kartu ada');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Kemarin' }).click();
   await page.waitForTimeout(1800);
   cek(await kartu(page).count() === 0, 'Kemarin: tanpa kartu');
@@ -125,6 +132,7 @@ const ukur = (page) => page.evaluate(() => {
   await page.waitForTimeout(500);
   cek(!/saran/.test(await page.getByRole('dialog').innerText()), 'Kemarin: Tambah item tanpa saran');
   await page.keyboard.press('Escape');
+  await bukaKotak(page);
   await page.locator('label.pilihan', { hasText: 'Hari ini' }).click();
   await page.waitForTimeout(1800);
   await ctx.close();
