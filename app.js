@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.43.0';
+  var VERSI_APLIKASI = '0.44.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -559,6 +559,30 @@
   /** "12,5 kg" yang tidak pernah terpisah baris. */
   function angkaSatuan(n, satuan) {
     return el('span', { class: 'angka-satuan', text: formatAngka(n) + (satuan ? ' ' + satuan : '') });
+  }
+
+  /**
+   * Cukup untuk berapa hari (aplikasi 0.44.0, Code.gs v0.43): stock ÷ rata-rata pemakaian per hari, satu angka di belakang
+   * koma dibulatkan ke bawah; null tanpa rata-rata atau tanpa pemakaian, 0 jika habis. Sama dengan cukupHari_ di server.
+   */
+  function hitungCukup(akhir, pakaiHarian) {
+    if (pakaiHarian == null || !(pakaiHarian > 0)) return null;
+    if (akhir <= 0) return 0;
+    return Math.floor(akhir / pakaiHarian * 10) / 10;
+  }
+
+  /** "± 2 hari", "kurang dari 1 hari", atau "habis" (tampilan Bagian 7). */
+  function teksCukup(cukup) {
+    if (cukup == null) return '';
+    if (cukup <= 0) return 'habis';
+    if (cukup < 1) return 'kurang dari 1 hari';
+    return '\u00b1\u00a0' + Math.floor(cukup) + '\u00a0hari';
+  }
+
+  /** "cukup ± 2 hari" atau "habis" untuk keterangan baris; '' tanpa angka. */
+  function ketCukup(cukup) {
+    if (cukup == null) return '';
+    return cukup <= 0 ? 'habis' : 'cukup ' + teksCukup(cukup);
   }
 
   /** "12,5 kg" sebagai teks (untuk kalimat di konfirmasi dan toast), angka dan satuan dipisah spasi tak terputus. */
@@ -3743,6 +3767,9 @@
       var konversi = el('span', { class: 'konversi', id: idKonversi });
       var akhirTeks = el('span', { class: 'stock-akhir-angka' });
       var wadahPeringatan = el('span', { class: 'wadah-peringatan' });
+      // Cukup untuk berapa hari (aplikasi 0.44.0): dari Stock akhir yang dihitung di sini, ikut angka yang diketik. Server lama
+      // tidak mengirim pakaiHarian, jadi tidak tampil.
+      var cukupTeks = el('span', { class: 'stock-cukup' });
       // Harga beli (aplikasi 0.23.0): per satuan yang diketik di Tambah masuk; di kartu baru tampil setelah Tambah masuk diisi.
       var adaHarga = !!(data && data.pembelianSiap);
       var inHarga = adaHarga ? isianAngka(it, 'harga', 'Harga beli') : null;
@@ -3807,6 +3834,8 @@
         }
         kosongkan(akhirTeks).appendChild(angkaSatuan(h.akhir, modeTabel ? '' : it.satuan));
         akhirTeks.classList.toggle('minus', h.akhir < 0);
+        var cukup = hitungCukup(h.akhir, it.pakaiHarian);
+        cukupTeks.textContent = cukup > 0 ? (modeTabel ? 'cukup ' : 'Cukup ') + teksCukup(cukup) : '';
         konversi.textContent = isian.besar && it.satuanBesar && h.masukDasar > 0
           ? '= ' + formatAngka(h.masukDasar) + ' ' + it.satuan : '';
         kosongkan(wadahPeringatan);
@@ -3854,7 +3883,7 @@
           el('td', { class: 'otomatis tercatat', text: tercatat || '–' }),
           el('td', { class: 'sel-masuk' }, [el('div', { class: 'baris-angka' }, [inMasuk, pilihSatuan, konversi]), kolomHarga, kolomBaik]),
           el('td', { class: sisaMode ? 'sel-sisa' : null }, [inKeluar, ketKeluar]),
-          el('td', { class: 'angka otomatis' }, [akhirTeks, el('br'), wadahPeringatan]),
+          el('td', { class: 'angka otomatis' }, [akhirTeks, cukupTeks, wadahPeringatan]),
           el('td', { class: 'otomatis', text: it.satuan })
         ]);
       } else {
@@ -3877,7 +3906,7 @@
             el('div', { class: 'baris-angka' }, [inKeluar, el('span', { class: 'satuan-tetap', text: it.satuan })]),
             ketKeluar
           ]),
-          el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Stock akhir' }), akhirTeks]),
+          el('div', { class: 'stock-akhir' }, [el('span', { class: 'otomatis', text: 'Stock akhir' }), akhirTeks, cukupTeks]),
           wadahPeringatan
         ]);
         // Label menunjuk ke kolomnya.
@@ -8486,6 +8515,8 @@
       wadah.appendChild(sekarang);
       if (d.tercatat < 0) wadah.appendChild(tandaStatus('masalah', 'Stock akhir minus'));
       else if (it.stokMin != null && d.tercatat < it.stokMin) wadah.appendChild(tandaStatus('tinjau', 'Di bawah stok minimum'));
+      var cukup = teksPakai(d, it.satuan);
+      if (cukup) wadah.appendChild(el('p', { class: 'kolom-bantuan riwayat-item-cukup', text: cukup }));
       if (!d.rekap.length) {
         wadah.appendChild(kotakKosong('Belum ada rekap untuk item ini.', 'riwayat'));
         return;
@@ -9306,16 +9337,33 @@
     });
   }
 
-  /** Lembar daftar item dari Perlu perhatian (stock minus, di bawah stok minimum); ketuk untuk riwayat item. */
+  /**
+   * Kalimat pemakaian di lembar riwayat item (aplikasi 0.44.0): "Cukup ± 2 hari. Pemakaian rata-rata 2,3 kg per hari (keluar,
+   * dipakai prep, dan waste; 12 hari buka terakhir)." '' untuk server lama atau item tanpa rekap.
+   */
+  function teksPakai(d, satuan) {
+    var p = d.pakai;
+    if (!p) return '';
+    if (p.rata == null) return 'Rata-rata pemakaian dihitung setelah ' + p.hariMin + ' hari buka (baru ' + p.hari + ' hari).';
+    if (!(p.rata > 0)) return 'Tidak terpakai dalam ' + p.jendela + ' hari terakhir.';
+    return (d.cukupHari > 0 ? 'Cukup ' + teksCukup(d.cukupHari) + '. ' : '') + 'Pemakaian rata-rata ' + teksAngkaSatuan(p.rata, satuan) +
+      ' per hari (keluar, dipakai prep, dan waste; ' + p.hari + ' hari buka terakhir).';
+  }
+
+  /** Lembar daftar item dari Perlu perhatian (stock minus, di bawah stok minimum, hampir habis); ketuk untuk riwayat item. */
   function bukaDaftarItemStock(p) {
     var item = (p.data && p.data.item) || [];
     bukaLembar({
       judul: p.judul,
       isi: [
-        el('p', { class: 'kartu-teks', text: 'Ketuk item untuk melihat riwayatnya' + (p.jenis === 'minus' ? ' dan menyesuaikan stock.' : '.') }),
+        el('p', { class: 'kartu-teks', text: 'Ketuk item untuk melihat riwayatnya' + (p.jenis === 'minus' ? ' dan menyesuaikan stock.' : '.') +
+          (p.jenis === 'hampirHabis' ? ' Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum ' +
+            'masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item.' : '') }),
         el('div', { class: 'daftar', role: 'group', 'aria-label': p.judul }, item.map(function (x) {
           var ket = 'Stock tercatat ' + formatAngka(x.stock) + (x.satuan ? ' ' + x.satuan : '');
           if (x.stokMin != null) ket += ' · minimum ' + formatAngka(x.stokMin) + (x.satuan ? ' ' + x.satuan : '');
+          if (x.cukupHari != null) ket += ' · ' + ketCukup(x.cukupHari);
+          if (x.pakaiHarian > 0 && p.jenis === 'hampirHabis') ket += ' · pakai ' + teksAngkaSatuan(x.pakaiHarian, x.satuan) + ' per hari';
           if (x.saran) ket += ' · saran order ' + x.saran;
           return el('button', { type: 'button', class: 'daftar-baris', 'aria-haspopup': 'dialog', onclick: function () { bukaRiwayatItem(x.nama); } }, [
             el('span', { class: 'daftar-baris-isi' }, [
@@ -9408,7 +9456,8 @@
     switch (p.jenis) {
       case 'suhu': return { href: '#/suhu' };
       case 'minus':
-      case 'bawahMinimum': return { klik: function () { bukaDaftarItemStock(p); } };
+      case 'bawahMinimum':
+      case 'hampirHabis': return { klik: function () { bukaDaftarItemStock(p); } };
       case 'lewatMasaSimpan':
       case 'habisBesok': return { klik: function () {
         bukaLembar({ judul: p.judul, isi: barisMasaSimpan({ lewat: data.lewat || [], habisBesok: data.habisBesok || [] }),
@@ -9434,7 +9483,7 @@
 
   /** Ikon ubin di daftar Perlu perhatian (versi 1.7), menurut jenis butirnya. */
   var IKON_PERHATIAN = {
-    suhu: 'termometer', minus: 'kotak', bawahMinimum: 'kotak', lewatMasaSimpan: 'jam', habisBesok: 'jam', sistem: 'segitiga',
+    suhu: 'termometer', minus: 'kotak', bawahMinimum: 'kotak', hampirHabis: 'kotak', lewatMasaSimpan: 'jam', habisBesok: 'jam', sistem: 'segitiga',
     dilaporkan: 'bendera', resetPin: 'kunci', terkunci: 'kunci', jadwal: 'jam', opname: 'opname', formBelum: 'tiket', belumDiperiksa: 'centang',
     tanpaHarga: 'label', menu: 'resep', penjualan: 'label', hargaBeli: 'truk', pemasangan: 'segitiga'
   };
@@ -10398,7 +10447,8 @@
         daftar: data.itemLain.filter(function (it) { return !ada[it.nama]; }),
         kosong: 'Semua item aktif sudah ada di daftar belanja.',
         ket: function (it) {
-          return it.kategori + ' · stock ' + formatAngka(it.stock) + ' ' + it.satuan + (it.dipesan ? ' · sudah dipesan' : '');
+          return it.kategori + ' · stock ' + formatAngka(it.stock) + ' ' + it.satuan + (it.cukupHari != null ? ' · ' + ketCukup(it.cukupHari) : '') +
+            (it.dipesan ? ' · sudah dipesan' : '');
         },
         pilih: function (it) {
           (tambahan[g.nama] = tambahan[g.nama] || []).push(it.nama);
@@ -10442,7 +10492,8 @@
       });
       perbarui();
       var info = 'Stock ' + formatAngka(it.stock) + ' ' + it.satuan +
-        (it.stokMin != null ? ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan : '');
+        (it.stokMin != null ? ' · minimum ' + formatAngka(it.stokMin) + ' ' + it.satuan : '') +
+        (it.cukupHari != null ? ' · ' + ketCukup(it.cukupHari) : '');
       var teksSaran = it.saran ? 'Saran ' + it.saran.teks : (it.ditambah ? '' : 'Tanpa saran: stok maksimum kosong');
       return el('div', { class: 'daftar-baris peristiwa tetap belanja-baris' }, [
         el('span', { class: 'daftar-baris-isi' }, [

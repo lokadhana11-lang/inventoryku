@@ -8,6 +8,9 @@ let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 700) : ''); } };
 seed();
 const VERSI = H.ambil('VERSI_KODE');
+// Versi tidak ditulis tetap: uji ini tetap benar sesudah Code.gs dan aplikasi naik versi.
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const VERSI_APP = (await import('node:fs')).readFileSync(new URL('../../app.js', import.meta.url), 'utf8').match(/VERSI_APLIKASI = '([^']+)'/)[1];
 const lalu = (menit) => new Date(Date.now() + H.geserWaktu - menit * 60000).toISOString();
 const status = (as, surel, brevo) => { H.supabaseUji.statusSistem = { appsScript: as, surel: surel || { menunggu: 0, sejak: null }, brevo: !!brevo }; };
 const susunan = (teks) => {
@@ -70,7 +73,7 @@ status({ versi: 'v0.41', salinan: lalu(45) }, { menunggu: 1, sejak: lalu(40) });
   cek(await grup.count() === 1, 'Beranda: grup Server dan salinan');
   const t = await grup.innerText().catch(() => '');
   cek(/Salinan ke Google Sheets berhenti/.test(t) && /\(45 menit lalu\)\. Selama berhenti, email laporan tidak terkirim/.test(t) &&
-    /1 email menunggu dikirim/.test(t) && /Versi Code\.gs berbeda/.test(t) && /Apps Script masih v0\.41, sedangkan Supabase v0\.42/.test(t),
+    /1 email menunggu dikirim/.test(t) && /Versi Code\.gs berbeda/.test(t) && new RegExp('Apps Script masih v0\\.41, sedangkan Supabase ' + esc(VERSI)).test(t),
     'Beranda: dua peringatan dengan teks', t);
   const tautan = grup.getByRole('link');
   cek(await tautan.count() === 2 && (await tautan.first().getAttribute('href')) === '#/pengaturan/outlet', 'Beranda: baris membuka Outlet dan jadwal');
@@ -80,7 +83,7 @@ status({ versi: 'v0.41', salinan: lalu(45) }, { menunggu: 1, sejak: lalu(40) });
   cek(/#\/pengaturan\/outlet$/.test(page.url()), 'ketuk: pindah ke Outlet dan jadwal', page.url());
   const k = await kartu(page).innerText().catch(() => '');
   cek(/Versi dan salinan/.test(k) && /Salinan ke Google Sheets berhenti\./.test(k) && /Versi Code\.gs berbeda\./.test(k), 'kartu: dua peringatan', k);
-  cek(/Aplikasi di perangkat ini\s*0\.43\.0/.test(k) && /Server\s*Code\.gs v0\.42 di Supabase/.test(k) && /Apps Script\s*Code\.gs v0\.41/.test(k) &&
+  cek(new RegExp('Aplikasi di perangkat ini\\s*' + esc(VERSI_APP)).test(k) && new RegExp('Server\\s*Code\\.gs ' + esc(VERSI) + ' di Supabase').test(k) && /Apps Script\s*Code\.gs v0\.41/.test(k) &&
     /Salinan ke Google Sheets\s*\d+ [A-Z][a-z]{2} \d\d\.\d\d \(45 menit lalu\)/.test(k) && /Email menunggu dikirim\s*1 email, sejak \d+ [A-Z][a-z]{2}/.test(k) &&
     /Susunan tab dan kolom\s*Lengkap/.test(k), 'kartu: daftar nilai', k);
   cek(await kartu(page).locator('.pesan-formulir.masalah').count() === 1 && await kartu(page).locator('.pesan-formulir.tinjau').count() === 1,
@@ -128,7 +131,7 @@ status({ versi: VERSI, salinan: lalu(2) });
   await page.evaluate(() => { location.hash = '#/pengaturan/outlet'; });
   await page.waitForTimeout(1500);
   const k = await kartu(page).innerText().catch(() => '');
-  cek(/Salinan ke Google Sheets berjalan dan versinya sama\./.test(k) && /Apps Script\s*Code\.gs v0\.42/.test(k) && /\(2 menit lalu\)/.test(k) &&
+  cek(/Salinan ke Google Sheets berjalan dan versinya sama\./.test(k) && new RegExp('Apps Script\\s*Code\\.gs ' + esc(VERSI)).test(k) && /\(2 menit lalu\)/.test(k) &&
     /Email menunggu dikirim\s*Tidak ada/.test(k), 'berjalan: kartu baik', k);
   await ctx.close();
 }

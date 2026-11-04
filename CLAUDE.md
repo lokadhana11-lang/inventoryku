@@ -116,17 +116,19 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** Code.gs v0.42, aplikasi 0.43.0 (pemantauan salinan Apps Script, versi, email, dan susunan Sheet, 2 November
-  2026, butir 428–436), menunggu pemilik: tempel Edge Function dan Code.gs, `setupSpreadsheet` sekali, gabungkan PR. Sebelumnya
-  aplikasi 0.42.0 (Pengaturan dua panel, PR #65) dan Code.gs v0.41 (sudah ditempel pemilik ke Edge Function `rapid-action` dan Apps
-  Script, 31 Oktober 2026); semua 68 PR sampai 2 November sudah digabung. Riwayat tiap rilis: `catatan/status.md`.
+- **Versi terakhir:** Code.gs v0.43, aplikasi 0.44.0 (cukup untuk berapa hari dan hampir habis, 4 November 2026, butir 437–443),
+  menunggu pemilik: tempel Edge Function dan Code.gs, gabungkan PR (tanpa setupSpreadsheet/pasangTrigger). Sebelumnya Code.gs v0.42 dan
+  aplikasi 0.43.0 (pemantauan, butir 428–436), digabung lewat PR #69 dan terpasang (4 November 2026: Edge Function `rapid-action` dan
+  Apps Script v0.42, `setupSpreadsheet` sudah dijalankan). Kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal adalah cara
+  memeriksa apa yang terpasang. Riwayat tiap rilis: `catatan/status.md`.
 - **Terpasang:** backend di Supabase sejak 16 Oktober 2026 (butir 203–213): Edge Function bernama `rapid-action`, database di
   Sydney (`config.js` memakai `?forceFunctionRegion=ap-southeast-2`, butir 274), email lewat Gmail pemilik oleh Apps Script (tanpa
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
-- **Fitur yang ada:** form Stock (Semua kategori, cari, Hitung sisa, pemasok dan harga beli, masa simpan barang masuk, pesanan), Suhu,
+- **Fitur yang ada:** form Stock (Semua kategori, cari, Hitung sisa, pemasok dan harga beli, masa simpan barang masuk, pesanan, cukup
+  untuk berapa hari), Suhu,
   Prep List (resep dengan catatan, hasil aktual, pesan stock hasil prep), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
-  stock, Perlu perhatian Hari ini/Rutin, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
+  stock, Perlu perhatian Hari ini/Rutin termasuk hampir habis, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
   banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
   susunan Sheet; kartu "Versi dan salinan" di Outlet dan jadwal).
@@ -136,8 +138,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
-  v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436). Saran lain yang belum dipilih: perkiraan "cukup untuk n hari" dari
-  rata-rata pemakaian, saran prep, tempel porsi terjual dari laporan kasir, foto nota di Tambah masuk, outlet tambahan.
+  v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443). Saran lain yang
+  belum dipilih: saran prep, tempel porsi terjual dari laporan kasir, foto nota di Tambah masuk, outlet tambahan.
 
 ## Keputusan tambahan
 

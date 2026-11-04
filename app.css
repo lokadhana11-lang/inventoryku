@@ -2615,6 +2615,29 @@ body.papan-ketik .lembar-aksi {
   display: none;
 }
 
+/* Cukup untuk berapa hari (aplikasi 0.44.0): di bawah angka Stock akhir; di kartu rata kanan, di tabel satu baris sendiri. */
+.stock-cukup {
+  display: block;
+  font-size: 14px;
+  color: var(--tinta-redup);
+  font-variant-numeric: tabular-nums;
+  /* Sel angka di tabel tidak terputus baris; kalimat ini boleh, supaya kolom Stock akhir tidak melebar (1.024 px). */
+  white-space: normal;
+}
+
+.stock-cukup:empty {
+  display: none;
+}
+
+.stock-akhir .stock-cukup {
+  flex-basis: 100%;
+  text-align: right;
+}
+
+.tabel-stock .wadah-peringatan:not(:empty) {
+  display: block;
+}
+
 .peringatan {
   font-size: 14px;
   padding: 8px 10px;

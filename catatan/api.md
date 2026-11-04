@@ -291,6 +291,13 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   peringatan: [seperti beranda] }`. Aksi pemilik dari Apps Script (diawali `__`) kini membawa `versiKode` (semua panggilan) dan
   `__berkas` membawa `galatSalinan` (hasil salinan sebelumnya, '' = berhasil); jawabannya tidak berubah. `__surel` menandai email yang
   lebih dari 3 hari belum terkirim sebagai gagal dan mencatatnya di `laporan_terakhir`/`rekap_terakhir`.
+- Cukup untuk berapa hari (Code.gs v0.43, aplikasi 0.44.0, 4 November 2026): `formStock.item[]` ditambah `pakaiHarian` (rata-rata
+  pemakaian per hari buka dalam 14 hari sebelum `tanggal`, atau `null` jika kurang dari 3 hari buka atau tanpa rekap; 0 = tidak
+  terpakai). `riwayatItem` ditambah `pakai: { total, hari, rata, jendela: 14, hariMin: 3 } | null` dan `cukupHari` (stock ÷ rata,
+  satu angka di belakang koma dibulatkan ke bawah; 0 = habis atau minus; null tanpa rata-rata atau tanpa pemakaian).
+  `daftarBelanja` (item kelompok dan `itemLain`, juga di jawaban `catatPesanan`/`tutupPesanan`) ditambah `pakaiHarian` dan
+  `cukupHari`. `dashboard.perhatian` ditambah butir jenis `hampirHabis` (tinjau, sesudah `bawahMinimum`; `data.item: [{ nama, stock,
+  satuan, stokMin, cukupHari, pakaiHarian }]`), dan `data.item` butir `bawahMinimum` ditambah `cukupHari` dan `pakaiHarian`.
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
