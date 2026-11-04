@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.42.0';
+  var VERSI_APLIKASI = '0.43.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -2801,7 +2801,7 @@
       gambarTiket(form, libur);
       gambarKemajuan(form, libur);
       gambarPemberitahuan(data.permintaanReset || [], data.pemeriksaan || null, data.peringatanSistem || [], data.masaSimpan || null,
-        data.opname || null, data.terkunci || [], libur, data.liburBesok || null);
+        data.opname || null, data.terkunci || [], libur, data.liburBesok || null, data.peringatanPemasangan || []);
       dataTerakhir = data;
     }
     var dataTerakhir = null;
@@ -2910,7 +2910,7 @@
      * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
      * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
      */
-    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci, libur, liburBesok) {
+    function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci, libur, liburBesok, pemasangan) {
       kosongkan(bawah);
       // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
       var simpan = barisMasaSimpan(masaSimpan);
@@ -2930,6 +2930,18 @@
             tandaStatus('masalah', 'Perlu perhatian'),
             el('span', { class: 'daftar-baris-ket', text: p + ' Rinciannya di tab M_Konfigurasi.' })
           ]));
+        })), bawah.firstChild);
+      }
+      // Salinan Apps Script, versi, email tertahan, susunan Sheet (aplikasi 0.43.0, Code.gs v0.42): ketuk membuka Outlet dan jadwal.
+      if (pemasangan && pemasangan.length) {
+        bawah.insertBefore(el('div', { class: 'daftar', role: 'group', 'aria-label': 'Server dan salinan' }, pemasangan.map(function (p) {
+          return el('a', { class: 'daftar-baris pemberitahuan', href: '#/pengaturan/outlet' }, [
+            el('span', { class: 'daftar-baris-isi' }, [
+              tandaStatus(p.tingkat === 'masalah' ? 'masalah' : 'tinjau', p.judul),
+              el('span', { class: 'daftar-baris-ket', text: p.ket })
+            ]),
+            ikon('kanan')
+          ]);
         })), bawah.firstChild);
       }
       // Hari libur hari ini atau besok (aplikasi 0.30.0): di bawah reset PIN dan akun terkunci, di atas peringatan sistem.
@@ -9407,7 +9419,8 @@
       case 'resetPin':
       case 'terkunci': return { href: hrefStaff(data.nama, true) };
       case 'formBelum': return { href: '#/' };
-      case 'jadwal': return { href: '#/pengaturan/outlet' };
+      case 'jadwal':
+      case 'pemasangan': return { href: '#/pengaturan/outlet' };
       case 'opname': return { href: '#/opname' };
       case 'tanpaHarga': return { klik: function () { bukaNilaiStock(d.nilaiStock); } };
       case 'menu': return { href: '#/hpp/menu' };
@@ -9423,7 +9436,7 @@
   var IKON_PERHATIAN = {
     suhu: 'termometer', minus: 'kotak', bawahMinimum: 'kotak', lewatMasaSimpan: 'jam', habisBesok: 'jam', sistem: 'segitiga',
     dilaporkan: 'bendera', resetPin: 'kunci', terkunci: 'kunci', jadwal: 'jam', opname: 'opname', formBelum: 'tiket', belumDiperiksa: 'centang',
-    tanpaHarga: 'label', menu: 'resep', penjualan: 'label', hargaBeli: 'truk'
+    tanpaHarga: 'label', menu: 'resep', penjualan: 'label', hargaBeli: 'truk', pemasangan: 'segitiga'
   };
   var KATA_TINGKAT = { masalah: 'Masalah', tinjau: 'Perlu ditinjau', menunggu: 'Menunggu' };
 
@@ -10938,6 +10951,61 @@
     return duaAngka(Math.floor(x / 60)) + ':' + duaAngka(x % 60);
   }
 
+  /** "baru saja", "3 menit lalu", "2 jam lalu", "3 hari lalu". */
+  function lamaLalu(iso) {
+    var ms = Date.now() - new Date(iso).getTime();
+    if (!(ms >= 60000)) return 'baru saja';
+    var menit = Math.floor(ms / 60000);
+    if (menit < 60) return menit + ' menit lalu';
+    var j = Math.floor(menit / 60);
+    return j < 48 ? j + ' jam lalu' : Math.floor(j / 24) + ' hari lalu';
+  }
+
+  /**
+   * Kartu Versi dan salinan di Outlet dan jadwal (aplikasi 0.43.0, Code.gs v0.42): versi aplikasi dan server, kontak terakhir
+   * Apps Script (salinan ke Google Sheets tiap 5 menit), email yang menunggu dikirim lewat Gmail, susunan tab dan kolom, dan
+   * peringatan yang sama dengan Beranda. s = bacaOutletJadwal.statusSistem.
+   */
+  function kartuStatusSistem(s) {
+    var as = s.appsScript || null;
+    var baris = [
+      ['Aplikasi di perangkat ini', VERSI_APLIKASI],
+      ['Server', 'Code.gs ' + s.versiServer + (s.diSupabase ? ' di Supabase' : ' di Apps Script')]
+    ];
+    if (s.diSupabase) {
+      baris.push(['Apps Script', !as ? 'Belum tercatat' : as.versi ? 'Code.gs ' + as.versi : 'Code.gs sebelum v0.42']);
+      baris.push(['Salinan ke Google Sheets', !as ? 'Belum tercatat' : waktuPendek(as.salinan) + ' (' + lamaLalu(as.salinan) + ')']);
+      if (s.surel && s.surel.lewatGmail) {
+        baris.push(['Email menunggu dikirim', s.surel.menunggu ? s.surel.menunggu + ' email, sejak ' + waktuPendek(s.surel.sejak) : 'Tidak ada']);
+      }
+    }
+    baris.push(['Susunan tab dan kolom', !s.susunan ? 'Belum diperiksa' : s.susunan.lengkap ? 'Lengkap' : 'Belum lengkap']);
+    var peringatan = s.peringatan || [];
+    var atas = peringatan.map(function (p) {
+      var jenis = p.tingkat === 'masalah' ? 'masalah' : 'tinjau';
+      return el('p', { class: 'pesan-formulir ' + jenis }, [ikon(jenis === 'masalah' ? 'seru' : 'info'),
+        el('span', {}, [el('strong', { text: p.judul + '. ' }), document.createTextNode(p.ket)])]);
+    });
+    if (s.diSupabase && !as) {
+      atas.push(el('p', { class: 'kolom-bantuan', text: 'Kontak dari Apps Script tercatat paling lambat 5 menit sesudah Edge Function di ' +
+        'Supabase diperbarui.' }));
+    } else if (!peringatan.length) {
+      atas.push(el('p', { class: 'pesan-formulir baik' }, [ikon('centang'), el('span', { text: s.diSupabase
+        ? 'Salinan ke Google Sheets berjalan dan versinya sama.' : 'Tidak ada yang perlu dipasang ulang.' })]));
+    }
+    return el('section', { class: 'kartu status-sistem', 'aria-labelledby': 'judul-status-sistem' }, [
+      el('h2', { class: 'kartu-judul', id: 'judul-status-sistem', text: 'Versi dan salinan' })
+    ].concat(atas, [
+      el('dl', { class: 'status-sistem-daftar' }, baris.map(function (b) {
+        return el('div', {}, [el('dt', { text: b[0] }), el('dd', { text: b[1] })]);
+      })),
+      el('p', { class: 'kolom-bantuan', text: s.diSupabase
+        ? 'Apps Script menyalin data ke Google Sheets, PDF dan foto ke Google Drive, dan mengirim email dari Gmail pemilik Sheet tiap 5 ' +
+          'menit. Susunan tab dan kolom diperiksa setiap laporan harian dan setiap setupSpreadsheet.'
+        : 'Susunan tab dan kolom diperiksa setiap laporan harian dan setiap setupSpreadsheet.' })
+    ]));
+  }
+
   function layarOutletJadwal(k) {
     aturJudul('Outlet dan jadwal');
     var penanda = el('span', { class: 'memperbarui', role: 'status' });
@@ -11119,6 +11187,8 @@
       if (data.perluPasangTrigger) {
         wadah.appendChild(el('p', { class: 'pesan-formulir tinjau bagian' }, [ikon('info'), el('span', { text: PESAN_PASANG_TRIGGER })]));
       }
+      // Versi dan salinan (aplikasi 0.43.0): server lama tidak mengirim statusSistem, jadi kartunya tidak tampil.
+      if (data.statusSistem) wadah.appendChild(kartuStatusSistem(data.statusSistem));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [el('h2', { class: 'kartu-judul', text: 'Outlet' }), kNama.wadah, kZona.wadah]));
       wadah.appendChild(el('section', { class: 'kartu formulir' }, [
         el('h2', { class: 'kartu-judul', text: 'Jadwal' }),

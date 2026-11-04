@@ -38,6 +38,9 @@
 > dikelompokkan "Hari ini" dan "Rutin" (Bagian 5.6).
 > Tambahan 28 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): barang jadi yang dinilai dari resepnya
 > di lembar Nilai stock dan Pengaturan → Item (Bagian 5.6 dan 5.7).
+> Tambahan 2 November 2026 (keputusan pemilik, dari telaah aplikasi): peringatan "Server dan salinan" di Beranda
+> dan Dashboard Pengelola, dan kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal (Bagian 5.2, 5.6, 5.7,
+> dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -625,6 +628,11 @@ Satu-satunya layar yang sepenuhnya navy.
   Perlu perhatian yang sama dengan ikon kunci.
 - **Pengingat stock opname** untuk Pengelola jika sudah lewat jadwal: "Stock opname
   terakhir 9 hari lalu." Ketuk untuk membuka layar Stock opname.
+- **Server dan salinan** (2 November 2026, spesifikasi sistem Bagian 4.5) untuk Pengelola, di atas peringatan
+  email/cadangan yang gagal: satu baris per peringatan, bertanda Masalah ("Salinan ke Google Sheets berhenti",
+  "2 email belum terkirim", "Salinan ke Google Sheets gagal") atau Perlu ditinjau ("Versi Code.gs berbeda",
+  "Susunan Sheet belum lengkap"), dengan keterangan lengkap dan apa yang perlu dilakukan pemilik Sheet. Ketuk
+  untuk membuka Pengaturan → Outlet dan jadwal. Tanpa akhiran "Rinciannya di tab M_Konfigurasi".
 - **Hari libur** (22 Oktober 2026, spesifikasi sistem Bagian 5.8). Kemajuan diganti ikon kalender
   dan "Hari libur: Lebaran" (tanpa keterangan cukup "Hari libur"), warna Teks di Navy, dan rel
   tidak tampil. Tiket yang belum diisi bertanda Menunggu "Hari libur" dengan baris sobek "Tidak
@@ -990,8 +998,9 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Hari ini dan Rutin** (28 Oktober 2026): daftar dibagi dua kelompok, masing-masing tetap urut dari
   yang paling mendesak. "Hari ini" (subjudul kecil) berisi yang perlu ditangani hari itu: suhu di luar
   standar, stock minus, di bawah stok minimum, lewat masa simpan, habis besok, laporan atau jadwal
-  yang gagal, baris dilaporkan keliru, reset PIN, akun terkunci, form belum lengkap, dan penjualan
-  belum dicatat; tanpa butir: "Tidak ada yang mendesak hari ini." "Rutin" berisi pekerjaan berkala:
+  yang gagal, salinan ke Google Sheets, email, versi Code.gs, dan susunan Sheet (2 November 2026; ubin
+  segitiga, ketuk membuka Outlet dan jadwal), baris dilaporkan keliru, reset PIN, akun terkunci, form belum
+  lengkap, dan penjualan belum dicatat; tanpa butir: "Tidak ada yang mendesak hari ini." "Rutin" berisi pekerjaan berkala:
   isian belum diperiksa, stock opname, harga beli berbeda, menu di atas target, dan item belum punya
   harga. Rutin bisa dilipat: baris "Rutin · 5 butir" dengan keterangan "Pemeriksaan isian, stock
   opname, harga, dan menu" dan panah; bawaannya terlipat selama ada butir Hari ini (terbuka jika
@@ -1115,6 +1124,17 @@ Satu-satunya layar yang sepenuhnya navy.
 
 **Pengaturan → Outlet dan jadwal:**
 
+- Kartu "Versi dan salinan" (2 November 2026), paling atas, hanya jika server mengirimnya: peringatan yang
+  sama dengan Beranda (judul tebal lalu keterangan, warna Masalah atau Perlu ditinjau), atau "Salinan ke
+  Google Sheets berjalan dan versinya sama." (Baik). Lalu daftar: "Aplikasi di perangkat ini" (0.43.0),
+  "Server" (Code.gs v0.42 di Supabase), "Apps Script" (Code.gs v0.42, "Code.gs sebelum v0.42", atau "Belum
+  tercatat"), "Salinan ke Google Sheets" ("2 Nov 14.05 (3 menit lalu)"), "Email menunggu dikirim" (hanya
+  jika email lewat Gmail: "Tidak ada" atau "2 email, sejak 2 Nov 22.15"), dan "Susunan tab dan kolom"
+  ("Lengkap", "Belum lengkap", atau "Belum diperiksa"). Label di atas nilai di HP, dua kolom mulai 480 px.
+  Keterangan: "Apps Script menyalin data ke Google Sheets, PDF dan foto ke Google Drive, dan mengirim email
+  dari Gmail pemilik Sheet tiap 5 menit. Susunan tab dan kolom diperiksa setiap laporan harian dan setiap
+  setupSpreadsheet." Selama belum ada kontak: "Kontak dari Apps Script tercatat paling lambat 5 menit
+  sesudah Edge Function di Supabase diperbarui."
 - Selain nama outlet, zona waktu, jam closing, dan jadwal stock opname, ada pilihan
   "Keluar otomatis setelah tidak dipakai": 5, 10, 15, atau 30 menit. Nilai awalnya 5 menit.
   Di bawahnya satu baris keterangan: "Berlaku untuk semua pengguna di semua perangkat."
@@ -1575,6 +1595,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
+| Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
 | Seharusnya vs nyata | "Terpakai lebih banyak dari porsi terjual" / "Sesuai porsi terjual" |
 | Notifikasi suhu (judul, isi) | "Suhu di luar standar: Opening", "Chiller 1 9 °C (Pintu ditutup). Dicatat Rina." |

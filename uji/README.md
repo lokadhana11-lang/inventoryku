@@ -34,7 +34,9 @@ memuat Playwright. Tidak ada `package.json` di repo, supaya frontend tetap tanpa
 - `alat/jam.mjs`: jam uji tetap (diimpor paling awal oleh `harness.mjs`; `UJI_JAM` untuk tanggal lain) dan `namaBulan`.
 - `alat/harness.mjs`: Code.gs asli di atas `supabase/src/sheet.js` dan `layanan.js` dengan jam yang bisa
   digeser (`aturGeser`), penampung email, PDF, Drive, dan jadwal, serta server statis untuk uji layar
-  (`layani(0)` = port kosong mana pun; `config.js` diganti alamat API tiruan).
+  (`layani(0)` = port kosong mana pun; `config.js` diganti alamat API tiruan). `supabaseUji` adalah `SUPABASE_`
+  untuk Code.gs: uji pemantauan mengisi `supabaseUji.statusSistem` seperti runtime.js (kontak Apps Script dan
+  email yang menunggu) dan menghapusnya lagi di akhir.
 - `alat/seed.mjs`: data contoh 12 hari: empat staff, 11 item, tiga unit, dua pemasok, resep Sambal dasar,
   menu Ayam geprek dan Telur balado, isian Stock, Suhu, Prep, Waste, dan penjualan tiap hari.
 - `alat/peramban.mjs`: memuat Chromium dari Playwright; setiap konteks peramban memakai jam uji yang sama.
@@ -49,7 +51,9 @@ yang tidak pernah ada), bukan data outlet.
 - Tiap berkas memulai data baru (`seed()`), jadi berkas boleh dijalankan dalam urutan apa pun.
 - Data contoh dibuat mundur 12 hari dari jam uji (8–19 Oktober 2026), jadi seluruhnya di bulan yang sama. Dengan
   `UJI_JAM` pada tanggal 1–12, sebagian data jatuh di bulan lalu dan pemeriksaan yang menghitung bulan berjalan
-  (HPP, food cost sementara, rekap) memang berbeda; pakai tanggal 13 ke atas.
+  (HPP, food cost sementara, rekap) memang berbeda; pakai tanggal 14 ke atas. Pada tanggal 13 `server/fc_sementara`
+  juga berbeda: hanya tanggal 1 yang belum punya penjualan, jadi sesudah dicatat food cost sudah lengkap dan angka
+  "sementara" memang hilang (diperiksa 2 November 2026 dengan `UJI_JAM` 13 dan 14 Januari 2027).
 - Uji baru tidak menulis nama bulan atau tanggal tetap: hitung dari jam uji (`namaBulan(hari(0))`), supaya uji tetap
   benar jika jam uji diganti. Penjualan dan isian lain tidak bisa dicatat untuk tanggal yang belum datang, jadi
   majukan jam (`H.aturGeser`) lebih dulu.

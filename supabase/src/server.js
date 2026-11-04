@@ -3,7 +3,8 @@
 // - Aksi pemilik (diawali "__"): hanya dengan rahasia RAHASIA_SINKRON (dari Apps Script pemilik) atau rahasia jadwal
 //   (dari pg_cron).
 
-import { impor, sinkron, sinkronSelesai, berkasUntukDrive, berkasTersalin, surelUntukGmail, surelTerkirim } from './sinkron.js';
+import { impor, sinkron, sinkronSelesai, berkasUntukDrive, berkasTersalin, surelUntukGmail, surelTerkirim, surelKedaluwarsa,
+  PESAN_SUREL_KEDALUWARSA } from './sinkron.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,8 @@ const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan'
   'pengingatSuhuClosing', 'pengingatStock', 'pengingatClosing', 'arsipTahunan'];
 // Jadwal yang cukup memuat tab master; tab lain dimuat saat dibutuhkan.
 const JADWAL_RINGAN = /^(pengingatSuhu|pengingatStock$|pengingatClosing$|arsipTahunan$)/;
+// Panggilan salinan tiap 5 menit dari Apps Script (sinkronDariSupabase): waktunya dicatat sebagai salinan terakhir (Code.gs v0.42).
+const PANGGILAN_SALINAN = ['__berkas', '__sinkron', '__surel'];
 
 function samaAman(a, b) {
   a = String(a || '');
@@ -40,6 +43,26 @@ function jawab(teks, status) {
 export function buatPelayan(dep) {
   const log = dep.log || console;
   const KelasDate = dep.Date || Date;
+
+  /**
+   * Kontak dari Apps Script (Code.gs v0.42), di info appsScript: { versi: versi Code.gs di Apps Script (dikirim sejak v0.42),
+   * salinan: waktu panggilan salinan terakhir, galat: kegagalan salinan sebelumnya ('' jika berhasil) }. Apps Script yang lebih
+   * lama tidak mengirim versiKode, jadi versi tetap kosong dan hanya waktu salinan yang tercatat. Kegagalan mencatat tidak
+   * menghentikan salinan.
+   */
+  async function catatAppsScript(a, body) {
+    const isi = {};
+    if (typeof body.versiKode === 'string' && /^v\d+(\.\d+){1,3}$/.test(body.versiKode)) isi.versi = body.versiKode;
+    if (PANGGILAN_SALINAN.indexOf(a) >= 0) isi.salinan = new KelasDate().toISOString();
+    if (a === '__berkas' && typeof body.galatSalinan === 'string') isi.galat = body.galatSalinan.slice(0, 500);
+    if (!Object.keys(isi).length) return;
+    try {
+      await dep.sql`insert into inventoryku.info (kunci, nilai) values ('appsScript', ${dep.sql.json(isi)})
+        on conflict (kunci) do update set nilai = coalesce(inventoryku.info.nilai, '{}'::jsonb) || excluded.nilai`;
+    } catch (err) {
+      log.error('Kontak Apps Script tidak bisa dicatat: ' + (err && err.message ? err.message : err));
+    }
+  }
 
   async function aksiPemilik(body) {
     const a = body.action;
@@ -64,6 +87,7 @@ export function buatPelayan(dep) {
     }
     if (!dep.rahasiaSinkron) throw new Error('Secret RAHASIA_SINKRON belum dipasang di Supabase (Edge Functions → Secrets).');
     if (!samaAman(body.rahasia, dep.rahasiaSinkron)) throw Object.assign(new Error('Rahasia sinkron salah.'), { status: 403 });
+    await catatAppsScript(a, body);
     switch (a) {
       case '__impor':
         if (body.langkah === 'mulai' && !body.timpa) {
@@ -102,8 +126,14 @@ export function buatPelayan(dep) {
         return berkasUntukDrive(dep.sql, dep.adaptor.alamatBerkas);
       case '__berkasTersalin':
         return berkasTersalin(dep.sql, body);
-      case '__surel':
+      case '__surel': {
+        // Email yang tertahan lebih dari 3 hari dicatat gagal (laporan_terakhir/rekap_terakhir) dan tidak dikirim lagi.
+        const lama = await surelKedaluwarsa(dep.sql);
+        for (const x of lama) {
+          await dep.runtime.catatSurelGagal(x.asal, PESAN_SUREL_KEDALUWARSA + (x.subjek ? ': ' + x.subjek : ''));
+        }
         return dep.adaptor.kirimSurel ? [] : surelUntukGmail(dep.sql);
+      }
       case '__surelTerkirim': {
         const gagal = await surelTerkirim(dep.sql, body);
         for (const g of gagal) await dep.runtime.catatSurelGagal(g.asal, g.galat);

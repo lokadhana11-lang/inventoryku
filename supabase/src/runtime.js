@@ -140,7 +140,11 @@ export function buatRuntime(dep) {
         };
         const G = buatLayanan(k);
         G.DI_SUPABASE = true;
-        G.SUPABASE_ = dep.tambahan || {};
+        // statusSistem (Code.gs v0.42): kontak terakhir Apps Script (info appsScript, dicatat server.js) dan email yang belum
+        // terkirim, untuk peringatan di Beranda, Dashboard, dan Pengaturan → Outlet dan jadwal.
+        G.SUPABASE_ = Object.assign({}, dep.tambahan || {}, {
+          statusSistem: { appsScript: info.appsScript || null, surel: awal.surel || { menunggu: 0, sejak: null }, brevo: !!dep.kirimSurel }
+        });
         G.Date = KelasDate;
         const kode = dep.buatKodeGs(G);
         let keluaran;

@@ -82,6 +82,11 @@ aplikasi menolak isian baru; pilih waktu di luar jam sibuk.
   Deploy Edge Function lebih dulu, lalu tempel Code.gs, lalu (jika diminta) `setupSpreadsheet`. Sejak Code.gs
   v0.30, `setupSpreadsheet` berhenti dengan pesan jika Edge Function masih versi lama, supaya Sheet tidak
   punya tab yang tidak ada di Supabase.
+- **Memeriksa yang terpasang** (sejak Code.gs v0.42): aplikasi → Pengaturan → Outlet dan jadwal → kartu "Versi
+  dan salinan" menunjukkan versi aplikasi, versi Code.gs di Supabase dan di Apps Script, waktu salinan terakhir ke
+  Google Sheets, email yang menunggu, dan tab atau kolom yang belum dibuat `setupSpreadsheet`. Beranda dan Dashboard
+  Pengelola memberi tahu jika salinan berhenti lebih dari 30 menit, email tertahan, versinya berbeda, atau
+  `setupSpreadsheet` perlu dijalankan. Versi Apps Script tercatat paling lambat 5 menit sesudah Code.gs ditempel.
 - **Log:** Supabase → Edge Functions → api → Logs (lama tiap aksi: "Aksi beranda: 12 ms").
 
 ## Function di region yang sama dengan database

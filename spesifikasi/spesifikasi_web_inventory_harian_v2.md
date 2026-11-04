@@ -96,6 +96,12 @@
 > form yang ditagih, penjualan tidak perlu dicatat, dan email harian serta pengingat cek suhu tidak
 > dikirim (Bagian 3, 5.1, 5.8, 5.9, 6.1, 7.1, 8.2, 8.5, 9.1, 9.3, 10, 10.1, 12, 13).
 >
+> Diperbarui 2 November 2026 (keputusan pemilik, dari telaah aplikasi): pemantauan pemasangan. Supabase
+> mencatat kontak terakhir Apps Script dan versi Code.gs-nya; Beranda, Dashboard, dan Pengaturan → Outlet
+> dan jadwal memberi tahu Pengelola jika salinan ke Google Sheets berhenti atau gagal, email tertahan, versi
+> Code.gs berbeda, atau setupSpreadsheet perlu dijalankan; email yang tertahan lebih dari 3 hari dicatat
+> gagal (Bagian 4.5, 5.1, 10, 10.1).
+>
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
 >
@@ -381,7 +387,9 @@ Apps Script (menempel di Google Sheet yang sama)
   halaman PDF stock per kategori selalu dipatuhi.
 - **Email** lewat Brevo jika `BREVO_API_KEY` dan `SUREL_PENGIRIM` dipasang; jika tidak, email menunggu
   di antrean dan Apps Script mengirimnya dari Gmail pemilik paling lambat 5 menit. Email yang gagal
-  dicatat seperti sebelumnya (Beranda Pengelola, `laporan_terakhir`/`rekap_terakhir`).
+  dicatat seperti sebelumnya (Beranda Pengelola, `laporan_terakhir`/`rekap_terakhir`). Email yang lebih
+  dari 3 hari belum terkirim (salinan Apps Script berhenti selama itu) tidak dikirim lagi dan dicatat
+  gagal dengan subjeknya (2 November 2026); dulu dibuang tanpa catatan.
 - **Jadwal** dipasang ulang otomatis begitu Pengelola mengubah jam closing, jeda, hari cadangan, atau
   zona waktu; tidak perlu menjalankan `pasangTrigger` lagi. pg_cron memakai UTC; jam lokal diubah
   dengan zona waktu tersimpan.
@@ -391,6 +399,21 @@ Apps Script (menempel di Google Sheet yang sama)
   tab yang disalin, jadi tetap jalan. Sheets hanya untuk dicek: ketikan langsung di Sheet tertimpa;
   jika jumlah baris Sheet tidak cocok, tab itu disalin penuh, dan sekali sehari (sesudah pukul 02.00)
   semua tab disalin penuh.
+- **Pemantauan** (2 November 2026). Jika salinan Apps Script berhenti, tidak ada yang gagal di Supabase,
+  padahal email lewat Gmail, berkas di Drive, dan Google Sheets ikut berhenti. Karena itu Supabase mencatat
+  setiap panggilan salinan (waktu, versi Code.gs di Apps Script, dan kegagalan salinan sebelumnya) dan
+  menghitung email yang belum terkirim. Pengelola diberi tahu di Beranda dan Dashboard, dengan rincian di
+  Pengaturan → Outlet dan jadwal (kartu "Versi dan salinan"), jika:
+  - salinan tidak berjalan lebih dari 30 menit (Masalah; juga notifikasi ke HP Pengelola sesudah laporan
+    harian, Bagian 10.1). Selama belum pernah ada kontak (Edge Function baru diperbarui), tidak dianggap
+    berhenti;
+  - email belum terkirim lebih dari 60 menit, atau salinan terakhir gagal (Masalah);
+  - versi Code.gs di Apps Script berbeda dari Supabase (Perlu ditinjau; Apps Script sebelum v0.42 tidak
+    melaporkan versinya, jadi ditulis "sebelum v0.42");
+  - tab atau kolom yang dibuat `setupSpreadsheet` belum ada (Perlu ditinjau). Diperiksa setiap laporan
+    harian (juga hari libur) dan setiap `setupSpreadsheet`, karena perlu membaca semua tab; hasilnya di
+    `M_Konfigurasi` baris `susunan_sheet`. Langkah `setupSpreadsheet` yang hanya mengubah tampilan Google
+    Sheets (warna, rumus) tidak bisa diperiksa dari sini.
 - **Berkas di Drive.** Laporan PDF, foto bukti waste, dan cadangan disalin ke folder Drive yang sama
   seperti sebelumnya (`Laporan Kitchen/...`); kolom Foto Bukti di Sheet berisi tautan Drive. Di
   aplikasi, Pengelola membuka foto lewat tautan sementara dari Storage.
@@ -468,7 +491,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_FormKolom` | ID Form, Urutan, Label, Jenis Kolom, Pilihan, Wajib, Bagian (kepala / baris), Aktif | Susunan kolom tiap form kustom |
 | `M_HariLibur` (22 Oktober 2026) | Tanggal, Keterangan (tidak wajib, paling panjang 40 huruf), Dicatat Oleh, Dicatat Pada | Hari libur (Bagian 5.8) |
 | `M_Satuan` | Satuan, Jenis (Berat / Isi / Hitungan / Kemasan), Aktif | Daftar satuan yang sah |
-| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit), target food cost (35%), bahan kecil (3%) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis, HPP |
+| `M_Konfigurasi` | Kode Pemasangan (sekali pakai), zona waktu (terdeteksi otomatis), jam closing (21:30), jeda laporan setelah closing (45 menit), batas suhu Chiller (1 sampai 5), batas suhu Freezer (−18 atau lebih rendah), jadwal stock opname (mingguan atau bulanan), hari cadangan mingguan, lama keluar otomatis (5 menit), target food cost (35%), bahan kecil (3%); hasil pemeriksaan susunan tab dan kolom (`susunan_sheet`, 2 November 2026, diisi otomatis) | Trigger terjadwal, validasi suhu, pengingat opname, keluar otomatis, HPP |
 
 **Riwayat harga item (`M_HargaItem`):**
 
@@ -1750,6 +1773,7 @@ Apps Script tidak bisa mengirimnya.
 | "Waktunya cek suhu Opening" dan unit yang belum diisi | Semua HP yang menyala | Pada jam pengingat, hanya jika waktu cek itu belum diisi untuk semua unit aktif, kecuali pada hari libur (Bagian 5.8) |
 | "Stock hari ini: 1 minus, 3 di bawah minimum, 1 lewat masa simpan" dan nama itemnya (18 Oktober 2026) | HP Pengelola | Sekali sehari pada jam pengingat stock, hanya jika ada item aktif yang minus atau di bawah stok minimum, atau barang yang lewat masa simpan atau habis besok |
 | "Closing 21.30: 3 form belum diisi" dan nama formnya (28 Oktober 2026) | Semua HP yang menyala | Sekian menit sebelum jam closing, hanya jika ada form wajib hari itu yang belum diisi atau belum lengkap (Bagian 5.8), kecuali pada hari libur |
+| "Email laporan harian tertahan" (atau "Salinan ke Google Sheets berhenti" jika tidak ada email laporan atau email lewat Brevo) dan sejak kapan (2 November 2026) | HP Pengelola | Sesudah laporan harian dari jadwal, juga pada hari libur, hanya jika salinan Apps Script tidak berjalan lebih dari 30 menit (Bagian 4.5) |
 
 - **Jam pengingat cek suhu** diatur Pengelola di Pengaturan → Outlet dan jadwal: Opening 08.00,
   Middle 14.00, Closing 21.00 (nilai awal); jam yang dikosongkan mematikan pengingat itu. Tidak ada
@@ -1768,7 +1792,8 @@ Apps Script tidak bisa mengirimnya.
   tanggalnya.
 - Hanya pengguna aktif yang punya PIN yang menerima; Pengelola menurut role saat notifikasi dikirim.
 - Mengetuk notifikasi membuka layar yang sesuai (form Suhu, reset PIN staff itu, Dashboard untuk
-  pengingat stock, atau Beranda untuk pengingat sebelum closing).
+  pengingat stock, Beranda untuk pengingat sebelum closing, atau Pengaturan → Outlet dan jadwal untuk
+  salinan yang berhenti).
 - Notifikasi tidak menggantikan apa pun: pemberitahuan di Beranda, Dashboard, dan email harian tetap.
 - Pada hari libur pengingat cek suhu dan pengingat sebelum closing tidak dikirim. Notifikasi suhu di luar standar, reset
   PIN, akun terkunci, dan pengingat stock tetap dikirim (isian tetap diterima, dan barang tetap bisa
