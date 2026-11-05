@@ -3131,4 +3131,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 460. **Uji:** `uji/layar/tiket_kolom.mjs` (93 pemeriksaan): 4, 5, 7, dan 9 form pada delapan ukuran dan 600 px: jumlah kolom yang
     diharapkan, tanpa tiket sendirian di tablet dan laptop, tanpa gulir samping, isi tiket tidak keluar dari tiketnya, tiket ≥ 120 px;
     gerak menyala. Uji memeriksa isi tiket per elemen, bukan `scrollWidth`, karena takik setengah lingkaran di baris sobek memang
-    menjorok 3 px di tiap sisi (sejak versi 1.7). Code.gs tidak berubah.
+    menjorok 3 px di tiap sisi (sejak versi 1.7). Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada 5 November: 45 berkas,
+    2.317 pemeriksaan lulus (server 20 berkas 781, layar 25 berkas 1.536), 0 gagal. Belum diuji di HP asli.
