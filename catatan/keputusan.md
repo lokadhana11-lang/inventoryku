@@ -3085,3 +3085,33 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     judul sejajar panel samping. `stock`, `pesanan`, `pesanan2`, dan `saran_prep` membuka kotak info dengan Ubah sebelum memilih
     Tanggal, Kategori, Catat pemakaian, atau Pemasok di HP (`bukaKotak`). Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
     pada 4 November: 43 berkas, 2.158 pemeriksaan lulus (server 20 berkas 781, layar 23 berkas 1.377), 0 gagal. Belum diuji di HP asli.
+
+### Pemberitahuan Beranda dalam satu daftar (aplikasi 0.47.0, 4 November 2026)
+
+456. **Satu daftar "Perlu ditindaklanjuti".** Telaah desain 4 November 2026 butir 4, dipilih pemilik ("lanjut ke butir 4"). Sebelumnya
+    Beranda menampilkan tiap kelompok pemberitahuan sebagai kartu sendiri dengan chip tanda status (reset PIN, hari libur, server dan
+    salinan, peringatan sistem, pemeriksaan, opname, masa simpan, isian di HP), sedangkan Dashboard memakai daftar berikon; di laptop
+    tiap kartu membentang selebar layar untuk satu baris teks. Kini `gambarPemberitahuan` mengumpulkan semua baris ke satu
+    `section.beranda-tindak` berjudul "Perlu ditindaklanjuti" berisi satu `.daftar` (`role="group"`, `aria-labelledby` ke judul).
+    Baris dibuat `barisTindak({ tingkat, ikon, judul, ket, href | klik | aksi })`: ubin ikon (`ubinIkon`, warna tingkat), judul
+    dengan kata tingkat untuk pembaca layar (`KATA_TINGKAT`, seperti Perlu perhatian), keterangan, lalu panah atau tombol aksi.
+    Pembuat baris lama diganti `tindakMasaSimpan`, `tindakAntrean`, `tindakPemeriksaan`, `tindakOpname`, dan `tindakHariLibur`;
+    `barisMasaSimpan` tetap untuk lembar masa simpan di Dashboard. Urutan, teks, tautan, dan tingkat tetap, kecuali: peringatan
+    sistem ("Laporan harian: Gagal …") berjudul dari awal pesannya ("Laporan harian perlu perhatian") dengan sisanya di keterangan
+    (sebelumnya chip "Perlu perhatian" untuk semuanya); isian di HP menjadi satu judul "2 isian menunggu kirim · 1 isian gagal kirim"
+    bertingkat Masalah jika ada yang gagal; judul stock opname tanpa titik. Baris masa simpan: teks selalu di samping ubin ikon
+    (`flex-basis: calc(100% - 52px)` di HP, sehingga di 320 px pun tidak turun ke bawah ikon), tombol "Catat sebagai waste" di
+    bawah teks dan sejajar teks di HP, di kanan mulai 600 px. Tanpa pemberitahuan, judul dan kartu tidak tampil (seperti dulu).
+    Urutan menurut tingkat (Masalah dulu) tidak dipilih, karena urutan sekarang sudah diputuskan per butir (misalnya butir hari libur
+    di bawah reset PIN); bisa diubah jika pemilik meminta.
+457. **Perbaikan garis kiri Beranda.** `.beranda-bawah` memakai bantalan di dalam wadah 1.200 px (seperti `.layar-isi`), sedangkan
+    butir 452 menyempitkannya ke `1200px − 2 × tepi` bersama wadah berbantalan luar; di lebar 1.153–1.247 px isinya jadi 24 px lebih
+    ke kanan dari garis kiri (tidak tertangkap uji delapan ukuran). Kini di 1.024 px ke atas `.beranda-bawah` kembali 1.200 px
+    dengan bantalan tepi di semua lebar. `uji/layar/beranda_tindak.mjs` memeriksa garis kiri juga di 1200×800.
+458. **Uji:** `uji/layar/beranda_tindak.mjs` (66 pemeriksaan): urutan dan kata tingkat, ubin ikon per tingkat, tautan (reset PIN,
+    Riwayat, Stock opname), Catat sebagai waste membuka Waste, tanpa chip tanda status, peringatan sistem dengan dan tanpa awalan,
+    hari libur besok di bawah reset PIN, isian di HP gagal kirim di baris terakhir dan membuka lembarnya, Staff hanya masa simpan,
+    tanpa pemberitahuan tanpa judul, sembilan ukuran (delapan Bagian 4.6 dan 1200×800: tanpa gulir samping, baris ≥ 56 px, tombol
+    ≥ 44 px, teks di samping ikon, tombol di kanan atau di bawah, daftar sejajar tiket dan merek), gerak menyala.
+    `uji/layar/pemantauan.mjs` kini mencari baris server dan salinan di daftar ini (grup "Server dan salinan" tidak ada lagi).
+    Code.gs tidak berubah.

@@ -6,6 +6,9 @@ import { muatChromium } from '../alat/peramban.mjs';
 const chromium = await muatChromium();
 let gagal = 0, lulus = 0;
 const cek = (k, label, x) => { if (k) lulus++; else { gagal++; console.log('GAGAL:', label, x !== undefined ? JSON.stringify(x).slice(0, 700) : ''); } };
+// Peringatan pemasangan di Beranda: baris di daftar Perlu ditindaklanjuti yang membuka Outlet dan jadwal (aplikasi 0.47.0, butir 456).
+const barisPasang = (page) => page.locator('#layar .beranda-tindak a.daftar-baris[href="#/pengaturan/outlet"]');
+const teksPasang = async (page) => (await barisPasang(page).allInnerTexts()).join('\n');
 seed();
 const VERSI = H.ambil('VERSI_KODE');
 // Versi tidak ditulis tetap: uji ini tetap benar sesudah Code.gs dan aplikasi naik versi.
@@ -69,13 +72,12 @@ const ukur = (page) => page.evaluate(() => {
 status({ versi: 'v0.41', salinan: lalu(45) }, { menunggu: 1, sejak: lalu(40) });
 {
   const { ctx, page } = await buka(390, 844, null);
-  const grup = page.getByRole('group', { name: 'Server dan salinan' });
-  cek(await grup.count() === 1, 'Beranda: grup Server dan salinan');
-  const t = await grup.innerText().catch(() => '');
+  cek(await barisPasang(page).count() === 2, 'Beranda: dua baris server dan salinan di Perlu ditindaklanjuti');
+  const t = await teksPasang(page);
   cek(/Salinan ke Google Sheets berhenti/.test(t) && /\(45 menit lalu\)\. Selama berhenti, email laporan tidak terkirim/.test(t) &&
     /1 email menunggu dikirim/.test(t) && /Versi Code\.gs berbeda/.test(t) && new RegExp('Apps Script masih v0\\.41, sedangkan Supabase ' + esc(VERSI)).test(t),
     'Beranda: dua peringatan dengan teks', t);
-  const tautan = grup.getByRole('link');
+  const tautan = barisPasang(page);
   cek(await tautan.count() === 2 && (await tautan.first().getAttribute('href')) === '#/pengaturan/outlet', 'Beranda: baris membuka Outlet dan jadwal');
   cek(!/Rinciannya di tab M_Konfigurasi/.test(t), 'Beranda: tanpa akhiran M_Konfigurasi', t);
   await tautan.first().click();
@@ -119,7 +121,7 @@ status({ versi: 'v0.41', salinan: lalu(45) }, { menunggu: 1, sejak: lalu(40) });
 // C. Staff: tanpa grup; Outlet dan jadwal tidak terbuka.
 {
   const { ctx, page } = await buka(390, 844, null, { nama: 'Rina', pin: '730264' });
-  cek(await page.getByRole('group', { name: 'Server dan salinan' }).count() === 0, 'Staff: tanpa peringatan pemasangan');
+  cek(await barisPasang(page).count() === 0, 'Staff: tanpa peringatan pemasangan');
   await ctx.close();
 }
 
@@ -127,7 +129,7 @@ status({ versi: 'v0.41', salinan: lalu(45) }, { menunggu: 1, sejak: lalu(40) });
 status({ versi: VERSI, salinan: lalu(2) });
 {
   const { ctx, page } = await buka(390, 844, null);
-  cek(await page.getByRole('group', { name: 'Server dan salinan' }).count() === 0, 'berjalan: Beranda tanpa grup');
+  cek(await barisPasang(page).count() === 0, 'berjalan: Beranda tanpa grup');
   await page.evaluate(() => { location.hash = '#/pengaturan/outlet'; });
   await page.waitForTimeout(1500);
   const k = await kartu(page).innerText().catch(() => '');
@@ -147,7 +149,7 @@ susunan('Kurang: M_Resep: kolom Catatan');
     'kartu: belum tercatat, Brevo, susunan', k);
   await page.evaluate(() => { location.hash = '#/'; });
   await page.waitForTimeout(1500);
-  const t = await page.getByRole('group', { name: 'Server dan salinan' }).innerText().catch(() => '');
+  const t = await teksPasang(page);
   cek(/Susunan Sheet belum lengkap/.test(t), 'Beranda: susunan', t);
   await ctx.close();
 }
@@ -165,7 +167,7 @@ susunan('Lengkap');
 status({ versi: 'v0.41', salinan: lalu(45) });
 {
   const { ctx, page } = await buka(390, 844, null, { serverLama: true });
-  cek(await page.getByRole('group', { name: 'Server dan salinan' }).count() === 0, 'server lama: Beranda tanpa grup');
+  cek(await barisPasang(page).count() === 0, 'server lama: Beranda tanpa grup');
   await page.evaluate(() => { location.hash = '#/pengaturan/outlet'; });
   await page.waitForTimeout(1500);
   cek(await kartu(page).count() === 0 && /Outlet/.test(await layar(page).innerText()), 'server lama: tanpa kartu, layar tetap ada');
@@ -178,8 +180,8 @@ susunan('Kurang: tab Data_PenjualanMenu; M_Resep: kolom Catatan; Data_Stock: kol
 for (const [w, h] of [[320, 568], [360, 740], [390, 844], [430, 932], [768, 1024], [1024, 768], [1366, 768], [1920, 1080]]) {
   const { ctx, page } = await buka(w, h, null);
   const mb = await ukur(page);
-  const ada = await page.getByRole('group', { name: 'Server dan salinan' }).count() === 1;
-  const tinggi = await page.getByRole('group', { name: 'Server dan salinan' }).getByRole('link').first().evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
+  const ada = await barisPasang(page).count() >= 1;
+  const tinggi = await barisPasang(page).first().evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
   await page.evaluate(() => { location.hash = '#/pengaturan/outlet'; });
   await page.waitForTimeout(1500);
   const mo = await ukur(page);

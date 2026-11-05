@@ -49,6 +49,8 @@
 > Beranda dan Dashboard, satu garis kiri untuk merek, judul, dan isi di laptop, bar navigasi bawah tidak tampil di
 > layar isian dan layar dalam, dan kotak info form yang ringkas: satu baris dengan "Ubah" di HP, tiga kolom di
 > laptop (Bagian 4.2, 4.3, 4.7, 5.3, 5.7, dan 7).
+> Tambahan 4 November 2026 (keputusan pemilik, telaah desain butir 4): pemberitahuan di Beranda dalam satu daftar
+> "Perlu ditindaklanjuti" berikon, seperti Perlu perhatian di Dashboard (Bagian 5.2 dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -599,7 +601,8 @@ Satu-satunya layar yang sepenuhnya navy.
 │ │14.05, Rina ││            │ │
 │ └────────────┘└────────────┘ │
 │                              │
-│ 1 isian menunggu kirim       │
+│ Perlu ditindaklanjuti        │  satu kartu daftar berikon
+│ [i] 1 isian menunggu kirim  › │
 ├──────────────────────────────┤
 │▓ Beranda   Riwayat   Laporan ▓│
 └──────────────────────────────┘
@@ -647,6 +650,21 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Form kustom** tampil sebagai tiket tambahan dengan bentuk yang sama, mengikuti urutan
   yang diatur Pengelola. Form yang disembunyikan tidak tampil. Jika tiket lebih dari empat,
   layar digulir; rel dan kepala navy tetap di tempatnya.
+- **Satu daftar "Perlu ditindaklanjuti"** (tambahan 4 November 2026). Semua pemberitahuan di bawah tiket
+  (butir-butir di bawah ini) tampil sebagai baris dalam **satu kartu daftar** dengan judul bagian "Perlu
+  ditindaklanjuti", seperti Perlu perhatian di Dashboard. Tiap baris: ubin ikon 40 px berwarna tingkatnya
+  (Masalah, Perlu ditinjau, atau Menunggu; Bagian 6) di kiri, judul tebal (kata tingkatnya dibacakan pembaca layar,
+  misalnya "Perlu ditinjau: Rina meminta reset PIN"), keterangan Tinta Redup di bawahnya, lalu panah jika baris
+  bisa diketuk atau tombol "Catat sebagai waste" di baris masa simpan. Di HP tombol itu turun ke bawah keterangan,
+  sejajar teks; mulai 600 px tombol di kanan. Chip tanda status tidak dipakai lagi di sini; tingkatnya dibawa ubin
+  ikon dan kata untuk pembaca layar. Urutan (atas ke bawah): permintaan reset PIN, akun terkunci, hari libur, server
+  dan salinan, peringatan sistem, isian belum diperiksa, baris dilaporkan keliru, stock opname, lewat masa simpan,
+  habis besok, lalu isian di HP. Ikon: kunci (reset PIN, terkunci), kalender (hari libur), segitiga (server dan
+  salinan, peringatan sistem), centang (belum diperiksa), bendera (dilaporkan keliru), papan (stock opname), jam (masa
+  simpan), HP (isian di HP). Peringatan sistem berjudul dari awal pesannya, misalnya "Laporan harian perlu
+  perhatian", dengan sisa pesan dan "Rinciannya di tab M_Konfigurasi." sebagai keterangan. Tanpa pemberitahuan,
+  judul dan kartu tidak tampil. Staff hanya melihat masa simpan dan isian di HP. Di laptop kartu selebar tiket,
+  di garis kiri yang sama (Bagian 4.3).
 - Pengelola melihat tambahan di bawah tiket: "3 isian belum diperiksa" dan
   "1 baris dilaporkan keliru", masing-masing membuka Riwayat dengan filter yang sesuai.
 - **Permintaan reset PIN** tampil paling atas untuk Pengelola, dengan tanda Perlu
@@ -656,7 +674,7 @@ Satu-satunya layar yang sepenuhnya navy.
   baru." (kunci 24 jam diawali "Salah berulang kali dalam 24 jam."). Dashboard menampilkan butir
   Perlu perhatian yang sama dengan ikon kunci.
 - **Pengingat stock opname** untuk Pengelola jika sudah lewat jadwal: "Stock opname
-  terakhir 9 hari lalu." Ketuk untuk membuka layar Stock opname.
+  terakhir 9 hari lalu" (judul baris tanpa titik sejak 4 November 2026). Ketuk untuk membuka layar Stock opname.
 - **Server dan salinan** (2 November 2026, spesifikasi sistem Bagian 4.5) untuk Pengelola, di atas peringatan
   email/cadangan yang gagal: satu baris per peringatan, bertanda Masalah ("Salinan ke Google Sheets berhenti",
   "2 email belum terkirim", "Salinan ke Google Sheets gagal") atau Perlu ditinjau ("Versi Code.gs berbeda",
@@ -1676,6 +1694,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Saran prep (4 November 2026) | Judul "Saran prep", baris "Saus kacang ½ resep" dengan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari", tombol "Tambahkan" lalu "Sudah di daftar", pesan "Saus kacang ½ resep ditambahkan ke daftar.", "Belum ada yang perlu dibuat hari ini.", "Belum perlu: Kaldu ayam (cukup ± 6 hari).", "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).", "Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep." |
 | Kotak info ringkas (4 November 2026) | Baris ringkasan di HP: "**Hari ini** · Semua kategori · Tambah keluar" (pemasok ikut disebut jika dipilih, tanggal lain ditulis "18 Okt"), atau "Tanggal: **Hari ini**"; tombol tautan "Ubah", menjadi "Tutup" saat kolomnya terbuka |
+| Perlu ditindaklanjuti (4 November 2026) | Judul bagian "Perlu ditindaklanjuti" di Beranda; peringatan sistem "Laporan harian perlu perhatian" (keterangan "Gagal … Rinciannya di tab M_Konfigurasi."); isian di HP "2 isian menunggu kirim · 1 isian gagal kirim" |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
@@ -1921,5 +1940,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Perpindahan layar dan angka berhitung (17 Oktober 2026) | Keduanya dipakai; angka berhitung dengan kecepatan sedang (0,9 detik). Larangan library animasi dan library grafik dicabut (Bagian 8.2 dan 8.5). |
 | Pengaturan dua panel (31 Oktober 2026) | Di laptop dan desktop, layar di dalam Pengaturan memakai panel samping berisi semua bagian di kiri dan isi di kanan; daftar Pengaturan sendiri tetap satu kolom; menu utama tetap di bar atas (Bagian 4.3 dan 5.7) |
 | Tata letak ringkas (4 November 2026, telaah desain butir 1–3) | Kepala navy ringkas kecuali Beranda dan Dashboard; satu garis kiri untuk merek, judul, dan isi di laptop; bar navigasi bawah hanya di layar menu; kotak info form satu baris dengan "Ubah" di HP dan tiga kolom di laptop (Bagian 4.2, 4.3, 4.7, dan 5.3) |
+| Pemberitahuan Beranda (4 November 2026, telaah desain butir 4) | Satu kartu daftar "Perlu ditindaklanjuti" berikon seperti Perlu perhatian di Dashboard, menggantikan kartu terpisah per pemberitahuan (Bagian 5.2) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

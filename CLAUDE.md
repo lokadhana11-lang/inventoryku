@@ -116,9 +116,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** aplikasi 0.46.0 (tata letak ringkas dari telaah desain butir 1–3: kepala navy ringkas, satu garis kiri, bar
-  bawah hanya di layar menu, kotak info ringkas; butir 451–455) dan 0.45.1 (jarak kartu Saran prep, butir 450); Code.gs tidak
-  berubah; menunggu digabung (satu PR). Code.gs v0.44,
+- **Versi terakhir:** aplikasi 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti", telaah desain butir 4;
+  butir 456–458; Code.gs tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.46.0 (tata letak ringkas dari telaah desain butir
+  1–3: kepala navy ringkas, satu garis kiri, bar bawah hanya di layar menu, kotak info ringkas; butir 451–455) dan 0.45.1 (jarak
+  kartu Saran prep, butir 450), digabung lewat PR #73 dan tayang (4 November 2026). Code.gs v0.44,
   aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), digabung lewat PR #71 dan terpasang (4 November 2026: Edge Function
   `rapid-action` dan Apps Script v0.44; kartu "Versi dan salinan" menunjukkan v0.44). Sebelumnya Code.gs v0.43, aplikasi 0.44.0 (cukup untuk
   berapa hari dan hampir habis, butir 437–443), digabung lewat PR #70 dan terpasang (4 November 2026; kartu "Versi dan salinan"
@@ -142,9 +143,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   di Google Sheets tidak bisa diuji di sini.
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
 - **Telaah desain 4 November 2026:** sembilan temuan; pemilik memilih butir 1–3 (kotak info form ringkas, bar bawah tidak tampil di
-  layar isian dan layar dalam, kepala navy ringkas dengan satu garis kiri), dibangun di aplikasi 0.46.0. Butir 4–9 (pemberitahuan
-  Beranda sebagai satu daftar, tiket tablet 2×2, Laporan dua kolom dan Pengaturan berkelompok, Daftar belanja dari ubin Dashboard,
-  filter Riwayat ringkas, satu penanda menu aktif) belum dipilih.
+  layar isian dan layar dalam, kepala navy ringkas dengan satu garis kiri), dibangun di aplikasi 0.46.0, lalu butir 4 (pemberitahuan
+  Beranda sebagai satu daftar) di 0.47.0. Butir 5–9 (tiket tablet 2×2, Laporan dua kolom dan Pengaturan berkelompok, Daftar belanja
+  dari ubin Dashboard, filter Riwayat ringkas, satu penanda menu aktif) belum dipilih.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
@@ -168,7 +169,7 @@ ada di `catatan/keputusan.md`; butir baru ditulis di sana. Yang paling sering di
 - **Pola app.js:** router `RUTE`, `muatData`, `tombol`/`aturTombolProses`, `bukaLembar`, `konfirmasi`, `toast`, `kolomIsian`,
   `grupPilihan`, `tandaStatus`, `kotakKosong` (butir 30); kepala navy dipasang router dari judul layar (butir 176), ringkas kecuali
   Beranda dan Dashboard, dengan satu garis kiri; bar bawah hanya di layar menu (`aturMenuBawah`); kotak info form dilipat di HP
-  dengan `lipatKotakInfo` (butir 451–454); gerak, View Transitions, dan angka berhitung mati saat "kurangi gerak" (butir 186–189,
+  dengan `lipatKotakInfo` (butir 451–454); pemberitahuan Beranda lewat `barisTindak` (butir 456); gerak, View Transitions, dan angka berhitung mati saat "kurangi gerak" (butir 186–189,
   243–245).
 - **Riwayat dan koreksi:** definisi per form di `RIWAYAT_FORM` dan `defRiwayat_` (butir 48), koreksi dicatat di `Log_Perubahan` (butir 50,
   51), Staff membetulkan isiannya sendiri 15 menit sesudah dikirim (butir 359–363).

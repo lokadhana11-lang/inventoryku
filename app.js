@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.46.0';
+  var VERSI_APLIKASI = '0.47.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -2951,73 +2951,55 @@
     }
 
     /**
-     * Pengelola: "NAMA meminta reset PIN" (paling atas; ketuk untuk membuka
-     * layar reset PIN staff itu), lalu jumlah isian belum diperiksa dan baris
-     * dilaporkan keliru (ketuk untuk membuka Riwayat dengan filter itu).
+     * Satu daftar "Perlu ditindaklanjuti" (butir 456, telaah desain 4 November 2026): semua pemberitahuan Beranda dalam
+     * satu kartu berikon, seperti Perlu perhatian di Dashboard. Urutannya tetap: Pengelola mendapat permintaan reset PIN dan
+     * akun terkunci (ketuk untuk membuat PIN baru), hari libur, server dan salinan, peringatan sistem, isian belum diperiksa
+     * dan dilaporkan keliru (ketuk untuk Riwayat dengan filter itu), dan stock opname; semua role mendapat masa simpan
+     * (dengan Catat sebagai waste) dan isian yang menunggu di HP.
      */
     function gambarPemberitahuan(permintaan, pemeriksaan, peringatan, masaSimpan, opname, terkunci, libur, liburBesok, pemasangan) {
       kosongkan(bawah);
-      // Lewat masa simpan dan Habis besok: untuk semua role (Tahap 6).
-      var simpan = barisMasaSimpan(masaSimpan);
-      if (simpan) bawah.appendChild(simpan);
-      var baris = barisAntrean();
-      if (baris) bawah.appendChild(baris);
-      if (!sesiKini().pengguna.pengelola) return;
-      // Pengingat stock opname yang lewat jadwal (Tahap 8), di bawah pemeriksaan.
-      var pengingat = barisPengingatOpname(opname);
-      if (pengingat) bawah.insertBefore(pengingat, bawah.firstChild);
-      var periksa = barisPemeriksaan(pemeriksaan);
-      if (periksa) bawah.insertBefore(periksa, bawah.firstChild);
-      // Email laporan harian atau cadangan mingguan yang gagal (Tahap 4).
-      if (peringatan && peringatan.length) {
-        bawah.insertBefore(el('div', { class: 'daftar', role: 'group', 'aria-label': 'Peringatan sistem' }, peringatan.map(function (p) {
-          return el('div', { class: 'daftar-baris peristiwa tetap' }, el('span', { class: 'daftar-baris-isi' }, [
-            tandaStatus('masalah', 'Perlu perhatian'),
-            el('span', { class: 'daftar-baris-ket', text: p + ' Rinciannya di tab M_Konfigurasi.' })
-          ]));
-        })), bawah.firstChild);
+      var baris = [];
+      if (sesiKini().pengguna.pengelola) {
+        permintaan.forEach(function (p) {
+          baris.push(barisTindak({ tingkat: 'tinjau', ikon: 'kunci', judul: p.nama + ' meminta reset PIN',
+            ket: 'Diminta ' + waktuSingkat(p.waktu) + '. Ketuk untuk membuat PIN baru.',
+            href: '#/pengaturan/staff/' + encodeURIComponent(p.nama) + '/pin' }));
+        });
+        // Akun yang terkunci karena PIN salah (Code.gs v0.17), di bawah permintaan reset PIN.
+        terkunci.forEach(function (a) {
+          baris.push(barisTindak({ tingkat: 'tinjau', ikon: 'kunci', judul: a.nama + ' terkunci karena PIN salah',
+            ket: (a.panjang ? 'Salah berulang kali dalam 24 jam. ' : '') + 'Terbuka sendiri ' + waktuSingkat(a.sampai) +
+              '. Ketuk untuk membuat PIN baru.', href: hrefStaff(a.nama, true) }));
+        });
+        // Hari libur hari ini atau besok (aplikasi 0.30.0).
+        var hl = tindakHariLibur(libur, liburBesok);
+        if (hl) baris.push(hl);
+        // Salinan Apps Script, versi, email tertahan, susunan Sheet (aplikasi 0.43.0, Code.gs v0.42): ketuk membuka Outlet dan jadwal.
+        (pemasangan || []).forEach(function (p) {
+          baris.push(barisTindak({ tingkat: p.tingkat === 'masalah' ? 'masalah' : 'tinjau', ikon: 'segitiga', judul: p.judul, ket: p.ket,
+            href: '#/pengaturan/outlet' }));
+        });
+        // Email laporan harian, cadangan, rekap, arsip, atau jadwal yang bermasalah (Tahap 4): "Laporan harian: Gagal …".
+        (peringatan || []).forEach(function (p) {
+          var bagian = String(p).match(/^([^:]{1,40}): ([\s\S]*)$/);
+          baris.push(barisTindak({ tingkat: 'masalah', ikon: 'segitiga', judul: bagian ? bagian[1] + ' perlu perhatian' : 'Perlu perhatian',
+            ket: (bagian ? bagian[2] : p) + ' Rinciannya di tab M_Konfigurasi.' }));
+        });
+        baris = baris.concat(tindakPemeriksaan(pemeriksaan));
+        // Pengingat stock opname yang lewat jadwal (Tahap 8).
+        var op = tindakOpname(opname);
+        if (op) baris.push(op);
       }
-      // Salinan Apps Script, versi, email tertahan, susunan Sheet (aplikasi 0.43.0, Code.gs v0.42): ketuk membuka Outlet dan jadwal.
-      if (pemasangan && pemasangan.length) {
-        bawah.insertBefore(el('div', { class: 'daftar', role: 'group', 'aria-label': 'Server dan salinan' }, pemasangan.map(function (p) {
-          return el('a', { class: 'daftar-baris pemberitahuan', href: '#/pengaturan/outlet' }, [
-            el('span', { class: 'daftar-baris-isi' }, [
-              tandaStatus(p.tingkat === 'masalah' ? 'masalah' : 'tinjau', p.judul),
-              el('span', { class: 'daftar-baris-ket', text: p.ket })
-            ]),
-            ikon('kanan')
-          ]);
-        })), bawah.firstChild);
-      }
-      // Hari libur hari ini atau besok (aplikasi 0.30.0): di bawah reset PIN dan akun terkunci, di atas peringatan sistem.
-      var hl = barisHariLibur(libur, liburBesok);
-      if (hl) bawah.insertBefore(hl, bawah.firstChild);
-      if (!permintaan.length && !terkunci.length) return;
-      var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemberitahuan' });
-      permintaan.forEach(function (p) {
-        daftar.appendChild(el('a', {
-          class: 'daftar-baris pemberitahuan',
-          href: '#/pengaturan/staff/' + encodeURIComponent(p.nama) + '/pin'
-        }, [
-          el('span', { class: 'daftar-baris-isi' }, [
-            tandaStatus('tinjau', p.nama + ' meminta reset PIN'),
-            el('span', { class: 'daftar-baris-ket', text: 'Diminta ' + waktuSingkat(p.waktu) + '. Ketuk untuk membuat PIN baru.' })
-          ]),
-          ikon('kanan')
-        ]));
-      });
-      // Akun yang terkunci karena PIN salah (Code.gs v0.17), di bawah permintaan reset PIN.
-      terkunci.forEach(function (a) {
-        daftar.appendChild(el('a', { class: 'daftar-baris pemberitahuan', href: hrefStaff(a.nama, true) }, [
-          el('span', { class: 'daftar-baris-isi' }, [
-            tandaStatus('tinjau', a.nama + ' terkunci karena PIN salah'),
-            el('span', { class: 'daftar-baris-ket', text: (a.panjang ? 'Salah berulang kali dalam 24 jam. ' : '') +
-              'Terbuka sendiri ' + waktuSingkat(a.sampai) + '. Ketuk untuk membuat PIN baru.' })
-          ]),
-          ikon('kanan')
-        ]));
-      });
-      bawah.insertBefore(daftar, bawah.firstChild);
+      // Lewat masa simpan dan Habis besok, lalu isian di HP: untuk semua role.
+      baris = baris.concat(tindakMasaSimpan(masaSimpan));
+      var an = tindakAntrean();
+      if (an) baris.push(an);
+      if (!baris.length) return;
+      bawah.appendChild(el('section', { class: 'beranda-tindak', 'aria-labelledby': 'judul-tindak' }, [
+        el('h2', { class: 'judul-bagian', id: 'judul-tindak', text: 'Perlu ditindaklanjuti' }),
+        el('div', { class: 'daftar', role: 'group', 'aria-labelledby': 'judul-tindak' }, baris)
+      ]));
     }
 
     function muat() {
@@ -3338,28 +3320,52 @@
     return daftar;
   }
 
-  /** Baris ringkas di Beranda: "2 isian menunggu kirim" / "1 isian gagal kirim". */
-  function barisAntrean() {
+  /**
+   * Baris di daftar Perlu ditindaklanjuti (butir 456): ubin ikon menurut tingkat, judul (dengan kata tingkat untuk pembaca layar),
+   * keterangan, lalu panah (tautan atau tombol yang membuka lembar) atau tombol aksi di kanan.
+   * o: { tingkat: masalah/tinjau/menunggu, ikon, judul, ket?, ketPecah?, href?, klik?, aksi?: tombol }
+   */
+  function barisTindak(o) {
+    var isi = el('span', { class: 'daftar-baris-isi' }, [
+      el('span', { class: 'daftar-baris-judul' }, [el('span', { class: 'sr', text: (KATA_TINGKAT[o.tingkat] || '') + ': ' }), o.judul]),
+      o.ket ? el('span', { class: 'daftar-baris-ket' + (o.ketPecah ? ' ket-pecah' : ''), text: o.ket }) : null
+    ]);
+    var awal = ubinIkon(o.tingkat, o.ikon);
+    if (o.aksi) return el('div', { class: 'daftar-baris peristiwa tetap baris-tindak-aksi' }, [awal, isi, o.aksi]);
+    if (o.href) return el('a', { class: 'daftar-baris pemberitahuan', href: o.href }, [awal, isi, ikon('kanan')]);
+    if (o.klik) {
+      return el('button', { type: 'button', class: 'daftar-baris pemberitahuan', 'aria-haspopup': 'dialog', onclick: o.klik },
+        [awal, isi, ikon('kanan')]);
+    }
+    return el('div', { class: 'daftar-baris peristiwa tetap' }, [awal, isi]);
+  }
+
+  /** Lewat masa simpan dan Habis besok di Beranda, masing-masing dengan "Catat sebagai waste" (semua role). */
+  function tindakMasaSimpan(ms) {
+    var hasil = [];
+    function baris(x, lewat) {
+      hasil.push(barisTindak({ tingkat: lewat ? 'masalah' : 'tinjau', ikon: 'jam', judul: lewat ? 'Lewat masa simpan' : 'Habis besok',
+        ket: teksMasaSimpan(x, lewat), aksi: tombol('Catat sebagai waste', 'kedua', {
+          'aria-label': 'Catat ' + x.item + ' sebagai waste',
+          onclick: function () { catatSebagaiWaste(x.item); }
+        }) }));
+    }
+    ((ms && ms.lewat) || []).forEach(function (x) { baris(x, true); });
+    ((ms && ms.habisBesok) || []).forEach(function (x) { baris(x, false); });
+    return hasil;
+  }
+
+  /** Baris di Beranda: "2 isian menunggu kirim · 1 isian gagal kirim"; ketuk untuk daftar isian di HP. */
+  function tindakAntrean() {
     var p = penggunaKini();
     if (!p) return null;
     var daftar = Antrean.daftar(p.nama);
     if (!daftar.length) return null;
     var gagal = daftar.filter(function (e) { return e.status === 'gagal'; }).length;
     var tunggu = daftar.length - gagal;
-    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Isian di HP' }, el('button', {
-      type: 'button',
-      class: 'daftar-baris',
-      onclick: bukaLembarAntrean
-    }, [
-      el('span', { class: 'daftar-baris-isi' }, [
-        el('span', { class: 'deret-tombol' }, [
-          tunggu ? tandaStatus('menunggu', tunggu + ' isian menunggu kirim') : null,
-          gagal ? tandaStatus('masalah', gagal + ' isian gagal kirim') : null
-        ]),
-        el('span', { class: 'daftar-baris-ket', text: 'Tersimpan di HP. Ketuk untuk melihat atau mengirim ulang.' })
-      ]),
-      ikon('kanan')
-    ]));
+    return barisTindak({ tingkat: gagal ? 'masalah' : 'menunggu', ikon: 'hp',
+      judul: [tunggu ? tunggu + ' isian menunggu kirim' : '', gagal ? gagal + ' isian gagal kirim' : ''].filter(Boolean).join(' · '),
+      ket: 'Tersimpan di HP. Ketuk untuk melihat atau mengirim ulang.', klik: bukaLembarAntrean });
   }
 
   /** Daftar isian di HP: status tiap isian, Kirim ulang, dan Hapus untuk yang gagal. */
@@ -7484,32 +7490,22 @@
   }
 
   /** Baris ringkas di Beranda Pengelola: isian belum diperiksa dan baris dilaporkan keliru. */
-  function barisPemeriksaan(p) {
-    if (!p || (!p.belumDiperiksa && !p.dilaporkan)) return null;
-    var daftar = el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pemeriksaan' });
+  function tindakPemeriksaan(p) {
+    if (!p || (!p.belumDiperiksa && !p.dilaporkan)) return [];
     function tautan(status, formId) {
       return '#/riwayat?form=' + encodeURIComponent(formId || '') + '&status=' + status +
         '&dari=' + encodeURIComponent(p.dari || '') + '&sampai=' + encodeURIComponent(p.sampai || '');
     }
+    var hasil = [];
     if (p.belumDiperiksa) {
-      daftar.appendChild(el('a', { class: 'daftar-baris pemberitahuan', href: tautan('terkirim', p.formBelum) }, [
-        el('span', { class: 'daftar-baris-isi' }, [
-          tandaStatus('menunggu', p.belumDiperiksa + ' isian belum diperiksa'),
-          el('span', { class: 'daftar-baris-ket', text: BATAS_RIWAYAT_HARI + ' hari terakhir. Ketuk untuk membuka Riwayat.' })
-        ]),
-        ikon('kanan')
-      ]));
+      hasil.push(barisTindak({ tingkat: 'menunggu', ikon: 'centang', judul: p.belumDiperiksa + ' isian belum diperiksa',
+        ket: BATAS_RIWAYAT_HARI + ' hari terakhir. Ketuk untuk membuka Riwayat.', href: tautan('terkirim', p.formBelum) }));
     }
     if (p.dilaporkan) {
-      daftar.appendChild(el('a', { class: 'daftar-baris pemberitahuan', href: tautan('dilaporkan', p.formDilaporkan) }, [
-        el('span', { class: 'daftar-baris-isi' }, [
-          tandaStatus('tinjau', p.dilaporkan + ' baris dilaporkan keliru'),
-          el('span', { class: 'daftar-baris-ket', text: 'Ketuk untuk memeriksa dan mengoreksi.' })
-        ]),
-        ikon('kanan')
-      ]));
+      hasil.push(barisTindak({ tingkat: 'tinjau', ikon: 'bendera', judul: p.dilaporkan + ' baris dilaporkan keliru',
+        ket: 'Ketuk untuk memeriksa dan mengoreksi.', href: tautan('dilaporkan', p.formDilaporkan) }));
     }
-    return daftar;
+    return hasil;
   }
 
   /* ---------- Layar Riwayat: daftar (dan detail di kolom kanan pada desktop) ---------- */
@@ -9893,16 +9889,10 @@
   }
 
   /** Beranda Pengelola: pengingat jika opname terakhir sudah lewat jadwal. */
-  function barisPengingatOpname(s) {
+  function tindakOpname(s) {
     if (!s || !s.lewat) return null;
-    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Pengingat stock opname' },
-      el('a', { class: 'daftar-baris pemberitahuan', href: '#/opname' }, [
-        el('span', { class: 'daftar-baris-isi' }, [
-          tandaStatus('tinjau', teksPengingatOpname(s)),
-          el('span', { class: 'daftar-baris-ket', text: 'Jadwal ' + s.jadwal + '. Ketuk untuk membuka Stock opname.' })
-        ]),
-        ikon('kanan')
-      ]));
+    return barisTindak({ tingkat: 'tinjau', ikon: 'opname', judul: teksPengingatOpname(s).replace(/\.$/, ''),
+      ket: 'Jadwal ' + s.jadwal + '. Ketuk untuk membuka Stock opname.', href: '#/opname' });
   }
 
   /** "Ditandai Budi, 21 Okt 07.10" dari tanda hari libur. */
@@ -9914,20 +9904,14 @@
    * Beranda Pengelola (aplikasi 0.30.0): hari ini hari libur, atau besok hari libur, dengan tautan ke
    * Pengaturan → Hari libur supaya tanggal yang salah masih bisa diubah atau dihapus.
    */
-  function barisHariLibur(libur, liburBesok) {
+  function tindakHariLibur(libur, liburBesok) {
     var x = libur || liburBesok;
     if (!x) return null;
     var akibat = libur ? 'Email harian dan pengingat cek suhu tidak dikirim hari ini.'
       : 'Form besok tidak ditagih; email harian dan pengingat cek suhu besok tidak dikirim.';
-    return el('div', { class: 'daftar', role: 'group', 'aria-label': 'Hari libur' },
-      el('a', { class: 'daftar-baris pemberitahuan', href: '#/pengaturan/libur' }, [
-        el('span', { class: 'daftar-baris-isi' }, [
-          tandaStatus('menunggu', libur ? 'Hari ini hari libur' : 'Besok hari libur'),
-          el('span', { class: 'daftar-baris-ket ket-pecah', text: (x.keterangan ? x.keterangan + '. ' : '') + teksDitandaiLibur(x) + '. ' +
-            akibat + ' Ketuk untuk mengubah atau menghapus.' })
-        ]),
-        ikon('kanan')
-      ]));
+    return barisTindak({ tingkat: 'menunggu', ikon: 'kalender', judul: libur ? 'Hari ini hari libur' : 'Besok hari libur',
+      ket: (x.keterangan ? x.keterangan + '. ' : '') + teksDitandaiLibur(x) + '. ' + akibat + ' Ketuk untuk mengubah atau menghapus.',
+      ketPecah: true, href: '#/pengaturan/libur' });
   }
 
   /**
