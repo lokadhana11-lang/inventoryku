@@ -7581,9 +7581,15 @@ hr.pemisah {
      di luar (bukan di dalam) lebar 1.200 px, jadi lebarnya dikurangi dua bantalan tepi. */
   .bar-isi,
   .beranda-kepala-isi,
-  .tiket-grid,
-  .beranda-bawah {
+  .tiket-grid {
     max-width: calc(1200px - 2 * var(--tepi));
+  }
+  /* Pemberitahuan Beranda memakai bantalan di dalam seperti .layar-isi (aplikasi 0.47.0: sebelumnya di
+     1.153–1.247 px isinya 24 px lebih ke kanan dari garis kiri) */
+  .beranda-bawah {
+    max-width: 1200px;
+    padding-left: var(--pad-kiri);
+    padding-right: var(--pad-kanan);
   }
   /* Pengaturan dua panel: panel di garis kiri, judul kepala navy di atas panel; tombol di kepala
      (misalnya Tambah) tetap sejajar tepi kanan kolom isi */
@@ -7659,5 +7665,38 @@ hr.pemisah {
     align-content: center;
     min-height: 48px;
     margin-top: 26px;
+  }
+}
+
+/* =========================================================================
+ * Tambahan 4 November 2026 (aplikasi 0.47.0, butir 456; spesifikasi tampilan Bagian 5.2):
+ * pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti" berikon, seperti
+ * Perlu perhatian di Dashboard.
+ * ========================================================================= */
+.beranda-tindak > .judul-bagian {
+  margin: 4px 0 10px;
+}
+
+/* Baris dengan tombol aksi (Catat sebagai waste): tombol di kanan; di HP turun ke bawah teks,
+   sejajar teks (ubin ikon 40 px + jarak 12 px). */
+.baris-tindak-aksi {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.baris-tindak-aksi > .daftar-baris-isi {
+  flex: 1 1 calc(100% - 52px);
+}
+
+.baris-tindak-aksi > .tombol {
+  margin-left: 52px;
+}
+
+@media (min-width: 600px) {
+  .baris-tindak-aksi > .daftar-baris-isi {
+    flex-basis: 14em;
+  }
+  .baris-tindak-aksi > .tombol {
+    margin-left: auto;
   }
 }
