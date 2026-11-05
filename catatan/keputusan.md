@@ -3133,3 +3133,29 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     gerak menyala. Uji memeriksa isi tiket per elemen, bukan `scrollWidth`, karena takik setengah lingkaran di baris sobek memang
     menjorok 3 px di tiap sisi (sejak versi 1.7). Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada 5 November: 45 berkas,
     2.317 pemeriksaan lulus (server 20 berkas 781, layar 25 berkas 1.536), 0 gagal. Belum diuji di HP asli.
+
+### Pengaturan berkelompok dan Laporan dua kolom (aplikasi 0.49.0, 5 November 2026)
+
+461. **Pengaturan berkelompok.** Telaah desain 4 November 2026 butir 6, dipilih pemilik ("lanjut ke butir 6"): di laptop daftar
+    Pengaturan satu kolom 672 px dengan sisi kosong lebar, dan sebelas bagiannya tanpa kelompok. Kini `BAGIAN_PENGATURAN` punya
+    `kelompok` (indeks ke `KELOMPOK_PENGATURAN`: "Orang dan akses", "Data dapur", "Form dan jadwal") dan diurutkan per kelompok:
+    Staff dan PIN, Penerima email | Item, Resep, Menu, Unit, Pemasok, Kategori dan satuan | Form, Outlet dan jadwal, Hari libur.
+    Form pindah dari urutan ketiga ke kelompok terakhir, karena ia mengatur form dan jadwalnya, bukan data dapur. Layar Pengaturan:
+    `nav` berisi tiga `section.pengaturan-kelompok` (judul `h2.judul-sub`, satu `.daftar` per kelompok). Di HP dan tablet bersusun;
+    di 1.024 px ke atas `.pengaturan-daftar` selebar 1.200 px dari garis kiri dengan grid dua kolom `"orang dapur" "jadwal dapur"`
+    (baris kedua `1fr`, jadi sisa tinggi Data dapur tidak membuat celah di bawah Orang dan akses). Panel samping ikut berkelompok:
+    `div.panel-samping-grup` (`role="group"`, `aria-labelledby` ke label 12 px) dengan garis rambut di antara kelompok. Dengan label,
+    panel sekitar 70 px lebih tinggi dan di layar 768 px tinggi tidak muat lagi di layar pertama (uji lengkap menangkapnya:
+    `pengaturan_panel` "panel dan isi muat" di 1024×768 dan 1366×768). Karena itu label hanya tampil di layar setinggi 820 px ke
+    atas; di layar yang lebih pendek hanya garis pemisah yang tampil, dan nama kelompok tetap dibacakan lewat `aria-labelledby`.
+    Panel di 768 px kembali muat (bawah 743 px). `uji/layar/pengaturan_panel.mjs` memakai urutan baru.
+462. **Laporan dua kolom.** Laporan Pengelola (`.laporan-dua`) di 1.024 px ke atas selebar 1.200 px dari garis kiri, grid dua kolom
+    sama lebar: Laporan harian PDF dan Rekap bulanan di kiri, Daftar belanja (yang panjang) di kanan, kartu teratas sejajar.
+    Margin `.kartu + .kartu` dinolkan di grid. Baris status "Memperbarui…" hanya disisakan jika berisi (`:has(> .memperbarui:empty)`),
+    supaya tidak ada jarak kosong di atas kartu. Staff (satu kartu) tetap selebar layar sempit; HP dan tablet tetap satu kolom.
+463. **Uji:** `uji/layar/kelompok_laporan.mjs` (45 pemeriksaan): tiga kelompok dan urutannya di HP, label kelompok, tanda reset PIN,
+    satu kolom di HP; dua kolom Pengaturan di garis kiri di 1024, 1366, 1920 px; panel samping berkelompok dengan Item ditandai, label
+    tersembunyi dan panel muat di layar 768 px tinggi, label tampil di 1080 px, dan panel muat setelah digulir; Laporan dua kolom di laptop (sejajar, sama lebar, tanpa jarak kosong di atas kartu) dan satu kolom di
+    HP dan tablet pada delapan ukuran; Staff satu kartu; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada
+    5 November (sesudah perbaikan label panel): 46 berkas, 2.362 pemeriksaan lulus (server 20 berkas 781, layar 26 berkas 1.581),
+    0 gagal. Belum diuji di HP asli.

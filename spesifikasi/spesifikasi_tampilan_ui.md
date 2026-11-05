@@ -53,6 +53,8 @@
 > "Perlu ditindaklanjuti" berikon, seperti Perlu perhatian di Dashboard (Bagian 5.2 dan 7).
 > Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 5): jumlah kolom tiket Beranda dipilih supaya tidak
 > ada satu tiket sendirian di baris terakhir; empat form di tablet tampil sejajar (Bagian 4.2 dan 5.2).
+> Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 6): daftar Pengaturan dan panel sampingnya dikelompokkan
+> (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -1052,6 +1054,10 @@ Satu-satunya layar yang sepenuhnya navy.
 - Pengelola melihat tombol kedua: "Simpan ulang ke Drive".
 - Pengelola juga melihat dua bagian tambahan di bawahnya: **Daftar belanja** (Bagian 5.9)
   dan **Rekap bulanan** (pilih bulan, lalu "Unduh PDF").
+- **Dua kolom di laptop** (tambahan 5 November 2026, Pengelola). Pada lebar 1.024 px ke atas Laporan memakai lebar penuh
+  (1.200 px, dari garis kiri): Laporan harian PDF dan Rekap bulanan di kolom kiri, Daftar belanja yang panjang di kolom
+  kanan, kedua kolom sama lebar dan kartu teratasnya sejajar. Di HP dan tablet tetap satu kolom berurutan (Laporan harian
+  PDF, Daftar belanja, Rekap bulanan). Staff hanya punya kartu Laporan harian PDF, jadi tetap satu kolom selebar layar sempit.
 
 ### 5.6 Dashboard (Pengelola)
 
@@ -1163,14 +1169,24 @@ Satu-satunya layar yang sepenuhnya navy.
 
 ### 5.7 Pengaturan (Pengelola)
 
-- Daftar bagian: Staff dan PIN, Penerima email, Form, Item, Resep, Menu, Unit, Pemasok, Kategori
-  dan satuan, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
-  food cost, bahan kecil), dan Hari libur (22 Oktober 2026).
+- Daftar bagian, dalam tiga kelompok berjudul (tambahan 5 November 2026; judul kelompok 14 px tebal, Tinta Redup, tiap
+  kelompok satu kartu daftar):
+  - **Orang dan akses:** Staff dan PIN, Penerima email.
+  - **Data dapur:** Item, Resep, Menu, Unit, Pemasok, Kategori dan satuan.
+  - **Form dan jadwal:** Form, Outlet dan jadwal (nama outlet, zona waktu, jam closing, jadwal stock opname, target
+    food cost, bahan kecil), dan Hari libur (22 Oktober 2026).
+  Di HP dan tablet ketiganya bersusun satu kolom. Di laptop (1.024 px ke atas) daftar memakai lebar penuh dari garis kiri
+  dan dua kolom: Orang dan akses lalu Form dan jadwal di kiri, Data dapur di kanan. Sebelum 5 November 2026 daftar ini satu
+  kolom 672 px dengan urutan Staff dan PIN, Penerima email, Form, Item, …
 - Tiap bagian berupa daftar dengan tombol "Tambah" di atas; ketuk baris untuk mengubah.
 - **Dua panel di laptop dan desktop** (tambahan 31 Oktober 2026, permintaan pemilik). Pada lebar 1.024 px ke atas:
-  - Layar Pengaturan sendiri tetap berupa daftar bagian dengan keterangannya, satu kolom, seperti di HP.
+  - Layar Pengaturan sendiri tetap berupa daftar bagian dengan keterangannya, tanpa panel samping (sejak 5 November 2026
+    berkelompok dan dua kolom, lihat di atas).
   - Setiap layar di dalamnya (misalnya Item, ubah item, Tambah resep, Hari libur) tampil dua panel. Di kiri, **panel
-    samping** selebar 260 px berisi semua bagian (ikon dan nama, berurutan seperti daftar). Di kanan, isi bagian itu
+    samping** selebar 260 px berisi semua bagian (ikon dan nama, berurutan seperti daftar; sejak 5 November 2026 dengan label
+    kelompok kecil 12 px tebal Tinta Redup di atas tiap kelompok dan garis rambut di antara kelompok; di layar yang tingginya
+    di bawah 820 px, misalnya laptop 1366×768, label tidak tampil supaya panel tetap muat di layar pertama, dan garis
+    pemisahnya tetap). Di kanan, isi bagian itu
     selebar layar sempit seperti sebelumnya. Lebar total paling banyak 1.012 px; sejak 4 November 2026 keduanya
     mulai dari garis kiri yang sama dengan merek dan layar lain (Bagian 4.3), tidak lagi di tengah layar.
   - Panel samping berupa kartu (Kertas, garis rambut, bayangan kartu) yang lengket 16 px di bawah bar atas saat isi
@@ -1702,6 +1718,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Saran prep (4 November 2026) | Judul "Saran prep", baris "Saus kacang ½ resep" dengan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari", tombol "Tambahkan" lalu "Sudah di daftar", pesan "Saus kacang ½ resep ditambahkan ke daftar.", "Belum ada yang perlu dibuat hari ini.", "Belum perlu: Kaldu ayam (cukup ± 6 hari).", "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).", "Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep." |
 | Kotak info ringkas (4 November 2026) | Baris ringkasan di HP: "**Hari ini** · Semua kategori · Tambah keluar" (pemasok ikut disebut jika dipilih, tanggal lain ditulis "18 Okt"), atau "Tanggal: **Hari ini**"; tombol tautan "Ubah", menjadi "Tutup" saat kolomnya terbuka |
 | Perlu ditindaklanjuti (4 November 2026) | Judul bagian "Perlu ditindaklanjuti" di Beranda; peringatan sistem "Laporan harian perlu perhatian" (keterangan "Gagal … Rinciannya di tab M_Konfigurasi."); isian di HP "2 isian menunggu kirim · 1 isian gagal kirim" |
+| Kelompok Pengaturan (5 November 2026) | "Orang dan akses", "Data dapur", "Form dan jadwal" |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
@@ -1949,5 +1966,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Tata letak ringkas (4 November 2026, telaah desain butir 1–3) | Kepala navy ringkas kecuali Beranda dan Dashboard; satu garis kiri untuk merek, judul, dan isi di laptop; bar navigasi bawah hanya di layar menu; kotak info form satu baris dengan "Ubah" di HP dan tiga kolom di laptop (Bagian 4.2, 4.3, 4.7, dan 5.3) |
 | Pemberitahuan Beranda (4 November 2026, telaah desain butir 4) | Satu kartu daftar "Perlu ditindaklanjuti" berikon seperti Perlu perhatian di Dashboard, menggantikan kartu terpisah per pemberitahuan (Bagian 5.2) |
 | Susunan tiket Beranda (5 November 2026, telaah desain butir 5) | Jumlah kolom tanpa satu tiket sendirian di baris terakhir: tablet 3 → 4 → 2, laptop 4 → 5 → 3; empat form di tablet empat sejajar (Bagian 5.2) |
+| Pengaturan berkelompok dan Laporan dua kolom (5 November 2026, telaah desain butir 6) | Pengaturan dalam tiga kelompok (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop, juga di panel samping; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
