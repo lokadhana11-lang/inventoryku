@@ -7934,3 +7934,24 @@ a.ubin-belanja {
     white-space: nowrap;
   }
 }
+
+/* =========================================================================
+ * Tambahan 5 November 2026 (aplikasi 0.52.0, butir 470–471; spesifikasi tampilan
+ * Bagian 4.3): satu penanda menu aktif di bar atas laptop dan desktop.
+ * ========================================================================= */
+
+/* Menu aktif hanya ditandai garis amber yang bergeser (dan teks Kertas); pil Navy Lapis tidak lagi
+   tampil di menu aktif. Pil tipis tetap muncul saat kursor di atas menu lain, sebagai tanda bisa diklik.
+   Bar bawah HP dan tablet tidak berubah (pil dan garis amber). */
+@media (min-width: 1024px) {
+  .menu-item[aria-current='page']::before {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .menu-item[aria-current='page']:hover::before {
+    opacity: 0;
+  }
+}

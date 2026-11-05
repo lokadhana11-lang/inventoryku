@@ -59,6 +59,8 @@
 > belanja; Stock opname dan HPP dan food cost menjadi kartu tautan berikon (Bagian 5.5, 5.6, dan 7).
 > Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 8): di HP, Tanggal dan Tampilan Riwayat pindah ke lembar
 > Filter dengan satu baris ringkasan; tombol pilihan Riwayat seukuran isinya mulai 600 px (Bagian 5.4 dan 7).
+> Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 9): menu aktif di bar atas laptop dan desktop hanya ditandai
+> garis amber; pil Navy Lapis tidak lagi tampil di menu aktif (Bagian 4.3 dan 11).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -350,8 +352,10 @@ aturan ini.
 ```
 
 Di kiri bar: logo lencana, nama aplikasi dua warna, dan nama outlet kecil di bawahnya (Bagian
-4.5). Menu aktif ditandai pil Navy Lapis yang memudar di tempatnya dan garis amber di bawahnya;
-bar bertepi bawah Garis Navy. Di kanan: nama pengguna. Klik nama itu untuk
+4.5). Menu aktif ditandai garis amber di bawahnya yang bergeser ke menu yang baru, dan teksnya Kertas; sejak 5 November 2026 pil
+Navy Lapis tidak lagi tampil di menu aktif (satu penanda saja). Pil tipis Navy Lapis hanya muncul saat kursor berada di atas menu
+lain, sebagai tanda bisa diklik. Bar bawah di HP dan tablet tetap memakai pil dan garis amber (Bagian 4.2).
+Bar bertepi bawah Garis Navy. Di kanan: nama pengguna. Klik nama itu untuk
 membuka menu berisi dua pilihan, "Notifikasi" (Bagian 5.11) dan "Keluar". Karena bar ini ada di
 semua layar, keduanya bisa dicapai dari layar mana pun. Panah atas/bawah berpindah di antara
 keduanya.
@@ -1982,7 +1986,7 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Hari libur (22 Oktober 2026) | Ditandai di layar sendiri, Pengaturan → Hari libur, satu tanggal per tindakan; Beranda Pengelola menautkannya saat hari ini atau besok libur, dan lembar Catat penjualan menawarkannya untuk tanggal tanpa penjualan. Tidak ada tanda hari libur di Riwayat. Kata "Hapus" dipakai untuk membatalkan tanda (Bagian 5.2, 5.7, 5.10) |
 | HPP dan food cost (17 Oktober 2026) | Layar sendiri dari tombol di Dashboard (menu utama tetap lima), Pengaturan → Menu dengan takaran bersih dan hasil bersih, lembar Catat penjualan; nominal rupiah waste tidak tampil untuk Staff (Bagian 5.3, 5.6, 5.7, 5.10) |
 | PDF stock | Bisa diunduh per kategori; untuk semua kategori, satu halaman per kategori (Bagian 5.5) |
-| Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
+| Bar, logo, dan nama premium (12 Oktober 2026) | Bar bawah mengambang dengan pil menu aktif, bar atas dengan pil (sejak 5 November 2026 hanya garis amber di menu aktif) dan nama outlet, logo lencana buku terbuka, nama dua warna "Inventory" + "Ku" amber (Bagian 4.2, 4.3, dan 4.5) |
 | Perpindahan layar dan angka berhitung (17 Oktober 2026) | Keduanya dipakai; angka berhitung dengan kecepatan sedang (0,9 detik). Larangan library animasi dan library grafik dicabut (Bagian 8.2 dan 8.5). |
 | Pengaturan dua panel (31 Oktober 2026) | Di laptop dan desktop, layar di dalam Pengaturan memakai panel samping berisi semua bagian di kiri dan isi di kanan; daftar Pengaturan sendiri tetap satu kolom; menu utama tetap di bar atas (Bagian 4.3 dan 5.7) |
 | Tata letak ringkas (4 November 2026, telaah desain butir 1–3) | Kepala navy ringkas kecuali Beranda dan Dashboard; satu garis kiri untuk merek, judul, dan isi di laptop; bar navigasi bawah hanya di layar menu; kotak info form satu baris dengan "Ubah" di HP dan tiga kolom di laptop (Bagian 4.2, 4.3, 4.7, dan 5.3) |
@@ -1991,5 +1995,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Pengaturan berkelompok dan Laporan dua kolom (5 November 2026, telaah desain butir 6) | Pengaturan dalam tiga kelompok (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop, juga di panel samping; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7) |
 | Pintasan Dashboard (5 November 2026, telaah desain butir 7) | Ubin "Di bawah stok minimum" membuka Daftar belanja di Laporan; Stock opname dan HPP dan food cost sebagai kartu tautan berikon (Bagian 5.6) |
 | Filter Riwayat (5 November 2026, telaah desain butir 8) | HP: pilihan form lalu satu baris ringkasan dengan tombol Filter, Tanggal dan Tampilan di lembar Filter; mulai 600 px tombol pilihan seukuran isinya (Bagian 5.4) |
+| Penanda menu aktif di bar atas (5 November 2026, telaah desain butir 9) | Satu penanda: garis amber di bawah menu aktif; pil hanya saat kursor di atas menu lain. Bar bawah HP tetap pil dan garis (Bagian 4.3) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |
