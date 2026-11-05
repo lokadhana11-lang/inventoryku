@@ -453,6 +453,17 @@ svg {
   }
 }
 
+/* Layar isian dan layar dalam: bar bawah tidak tampil (butir 452; app.js aturMenuBawah). Bilah Kirim, toast,
+   dan jarak bawah ikut turun karena --ruang-menu memakai --tinggi-menu. */
+@media (max-width: 1023px) {
+  :root.tanpa-menu-bawah {
+    --tinggi-menu: 0px;
+  }
+  .tanpa-menu-bawah .menu {
+    display: none;
+  }
+}
+
 /* Pita sinyal: muncul di bawah kepala layar saat offline */
 .pita-sinyal {
   display: flex;
@@ -499,8 +510,11 @@ body.papan-ketik .layar {
   padding: 24px var(--pad-kanan) 32px var(--pad-kiri);
 }
 
+/* Layar sempit mulai dari garis kiri yang sama dengan layar lebar, bukan di tengah (butir 452). */
 .layar-sempit {
   max-width: 720px;
+  margin-left: max(0px, calc((100% - 1200px) / 2));
+  margin-right: auto;
 }
 
 /* Judul di dalam isi layar hanya untuk desktop (HP/tablet memakai judul di bar). */
@@ -606,6 +620,11 @@ body.papan-ketik .layar {
   .menu-penanda {
     top: auto;
     bottom: 0;
+  }
+
+  /* Merek dan menu sejajar isi layar (butir 452): wadah berbantalan di luar, jadi dikurangi dua bantalan tepi. */
+  .bar-isi {
+    max-width: calc(1200px - 2 * var(--tepi));
   }
 
   .bar-pengguna {
@@ -2224,6 +2243,9 @@ body.papan-ketik .lembar-aksi {
 
 @media (min-width: 1024px) {
   .tiket-grid { grid-template-columns: repeat(var(--kolom-laptop, 4), minmax(0, 1fr)); }
+  /* Sejajar isi layar lain (butir 452): bantalan di luar wadah, jadi dikurangi dua bantalan tepi. */
+  .beranda-kepala-isi,
+  .tiket-grid { max-width: calc(1200px - 2 * var(--tepi)); }
 }
 
 .tiket {
@@ -2373,12 +2395,6 @@ body.papan-ketik .lembar-aksi {
   gap: 12px;
 }
 
-@media (min-width: 1248px) {
-  .beranda-bawah {
-    padding-left: 0;
-    padding-right: 0;
-  }
-}
 
 .pemberitahuan .daftar-baris-judul {
   font-weight: 500;
@@ -2512,6 +2528,60 @@ body.papan-ketik .lembar-aksi {
 
 .kotak-info .pilihan-grup input[type='date'] {
   flex: 1 1 100%;
+}
+
+/* Jarak kotak info ke kartu di bawahnya (misalnya "Belum ada item waste") */
+.layar-form .kotak-info {
+  margin-bottom: 16px;
+}
+
+/* Kotak info ringkas (butir 454). HP: kolom yang jarang diganti dilipat menjadi satu baris ringkasan dengan
+   tombol Ubah (app.js lipatKotakInfo). Laptop: tiga kolom rapat. */
+.kotak-ringkas {
+  display: none;
+}
+
+.kotak-ringkas-teks {
+  min-width: 0;
+  margin: 0;
+  color: var(--tinta);
+  overflow-wrap: anywhere;
+}
+
+.kotak-ringkas-teks strong {
+  font-weight: 600;
+}
+
+.kotak-ringkas-tombol {
+  flex: none;
+}
+
+@media (max-width: 599px) {
+  .kotak-info.bisa-dilipat .kotak-ringkas {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -8px 0;
+  }
+  .kotak-info.bisa-dilipat:not(.terbuka) > .bisa-lipat {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .kotak-info.bisa-dilipat {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
+    gap: 16px 24px;
+  }
+  /* Status kiriman di sel ketiga, sejajar tombol dan kotak isian (di bawah label kolom: 26 px) */
+  .kotak-info.bisa-dilipat > .lebar-penuh {
+    grid-column: auto;
+    align-self: start;
+    align-content: center;
+    min-height: 48px;
+    margin-top: 26px;
+  }
 }
 
 .status-form {
@@ -3262,6 +3332,52 @@ body.papan-ketik .bilah-kirim {
   display: none;
 }
 
+/* HP (butir 467): Tanggal dan Tampilan pindah ke lembar Filter; kotak menampilkan pilihan Form lalu satu baris
+   "7 hari terakhir · Catatan" dengan tombol Filter di kanannya. */
+.riwayat-ringkas {
+  display: none;
+  margin: 0;
+}
+
+@media (max-width: 599px) {
+  .riwayat-atas > .riwayat-tanggal,
+  .riwayat-atas .pilih-tampilan {
+    display: none;
+  }
+  .riwayat-ringkas {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--tinta);
+    overflow-wrap: anywhere;
+  }
+  .riwayat-ringkas strong {
+    font-weight: 600;
+  }
+  .riwayat-alat .deret-tombol {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .riwayat-alat .deret-tombol > .tombol {
+    flex: none;
+  }
+}
+
+/* Mulai 600 px (butir 468): pilihan Tanggal dan Tampilan seukuran isinya, seperti pilihan Form dan tombol Filter. */
+@media (min-width: 600px) {
+  .riwayat-atas .riwayat-tanggal .pilihan,
+  .riwayat-atas .pilih-tampilan .pilihan {
+    flex: 0 0 auto;
+  }
+  .riwayat-atas .pilih-tampilan {
+    flex: 0 1 auto;
+  }
+  .riwayat-atas .riwayat-tanggal .pilihan span,
+  .riwayat-atas .pilih-tampilan .pilihan span {
+    white-space: nowrap;
+  }
+}
+
 .riwayat > .memperbarui {
   display: flex;
   margin-top: 8px;
@@ -3742,6 +3858,29 @@ body.papan-ketik .bilah-kirim {
   }
 }
 
+/* Laporan Pengelola di laptop (butir 462): dua kolom, Daftar belanja yang panjang di kanan. */
+@media (min-width: 1024px) {
+  .layar-sempit.laporan-dua {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "status status" "pdf belanja" "rekap belanja";
+    gap: 16px 24px;
+    align-items: start;
+  }
+  /* Tanpa tulisan "Memperbarui…", baris status tidak disisakan (tanpa jarak kosong di atas kartu). */
+  .layar-sempit.laporan-dua:has(> .memperbarui:empty) {
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "pdf belanja" "rekap belanja";
+  }
+  .layar-sempit.laporan-dua > * { margin: 0; }
+  .laporan-dua > .memperbarui { grid-area: status; }
+  .laporan-dua > .laporan-pdf { grid-area: pdf; }
+  .laporan-dua > .laporan-belanja { grid-area: belanja; }
+  .laporan-dua > .laporan-rekap { grid-area: rekap; }
+}
+
 /* =========================================================================
  * Gerak (spesifikasi tampilan Bagian 8): hanya transform dan opacity
  * ========================================================================= */
@@ -3939,6 +4078,35 @@ body.papan-ketik .bilah-kirim {
 .daftar-masa-simpan .daftar-baris-ket {
   color: var(--tinta);
   font-size: 16px;
+}
+
+/* Beranda: satu daftar "Perlu ditindaklanjuti" berikon (butir 456). Baris dengan tombol aksi (Catat sebagai
+   waste): tombol di kanan; di HP turun ke bawah teks, sejajar teks (ubin ikon 40 px + jarak 12 px). Sesudah
+   .peristiwa, supaya barisnya tetap rata tengah. */
+.beranda-tindak > .judul-bagian {
+  margin: 4px 0 10px;
+}
+
+.baris-tindak-aksi {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.baris-tindak-aksi > .daftar-baris-isi {
+  flex: 1 1 calc(100% - 52px);
+}
+
+.baris-tindak-aksi > .tombol {
+  margin-left: 52px;
+}
+
+@media (min-width: 600px) {
+  .baris-tindak-aksi > .daftar-baris-isi {
+    flex-basis: 14em;
+  }
+  .baris-tindak-aksi > .tombol {
+    margin-left: auto;
+  }
 }
 
 /* Resep: daftar bahan dan nilai terpilih */
@@ -4732,18 +4900,6 @@ body.papan-ketik .bilah-kirim {
  * belanja (Bagian 5.9)
  * ========================================================================= */
 
-/* Dashboard: tombol Stock opname dengan tanggal opname terakhir di sampingnya */
-.dashboard-opname {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin: 16px 0 24px;
-}
-
-.dashboard-opname .tombol {
-  flex: none;
-}
 
 .opname-tanggal {
   min-height: 48px;
@@ -5601,6 +5757,8 @@ textarea.isian-catatan {
 
 .kepala-layar-isi.layar-sempit {
   max-width: 720px;
+  margin-left: max(0px, calc((100% - 1200px) / 2));
+  margin-right: auto;
 }
 
 .kepala-layar.gantung .kepala-layar-isi {
@@ -5703,9 +5861,47 @@ textarea.isian-catatan {
   }
 }
 
+/* Kepala ringkas (butir 451): semua layar berkepala navy kecuali Dashboard (kepala gantung); Beranda memakai
+   kepalanya sendiri. Layar tanpa tautan kembali menaruh judul dan Online dalam satu baris (app.js pasangKepalaLayar). */
+.kepala-layar:not(.gantung) .kepala-layar-isi {
+  gap: 2px;
+  padding-bottom: 14px;
+}
+
+.kepala-layar:not(.gantung) .judul-layar {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.kepala-layar-atas.tanpa-kembali > .judul-layar,
+.kepala-layar-atas.tanpa-kembali > .kepala-isi {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .kepala-layar:not(.gantung) .kepala-layar-isi {
+    padding-top: 14px;
+    padding-bottom: 18px;
+  }
+  .kepala-layar:not(.gantung) .judul-layar {
+    font-size: 28px;
+  }
+  /* Tautan kembali tetap 44 px untuk jari, tetapi tidak menambah tinggi kepala */
+  .kepala-layar:not(.gantung) .kepala-layar-atas .tautan-kembali {
+    margin-top: -6px;
+    margin-bottom: -6px;
+  }
+  .kepala-layar .kepala-layar-atas.tanpa-kembali {
+    display: flex;
+    min-height: 0;
+  }
+}
+
 /* ---------- Pengaturan dua panel (tampilan Bagian 5.7, tambahan 31 Oktober 2026, butir 420) ----------
    Di HP dan tablet panel samping tidak tampil dan pembungkusnya tidak mengubah apa pun. Di 1.024 px ke atas:
-   panel 260 px di kiri, isi selebar layar sempit (672 px) di kanan, judul kepala navy sejajar kolom isi. */
+   panel 260 px di kiri, isi selebar layar sempit (672 px) di kanan. Panel dan judul kepala navy di garis kiri yang
+   sama dengan layar lain (butir 452); tombol di kepala (Tambah) sejajar tepi kanan kolom isi. */
 .panel-samping {
   display: none;
 }
@@ -5717,7 +5913,7 @@ textarea.isian-catatan {
     column-gap: 32px;
     align-items: start;
     max-width: 1012px;
-    margin: 0 auto;
+    margin: 0 auto 0 max(0px, calc((100% - 1200px) / 2));
     padding: 0 var(--pad-kanan) 0 var(--pad-kiri);
   }
   .dua-panel > .layar-isi {
@@ -5729,7 +5925,9 @@ textarea.isian-catatan {
   }
   .kepala-layar-isi.kepala-dua-panel {
     max-width: 1012px;
-    padding-left: calc(var(--pad-kiri) + 292px);
+    margin-left: max(0px, calc((100% - 1200px) / 2));
+    margin-right: auto;
+    padding-left: var(--pad-kiri);
   }
   .panel-samping {
     position: sticky;
@@ -5798,6 +5996,66 @@ textarea.isian-catatan {
   .panel-samping-baris:not([aria-current]):hover {
     background: var(--baja);
   }
+}
+
+/* Pengaturan berkelompok (butir 461): daftar dalam tiga kelompok berjudul; di laptop dua kolom selebar layar
+   (Orang dan akses, lalu Form dan jadwal, di kiri; Data dapur di kanan). Panel samping: label kecil per kelompok. */
+.pengaturan-kelompok-wadah {
+  display: grid;
+  gap: 4px;
+}
+
+.pengaturan-kelompok > .judul-sub {
+  margin: 12px 0 8px;
+}
+
+.pengaturan-kelompok:first-child > .judul-sub {
+  margin-top: 0;
+}
+
+.panel-samping-grup {
+  display: grid;
+  gap: 2px;
+}
+
+.panel-samping-grup + .panel-samping-grup {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--garis-halus);
+}
+
+.panel-samping-kelompok {
+  padding: 4px 12px 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  color: var(--tinta-redup);
+}
+
+/* Layar pendek (tinggi di bawah 820 px, misalnya laptop 1366×768): label kelompok di panel tidak tampil supaya
+   panel tetap muat di layar pertama; garis pemisah tetap, dan nama kelompok tetap dibacakan (aria-labelledby). */
+@media (max-height: 819px) {
+  .panel-samping-kelompok {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .layar-sempit.pengaturan-daftar {
+    max-width: 1200px;
+  }
+  .pengaturan-kelompok-wadah {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "orang dapur" "jadwal dapur";
+    column-gap: 24px;
+    align-items: start;
+  }
+  .pengaturan-kelompok:nth-child(1) { grid-area: orang; }
+  .pengaturan-kelompok:nth-child(2) { grid-area: dapur; }
+  .pengaturan-kelompok:nth-child(3) { grid-area: jadwal; }
+  .pengaturan-kelompok:nth-child(2) > .judul-sub { margin-top: 0; }
 }
 
 /* Ringkasan di kepala: chip dan angka utama berdampingan */
@@ -6190,7 +6448,8 @@ textarea.isian-catatan {
   animation: ikon-lonjak 380ms var(--ayun-lembut);
 }
 
-/* Desktop: bar atas bertepi Garis Navy; pil tiap menu memudar di tempat */
+/* Desktop: bar atas bertepi Garis Navy. Menu aktif hanya ditandai garis amber yang bergeser (butir 470); pil Navy
+   Lapis tipis hanya muncul saat kursor di atas menu lain. Bar bawah HP dan tablet tetap pil dan garis amber. */
 @media (min-width: 1024px) {
   .bar {
     box-shadow: inset 0 -1px 0 var(--garis-navy);
@@ -6209,16 +6468,12 @@ textarea.isian-catatan {
     transform: scale(0.9);
     transition: transform 200ms var(--ayun-masuk), opacity 200ms ease-out;
   }
-  .menu-item[aria-current='page']::before {
-    opacity: 1;
-    transform: none;
-  }
   .menu-penanda { bottom: 6px; }
 }
 
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .menu-item:hover::before { opacity: 0.6; transform: none; }
-  .menu-item[aria-current='page']:hover::before { opacity: 1; }
+  .menu-item[aria-current='page']:hover::before { opacity: 0; }
 }
 
 /* ---------- Cahaya pelan di permukaan navy ---------- */
@@ -6974,21 +7229,94 @@ html.vt-tutup::view-transition-new(root) { animation: 260ms var(--ayun-masuk) 10
  * layar HPP, Pengaturan → Menu, dan tombol di Dashboard
  * ========================================================================= */
 
-/* Dashboard: Stock opname dan HPP berdampingan di laptop dan desktop */
+/* Dashboard: kartu tautan Stock opname dan HPP (butir 465), bersusun di HP, berdampingan mulai 600 px */
 .dashboard-pintas {
   display: grid;
-  gap: 0 32px;
+  gap: 10px;
   margin: 16px 0 24px;
 }
 
-.dashboard-pintas .dashboard-opname {
-  margin: 0 0 8px;
-}
-
-@media (min-width: 1024px) {
+@media (min-width: 600px) {
   .dashboard-pintas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
+}
+
+.kartu-tautan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--sudut-kartu);
+  background: var(--kertas);
+  box-shadow: var(--bayang-kartu);
+  color: var(--tinta);
+  text-decoration: none;
+  transition: transform 100ms ease-out, background-color 100ms ease-out;
+}
+
+.kartu-tautan .daftar-baris-isi {
+  justify-items: start;
+}
+
+.kartu-tautan > .ikon {
+  flex: none;
+  color: var(--tinta-redup);
+}
+
+.kartu-tautan:active {
+  background: var(--kertas-tekan);
+  transform: scale(0.98);
+}
+
+.kartu-tautan:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kartu-tautan:hover {
+    background: var(--baja);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kartu-tautan,
+  .kartu-tautan:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Ubin "Di bawah stok minimum" membuka Daftar belanja (butir 464): keterangan berakhir tautan "Daftar belanja ›"
+   berwarna Biru Malam. Sesudah .ubin-tombol, supaya label tanpa ruang panah. */
+a.ubin-belanja {
+  text-decoration: none;
+}
+
+.ubin-belanja .ubin-label {
+  padding-right: 0;
+}
+
+.ubin-ket-tautan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 2px;
+}
+
+.ubin-tautan-teks {
+  color: var(--biru-malam);
+  font-weight: 500;
+}
+
+.ubin-ket-tautan > .ikon {
+  width: 16px;
+  height: 16px;
+  color: var(--biru-malam);
 }
 
 /* Kotak angka di kepala yang tidak bisa diketuk */
@@ -7525,433 +7853,3 @@ hr.pemisah {
   .harga-banyak-baris { grid-template-columns: minmax(0, 1fr); }
 }
 .isian-tempel { font-family: inherit; min-height: 9rem; white-space: pre; overflow-x: auto; }
-
-/* =========================================================================
- * Tambahan 4 November 2026 (aplikasi 0.46.0, butir 451–454; spesifikasi tampilan
- * Bagian 4.6, 4.7, 5.2, 5.3): kepala navy ringkas, satu garis kiri, bar menu bawah tidak
- * tampil di layar dalam, kotak info form ringkas.
- * ========================================================================= */
-
-/* Kepala ringkas (butir 451): semua layar berkepala navy kecuali Dashboard (kepala gantung).
-   Beranda memakai kepalanya sendiri. Layar tanpa tautan kembali menaruh judul dan Online
-   dalam satu baris (app.js pasangKepalaLayar). */
-.kepala-layar:not(.gantung) .kepala-layar-isi {
-  gap: 2px;
-  padding-bottom: 14px;
-}
-
-.kepala-layar:not(.gantung) .judul-layar {
-  font-size: 26px;
-  line-height: 1.1;
-}
-
-.kepala-layar-atas.tanpa-kembali > .judul-layar,
-.kepala-layar-atas.tanpa-kembali > .kepala-isi {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-@media (min-width: 1024px) {
-  .kepala-layar:not(.gantung) .kepala-layar-isi {
-    padding-top: 14px;
-    padding-bottom: 18px;
-  }
-  .kepala-layar:not(.gantung) .judul-layar {
-    font-size: 28px;
-  }
-  /* Tautan kembali tetap 44 px untuk jari, tetapi tidak menambah tinggi kepala */
-  .kepala-layar:not(.gantung) .kepala-layar-atas .tautan-kembali {
-    margin-top: -6px;
-    margin-bottom: -6px;
-  }
-  .kepala-layar .kepala-layar-atas.tanpa-kembali {
-    display: flex;
-    min-height: 0;
-  }
-}
-
-/* Satu garis kiri (butir 451): layar sempit (720 px) tidak lagi di tengah, tetapi mulai dari
-   garis kiri yang sama dengan layar lebar, merek di bar atas, dan judul kepala navy. */
-.layar-sempit,
-.kepala-layar-isi.layar-sempit {
-  margin-left: max(0px, calc((100% - 1200px) / 2));
-  margin-right: auto;
-}
-
-@media (min-width: 1024px) {
-  /* Merek dan menu bar atas, dan isi Beranda, sejajar isi layar lain. Wadah ini memakai bantalan
-     di luar (bukan di dalam) lebar 1.200 px, jadi lebarnya dikurangi dua bantalan tepi. */
-  .bar-isi,
-  .beranda-kepala-isi,
-  .tiket-grid {
-    max-width: calc(1200px - 2 * var(--tepi));
-  }
-  /* Pemberitahuan Beranda memakai bantalan di dalam seperti .layar-isi (aplikasi 0.47.0: sebelumnya di
-     1.153–1.247 px isinya 24 px lebih ke kanan dari garis kiri) */
-  .beranda-bawah {
-    max-width: 1200px;
-    padding-left: var(--pad-kiri);
-    padding-right: var(--pad-kanan);
-  }
-  /* Pengaturan dua panel: panel di garis kiri, judul kepala navy di atas panel; tombol di kepala
-     (misalnya Tambah) tetap sejajar tepi kanan kolom isi */
-  .dua-panel,
-  .kepala-layar-isi.kepala-dua-panel {
-    margin-left: max(0px, calc((100% - 1200px) / 2));
-    margin-right: auto;
-  }
-  .kepala-layar-isi.kepala-dua-panel {
-    padding-left: var(--pad-kiri);
-  }
-}
-
-/* Bar menu bawah tidak tampil di layar isian dan layar dalam (butir 452; app.js aturMenuBawah).
-   Bilah Kirim, toast, dan jarak bawah ikut turun karena --ruang-menu memakai --tinggi-menu. */
-@media (max-width: 1023px) {
-  :root.tanpa-menu-bawah {
-    --tinggi-menu: 0px;
-  }
-  .tanpa-menu-bawah .menu {
-    display: none;
-  }
-}
-
-/* Kotak info form (butir 453). HP: kolom yang jarang diganti dilipat menjadi satu baris
-   ringkasan dengan tombol Ubah (app.js lipatKotakInfo). Desktop: tiga kolom rapat. */
-.kotak-ringkas {
-  display: none;
-}
-
-@media (max-width: 599px) {
-  .kotak-info.bisa-dilipat .kotak-ringkas {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: -8px 0;
-  }
-  .kotak-info.bisa-dilipat:not(.terbuka) > .bisa-lipat {
-    display: none;
-  }
-}
-
-.kotak-ringkas-teks {
-  min-width: 0;
-  margin: 0;
-  color: var(--tinta);
-  overflow-wrap: anywhere;
-}
-
-.kotak-ringkas-teks strong {
-  font-weight: 600;
-}
-
-.kotak-ringkas-tombol {
-  flex: none;
-}
-
-/* Jarak kotak info ke kartu di bawahnya (misalnya "Belum ada item waste") */
-.layar-form .kotak-info {
-  margin-bottom: 16px;
-}
-
-@media (min-width: 1024px) {
-  .kotak-info.bisa-dilipat {
-    grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
-    gap: 16px 24px;
-  }
-  /* Status kiriman di sel ketiga, sejajar tombol dan kotak isian (di bawah label kolom: 26 px) */
-  .kotak-info.bisa-dilipat > .lebar-penuh {
-    grid-column: auto;
-    align-self: start;
-    align-content: center;
-    min-height: 48px;
-    margin-top: 26px;
-  }
-}
-
-/* =========================================================================
- * Tambahan 4 November 2026 (aplikasi 0.47.0, butir 456; spesifikasi tampilan Bagian 5.2):
- * pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti" berikon, seperti
- * Perlu perhatian di Dashboard.
- * ========================================================================= */
-.beranda-tindak > .judul-bagian {
-  margin: 4px 0 10px;
-}
-
-/* Baris dengan tombol aksi (Catat sebagai waste): tombol di kanan; di HP turun ke bawah teks,
-   sejajar teks (ubin ikon 40 px + jarak 12 px). */
-.baris-tindak-aksi {
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.baris-tindak-aksi > .daftar-baris-isi {
-  flex: 1 1 calc(100% - 52px);
-}
-
-.baris-tindak-aksi > .tombol {
-  margin-left: 52px;
-}
-
-@media (min-width: 600px) {
-  .baris-tindak-aksi > .daftar-baris-isi {
-    flex-basis: 14em;
-  }
-  .baris-tindak-aksi > .tombol {
-    margin-left: auto;
-  }
-}
-
-/* =========================================================================
- * Tambahan 5 November 2026 (aplikasi 0.49.0, butir 461–463; spesifikasi tampilan
- * Bagian 5.5 dan 5.7): Pengaturan berkelompok, Laporan dua kolom di laptop.
- * ========================================================================= */
-
-/* Daftar Pengaturan: tiga kelompok berjudul. */
-.pengaturan-kelompok-wadah {
-  display: grid;
-  gap: 4px;
-}
-
-.pengaturan-kelompok > .judul-sub {
-  margin: 12px 0 8px;
-}
-
-.pengaturan-kelompok:first-child > .judul-sub {
-  margin-top: 0;
-}
-
-/* Panel samping: label kecil di atas tiap kelompok. */
-.panel-samping-grup {
-  display: grid;
-  gap: 2px;
-}
-
-.panel-samping-grup + .panel-samping-grup {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--garis-halus);
-}
-
-.panel-samping-kelompok {
-  padding: 4px 12px 0;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
-  letter-spacing: 0.02em;
-  color: var(--tinta-redup);
-}
-
-/* Layar pendek (tinggi di bawah 820 px, misalnya laptop 1366×768): label kelompok di panel tidak tampil supaya
-   panel tetap muat di layar pertama; garis pemisah tetap, dan nama kelompok tetap dibacakan (aria-labelledby). */
-@media (max-height: 819px) {
-  .panel-samping-kelompok {
-    display: none;
-  }
-}
-
-@media (min-width: 1024px) {
-  /* Pengaturan: dua kolom selebar layar (Orang dan akses, lalu Form dan jadwal, di kiri; Data dapur di kanan). */
-  .layar-sempit.pengaturan-daftar {
-    max-width: 1200px;
-  }
-  .pengaturan-kelompok-wadah {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "orang dapur" "jadwal dapur";
-    column-gap: 24px;
-    align-items: start;
-  }
-  .pengaturan-kelompok:nth-child(1) { grid-area: orang; }
-  .pengaturan-kelompok:nth-child(2) { grid-area: dapur; }
-  .pengaturan-kelompok:nth-child(3) { grid-area: jadwal; }
-  .pengaturan-kelompok:nth-child(2) > .judul-sub { margin-top: 0; }
-
-  /* Laporan (Pengelola): dua kolom; Daftar belanja yang panjang di kanan. */
-  .layar-sempit.laporan-dua {
-    max-width: 1200px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas: "status status" "pdf belanja" "rekap belanja";
-    gap: 16px 24px;
-    align-items: start;
-  }
-  /* Tanpa tulisan "Memperbarui…", baris status tidak disisakan (tanpa jarak kosong di atas kartu). */
-  .layar-sempit.laporan-dua:has(> .memperbarui:empty) {
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "pdf belanja" "rekap belanja";
-  }
-  .layar-sempit.laporan-dua > * { margin: 0; }
-  .laporan-dua > .memperbarui { grid-area: status; }
-  .laporan-dua > .laporan-pdf { grid-area: pdf; }
-  .laporan-dua > .laporan-belanja { grid-area: belanja; }
-  .laporan-dua > .laporan-rekap { grid-area: rekap; }
-}
-
-/* =========================================================================
- * Tambahan 5 November 2026 (aplikasi 0.50.0, butir 464–466; spesifikasi tampilan
- * Bagian 5.6): ubin "Di bawah stok minimum" membuka Daftar belanja; Stock opname dan
- * HPP dan food cost di Dashboard sebagai kartu tautan.
- * ========================================================================= */
-
-/* Ubin yang bisa diketuk: keterangan berakhir tautan "Daftar belanja ›" berwarna Biru Malam. */
-a.ubin-belanja {
-  text-decoration: none;
-}
-
-.ubin-belanja .ubin-label {
-  padding-right: 0;
-}
-
-.ubin-ket-tautan {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 2px;
-}
-
-.ubin-tautan-teks {
-  color: var(--biru-malam);
-  font-weight: 500;
-}
-
-.ubin-ket-tautan > .ikon {
-  width: 16px;
-  height: 16px;
-  color: var(--biru-malam);
-}
-
-/* Pintasan Dashboard: dua kartu tautan, bersusun di HP, berdampingan mulai 600 px. */
-.dashboard-pintas {
-  gap: 10px;
-}
-
-@media (min-width: 600px) {
-  .dashboard-pintas {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-}
-
-.kartu-tautan {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  min-height: 64px;
-  padding: 12px 12px 12px 14px;
-  border-radius: var(--sudut-kartu);
-  background: var(--kertas);
-  box-shadow: var(--bayang-kartu);
-  color: var(--tinta);
-  text-decoration: none;
-  transition: transform 100ms ease-out, background-color 100ms ease-out;
-}
-
-.kartu-tautan .daftar-baris-isi {
-  justify-items: start;
-}
-
-.kartu-tautan > .ikon {
-  flex: none;
-  color: var(--tinta-redup);
-}
-
-.kartu-tautan:active {
-  background: var(--kertas-tekan);
-  transform: scale(0.98);
-}
-
-.kartu-tautan:focus-visible {
-  outline: 2px solid var(--biru-malam);
-  outline-offset: 2px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .kartu-tautan:hover {
-    background: var(--baja);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kartu-tautan,
-  .kartu-tautan:active {
-    transition: none;
-    transform: none;
-  }
-}
-
-/* =========================================================================
- * Tambahan 5 November 2026 (aplikasi 0.51.0, butir 467–469; spesifikasi tampilan
- * Bagian 5.4): filter Riwayat ringkas di HP, tombol pilihan Riwayat seukuran isinya.
- * ========================================================================= */
-
-/* HP: Tanggal dan Tampilan pindah ke lembar Filter; kotak menampilkan pilihan Form lalu satu baris
-   "7 hari terakhir · Catatan" dengan tombol Filter di kanannya. */
-.riwayat-ringkas {
-  display: none;
-  margin: 0;
-}
-
-@media (max-width: 599px) {
-  .riwayat-atas > .riwayat-tanggal,
-  .riwayat-atas .pilih-tampilan {
-    display: none;
-  }
-  .riwayat-ringkas {
-    display: block;
-    flex: 1 1 auto;
-    min-width: 0;
-    color: var(--tinta);
-    overflow-wrap: anywhere;
-  }
-  .riwayat-ringkas strong {
-    font-weight: 600;
-  }
-  .riwayat-alat .deret-tombol {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-  .riwayat-alat .deret-tombol > .tombol {
-    flex: none;
-  }
-}
-
-/* Mulai 600 px: pilihan Tanggal dan Tampilan seukuran isinya, seperti pilihan Form dan tombol Filter
-   (dulu "Catatan" dan "Rekap harian" membentang selebar kotak). */
-@media (min-width: 600px) {
-  .riwayat-atas .riwayat-tanggal .pilihan,
-  .riwayat-atas .pilih-tampilan .pilihan {
-    flex: 0 0 auto;
-  }
-  .riwayat-atas .pilih-tampilan {
-    flex: 0 1 auto;
-  }
-  .riwayat-atas .riwayat-tanggal .pilihan span,
-  .riwayat-atas .pilih-tampilan .pilihan span {
-    white-space: nowrap;
-  }
-}
-
-/* =========================================================================
- * Tambahan 5 November 2026 (aplikasi 0.52.0, butir 470–471; spesifikasi tampilan
- * Bagian 4.3): satu penanda menu aktif di bar atas laptop dan desktop.
- * ========================================================================= */
-
-/* Menu aktif hanya ditandai garis amber yang bergeser (dan teks Kertas); pil Navy Lapis tidak lagi
-   tampil di menu aktif. Pil tipis tetap muncul saat kursor di atas menu lain, sebagai tanda bisa diklik.
-   Bar bawah HP dan tablet tidak berubah (pil dan garis amber). */
-@media (min-width: 1024px) {
-  .menu-item[aria-current='page']::before {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
-
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  .menu-item[aria-current='page']:hover::before {
-    opacity: 0;
-  }
-}

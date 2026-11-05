@@ -47,6 +47,9 @@ memuat Playwright. Tidak ada `package.json` di repo, supaya frontend tetap tanpa
 - `alat/seed.mjs`: data contoh 12 hari: empat staff, 11 item, tiga unit, dua pemasok, resep Sambal dasar,
   menu Ayam geprek dan Telur balado, isian Stock, Suhu, Prep, Waste, dan penjualan tiap hari.
 - `alat/peramban.mjs`: memuat Chromium dari Playwright; setiap konteks peramban memakai jam uji yang sama.
+- `alat/potret_gaya.mjs` dan `alat/banding_gaya.mjs`: untuk perapian CSS yang tidak boleh mengubah tampilan (butir 473). Potret
+  gaya terhitung semua elemen di 31 layar × 7 ukuran dan beberapa keadaan diambil sebelum dan sesudah, lalu dibandingkan; hasilnya
+  harus "0 perbedaan". Bukan berkas uji, jadi tidak dijalankan `jalankan.mjs`.
 - `server/`: uji aksi Code.gs (satu berkas per fitur).
 - `layar/`: uji alur aplikasi di Chromium, termasuk delapan ukuran layar Bagian 4.6 spesifikasi tampilan.
 
