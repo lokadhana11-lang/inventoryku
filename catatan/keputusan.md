@@ -3202,3 +3202,17 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Tampilan, kembali ke 7 hari terakhir; laptop: Tanggal dan Tampilan di kotak, lima tombol < 220 px, Tampilan dan Filter sebaris
     dan sama tinggi, lembar tanpa Tanggal; delapan ukuran; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
     pada 5 November: 48 berkas, 2.428 pemeriksaan lulus (server 20 berkas 781, layar 28 berkas 1.647), 0 gagal. Belum diuji di HP asli.
+
+### Satu penanda menu aktif di bar atas (aplikasi 0.52.0, 5 November 2026)
+
+470. **Garis amber saja.** Telaah desain 4 November 2026 butir 9 (opsional), dipilih pemilik ("lanjut ke butir 9"): di bar atas laptop
+    menu aktif bertanda dua (pil Navy Lapis dan garis amber), padahal satu cukup. Yang dipertahankan garis amber, karena amber adalah
+    warna aksen merek di atas navy, garisnya bergeser ke menu yang baru (gerak yang sudah ada), dan pola garis bawah lazim untuk bar
+    atas; pil yang memudar di tempat lebih mirip tombol. `.menu-item[aria-current='page']::before` kini tidak tampil di 1.024 px ke
+    atas; pil tipis (0,6) tetap muncul saat kursor di atas menu lain sebagai tanda bisa diklik, tetapi tidak di atas menu aktif.
+    Menu aktif tetap dibedakan juga oleh warna teks Kertas dan `aria-current="page"`; tebal huruf tidak diubah supaya menu tidak
+    bergeser. Bar bawah di HP dan tablet tidak diubah (pil dan garis amber, keputusan 12 dan 17 Oktober 2026), karena di sana
+    pil menandai area ketuk yang besar. Jika pemilik lebih suka pil saja, cukup sembunyikan `.menu-penanda` di desktop.
+471. **Uji:** `uji/layar/menu_penanda.mjs` (15 pemeriksaan): laptop tanpa pil di menu aktif dan menu lain, garis amber di bawah menu
+    aktif dan pindah ke Riwayat, warna teks berbeda, pil tipis saat kursor di atas menu lain dan tidak di atas menu aktif; delapan
+    ukuran (desktop satu penanda, HP dan tablet tetap pil dan garis); gerak menyala. Code.gs tidak berubah.

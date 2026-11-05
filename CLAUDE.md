@@ -116,8 +116,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** aplikasi 0.51.0 (filter Riwayat ringkas di HP dan tombol pilihan seukuran isinya, telaah desain butir 8;
-  butir 467–469; Code.gs tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
+- **Versi terakhir:** aplikasi 0.52.0 (satu penanda menu aktif di bar atas laptop, telaah desain butir 9; butir 470–471; Code.gs
+  tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
   0.49.0 (Pengaturan berkelompok
   dan Laporan dua kolom, butir 461–463, PR #76), 0.48.0 (susunan tiket Beranda, butir 459–460, PR #75), 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
   butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
@@ -149,7 +149,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   layar isian dan layar dalam, kepala navy ringkas dengan satu garis kiri), dibangun di aplikasi 0.46.0, lalu butir 4 (pemberitahuan
   Beranda sebagai satu daftar) di 0.47.0, lalu butir 5 (tiket tanpa satu tiket sendirian di baris terakhir) di 0.48.0, lalu butir 6
   (Pengaturan berkelompok, Laporan dua kolom) di 0.49.0, lalu butir 7 (ubin ke Daftar belanja, kartu tautan) di 0.50.0, lalu butir 8
-  (filter Riwayat ringkas) di 0.51.0. Butir 9 (satu penanda menu aktif, opsional) belum dipilih.
+  (filter Riwayat ringkas) di 0.51.0, lalu butir 9 (satu penanda menu aktif) di 0.52.0. Semua butir telaah desain sudah dibangun.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
