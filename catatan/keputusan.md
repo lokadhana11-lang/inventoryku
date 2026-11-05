@@ -3200,4 +3200,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Filter satu baris (≥ 44 px), kotak ≤ 210 px, lembar dengan Tanggal dan Tampilan di atas, Satu tanggal + Rekap harian diterapkan,
     kotak ikut berubah dan tampil benar saat diputar ke tablet, galat rentang terbalik di lembar, rentang diterapkan, Waste tanpa
     Tampilan, kembali ke 7 hari terakhir; laptop: Tanggal dan Tampilan di kotak, lima tombol < 220 px, Tampilan dan Filter sebaris
-    dan sama tinggi, lembar tanpa Tanggal; delapan ukuran; gerak menyala. Code.gs tidak berubah.
+    dan sama tinggi, lembar tanpa Tanggal; delapan ukuran; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
+    pada 5 November: 48 berkas, 2.428 pemeriksaan lulus (server 20 berkas 781, layar 28 berkas 1.647), 0 gagal. Belum diuji di HP asli.
