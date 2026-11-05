@@ -3217,3 +3217,16 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     aktif dan pindah ke Riwayat, warna teks berbeda, pil tipis saat kursor di atas menu lain dan tidak di atas menu aktif; delapan
     ukuran (desktop satu penanda, HP dan tablet tetap pil dan garis); gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs
     --layar` pada 5 November: 49 berkas, 2.443 pemeriksaan lulus (server 20 berkas 781, layar 29 berkas 1.662), 0 gagal.
+
+### Uji dijalankan beberapa berkas sekaligus (5 November 2026, hanya uji)
+
+472. **Runner paralel.** Telaah aplikasi 5 November 2026 butir 1, dipilih pemilik ("Kerjakan butir 1 dulu"): `node uji/jalankan.mjs
+    --layar` makan 49 menit karena 29 berkas uji layar dijalankan satu per satu (README masih menulis 25 menit). `uji/jalankan.mjs`
+    kini menjalankan berkas di proses masing-masing beberapa sekaligus: bawaan sebanyak inti prosesor, paling banyak 4
+    (`os.availableParallelism`), atau `UJI_PARALEL` (misalnya `UJI_PARALEL=1` untuk satu per satu saat mencari uji yang goyah).
+    Hasil per berkas tetap dicetak menurut urutan nama berkas (dicetak begitu semua berkas sebelumnya selesai), dan baris terakhir
+    menyebut berapa sekaligus dan lamanya. Batas 20 menit per berkas tetap. Uji sudah aman berjalan bersamaan tanpa diubah: tiap
+    berkas memakai port acak (`H.layani(0)`), data di memori (`seed()`), Chromium sendiri, dan folder sementara dari `mkdtempSync`;
+    README meminta uji baru mengikuti aturan itu. Dengan 4 inti: 49 berkas, 2.443 pemeriksaan lulus dua kali berturut-turut, masing-masing
+    13,2 menit (dulu sekitar 50 menit), tanpa uji yang goyah; waktu per berkas hampir sama dengan saat sendirian, jadi prosesor bukan batasnya. Berkas terlama `layar/libur.mjs`
+    (4,5 menit) menentukan batas bawah. Aplikasi dan Code.gs tidak berubah.

@@ -103,7 +103,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
    tidak menampilkan fitur yang field-nya tidak dikirim server lama.
 4. **Jadwal baru** (fungsi trigger): daftarkan di `FUNGSI_JADWAL` `supabase/src/server.js` (dan pola `JADWAL_RINGAN` jika cukup tab master);
    pemilik menjalankan `pasangTrigger` sekali.
-5. **Uji.** `node uji/jalankan.mjs --layar` sebelum PR, dan tambahkan berkas uji fitur baru di `uji/server` dan/atau `uji/layar` (lihat
+5. **Uji.** `node uji/jalankan.mjs --layar` sebelum PR (4 berkas sekaligus, sekitar 13 menit; butir 472), dan tambahkan berkas uji fitur baru di `uji/server` dan/atau `uji/layar` (lihat
    `uji/README.md`). Layar diuji pada delapan ukuran Bagian 4.6 (320×568, 360×740, 390×844, 430×932, 768×1024, 1024×768, 1366×768,
    1920×1080) dan dengan "kurangi gerak".
 6. **Dokumen.** Spesifikasi sistem dan tampilan diberi catatan "Diperbarui/Tambahan <tanggal>" di kepalanya dan diubah di bagian yang
@@ -117,7 +117,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 ## Status sekarang
 
 - **Versi terakhir:** aplikasi 0.52.0 (satu penanda menu aktif di bar atas laptop, telaah desain butir 9; butir 470–471; Code.gs
-  tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
+  tidak berubah), digabung lewat PR #79 dan tayang (5 November 2026). Sesudahnya hanya uji yang berubah: berkas uji dijalankan 4
+  sekaligus (butir 472), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
   0.49.0 (Pengaturan berkelompok
   dan Laporan dua kolom, butir 461–463, PR #76), 0.48.0 (susunan tiket Beranda, butir 459–460, PR #75), 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
   butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
@@ -150,6 +151,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Beranda sebagai satu daftar) di 0.47.0, lalu butir 5 (tiket tanpa satu tiket sendirian di baris terakhir) di 0.48.0, lalu butir 6
   (Pengaturan berkelompok, Laporan dua kolom) di 0.49.0, lalu butir 7 (ubin ke Daftar belanja, kartu tautan) di 0.50.0, lalu butir 8
   (filter Riwayat ringkas) di 0.51.0, lalu butir 9 (satu penanda menu aktif) di 0.52.0. Semua butir telaah desain sudah dibangun.
+- **Telaah aplikasi 5 November 2026:** semua PR digabung, 0.52.0 tayang, produksi 24 jam tanpa galat. Lima usul: (1) uji paralel,
+  dikerjakan (butir 472); (2) satukan blok tambahan di akhir `app.css`; (3) kotak info Stock opname tiga kolom; (4) tombol tabel HPP
+  per menu 44 px; (5) hapus 25 cabang lama yang sudah tergabung. Butir 2–5 belum dipilih.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
