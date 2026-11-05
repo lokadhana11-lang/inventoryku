@@ -57,6 +57,8 @@
 > (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7).
 > Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 7): ubin "Di bawah stok minimum" di Dashboard membuka Daftar
 > belanja; Stock opname dan HPP dan food cost menjadi kartu tautan berikon (Bagian 5.5, 5.6, dan 7).
+> Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 8): di HP, Tanggal dan Tampilan Riwayat pindah ke lembar
+> Filter dengan satu baris ringkasan; tombol pilihan Riwayat seukuran isinya mulai 600 px (Bagian 5.4 dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -958,6 +960,13 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Atas:** pilihan form (tombol berjajar; bisa digeser ke samping jika form lebih dari
   empat), lalu tanggal. Filter lain (kategori, item,
   unit, pengisi, status) ada di balik tombol "Filter".
+  - **Di HP (di bawah 600 px, tambahan 5 November 2026):** kotak atas hanya berisi pilihan form, lalu satu baris
+    ringkasan "**7 hari terakhir** · Catatan" (tanggal tebal; "20 Okt" untuk satu tanggal, "14–20 Okt" untuk rentang;
+    tampilan hanya untuk Stock) dengan tombol "Filter" di kanannya. Tanggal dan Tampilan pindah ke lembar Filter, di atas
+    filter lain; berlaku saat "Terapkan" diketuk. Tanggal yang salah ditulis di bawah pilihan Tanggal di lembar itu dan
+    lembarnya tetap terbuka. Kotak atas setinggi kira-kira 190 px (sebelumnya sekitar 400 px).
+  - **Mulai 600 px:** Tanggal dan Tampilan tetap di kotak atas, berlaku langsung. Tombol pilihannya seukuran isinya,
+    seperti pilihan form dan tombol Filter (sebelum 5 November 2026 "Catatan" dan "Rekap harian" membentang selebar kotak).
 - **Daftar:** dikelompokkan per tanggal, tanggal sebagai judul kelompok. Tiap baris: form,
   pengisi, jam, jumlah baris, tanda status.
 - **Detail:** tata letak sama dengan layar isi form, tetapi semua nilai berupa teks.
@@ -1731,6 +1740,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Perlu ditindaklanjuti (4 November 2026) | Judul bagian "Perlu ditindaklanjuti" di Beranda; peringatan sistem "Laporan harian perlu perhatian" (keterangan "Gagal … Rinciannya di tab M_Konfigurasi."); isian di HP "2 isian menunggu kirim · 1 isian gagal kirim" |
 | Kelompok Pengaturan (5 November 2026) | "Orang dan akses", "Data dapur", "Form dan jadwal" |
 | Ubin Daftar belanja (5 November 2026) | Keterangan ubin "item · Daftar belanja"; nama untuk pembaca layar "Di bawah stok minimum: 4 item. Buka Daftar belanja" |
+| Ringkasan Riwayat di HP (5 November 2026) | "**7 hari terakhir** · Catatan", "**20 Okt** · Rekap harian", "**14–20 Okt**" (form selain Stock tanpa tampilan) |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
@@ -1980,5 +1990,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Susunan tiket Beranda (5 November 2026, telaah desain butir 5) | Jumlah kolom tanpa satu tiket sendirian di baris terakhir: tablet 3 → 4 → 2, laptop 4 → 5 → 3; empat form di tablet empat sejajar (Bagian 5.2) |
 | Pengaturan berkelompok dan Laporan dua kolom (5 November 2026, telaah desain butir 6) | Pengaturan dalam tiga kelompok (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop, juga di panel samping; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7) |
 | Pintasan Dashboard (5 November 2026, telaah desain butir 7) | Ubin "Di bawah stok minimum" membuka Daftar belanja di Laporan; Stock opname dan HPP dan food cost sebagai kartu tautan berikon (Bagian 5.6) |
+| Filter Riwayat (5 November 2026, telaah desain butir 8) | HP: pilihan form lalu satu baris ringkasan dengan tombol Filter, Tanggal dan Tampilan di lembar Filter; mulai 600 px tombol pilihan seukuran isinya (Bagian 5.4) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

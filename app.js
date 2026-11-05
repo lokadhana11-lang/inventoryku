@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.50.0';
+  var VERSI_APLIKASI = '0.51.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -7582,6 +7582,7 @@
 
     // Tanggal: 7 hari terakhir (bawaan), satu tanggal, atau rentang (paling banyak 31 hari).
     var gTanggal = grupPilihan('Tanggal', PILIHAN_TANGGAL, pilih.tanggal);
+    gTanggal.wadah.classList.add('riwayat-tanggal');
     var inDari = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Dari tanggal' });
     var inSampai = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Sampai tanggal' });
     var labelDari = el('label', { class: 'kolom-label' }, ['Dari', inDari]);
@@ -7601,19 +7602,39 @@
     }
     aturTanggalTampil();
 
+    /** Pesan galat pilihan tanggal ('' jika benar); dipakai kotak di atas dan lembar Filter di HP. */
+    function salahTanggal(mode, dari, sampai) {
+      if (mode === PILIHAN_TANGGAL[0]) return '';
+      if (!dari || !sampai) return 'Pilih tanggalnya.';
+      if (dari > hariIni || sampai > hariIni) return 'Tanggal masa depan belum punya isian.';
+      if (dari > sampai) return 'Tanggal awal harus sebelum tanggal akhir.';
+      if (geserHari(dari, BATAS_RIWAYAT_HARI - 1) < sampai) return 'Riwayat paling banyak ' + BATAS_RIWAYAT_HARI + ' hari sekali ambil. Persempit rentangnya.';
+      return '';
+    }
+
+    /** Kotak di atas mengikuti pilih (sesudah tanggal diganti dari lembar Filter di HP). */
+    function samakanTanggal() {
+      gTanggal.input.forEach(function (i) { i.checked = i.value === pilih.tanggal; });
+      inDari.value = pilih.dari || hariIni;
+      inSampai.value = pilih.sampai || hariIni;
+      kosongkan(galatTanggal);
+      aturTanggalTampil();
+    }
+
+    /** "7 hari terakhir", "20 Okt", atau "14–20 Okt" untuk baris ringkasan di HP. */
+    function teksTanggalRiwayat() {
+      if (pilih.tanggal === 'Rentang') return tanggalPendek(pilih.dari) + '–' + tanggalPendek(pilih.sampai);
+      if (pilih.tanggal === PILIHAN_TANGGAL[1]) return tanggalPendek(pilih.dari);
+      return PILIHAN_TANGGAL[0];
+    }
+
     function terapkanTanggal() {
       var mode = gTanggal.nilai();
       aturTanggalTampil();
       kosongkan(galatTanggal);
       var dari = inDari.value;
       var sampai = mode === 'Rentang' ? inSampai.value : dari;
-      var salah = '';
-      if (mode !== PILIHAN_TANGGAL[0]) {
-        if (!dari || !sampai) salah = 'Pilih tanggalnya.';
-        else if (dari > hariIni || sampai > hariIni) salah = 'Tanggal masa depan belum punya isian.';
-        else if (dari > sampai) salah = 'Tanggal awal harus sebelum tanggal akhir.';
-        else if (geserHari(dari, BATAS_RIWAYAT_HARI - 1) < sampai) salah = 'Riwayat paling banyak ' + BATAS_RIWAYAT_HARI + ' hari sekali ambil. Persempit rentangnya.';
-      }
+      var salah = salahTanggal(mode, dari, sampai);
       if (salah) {
         galatTanggal.appendChild(ikonStatus('masalah'));
         galatTanggal.appendChild(el('span', { text: salah }));
@@ -7681,7 +7702,13 @@
       if (!f || !f.adaRiwayat) return;
       var n = jumlahFilter(pilih);
       gantiTeksTombol(tombolFilter, n ? 'Filter (' + n + ')' : 'Filter');
-      var deret = el('div', { class: 'deret-tombol' }, [tombolFilter]);
+      // HP (butir 467): Tanggal dan Tampilan tidak tampil di kotak; gantinya satu baris ringkasan di samping Filter,
+      // dan keduanya diubah dari lembar Filter.
+      var ringkasHp = el('p', { class: 'riwayat-ringkas', 'aria-hidden': 'true' }, [
+        el('strong', { text: teksTanggalRiwayat() }),
+        f.stock ? document.createTextNode(' · ' + (pilih.tampilan === 'rekap' ? 'Rekap harian' : 'Catatan')) : null
+      ]);
+      var deret = el('div', { class: 'deret-tombol' }, [ringkasHp, tombolFilter]);
       if (f.stock) {
         // Riwayat Stock punya dua tampilan (tampilan Bagian 5.4).
         var g = grupPilihan('Tampilan', ['Catatan', 'Rekap harian'], pilih.tampilan === 'rekap' ? 'Rekap harian' : 'Catatan');
@@ -7716,10 +7743,35 @@
       }
     }
 
-    /** Lembar Filter: kategori, item, pengisi, status. */
+    /** Lembar Filter: kategori, item, pengisi, status; di HP juga Tanggal dan Tampilan (butir 467). */
     function bukaFilter() {
       var p = (data && data.pilihan) || { kategori: [], item: [], pengisi: [] };
       var rekap = pilih.tampilan === 'rekap';
+      var hp = !window.matchMedia('(min-width: 600px)').matches;
+      var fStock = !!(formTerpilih() || {}).stock;
+      var sTanggal = null, sDari = null, sSampai = null, sGalat = null, sTampilan = null;
+      if (hp) {
+        sTanggal = grupPilihan('Tanggal', PILIHAN_TANGGAL, pilih.tanggal);
+        sDari = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Dari tanggal' });
+        sSampai = el('input', { type: 'date', class: 'isian', max: hariIni, 'aria-label': 'Sampai tanggal' });
+        sDari.value = pilih.dari || hariIni;
+        sSampai.value = pilih.sampai || hariIni;
+        var sLabelDari = el('label', { class: 'kolom-label' }, ['Dari', sDari]);
+        var sLabelSampai = el('label', { class: 'kolom-label' }, ['Sampai', sSampai]);
+        var sDeret = el('div', { class: 'deret-tanggal' }, [sLabelDari, sLabelSampai]);
+        sGalat = el('p', { class: 'kolom-galat', role: 'alert' });
+        sTanggal.wadah.appendChild(sDeret);
+        sTanggal.wadah.appendChild(sGalat);
+        var aturLembarTanggal = function () {
+          var mode = sTanggal.nilai();
+          sDeret.hidden = mode === PILIHAN_TANGGAL[0];
+          sLabelSampai.hidden = mode !== 'Rentang';
+          sLabelDari.firstChild.textContent = mode === 'Rentang' ? 'Dari' : 'Tanggal';
+        };
+        aturLembarTanggal();
+        sTanggal.input.forEach(function (i) { i.addEventListener('change', aturLembarTanggal); });
+        if (fStock) sTampilan = grupPilihan('Tampilan', ['Catatan', 'Rekap harian'], rekap ? 'Rekap harian' : 'Catatan');
+      }
       function pilihan(label, nilai, daftar, semua) {
         var id = 'filter-' + (++nomorKolom);
         var s = el('select', { class: 'isian', id: id }, [el('option', { value: '', text: semua })]);
@@ -7751,6 +7803,8 @@
       bukaLembar({
         judul: 'Filter riwayat',
         isi: el('div', { class: 'formulir' }, [
+          sTanggal ? sTanggal.wadah : null,
+          sTampilan ? sTampilan.wadah : null,
           fKat ? fKat.wadah : null,
           fItem ? fItem.wadah : null,
           fPengisi ? fPengisi.wadah : null,
@@ -7770,6 +7824,23 @@
           },
           {
             teks: 'Terapkan', jenis: 'utama', klik: function (t, l) {
+              if (sTanggal) {
+                var mode = sTanggal.nilai();
+                var dari = sDari.value;
+                var sampai = mode === 'Rentang' ? sSampai.value : dari;
+                var salah = salahTanggal(mode, dari, sampai);
+                kosongkan(sGalat);
+                if (salah) {
+                  sGalat.appendChild(ikonStatus('masalah'));
+                  sGalat.appendChild(el('span', { text: salah }));
+                  return;
+                }
+                pilih.tanggal = mode;
+                pilih.dari = dari;
+                pilih.sampai = sampai;
+                if (sTampilan) pilih.tampilan = sTampilan.nilai() === 'Rekap harian' ? 'rekap' : 'catatan';
+                samakanTanggal();
+              }
               pilih.kategori = fKat ? fKat.pilih.value : '';
               pilih.item = fItem ? fItem.pilih.value : '';
               if (!rekap) {
