@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.47.0';
+  var VERSI_APLIKASI = '0.48.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -2764,6 +2764,24 @@
     nihil: { jenis: 'menunggu', kata: 'Nihil' }
   };
 
+  /**
+   * Jumlah kolom tiket Beranda supaya tidak ada satu tiket sendirian di baris terakhir (butir 459, telaah desain butir 5).
+   * Pilihan dicoba berurutan; yang pertama dengan sisa bagi bukan 1 (atau semua tiket muat dalam satu baris) dipakai.
+   * Tablet (600–1.023 px): 3, lalu 4, lalu 2 (4 form → 4 sejajar; 7 → 4 + 3). Laptop: 4, lalu 5, lalu 3 (5 → 5 sejajar;
+   * 9 → 5 + 4). HP tetap dua kolom. Nilainya dipasang sebagai variabel CSS, dipakai app.css di lebar masing-masing.
+   */
+  function kolomTiket(n, pilihan) {
+    for (var i = 0; i < pilihan.length; i++) {
+      if (n <= pilihan[i] || n % pilihan[i] !== 1) return pilihan[i];
+    }
+    return pilihan[0];
+  }
+
+  function aturKolomTiket(grid, n) {
+    grid.style.setProperty('--kolom-tablet', String(kolomTiket(n, [3, 4, 2])));
+    grid.style.setProperty('--kolom-laptop', String(kolomTiket(n, [4, 5, 3])));
+  }
+
   function layarBeranda(k) {
     aturJudul('Beranda');
     var sesi = k.sesi;
@@ -2816,6 +2834,7 @@
 
     function kerangka() {
       kosongkan(grid);
+      aturKolomTiket(grid, 4);
       for (var i = 0; i < 4; i++) grid.appendChild(el('span', { class: 'tiket kerangka kerangka-kartu', 'aria-hidden': 'true' }));
     }
 
@@ -2857,6 +2876,7 @@
         grid.appendChild(kotakKosong('Belum ada form yang tampil. Pengelola mengatur form di Pengaturan.'));
         return;
       }
+      aturKolomTiket(grid, form.length);
       var gerak = !tiketSudahTampil && !transisiAktif;
       form.forEach(function (f, i) {
         var st = STATUS_TIKET[f.status] || STATUS_TIKET.belum;
