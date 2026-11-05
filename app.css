@@ -2216,12 +2216,14 @@ body.papan-ketik .lembar-aksi {
   gap: 12px;
 }
 
+/* Jumlah kolom dipilih app.js (kolomTiket, butir 459) supaya tidak ada satu tiket sendirian di baris terakhir;
+   tanpa nilai: 3 di tablet, 4 di laptop. */
 @media (min-width: 600px) {
-  .tiket-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tiket-grid { grid-template-columns: repeat(var(--kolom-tablet, 3), minmax(0, 1fr)); }
 }
 
 @media (min-width: 1024px) {
-  .tiket-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tiket-grid { grid-template-columns: repeat(var(--kolom-laptop, 4), minmax(0, 1fr)); }
 }
 
 .tiket {

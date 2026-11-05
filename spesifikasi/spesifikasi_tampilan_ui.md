@@ -51,6 +51,8 @@
 > laptop (Bagian 4.2, 4.3, 4.7, 5.3, 5.7, dan 7).
 > Tambahan 4 November 2026 (keputusan pemilik, telaah desain butir 4): pemberitahuan di Beranda dalam satu daftar
 > "Perlu ditindaklanjuti" berikon, seperti Perlu perhatian di Dashboard (Bagian 5.2 dan 7).
+> Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 5): jumlah kolom tiket Beranda dipilih supaya tidak
+> ada satu tiket sendirian di baris terakhir; empat form di tablet tampil sejajar (Bagian 4.2 dan 5.2).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -323,7 +325,7 @@ terakhir tidak tertutup kapsul. Pengelola melihat 5 menu, staff 3.
 | Lebar layar | Contoh perangkat | Susunan isi |
 |---|---|---|
 | Di bawah 600 px | HP tegak | Satu kolom. Tiap baris form menjadi satu kartu. Tiket Beranda dua per baris. |
-| 600 sampai 1.023 px | Tablet tegak, HP dimiringkan, laptop kecil dengan skala layar besar | Kartu form berjajar dua kolom. Tiket Beranda tiga per baris. Lembar bawah dan kelompok menu di bar navigasi berada di tengah, lebar maksimal 600 px. |
+| 600 sampai 1.023 px | Tablet tegak, HP dimiringkan, laptop kecil dengan skala layar besar | Kartu form berjajar dua kolom. Tiket Beranda tiga per baris, kecuali jika satu tiket akan sendirian di baris terakhir (Bagian 5.2). Lembar bawah dan kelompok menu di bar navigasi berada di tengah, lebar maksimal 600 px. |
 
 ### 4.3 Laptop dan desktop (1.024 px ke atas)
 
@@ -646,7 +648,12 @@ Satu-satunya layar yang sepenuhnya navy.
   Masalah) dan "Habis besok" (tanda Perlu ditinjau), tiap baris dengan tombol "Catat
   sebagai waste". Daftar tidak tampil jika kosong. Sejak 19 Oktober 2026 daftar ini memuat
   barang jadi dan barang masuk yang punya "Baik sampai".
-- Di tablet tiket berjajar tiga per baris. Di laptop/desktop empat per baris.
+- Di tablet tiket berjajar tiga per baris. Di laptop/desktop empat per baris. **Tanpa tiket sendirian** (tambahan 5
+  November 2026): jika susunan itu menyisakan satu tiket sendirian di baris terakhir, aplikasi memakai jumlah kolom berikutnya
+  yang tidak menyisakan satu tiket. Urutannya di tablet 3, 4, lalu 2 kolom; di laptop 4, 5, lalu 3 kolom. Contohnya, empat form
+  di tablet tampil empat sejajar (dulu tiga, lalu Waste sendirian), tujuh form 4 + 3, lima form di laptop lima sejajar, dan
+  sembilan form 5 + 4. Tiket paling sempit sekitar 129 px (empat sejajar di lebar 600 px), hampir sama dengan tiket HP 320 px.
+  Di HP tetap dua kolom; jumlah form ganjil tetap menyisakan satu tiket di baris terakhir.
 - **Form kustom** tampil sebagai tiket tambahan dengan bentuk yang sama, mengikuti urutan
   yang diatur Pengelola. Form yang disembunyikan tidak tampil. Jika tiket lebih dari empat,
   layar digulir; rel dan kepala navy tetap di tempatnya.
@@ -1941,5 +1948,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Pengaturan dua panel (31 Oktober 2026) | Di laptop dan desktop, layar di dalam Pengaturan memakai panel samping berisi semua bagian di kiri dan isi di kanan; daftar Pengaturan sendiri tetap satu kolom; menu utama tetap di bar atas (Bagian 4.3 dan 5.7) |
 | Tata letak ringkas (4 November 2026, telaah desain butir 1–3) | Kepala navy ringkas kecuali Beranda dan Dashboard; satu garis kiri untuk merek, judul, dan isi di laptop; bar navigasi bawah hanya di layar menu; kotak info form satu baris dengan "Ubah" di HP dan tiga kolom di laptop (Bagian 4.2, 4.3, 4.7, dan 5.3) |
 | Pemberitahuan Beranda (4 November 2026, telaah desain butir 4) | Satu kartu daftar "Perlu ditindaklanjuti" berikon seperti Perlu perhatian di Dashboard, menggantikan kartu terpisah per pemberitahuan (Bagian 5.2) |
+| Susunan tiket Beranda (5 November 2026, telaah desain butir 5) | Jumlah kolom tanpa satu tiket sendirian di baris terakhir: tablet 3 → 4 → 2, laptop 4 → 5 → 3; empat form di tablet empat sejajar (Bagian 5.2) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

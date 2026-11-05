@@ -3116,3 +3116,20 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     `uji/layar/pemantauan.mjs` kini mencari baris server dan salinan di daftar ini (grup "Server dan salinan" tidak ada lagi).
     Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada 5 November: 44 berkas, 2.224 pemeriksaan lulus (server 20 berkas 781,
     layar 24 berkas 1.443), 0 gagal. Belum diuji di HP asli.
+
+### Susunan tiket Beranda tanpa tiket sendirian (aplikasi 0.48.0, 5 November 2026)
+
+459. **Jumlah kolom tiket.** Telaah desain 4 November 2026 butir 5, dipilih pemilik ("lanjut ke butir 5"): di tablet tiket tiga per
+    baris, sehingga dengan empat form Waste sendirian di baris kedua. Usul telaah: 2×2 atau 4 sejajar. Dipilih aturan umum
+    `kolomTiket(n, pilihan)`: coba pilihan berurutan dan pakai yang pertama dengan sisa bagi bukan 1 (atau semua tiket muat dalam
+    satu baris). Tablet `[3, 4, 2]`: 4 form → 4 sejajar (bukan 2×2, supaya tiket tetap ringkas dan daftar Perlu ditindaklanjuti naik
+    ke layar pertama; ruas rel juga empat), 5 → 3 + 2, 7 → 4 + 3, 10 → 4 + 4 + 2. Laptop `[4, 5, 3]`, karena masalah yang sama
+    muncul di laptop dengan lima form (Checklist sendirian): 5 → 5 sejajar, 9 → 5 + 4. Jika semua pilihan menyisakan satu (misalnya
+    13 form di tablet), pilihan pertama dipakai. HP tetap dua kolom (tiga kolom di 320 px terlalu sempit). `aturKolomTiket` memasang
+    `--kolom-tablet` dan `--kolom-laptop` di `.tiket-grid` (juga untuk kerangka: empat), dan app.css memakainya di 600 px dan 1.024 px
+    ke atas dengan nilai bawaan 3 dan 4. Tiket paling sempit 129 px (empat sejajar di 600 px); isi tiket tetap utuh.
+460. **Uji:** `uji/layar/tiket_kolom.mjs` (93 pemeriksaan): 4, 5, 7, dan 9 form pada delapan ukuran dan 600 px: jumlah kolom yang
+    diharapkan, tanpa tiket sendirian di tablet dan laptop, tanpa gulir samping, isi tiket tidak keluar dari tiketnya, tiket ≥ 120 px;
+    gerak menyala. Uji memeriksa isi tiket per elemen, bukan `scrollWidth`, karena takik setengah lingkaran di baris sobek memang
+    menjorok 3 px di tiap sisi (sejak versi 1.7). Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada 5 November: 45 berkas,
+    2.317 pemeriksaan lulus (server 20 berkas 781, layar 25 berkas 1.536), 0 gagal. Belum diuji di HP asli.

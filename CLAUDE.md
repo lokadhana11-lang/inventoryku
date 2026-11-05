@@ -116,8 +116,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 ## Status sekarang
 
-- **Versi terakhir:** aplikasi 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti", telaah desain butir 4;
-  butir 456–458; Code.gs tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.46.0 (tata letak ringkas dari telaah desain butir
+- **Versi terakhir:** aplikasi 0.48.0 (susunan tiket Beranda tanpa tiket sendirian, telaah desain butir 5; butir 459–460; Code.gs
+  tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
+  butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
   1–3: kepala navy ringkas, satu garis kiri, bar bawah hanya di layar menu, kotak info ringkas; butir 451–455) dan 0.45.1 (jarak
   kartu Saran prep, butir 450), digabung lewat PR #73 dan tayang (4 November 2026). Code.gs v0.44,
   aplikasi 0.45.0 (saran prep, 4 November 2026, butir 444–448), digabung lewat PR #71 dan terpasang (4 November 2026: Edge Function
@@ -144,8 +145,9 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - **Telaah aplikasi 19 Oktober 2026:** semua butir yang dipilih pemilik sudah dibangun (terakhir: simpan uji di repo, ringkas CLAUDE.md).
 - **Telaah desain 4 November 2026:** sembilan temuan; pemilik memilih butir 1–3 (kotak info form ringkas, bar bawah tidak tampil di
   layar isian dan layar dalam, kepala navy ringkas dengan satu garis kiri), dibangun di aplikasi 0.46.0, lalu butir 4 (pemberitahuan
-  Beranda sebagai satu daftar) di 0.47.0. Butir 5–9 (tiket tablet 2×2, Laporan dua kolom dan Pengaturan berkelompok, Daftar belanja
-  dari ubin Dashboard, filter Riwayat ringkas, satu penanda menu aktif) belum dipilih.
+  Beranda sebagai satu daftar) di 0.47.0, lalu butir 5 (tiket tanpa satu tiket sendirian di baris terakhir) di 0.48.0. Butir 6–9
+  (Laporan dua kolom dan Pengaturan berkelompok, Daftar belanja dari ubin Dashboard, filter Riwayat ringkas, satu penanda menu aktif)
+  belum dipilih.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
