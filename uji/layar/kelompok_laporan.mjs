@@ -84,6 +84,10 @@ for (const [w, h] of [[1024, 768], [1366, 768], [1920, 1080]]) {
   })));
   cek(JSON.stringify(panel.map((g) => [g.label, g.baris])) === JSON.stringify(KELOMPOK) && panel.every((g) => g.peran === 'group'), `${w}: panel samping berkelompok`, panel);
   cek(panel[1].aktif.length === 1 && panel[1].aktif[0] === 'Item' && !panel[0].aktif.length && !panel[2].aktif.length, `${w}: Item ditandai di Data dapur`, panel);
+  // Label kelompok di panel hanya tampil di layar setinggi 820 px ke atas; di layar pendek panel muat di layar pertama.
+  const label = await page.evaluate(() => getComputedStyle(document.querySelector('#layar .panel-samping-kelompok')).display);
+  const [p0] = await kotak(page, '#layar .panel-samping');
+  cek(h >= 820 ? label !== 'none' : label === 'none' && p0.bawah <= h, `${w}x${h}: label kelompok ${h >= 820 ? 'tampil' : 'tersembunyi, panel muat'}`, { label, p0 });
   await page.evaluate(() => window.scrollTo(0, 400));
   await page.waitForTimeout(400);
   const p = await kotak(page, '#layar .panel-samping');

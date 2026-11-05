@@ -1184,7 +1184,9 @@ Satu-satunya layar yang sepenuhnya navy.
     berkelompok dan dua kolom, lihat di atas).
   - Setiap layar di dalamnya (misalnya Item, ubah item, Tambah resep, Hari libur) tampil dua panel. Di kiri, **panel
     samping** selebar 260 px berisi semua bagian (ikon dan nama, berurutan seperti daftar; sejak 5 November 2026 dengan label
-    kelompok kecil 12 px tebal Tinta Redup di atas tiap kelompok dan garis rambut di antara kelompok). Di kanan, isi bagian itu
+    kelompok kecil 12 px tebal Tinta Redup di atas tiap kelompok dan garis rambut di antara kelompok; di layar yang tingginya
+    di bawah 820 px, misalnya laptop 1366×768, label tidak tampil supaya panel tetap muat di layar pertama, dan garis
+    pemisahnya tetap). Di kanan, isi bagian itu
     selebar layar sempit seperti sebelumnya. Lebar total paling banyak 1.012 px; sejak 4 November 2026 keduanya
     mulai dari garis kiri yang sama dengan merek dan layar lain (Bagian 4.3), tidak lagi di tengah layar.
   - Panel samping berupa kartu (Kertas, garis rambut, bayangan kartu) yang lengket 16 px di bawah bar atas saat isi

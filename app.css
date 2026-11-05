@@ -7743,6 +7743,14 @@ hr.pemisah {
   color: var(--tinta-redup);
 }
 
+/* Layar pendek (tinggi di bawah 820 px, misalnya laptop 1366×768): label kelompok di panel tidak tampil supaya
+   panel tetap muat di layar pertama; garis pemisah tetap, dan nama kelompok tetap dibacakan (aria-labelledby). */
+@media (max-height: 819px) {
+  .panel-samping-kelompok {
+    display: none;
+  }
+}
+
 @media (min-width: 1024px) {
   /* Pengaturan: dua kolom selebar layar (Orang dan akses, lalu Form dan jadwal, di kiri; Data dapur di kanan). */
   .layar-sempit.pengaturan-daftar {
