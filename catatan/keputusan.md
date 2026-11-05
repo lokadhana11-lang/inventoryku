@@ -3251,4 +3251,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     elemen dan `::before`/`::after` di 31 layar × 7 ukuran (390, 320, 768, 1024, 1366, 1920, dan 740×400) ditambah kotak info terbuka,
     lembar Filter Riwayat, kursor di atas menu dan kartu tautan, Pengaturan digulir, dan layar Staff: 277 potret. Dua potret sebelum
     perubahan sama persis (alatnya stabil), dan potret sesudah sama persis dengan sebelum (`uji/alat/banding_gaya.mjs`: 0 perbedaan).
-    Gerak tanpa "kurangi gerak" tidak dipotret; aturan gerak yang dipindah hanya milik kartu tautan, dipindah utuh.
+    Gerak tanpa "kurangi gerak" tidak dipotret; aturan gerak yang dipindah hanya milik kartu tautan, dipindah utuh. `node
+    uji/jalankan.mjs --layar` pada 5 November: 49 berkas, 2.443 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,0 menit).
