@@ -3156,4 +3156,6 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
 463. **Uji:** `uji/layar/kelompok_laporan.mjs` (45 pemeriksaan): tiga kelompok dan urutannya di HP, label kelompok, tanda reset PIN,
     satu kolom di HP; dua kolom Pengaturan di garis kiri di 1024, 1366, 1920 px; panel samping berkelompok dengan Item ditandai, label
     tersembunyi dan panel muat di layar 768 px tinggi, label tampil di 1080 px, dan panel muat setelah digulir; Laporan dua kolom di laptop (sejajar, sama lebar, tanpa jarak kosong di atas kartu) dan satu kolom di
-    HP dan tablet pada delapan ukuran; Staff satu kartu; gerak menyala. Code.gs tidak berubah.
+    HP dan tablet pada delapan ukuran; Staff satu kartu; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada
+    5 November (sesudah perbaikan label panel): 46 berkas, 2.362 pemeriksaan lulus (server 20 berkas 781, layar 26 berkas 1.581),
+    0 gagal. Belum diuji di HP asli.
