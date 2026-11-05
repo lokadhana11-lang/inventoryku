@@ -10,7 +10,8 @@ Dari akar repo, dengan Node 22:
 
 ```
 node uji/jalankan.mjs              # semua uji server (sekitar 10 detik)
-node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (sekitar 25 menit)
+node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (4 berkas sekaligus, sekitar 15 menit)
+UJI_PARALEL=1 node uji/jalankan.mjs --layar   # satu berkas sekaligus (sekitar 50 menit), misalnya untuk mencari uji yang goyah
 node uji/jalankan.mjs libur        # hanya uji yang namanya memuat "libur" (server dan layar)
 node uji/server/pesanan.mjs        # satu berkas saja
 UJI_JAM=2026-11-01T09:00:00+07:00 node uji/jalankan.mjs   # uji pada tanggal dan jam lain
@@ -23,6 +24,12 @@ sama dipakai server tiruan, data contoh, berkas uji, dan halaman di Chromium, ja
 
 Ringkasan per berkas ditulis "LULUS"/"GAGAL" dengan jumlah pemeriksaan, lalu baris yang gagal.
 Kode keluar 1 jika ada yang gagal.
+
+Berkas uji dijalankan beberapa sekaligus (bawaan: sebanyak inti prosesor, paling banyak 4; `UJI_PARALEL` untuk jumlah lain),
+masing-masing di proses Node dan Chromium sendiri, jadi uji baru tidak boleh bergantung pada berkas lain: pakai `H.layani(0)`
+(port acak), data contoh di memori (`seed()`), dan folder sementara dari `mkdtempSync`. Hasilnya tetap dicetak menurut urutan
+nama berkas, dan baris terakhir menyebut berapa sekaligus dan lamanya. Waktu per berkas yang dicetak adalah waktu berkas itu
+sendiri; saat paralel angkanya lebih besar daripada saat sendirian karena prosesor dibagi.
 
 Uji layar butuh Playwright dan Chromium. Di lingkungan Claude Code keduanya sudah terpasang
 (Playwright di `/opt/node22/lib/node_modules/`). Di tempat lain: `npm install playwright` lalu
