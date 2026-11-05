@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.48.0';
+  var VERSI_APLIKASI = '0.49.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -9074,10 +9074,11 @@
     var tombolDrive = pengelola ? tombol('Simpan ulang ke Drive', 'kedua') : null;
     var pesanDrive = el('p', { class: 'pesan-formulir', role: 'status' });
 
-    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+    // Pengelola di laptop: dua kolom (butir 462); Laporan harian PDF dan Rekap bulanan di kiri, Daftar belanja di kanan.
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' + (pengelola ? ' laporan-dua' : '') }, [
       el('h1', { class: 'judul-layar', text: 'Laporan' }),
       penanda,
-      el('section', { class: 'kartu laporan-kartu', 'aria-label': 'Laporan harian PDF' }, [
+      el('section', { class: 'kartu laporan-kartu laporan-pdf', 'aria-label': 'Laporan harian PDF' }, [
         el('h2', { class: 'kartu-judul', text: 'Laporan harian PDF' }),
         gTanggal.wadah,
         wadahForm,
@@ -10520,7 +10521,7 @@
     var pesanKartu = el('p', { class: 'pesan-formulir', role: 'status', 'aria-live': 'polite', tabindex: '-1' });
     var catatan = el('p', { class: 'kolom-bantuan' });
     var unduh = unduhPdf({ aksi: 'unduhPdfBelanja', minta: function () { return { order: orderCetak(), tambahan: daftarTambahan() }; } });
-    var kartu = el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-belanja' }, [
+    var kartu = el('section', { class: 'kartu laporan-kartu laporan-belanja', 'aria-labelledby': 'judul-belanja' }, [
       el('h2', { class: 'kartu-judul', id: 'judul-belanja', text: 'Daftar belanja' }),
       pesanKartu,
       wadah,
@@ -11025,7 +11026,7 @@
       Cache.tulis('rekap-pilihan', { bulan: pilihBulan.value });
       unduh.reset();
     });
-    return el('section', { class: 'kartu laporan-kartu', 'aria-labelledby': 'judul-rekap' }, [
+    return el('section', { class: 'kartu laporan-kartu laporan-rekap', 'aria-labelledby': 'judul-rekap' }, [
       el('h2', { class: 'kartu-judul', id: 'judul-rekap', text: 'Rekap bulanan' }),
       el('p', { class: 'kartu-teks', text: 'Stock, stock opname, waste, prep, suhu, dan kepatuhan selama satu bulan. ' +
         'Rekap bulan lalu juga dikirim ke penerima email tiap tanggal 1.' }),
@@ -11047,24 +11048,32 @@
   }
 
   /**
-   * Bagian Pengaturan (tampilan Bagian 5.7), berurutan. Dipakai daftar di layar Pengaturan dan panel samping
-   * di laptop dan desktop. id: bagian alamat sesudah #/pengaturan/.
+   * Bagian Pengaturan (tampilan Bagian 5.7), berurutan dalam tiga kelompok (butir 461, telaah desain butir 6). Dipakai daftar
+   * di layar Pengaturan dan panel samping di laptop dan desktop. id: bagian alamat sesudah #/pengaturan/.
    */
+  var KELOMPOK_PENGATURAN = ['Orang dan akses', 'Data dapur', 'Form dan jadwal'];
   var BAGIAN_PENGATURAN = [
-    { id: 'staff', ikon: 'staff', judul: 'Staff dan PIN', ket: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan, hapus.' },
-    { id: 'penerima', ikon: 'email', judul: 'Penerima email', ket: 'Alamat yang menerima laporan harian.' },
-    { id: 'form', ikon: 'tiket', judul: 'Form', ket: 'Urutan dan tampil di Beranda, ganti nama, buat dan susun form kustom.' },
-    { id: 'item', ikon: 'kotak', judul: 'Item', ket: 'Nama, kategori, satuan, kemasan besar, harga, stok minimum dan maksimum.' },
-    { id: 'resep', ikon: 'resep', judul: 'Resep', ket: 'Barang jadi, hasil per resep, bahan, dan masa simpan untuk Prep List.' },
-    { id: 'menu', ikon: 'label', judul: 'Menu', ket: 'Harga jual dan takaran bahan per porsi untuk menghitung HPP.' },
-    { id: 'unit', ikon: 'termometer', judul: 'Unit', ket: 'Chiller dan freezer untuk form Suhu.' },
-    { id: 'pemasok', ikon: 'truk', judul: 'Pemasok', ket: 'Daftar pemasok untuk barang masuk, dan pembelian bulan ini.' },
-    { id: 'kategori', ikon: 'label', judul: 'Kategori dan satuan', ket: 'Kategori stock beserta urutannya, dan daftar satuan.' },
-    { id: 'outlet', ikon: 'jam', judul: 'Outlet dan jadwal',
+    { id: 'staff', kelompok: 0, ikon: 'staff', judul: 'Staff dan PIN', ket: 'Tambah staff, ubah role, buat atau reset PIN, nonaktifkan, hapus.' },
+    { id: 'penerima', kelompok: 0, ikon: 'email', judul: 'Penerima email', ket: 'Alamat yang menerima laporan harian.' },
+    { id: 'item', kelompok: 1, ikon: 'kotak', judul: 'Item', ket: 'Nama, kategori, satuan, kemasan besar, harga, stok minimum dan maksimum.' },
+    { id: 'resep', kelompok: 1, ikon: 'resep', judul: 'Resep', ket: 'Barang jadi, hasil per resep, bahan, dan masa simpan untuk Prep List.' },
+    { id: 'menu', kelompok: 1, ikon: 'label', judul: 'Menu', ket: 'Harga jual dan takaran bahan per porsi untuk menghitung HPP.' },
+    { id: 'unit', kelompok: 1, ikon: 'termometer', judul: 'Unit', ket: 'Chiller dan freezer untuk form Suhu.' },
+    { id: 'pemasok', kelompok: 1, ikon: 'truk', judul: 'Pemasok', ket: 'Daftar pemasok untuk barang masuk, dan pembelian bulan ini.' },
+    { id: 'kategori', kelompok: 1, ikon: 'label', judul: 'Kategori dan satuan', ket: 'Kategori stock beserta urutannya, dan daftar satuan.' },
+    { id: 'form', kelompok: 2, ikon: 'tiket', judul: 'Form', ket: 'Urutan dan tampil di Beranda, ganti nama, buat dan susun form kustom.' },
+    { id: 'outlet', kelompok: 2, ikon: 'jam', judul: 'Outlet dan jadwal',
       ket: 'Nama outlet, zona waktu, jam closing, jadwal opname dan cadangan, keluar otomatis, target food cost.' },
-    { id: 'libur', ikon: 'kalender', judul: 'Hari libur',
+    { id: 'libur', kelompok: 2, ikon: 'kalender', judul: 'Hari libur',
       ket: 'Tanggal dapur tutup: form tidak ditagih, email harian dan pengingat cek suhu tidak dikirim.' }
   ];
+
+  /** Bagian Pengaturan per kelompok: [{ judul, bagian: [...] }]. */
+  function kelompokPengaturan() {
+    return KELOMPOK_PENGATURAN.map(function (judul, i) {
+      return { judul: judul, bagian: BAGIAN_PENGATURAN.filter(function (b) { return b.kelompok === i; }) };
+    });
+  }
 
   /** Jumlah permintaan reset PIN dari data Beranda yang tersimpan di HP. */
   function jumlahResetPin() {
@@ -11075,17 +11084,24 @@
   function layarPengaturan(k) {
     aturJudul('Pengaturan');
     var jumlahReset = jumlahResetPin();
-    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit' }, [
+    // Tiga kelompok berjudul (butir 461); di laptop dua kolom: Orang dan akses lalu Form dan jadwal di kiri, Data dapur di kanan.
+    k.wadah.appendChild(el('div', { class: 'layar-isi layar-sempit pengaturan-daftar' }, [
       el('h1', { class: 'judul-layar', text: 'Pengaturan' }),
-      el('nav', { class: 'daftar', 'aria-label': 'Bagian pengaturan' }, BAGIAN_PENGATURAN.map(function (b) {
-        return el('a', { class: 'daftar-baris', href: '#/pengaturan/' + b.id }, [
-          ikon(b.ikon),
-          el('span', { class: 'daftar-baris-isi' }, [
-            el('span', { class: 'daftar-baris-judul', text: b.judul }),
-            el('span', { class: 'daftar-baris-ket', text: b.ket }),
-            b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
-          ]),
-          ikon('kanan')
+      el('nav', { class: 'pengaturan-kelompok-wadah', 'aria-label': 'Bagian pengaturan' }, kelompokPengaturan().map(function (g, i) {
+        var id = 'kelompok-pengaturan-' + i;
+        return el('section', { class: 'pengaturan-kelompok', 'aria-labelledby': id }, [
+          el('h2', { class: 'judul-sub', id: id, text: g.judul }),
+          el('div', { class: 'daftar' }, g.bagian.map(function (b) {
+            return el('a', { class: 'daftar-baris', href: '#/pengaturan/' + b.id }, [
+              ikon(b.ikon),
+              el('span', { class: 'daftar-baris-isi' }, [
+                el('span', { class: 'daftar-baris-judul', text: b.judul }),
+                el('span', { class: 'daftar-baris-ket', text: b.ket }),
+                b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
+              ]),
+              ikon('kanan')
+            ]);
+          }))
         ]);
       }))
     ]));
@@ -11104,16 +11120,22 @@
     var isi = main.querySelector(':scope > .layar-isi');
     if (!m || !isi) return;
     var jumlahReset = jumlahResetPin();
-    var panel = el('nav', { class: 'panel-samping', 'aria-label': 'Bagian pengaturan' }, BAGIAN_PENGATURAN.map(function (b) {
-      var a = el('a', { class: 'panel-samping-baris', href: '#/pengaturan/' + b.id }, [
-        ikon(b.ikon),
-        el('span', { class: 'panel-samping-isi' }, [
-          el('span', { class: 'panel-samping-judul', text: b.judul }),
-          b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
-        ])
-      ]);
-      if (b.id === m[1]) a.setAttribute('aria-current', jalur === '/pengaturan/' + b.id ? 'page' : 'true');
-      return a;
+    // Panel juga berkelompok (butir 461): label kecil di atas tiap kelompok.
+    var panel = el('nav', { class: 'panel-samping', 'aria-label': 'Bagian pengaturan' }, kelompokPengaturan().map(function (g, i) {
+      var id = 'panel-kelompok-' + i;
+      return el('div', { class: 'panel-samping-grup', role: 'group', 'aria-labelledby': id }, [
+        el('span', { class: 'panel-samping-kelompok', id: id, text: g.judul })
+      ].concat(g.bagian.map(function (b) {
+        var a = el('a', { class: 'panel-samping-baris', href: '#/pengaturan/' + b.id }, [
+          ikon(b.ikon),
+          el('span', { class: 'panel-samping-isi' }, [
+            el('span', { class: 'panel-samping-judul', text: b.judul }),
+            b.id === 'staff' && jumlahReset ? tandaStatus('tinjau', jumlahReset + ' permintaan reset PIN') : null
+          ])
+        ]);
+        if (b.id === m[1]) a.setAttribute('aria-current', jalur === '/pengaturan/' + b.id ? 'page' : 'true');
+        return a;
+      })));
     }));
     var wadah = el('div', { class: 'dua-panel' });
     main.insertBefore(wadah, isi);

@@ -7702,3 +7702,82 @@ hr.pemisah {
     margin-left: auto;
   }
 }
+
+/* =========================================================================
+ * Tambahan 5 November 2026 (aplikasi 0.49.0, butir 461–463; spesifikasi tampilan
+ * Bagian 5.5 dan 5.7): Pengaturan berkelompok, Laporan dua kolom di laptop.
+ * ========================================================================= */
+
+/* Daftar Pengaturan: tiga kelompok berjudul. */
+.pengaturan-kelompok-wadah {
+  display: grid;
+  gap: 4px;
+}
+
+.pengaturan-kelompok > .judul-sub {
+  margin: 12px 0 8px;
+}
+
+.pengaturan-kelompok:first-child > .judul-sub {
+  margin-top: 0;
+}
+
+/* Panel samping: label kecil di atas tiap kelompok. */
+.panel-samping-grup {
+  display: grid;
+  gap: 2px;
+}
+
+.panel-samping-grup + .panel-samping-grup {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--garis-halus);
+}
+
+.panel-samping-kelompok {
+  padding: 4px 12px 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  color: var(--tinta-redup);
+}
+
+@media (min-width: 1024px) {
+  /* Pengaturan: dua kolom selebar layar (Orang dan akses, lalu Form dan jadwal, di kiri; Data dapur di kanan). */
+  .layar-sempit.pengaturan-daftar {
+    max-width: 1200px;
+  }
+  .pengaturan-kelompok-wadah {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "orang dapur" "jadwal dapur";
+    column-gap: 24px;
+    align-items: start;
+  }
+  .pengaturan-kelompok:nth-child(1) { grid-area: orang; }
+  .pengaturan-kelompok:nth-child(2) { grid-area: dapur; }
+  .pengaturan-kelompok:nth-child(3) { grid-area: jadwal; }
+  .pengaturan-kelompok:nth-child(2) > .judul-sub { margin-top: 0; }
+
+  /* Laporan (Pengelola): dua kolom; Daftar belanja yang panjang di kanan. */
+  .layar-sempit.laporan-dua {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "status status" "pdf belanja" "rekap belanja";
+    gap: 16px 24px;
+    align-items: start;
+  }
+  /* Tanpa tulisan "Memperbarui…", baris status tidak disisakan (tanpa jarak kosong di atas kartu). */
+  .layar-sempit.laporan-dua:has(> .memperbarui:empty) {
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "pdf belanja" "rekap belanja";
+  }
+  .layar-sempit.laporan-dua > * { margin: 0; }
+  .laporan-dua > .memperbarui { grid-area: status; }
+  .laporan-dua > .laporan-pdf { grid-area: pdf; }
+  .laporan-dua > .laporan-belanja { grid-area: belanja; }
+  .laporan-dua > .laporan-rekap { grid-area: rekap; }
+}

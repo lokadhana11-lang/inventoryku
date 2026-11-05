@@ -62,7 +62,8 @@ const ukur = (page) => page.evaluate(() => {
   };
 });
 
-const BAGIAN = ['Staff dan PIN', 'Penerima email', 'Form', 'Item', 'Resep', 'Menu', 'Unit', 'Pemasok', 'Kategori dan satuan', 'Outlet dan jadwal', 'Hari libur'];
+// Urutan per kelompok sejak aplikasi 0.49.0 (butir 461): Orang dan akses, Data dapur, Form dan jadwal.
+const BAGIAN = ['Staff dan PIN', 'Penerima email', 'Item', 'Resep', 'Menu', 'Unit', 'Pemasok', 'Kategori dan satuan', 'Form', 'Outlet dan jadwal', 'Hari libur'];
 
 // A. 1.366 x 768: daftar Pengaturan tetap satu kolom tanpa panel samping; layar bagian dua panel
 {
