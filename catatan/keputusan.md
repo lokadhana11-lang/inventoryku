@@ -3230,3 +3230,26 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     README meminta uji baru mengikuti aturan itu. Dengan 4 inti: 49 berkas, 2.443 pemeriksaan lulus dua kali berturut-turut, masing-masing
     13,2 menit (dulu sekitar 50 menit), tanpa uji yang goyah; waktu per berkas hampir sama dengan saat sendirian, jadi prosesor bukan batasnya. Berkas terlama `layar/libur.mjs`
     (4,5 menit) menentukan batas bawah. Aplikasi dan Code.gs tidak berubah.
+
+### Perapian app.css (aplikasi 0.52.1, 5 November 2026)
+
+473. **Blok tambahan disatukan ke bagiannya.** Telaah aplikasi 5 November 2026 butir 2, dipilih pemilik ("lanjut ke butir 2"): enam
+    blok "Tambahan" (aplikasi 0.46.0–0.52.0) ditulis di akhir `app.css` dan menimpa aturan lama, sehingga satu komponen diatur di dua
+    tempat. Kini tiap aturan ada di bagian komponennya: kepala ringkas di bagian kepala navy, garis kiri di `.layar-sempit` dan
+    `.kepala-layar-isi.layar-sempit` serta Pengaturan dua panel (nilai lama `margin: 0 auto` dan `padding-left: calc(... + 292px)`
+    langsung diganti), bar bawah di dekat aturan papan ketik, `.bar-isi` di blok bar desktop, tiket dan kepala Beranda di bagian
+    Beranda, kotak info ringkas di bagian kotak info, Riwayat, Laporan dua kolom, Pengaturan berkelompok, pintasan dan kartu tautan
+    Dashboard di bagiannya masing-masing. Aturan yang hanya membatalkan aturan lama dihapus bersama aturan lamanya: bantalan
+    `.beranda-bawah` di 1.248 px (butir 457), pil menu aktif desktop (butir 470: aturan pil aktif dihapus, kursor di atas menu aktif
+    `opacity: 0`), `.dashboard-pintas` lama (1.024 px dan jarak `0 32px`). CSS `.dashboard-opname` yang tidak dipakai sejak 0.50.0
+    dibuang. Urutan dijaga di tempat bobot aturannya sama: Perlu ditindaklanjuti sesudah `.peristiwa` (supaya baris tetap rata
+    tengah), Laporan dua kolom sesudah `.kartu + .kartu` dan `.layar-isi > .memperbarui`, ubin Daftar belanja sesudah `.ubin-tombol`,
+    Riwayat sesudah `.riwayat-alat .deret-tombol`. `app.css` 7.957 → 7.855 baris; aturan yang ditulis lebih dari sekali pada kondisi
+    layar yang sama 55 → 48 (sisanya lapisan desain versi 1.7–1.12, belum disentuh). Tampilan tidak berubah; versi naik ke 0.52.1
+    hanya supaya service worker mengambil `app.css` baru.
+    **Bukti tanpa perubahan tampilan:** `uji/alat/potret_gaya.mjs` (baru) memotret posisi, ukuran, dan sekitar 80 properti CSS setiap
+    elemen dan `::before`/`::after` di 31 layar × 7 ukuran (390, 320, 768, 1024, 1366, 1920, dan 740×400) ditambah kotak info terbuka,
+    lembar Filter Riwayat, kursor di atas menu dan kartu tautan, Pengaturan digulir, dan layar Staff: 277 potret. Dua potret sebelum
+    perubahan sama persis (alatnya stabil), dan potret sesudah sama persis dengan sebelum (`uji/alat/banding_gaya.mjs`: 0 perbedaan).
+    Gerak tanpa "kurangi gerak" tidak dipotret; aturan gerak yang dipindah hanya milik kartu tautan, dipindah utuh. `node
+    uji/jalankan.mjs --layar` pada 5 November: 49 berkas, 2.443 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,0 menit).
