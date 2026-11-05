@@ -3227,6 +3227,6 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     Hasil per berkas tetap dicetak menurut urutan nama berkas (dicetak begitu semua berkas sebelumnya selesai), dan baris terakhir
     menyebut berapa sekaligus dan lamanya. Batas 20 menit per berkas tetap. Uji sudah aman berjalan bersamaan tanpa diubah: tiap
     berkas memakai port acak (`H.layani(0)`), data di memori (`seed()`), Chromium sendiri, dan folder sementara dari `mkdtempSync`;
-    README meminta uji baru mengikuti aturan itu. Dengan 4 inti: 49 berkas, 2.443 pemeriksaan lulus dalam 13,2 menit (dulu sekitar
-    50 menit); waktu per berkas hampir sama dengan saat sendirian, jadi prosesor bukan batasnya. Berkas terlama `layar/libur.mjs`
+    README meminta uji baru mengikuti aturan itu. Dengan 4 inti: 49 berkas, 2.443 pemeriksaan lulus dua kali berturut-turut, masing-masing
+    13,2 menit (dulu sekitar 50 menit), tanpa uji yang goyah; waktu per berkas hampir sama dengan saat sendirian, jadi prosesor bukan batasnya. Berkas terlama `layar/libur.mjs`
     (4,5 menit) menentukan batas bawah. Aplikasi dan Code.gs tidak berubah.
