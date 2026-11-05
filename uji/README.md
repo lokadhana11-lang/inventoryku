@@ -9,8 +9,8 @@ aplikasi dibuka di Chromium dengan API tiruan yang memanggil `doPost` Code.gs it
 Dari akar repo, dengan Node 22:
 
 ```
-node uji/jalankan.mjs              # semua uji server (sekitar 10 detik)
-node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (4 berkas sekaligus, sekitar 15 menit)
+node uji/jalankan.mjs              # semua uji server (beberapa detik)
+node uji/jalankan.mjs --layar      # uji server lalu uji layar di Chromium (4 berkas sekaligus, sekitar 13 menit)
 UJI_PARALEL=1 node uji/jalankan.mjs --layar   # satu berkas sekaligus (sekitar 50 menit), misalnya untuk mencari uji yang goyah
 node uji/jalankan.mjs libur        # hanya uji yang namanya memuat "libur" (server dan layar)
 node uji/server/pesanan.mjs        # satu berkas saja

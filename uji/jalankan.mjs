@@ -89,7 +89,8 @@ async function pekerja() {
 }
 await Promise.all(Array.from({ length: Math.min(paralel, berkas.length) }, pekerja));
 
-const menit = ((Date.now() - mulaiSemua) / 60000).toFixed(1).replace('.', ',');
+const ms = Date.now() - mulaiSemua;
+const lama = ms < 60000 ? Math.round(ms / 1000) + ' detik' : (ms / 60000).toFixed(1).replace('.', ',') + ' menit';
 console.log('\n' + berkas.length + ' berkas uji: ' + totalLulus + ' pemeriksaan lulus, ' + totalGagal + ' gagal.' +
-  (bermasalah.length ? ' Bermasalah: ' + bermasalah.join(', ') : '') + ' (' + paralel + ' sekaligus, ' + menit + ' menit)');
+  (bermasalah.length ? ' Bermasalah: ' + bermasalah.join(', ') : '') + ' (' + paralel + ' sekaligus, ' + lama + ')');
 process.exit(bermasalah.length ? 1 : 0);
