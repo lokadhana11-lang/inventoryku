@@ -3114,4 +3114,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tanpa pemberitahuan tanpa judul, sembilan ukuran (delapan Bagian 4.6 dan 1200×800: tanpa gulir samping, baris ≥ 56 px, tombol
     ≥ 44 px, teks di samping ikon, tombol di kanan atau di bawah, daftar sejajar tiket dan merek), gerak menyala.
     `uji/layar/pemantauan.mjs` kini mencari baris server dan salinan di daftar ini (grup "Server dan salinan" tidak ada lagi).
-    Code.gs tidak berubah.
+    Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada 5 November: 44 berkas, 2.224 pemeriksaan lulus (server 20 berkas 781,
+    layar 24 berkas 1.443), 0 gagal. Belum diuji di HP asli.
