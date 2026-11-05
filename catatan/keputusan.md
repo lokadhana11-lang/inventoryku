@@ -3215,4 +3215,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     pil menandai area ketuk yang besar. Jika pemilik lebih suka pil saja, cukup sembunyikan `.menu-penanda` di desktop.
 471. **Uji:** `uji/layar/menu_penanda.mjs` (15 pemeriksaan): laptop tanpa pil di menu aktif dan menu lain, garis amber di bawah menu
     aktif dan pindah ke Riwayat, warna teks berbeda, pil tipis saat kursor di atas menu lain dan tidak di atas menu aktif; delapan
-    ukuran (desktop satu penanda, HP dan tablet tetap pil dan garis); gerak menyala. Code.gs tidak berubah.
+    ukuran (desktop satu penanda, HP dan tablet tetap pil dan garis); gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs
+    --layar` pada 5 November: 49 berkas, 2.443 pemeriksaan lulus (server 20 berkas 781, layar 29 berkas 1.662), 0 gagal.
