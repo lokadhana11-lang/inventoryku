@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.49.0';
+  var VERSI_APLIKASI = '0.50.0';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -1392,7 +1392,7 @@
     { pola: /^\/form\/([A-Za-z0-9_%]+)$/, menu: 'beranda', layar: layarFormKustom },
     { pola: /^\/riwayat(?:\?(.*))?$/, menu: 'riwayat', layar: layarRiwayat },
     { pola: /^\/riwayat\/([A-Z0-9_]+)\/([A-Za-z0-9-]+)$/, menu: 'riwayat', layar: layarRiwayatDetail },
-    { pola: /^\/laporan$/, menu: 'laporan', layar: layarLaporan },
+    { pola: /^\/laporan(?:\?(.*))?$/, menu: 'laporan', layar: layarLaporan },
     { pola: /^\/dashboard$/, menu: 'dashboard', pengelola: true, layar: layarDashboard },
     { pola: /^\/opname$/, menu: 'dashboard', pengelola: true, layar: layarOpname },
     { pola: /^\/hpp(\/menu)?$/, menu: 'dashboard', pengelola: true, layar: layarHpp },
@@ -9093,6 +9093,22 @@
       pengelola ? kartuRekapBulanan() : null
     ]));
 
+    // Dari ubin "Di bawah stok minimum" di Dashboard (#/laporan?bagian=belanja, butir 464): langsung ke Daftar belanja.
+    // Ditunda sebentar karena router menggulir ke atas sesudah layar digambar.
+    var kueri = k.cocok && k.cocok[1] ? bacaKueriAlamat(k.cocok[1]) : {};
+    if (pengelola && kueri.bagian === 'belanja') {
+      setTimeout(function () {
+        var kartuBelanja = k.wadah.querySelector('.laporan-belanja');
+        var judulBelanja = kartuBelanja && kartuBelanja.querySelector('.kartu-judul');
+        if (!kartuBelanja || !document.contains(kartuBelanja)) return;
+        kartuBelanja.scrollIntoView({ block: 'start' });
+        if (judulBelanja) {
+          judulBelanja.setAttribute('tabindex', '-1');
+          judulBelanja.focus({ preventScroll: true });
+        }
+      }, 60);
+    }
+
     function simpanPilihan() {
       Cache.tulis('laporan-pilihan', pilih);
     }
@@ -9794,8 +9810,31 @@
       ]),
       ubin('Belum diperiksa', String(r.belumDiperiksa || 0), 'isian, ' + BATAS_RIWAYAT_HARI + ' hari terakhir', 'centang'),
       ubin('Suhu di luar standar', String(r.suhuLuar || 0), 'pengecekan hari ini', 'termometer'),
-      ubin('Di bawah stok minimum', String(r.bawahMinimum || 0), 'item', 'kotak'),
+      // Ubin ini membuka Daftar belanja di Laporan (butir 464, telaah desain butir 7).
+      el('a', { class: 'ubin ubin-tombol ubin-belanja', href: '#/laporan?bagian=belanja',
+        'aria-label': 'Di bawah stok minimum: ' + (r.bawahMinimum || 0) + ' item. Buka Daftar belanja' }, [
+        el('span', { class: 'ubin-atas' }, [el('span', { class: 'ubin-label', text: 'Di bawah stok minimum' }), ikon('kotak')]),
+        el('span', { class: 'ubin-nilai', text: String(r.bawahMinimum || 0) }),
+        el('span', { class: 'ubin-ket ubin-ket-tautan' }, [el('span', { text: 'item · ' }), el('span', { class: 'ubin-tautan-teks', text: 'Daftar belanja' }),
+          ikon('kanan')])
+      ]),
       ubin('Total waste', formatRupiah(r.wasteRp || 0), r.wasteCatatan ? r.wasteCatatan + ' catatan hari ini' : 'hari ini', 'sampah')
+    ]);
+  }
+
+  /**
+   * Kartu tautan (butir 465): ubin ikon, judul, keterangan, dan panah; seluruh kartu bisa diketuk. Keterangan yang perlu
+   * ditinjau ditulis sebagai tanda status (ikon dan kata), dan ubin ikonnya ikut berwarna Perlu ditinjau.
+   * o: { href, ikon, judul, ket, tinjau? }
+   */
+  function kartuTautan(o) {
+    return el('a', { class: 'kartu-tautan', href: o.href }, [
+      ubinIkon(o.tinjau ? 'tinjau' : 'biasa', o.ikon),
+      el('span', { class: 'daftar-baris-isi' }, [
+        el('span', { class: 'daftar-baris-judul', text: o.judul }),
+        o.tinjau ? tandaStatus('tinjau', o.ket) : el('span', { class: 'daftar-baris-ket', text: o.ket })
+      ]),
+      ikon('kanan')
     ]);
   }
 
@@ -9818,21 +9857,13 @@
       if (d.tanggal && d.tanggal !== tanggalIso(new Date())) {
         wadah.appendChild(el('p', { class: 'kolom-bantuan', text: 'Data ' + tanggalJudul(d.tanggal) + '.' }));
       }
-      // Tombol Stock opname dengan tanggal opname terakhir di sampingnya (Tahap 8).
-      wadah.appendChild(el('div', { class: 'dashboard-pintas' }, [
-        el('div', { class: 'dashboard-opname' }, [
-          el('a', { class: 'tombol tombol-kedua', href: '#/opname' }, el('span', { class: 'tombol-teks', text: 'Stock opname' })),
-          d.opname && d.opname.lewat
-            ? tandaStatus('tinjau', teksOpnameTerakhir(d.opname))
-            : el('span', { class: 'kolom-bantuan', text: teksOpnameTerakhir(d.opname) })
-        ]),
-        // HPP dan food cost (tampilan Bagian 5.6 dan 5.10), dengan food cost bulan ini di sampingnya.
-        el('div', { class: 'dashboard-opname' }, [
-          el('a', { class: 'tombol tombol-kedua', href: '#/hpp' }, el('span', { class: 'tombol-teks', text: 'HPP dan food cost' })),
-          d.hpp && foodCostTampil(d.hpp) != null && foodCostTampil(d.hpp) > d.hpp.target
-            ? tandaStatus('tinjau', teksFoodCostDashboard(d.hpp))
-            : el('span', { class: 'kolom-bantuan', text: teksFoodCostDashboard(d.hpp) })
-        ])
+      // Stock opname (Tahap 8) dan HPP dan food cost (tampilan Bagian 5.6 dan 5.10) sebagai kartu tautan berikon (butir 465):
+      // keterangannya tanggal opname terakhir dan food cost bulan ini, bertanda Perlu ditinjau jika lewat jadwal atau target.
+      var opnameLewat = !!(d.opname && d.opname.lewat);
+      var fcLewat = !!(d.hpp && foodCostTampil(d.hpp) != null && foodCostTampil(d.hpp) > d.hpp.target);
+      wadah.appendChild(el('nav', { class: 'dashboard-pintas', 'aria-label': 'Pintasan' }, [
+        kartuTautan({ href: '#/opname', ikon: 'opname', judul: 'Stock opname', ket: teksOpnameTerakhir(d.opname), tinjau: opnameLewat }),
+        kartuTautan({ href: '#/hpp', ikon: 'label', judul: 'HPP dan food cost', ket: teksFoodCostDashboard(d.hpp), tinjau: fcLewat })
       ]));
       wadah.appendChild(el('div', { class: 'dashboard-isi' }, [
         el('section', { class: 'dashboard-perhatian', 'aria-labelledby': 'judul-perhatian' }, [

@@ -3159,3 +3159,24 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     HP dan tablet pada delapan ukuran; Staff satu kartu; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada
     5 November (sesudah perbaikan label panel): 46 berkas, 2.362 pemeriksaan lulus (server 20 berkas 781, layar 26 berkas 1.581),
     0 gagal. Belum diuji di HP asli.
+
+### Pintasan Dashboard: Daftar belanja dan kartu tautan (aplikasi 0.50.0, 5 November 2026)
+
+464. **Ubin ke Daftar belanja.** Telaah desain 4 November 2026 butir 7, dipilih pemilik ("lanjut ke butir 7"): Daftar belanja hanya
+    ada di Laporan, padahal Dashboard menampilkan jumlah item di bawah stok minimum. Ubin "Di bawah stok minimum" kini `a.ubin.
+    ubin-tombol.ubin-belanja` ke `#/laporan?bagian=belanja`, dengan keterangan "item · Daftar belanja ›" dan `aria-label`
+    "Di bawah stok minimum: n item. Buka Daftar belanja". Ubin lain tetap bukan tautan (di luar butir ini; tujuan mereka sudah ada
+    di Perlu perhatian). Pola rute Laporan menerima kueri (`/^\/laporan(?:\?(.*))?$/`); dengan `bagian=belanja` (dan Pengelola),
+    layar Laporan menggulir ke `.laporan-belanja` dan memfokus judulnya (`tabindex="-1"`), ditunda 60 ms karena router menggulir
+    ke atas sesudah layar digambar. Tidak dibuat rute atau layar Daftar belanja tersendiri: kartunya sudah lengkap di Laporan, dan
+    di laptop (butir 462) kartu itu sudah terlihat di kolom kanan.
+465. **Kartu tautan Stock opname dan HPP.** Tombol garis "Stock opname" dan "HPP dan food cost" dengan teks di sampingnya diganti
+    `kartuTautan({ href, ikon, judul, ket, tinjau })`: `a.kartu-tautan` (kartu Kertas, ubin ikon, judul, keterangan, panah, tinggi
+    minimal 64 px) dalam `nav.dashboard-pintas` ("Pintasan"), bersusun di HP dan berdampingan mulai 600 px (dulu baru di 1.024 px).
+    Keterangan yang perlu ditinjau (opname lewat jadwal, food cost di atas target) tetap berupa tanda status, dan ubin ikonnya ikut
+    berwarna Perlu ditinjau; selain itu ubin ikon Baja (`ubin-ikon-biasa`). Teks keterangannya sama seperti dulu.
+466. **Uji:** `uji/layar/dashboard_pintas.mjs` (40 pemeriksaan): ubin berupa tautan dengan nama dan keterangannya, hanya satu ubin
+    tautan, dua kartu tautan dan teksnya, tanpa tombol garis lama, ubin membuka Laporan (menu aktif) yang digulir ke Daftar belanja
+    dengan judul difokus, kartu Stock opname membuka Stock opname, Laporan tanpa kueri tidak digulir, food cost di atas target
+    bertanda, delapan ukuran (tanpa gulir samping, kartu ≥ 56 px, bersusun atau berdampingan, Daftar belanja terlihat sesudah
+    diketuk), Staff membuka alamat yang sama tanpa galat, gerak menyala. Code.gs tidak berubah.

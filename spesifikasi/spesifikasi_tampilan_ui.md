@@ -55,6 +55,8 @@
 > ada satu tiket sendirian di baris terakhir; empat form di tablet tampil sejajar (Bagian 4.2 dan 5.2).
 > Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 6): daftar Pengaturan dan panel sampingnya dikelompokkan
 > (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7).
+> Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 7): ubin "Di bawah stok minimum" di Dashboard membuka Daftar
+> belanja; Stock opname dan HPP dan food cost menjadi kartu tautan berikon (Bagian 5.5, 5.6, dan 7).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -1053,7 +1055,8 @@ Satu-satunya layar yang sepenuhnya navy.
   daftar belanja, dan rekap bulanan.
 - Pengelola melihat tombol kedua: "Simpan ulang ke Drive".
 - Pengelola juga melihat dua bagian tambahan di bawahnya: **Daftar belanja** (Bagian 5.9)
-  dan **Rekap bulanan** (pilih bulan, lalu "Unduh PDF").
+  dan **Rekap bulanan** (pilih bulan, lalu "Unduh PDF"). Ubin "Di bawah stok minimum" di Dashboard membuka Laporan langsung
+  di kartu Daftar belanja (tambahan 5 November 2026, Bagian 5.6).
 - **Dua kolom di laptop** (tambahan 5 November 2026, Pengelola). Pada lebar 1.024 px ke atas Laporan memakai lebar penuh
   (1.200 px, dari garis kiri): Laporan harian PDF dan Rekap bulanan di kolom kiri, Daftar belanja yang panjang di kolom
   kanan, kedua kolom sama lebar dan kartu teratasnya sejajar. Di HP dan tablet tetap satu kolom berurutan (Laporan harian
@@ -1070,9 +1073,17 @@ Satu-satunya layar yang sepenuhnya navy.
   HP dan tablet: dua kolom, "Form terisi" selebar dua kolom. Laptop/desktop: satu baris.
   Pada hari libur (22 Oktober 2026) ubin "Form terisi" bertuliskan "Libur" dengan keterangan "tidak
   ada form yang ditagih", bukan "0 dari 0".
+- **Ubin "Di bawah stok minimum" membuka Daftar belanja** (tambahan 5 November 2026). Ubin ini satu-satunya ubin yang bisa
+  diketuk: keterangannya "item · **Daftar belanja** ›" (kata Daftar belanja dan panahnya Biru Malam), dan pembaca layar
+  membacakan "Di bawah stok minimum: 4 item. Buka Daftar belanja". Ketukan membuka Laporan (menu Laporan aktif) yang langsung
+  digulir ke kartu Daftar belanja, dan judul kartu itu difokus. Alamatnya `#/laporan?bagian=belanja`; Staff yang membuka
+  alamat itu melihat Laporan biasa.
 - Daftar "Perlu perhatian": tiap baris diawali ubin ikon (Bagian 6) berwarna makna statusnya.
-- Tombol "Stock opname" di bagian atas, dengan tanggal opname terakhir di sampingnya.
-- Di sampingnya (di bawahnya di HP dan tablet) tombol "HPP dan food cost" dengan food cost bulan
+- **Kartu tautan "Stock opname"** di bawah ubin (sebelum 5 November 2026 berupa tombol garis), dengan tanggal opname
+  terakhir sebagai keterangan ("Terakhir 3 Okt (3 hari lalu)"; jika lewat jadwal atau belum pernah, berupa tanda Perlu
+  ditinjau). Kartu tautan: kartu Kertas berbayangan kartu, ubin ikon 40 px di kiri (Baja, atau Perlu ditinjau jika ada
+  tandanya), judul tebal, keterangan, dan panah di kanan; seluruh kartu bisa diketuk, tinggi minimal 64 px.
+- Di sampingnya (mulai 600 px; di bawahnya di HP) kartu tautan "HPP dan food cost" dengan food cost bulan
   ini dan targetnya ("Oktober 33,8% · target 35%"; bertanda Perlu ditinjau jika di atas target).
   Selama penjualan bulan ini belum lengkap: food cost sementara ("Oktober 33,8% sementara · target
   35%", juga bertanda Perlu ditinjau jika di atas target).
@@ -1719,6 +1730,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Kotak info ringkas (4 November 2026) | Baris ringkasan di HP: "**Hari ini** · Semua kategori · Tambah keluar" (pemasok ikut disebut jika dipilih, tanggal lain ditulis "18 Okt"), atau "Tanggal: **Hari ini**"; tombol tautan "Ubah", menjadi "Tutup" saat kolomnya terbuka |
 | Perlu ditindaklanjuti (4 November 2026) | Judul bagian "Perlu ditindaklanjuti" di Beranda; peringatan sistem "Laporan harian perlu perhatian" (keterangan "Gagal … Rinciannya di tab M_Konfigurasi."); isian di HP "2 isian menunggu kirim · 1 isian gagal kirim" |
 | Kelompok Pengaturan (5 November 2026) | "Orang dan akses", "Data dapur", "Form dan jadwal" |
+| Ubin Daftar belanja (5 November 2026) | Keterangan ubin "item · Daftar belanja"; nama untuk pembaca layar "Di bawah stok minimum: 4 item. Buka Daftar belanja" |
 | Cukup untuk berapa hari (4 November 2026) | Form Stock "Cukup ± 2 hari" / "Cukup kurang dari 1 hari"; keterangan baris "· cukup ± 2 hari" / "· habis"; Dashboard "2 item hampir habis", "Cukup kurang dari 3 hari menurut pemakaian 14 hari terakhir: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari."; lembarnya "Ketuk item untuk melihat riwayatnya. Menurut rata-rata pemakaian 14 hari terakhir. Item ini belum di bawah stok minimum, jadi belum masuk Daftar belanja: tambahkan dari sana, atau atur stok minimumnya di Pengaturan → Item."; pengingat stock "Stock hari ini: …, 2 hampir habis", "Hampir habis: Cabai merah ± 2 hari dan Ayam fillet ± 2 hari." |
 | Server dan salinan (2 November 2026) | "Salinan ke Google Sheets berhenti", "Terakhir berjalan 2 Nov 14.05 (3 jam lalu). Selama berhenti, email laporan tidak terkirim, PDF dan foto tidak masuk Google Drive, dan Google Sheets tidak diperbarui. Pemilik Sheet perlu menjalankan pasangTrigger di editor Apps Script; jika masih berhenti, lihat menu Eksekusi di sana."; "Versi Code.gs berbeda", "Apps Script masih v0.41, sedangkan Supabase v0.42. Pemilik Sheet perlu menempel apps-script/Code.gs terbaru ke editor Apps Script."; "Susunan Sheet belum lengkap", "Belum ada: M_Resep: kolom Catatan. Pemilik Sheet perlu menjalankan setupSpreadsheet sekali di editor Apps Script."; notifikasi "Email laporan harian tertahan", "Salinan Apps Script tidak berjalan sejak 2 Nov 14.05, jadi email laporan belum terkirim. Ketuk untuk melihat." |
 | Akun terkunci (untuk Pengelola) | "Rina terkunci karena PIN salah" |
@@ -1967,5 +1979,6 @@ Ditetapkan pemilik sistem pada 3 sampai 5 Oktober 2026. Tidak ada butir terbuka.
 | Pemberitahuan Beranda (4 November 2026, telaah desain butir 4) | Satu kartu daftar "Perlu ditindaklanjuti" berikon seperti Perlu perhatian di Dashboard, menggantikan kartu terpisah per pemberitahuan (Bagian 5.2) |
 | Susunan tiket Beranda (5 November 2026, telaah desain butir 5) | Jumlah kolom tanpa satu tiket sendirian di baris terakhir: tablet 3 → 4 → 2, laptop 4 → 5 → 3; empat form di tablet empat sejajar (Bagian 5.2) |
 | Pengaturan berkelompok dan Laporan dua kolom (5 November 2026, telaah desain butir 6) | Pengaturan dalam tiga kelompok (Orang dan akses, Data dapur, Form dan jadwal), dua kolom di laptop, juga di panel samping; Laporan Pengelola dua kolom di laptop (Bagian 5.5 dan 5.7) |
+| Pintasan Dashboard (5 November 2026, telaah desain butir 7) | Ubin "Di bawah stok minimum" membuka Daftar belanja di Laporan; Stock opname dan HPP dan food cost sebagai kartu tautan berikon (Bagian 5.6) |
 | Pola navy, bar, dan kartu (17 Oktober 2026) | Pola C dari pratinjau: cahaya dan butiran menggantikan tekstur garis di semua permukaan navy, bar navigasi bawah kaca buram, kartu bertepi garis rambut (Bagian 2, 4.2, dan 6). Tanpa library dan tanpa gerak baru. |
 | Arah premium (11 Oktober 2026) | Kepala navy berisi ringkasan di setiap layar, bayangan lembut menggantikan garis tepi kartu, tekstur garis halus di navy, angka utama Barlow Condensed yang besar, tiket berikon dengan potongan sobek. Layar isi tetap terang, amber tetap satu-satunya aksen. |

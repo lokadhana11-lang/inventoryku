@@ -7789,3 +7789,96 @@ hr.pemisah {
   .laporan-dua > .laporan-belanja { grid-area: belanja; }
   .laporan-dua > .laporan-rekap { grid-area: rekap; }
 }
+
+/* =========================================================================
+ * Tambahan 5 November 2026 (aplikasi 0.50.0, butir 464–466; spesifikasi tampilan
+ * Bagian 5.6): ubin "Di bawah stok minimum" membuka Daftar belanja; Stock opname dan
+ * HPP dan food cost di Dashboard sebagai kartu tautan.
+ * ========================================================================= */
+
+/* Ubin yang bisa diketuk: keterangan berakhir tautan "Daftar belanja ›" berwarna Biru Malam. */
+a.ubin-belanja {
+  text-decoration: none;
+}
+
+.ubin-belanja .ubin-label {
+  padding-right: 0;
+}
+
+.ubin-ket-tautan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 2px;
+}
+
+.ubin-tautan-teks {
+  color: var(--biru-malam);
+  font-weight: 500;
+}
+
+.ubin-ket-tautan > .ikon {
+  width: 16px;
+  height: 16px;
+  color: var(--biru-malam);
+}
+
+/* Pintasan Dashboard: dua kartu tautan, bersusun di HP, berdampingan mulai 600 px. */
+.dashboard-pintas {
+  gap: 10px;
+}
+
+@media (min-width: 600px) {
+  .dashboard-pintas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+.kartu-tautan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--sudut-kartu);
+  background: var(--kertas);
+  box-shadow: var(--bayang-kartu);
+  color: var(--tinta);
+  text-decoration: none;
+  transition: transform 100ms ease-out, background-color 100ms ease-out;
+}
+
+.kartu-tautan .daftar-baris-isi {
+  justify-items: start;
+}
+
+.kartu-tautan > .ikon {
+  flex: none;
+  color: var(--tinta-redup);
+}
+
+.kartu-tautan:active {
+  background: var(--kertas-tekan);
+  transform: scale(0.98);
+}
+
+.kartu-tautan:focus-visible {
+  outline: 2px solid var(--biru-malam);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kartu-tautan:hover {
+    background: var(--baja);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kartu-tautan,
+  .kartu-tautan:active {
+    transition: none;
+    transform: none;
+  }
+}
