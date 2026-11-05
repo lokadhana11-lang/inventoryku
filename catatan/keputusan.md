@@ -3181,3 +3181,24 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     bertanda, delapan ukuran (tanpa gulir samping, kartu ≥ 56 px, bersusun atau berdampingan, Daftar belanja terlihat sesudah
     diketuk), Staff membuka alamat yang sama tanpa galat, gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada
     5 November: 47 berkas, 2.402 pemeriksaan lulus (server 20 berkas 781, layar 27 berkas 1.621), 0 gagal. Belum diuji di HP asli.
+
+### Filter Riwayat ringkas di HP (aplikasi 0.51.0, 5 November 2026)
+
+467. **Satu baris dan lembar Filter.** Telaah desain 4 November 2026 butir 8, dipilih pemilik ("lanjut ke butir 8"): di HP kotak atas
+    Riwayat (Form, Tanggal tiga pilihan, Tampilan, Filter) setinggi sekitar 400 px sebelum daftar mulai. Kini di bawah 600 px Tanggal
+    (`.riwayat-tanggal`) dan Tampilan (`.pilih-tampilan`) tidak tampil di kotak; gantinya `p.riwayat-ringkas` ("**7 hari terakhir**
+    · Catatan", `teksTanggalRiwayat`) di deret yang sama dengan tombol Filter (`aria-hidden`, karena isinya diumumkan lewat lembar).
+    Lembar Filter di HP mendapat salinan Tanggal (dengan tanggal dan rentang) dan Tampilan (Stock) di atas filter lain; semuanya
+    berlaku saat Terapkan. Pemeriksaan tanggal dipindah ke `salahTanggal(mode, dari, sampai)` dan dipakai kotak maupun lembar; galat
+    di lembar membuat lembar tetap terbuka. Sesudah diterapkan, `samakanTanggal` menyamakan kotak di atas, sehingga layar yang diputar
+    ke tablet menunjukkan pilihan yang sama. Tidak memakai `lipatKotakInfo` (butir 454), karena Riwayat sudah punya tombol Filter dan
+    dua tombol (Ubah dan Filter) di satu baris membingungkan. Pilihan Form tetap di kotak (paling sering diganti).
+468. **Tombol seukuran isinya.** Mulai 600 px pilihan Tanggal dan Tampilan di kotak atas `flex: 0 0 auto`, sama dengan pilihan Form
+    dan tombol Filter. Sebelumnya di laptop "Catatan" dan "Rekap harian" membentang selebar kotak (sekitar 500 dan 540 px) di samping
+    tombol Filter 110 px. Pilihan "Rekap harian / Transaksi" di lembar riwayat item tidak diubah.
+469. **Uji:** `uji/layar/riwayat_filter.mjs` (26 pemeriksaan): HP tanpa Tanggal dan Tampilan di kotak, ringkasan awal, ringkasan dan
+    Filter satu baris (≥ 44 px), kotak ≤ 210 px, lembar dengan Tanggal dan Tampilan di atas, Satu tanggal + Rekap harian diterapkan,
+    kotak ikut berubah dan tampil benar saat diputar ke tablet, galat rentang terbalik di lembar, rentang diterapkan, Waste tanpa
+    Tampilan, kembali ke 7 hari terakhir; laptop: Tanggal dan Tampilan di kotak, lima tombol < 220 px, Tampilan dan Filter sebaris
+    dan sama tinggi, lembar tanpa Tanggal; delapan ukuran; gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar`
+    pada 5 November: 48 berkas, 2.428 pemeriksaan lulus (server 20 berkas 781, layar 28 berkas 1.647), 0 gagal. Belum diuji di HP asli.

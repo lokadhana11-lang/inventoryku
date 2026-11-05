@@ -7882,3 +7882,55 @@ a.ubin-belanja {
     transform: none;
   }
 }
+
+/* =========================================================================
+ * Tambahan 5 November 2026 (aplikasi 0.51.0, butir 467–469; spesifikasi tampilan
+ * Bagian 5.4): filter Riwayat ringkas di HP, tombol pilihan Riwayat seukuran isinya.
+ * ========================================================================= */
+
+/* HP: Tanggal dan Tampilan pindah ke lembar Filter; kotak menampilkan pilihan Form lalu satu baris
+   "7 hari terakhir · Catatan" dengan tombol Filter di kanannya. */
+.riwayat-ringkas {
+  display: none;
+  margin: 0;
+}
+
+@media (max-width: 599px) {
+  .riwayat-atas > .riwayat-tanggal,
+  .riwayat-atas .pilih-tampilan {
+    display: none;
+  }
+  .riwayat-ringkas {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--tinta);
+    overflow-wrap: anywhere;
+  }
+  .riwayat-ringkas strong {
+    font-weight: 600;
+  }
+  .riwayat-alat .deret-tombol {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .riwayat-alat .deret-tombol > .tombol {
+    flex: none;
+  }
+}
+
+/* Mulai 600 px: pilihan Tanggal dan Tampilan seukuran isinya, seperti pilihan Form dan tombol Filter
+   (dulu "Catatan" dan "Rekap harian" membentang selebar kotak). */
+@media (min-width: 600px) {
+  .riwayat-atas .riwayat-tanggal .pilihan,
+  .riwayat-atas .pilih-tampilan .pilihan {
+    flex: 0 0 auto;
+  }
+  .riwayat-atas .pilih-tampilan {
+    flex: 0 1 auto;
+  }
+  .riwayat-atas .riwayat-tanggal .pilihan span,
+  .riwayat-atas .pilih-tampilan .pilihan span {
+    white-space: nowrap;
+  }
+}
