@@ -3179,4 +3179,5 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tautan, dua kartu tautan dan teksnya, tanpa tombol garis lama, ubin membuka Laporan (menu aktif) yang digulir ke Daftar belanja
     dengan judul difokus, kartu Stock opname membuka Stock opname, Laporan tanpa kueri tidak digulir, food cost di atas target
     bertanda, delapan ukuran (tanpa gulir samping, kartu ≥ 56 px, bersusun atau berdampingan, Daftar belanja terlihat sesudah
-    diketuk), Staff membuka alamat yang sama tanpa galat, gerak menyala. Code.gs tidak berubah.
+    diketuk), Staff membuka alamat yang sama tanpa galat, gerak menyala. Code.gs tidak berubah. `node uji/jalankan.mjs --layar` pada
+    5 November: 47 berkas, 2.402 pemeriksaan lulus (server 20 berkas 781, layar 27 berkas 1.621), 0 gagal. Belum diuji di HP asli.
