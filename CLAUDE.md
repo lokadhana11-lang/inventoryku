@@ -118,8 +118,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 - **Versi terakhir:** aplikasi 0.52.0 (satu penanda menu aktif di bar atas laptop, telaah desain butir 9; butir 470–471; Code.gs
   tidak berubah), digabung lewat PR #79 dan tayang (5 November 2026). Sesudahnya: uji dijalankan 4 berkas sekaligus (butir 472,
-  PR #80), aplikasi 0.52.1 (perapian `app.css` tanpa perubahan tampilan, butir 473, PR #81), lalu aplikasi 0.52.2 (kotak info
-  Stock opname tiga kolom di laptop dan tombol nama di tabel 44 px, butir 474–475; Code.gs tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
+  PR #80), aplikasi 0.52.1 (perapian `app.css` tanpa perubahan tampilan, butir 473, PR #81), aplikasi 0.52.2 (kotak info
+  Stock opname tiga kolom di laptop dan tombol nama di tabel 44 px, butir 474–475, PR #82, tayang), lalu Code.gs v0.45 (mulai
+  bersih: `mulaiBersih` di editor menghapus isian uji sesudah dicadangkan, dan panduan staff `catatan/panduan_staff.html`; butir
+  476–477; aplikasi tidak berubah), menunggu digabung dan dipasang (Edge Function lalu Apps Script). Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
   0.49.0 (Pengaturan berkelompok
   dan Laporan dua kolom, butir 461–463, PR #76), 0.48.0 (susunan tiket Beranda, butir 459–460, PR #75), 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
   butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
@@ -140,7 +142,7 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin termasuk hampir habis, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
   banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
-  arsip tahunan; cadangan dan pemulihan; keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
+  arsip tahunan; cadangan dan pemulihan; mulai bersih (`mulaiBersih`, hapus isian uji dari editor); keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
   susunan Sheet; kartu "Versi dan salinan" di Outlet dan jadwal).
 - **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional; pemilik memutuskan tidak dikerjakan,
   butir 449); PDF stock semua kategori satu halaman per kategori hanya jika `ujiPemisahHalamanPdf` berhasil (di Supabase
@@ -155,7 +157,11 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 - **Telaah aplikasi 5 November 2026:** semua PR digabung, 0.52.0 tayang, produksi 24 jam tanpa galat. Lima usul: (1) uji paralel,
   dikerjakan (butir 472); (2) satukan blok tambahan di akhir `app.css`; (3) kotak info Stock opname tiga kolom; (4) tombol tabel HPP
   per menu 44 px; (5) hapus 25 cabang lama yang sudah tergabung. Butir 2 dikerjakan (butir 473), butir 3 dan 4 sekaligus (butir
-  474–475); butir 5 belum dipilih.
+  474–475), butir 5 dikerjakan pemilik lewat GitHub (24 cabang; sesi Claude hanya boleh push ke cabang kerjanya).
+- **Telaah aplikasi 6 November 2026:** aplikasi belum dipakai sehari-hari: semua isian bertanggal 1–22 Oktober (isian uji, kata
+  pemilik), tidak ada permintaan dari HP pada 5–6 November, pengingat "dikirim ke 0 HP". Sapuan 31 layar: tidak ada sasaran sentuh di
+  bawah 44 px. Pemilik memilih mulai pakai: mulai bersih dan panduan staff (butir 476–477). Usul berikutnya: telaah lagi sesudah
+  seminggu dipakai, dari pemakaian nyata; perapian 48 aturan CSS ganda ditunda.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep

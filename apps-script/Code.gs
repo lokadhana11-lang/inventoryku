@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.44 (saran prep menurut rata-rata pemakaian)
+// InventoryKu Code.gs v0.45 (mulai bersih: hapus isian uji dari editor)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -137,9 +137,13 @@
  *                        email harian "Hampir habis".
  * - 4 November 2026    : saran prep (saranPrep_): formPrep.resep[].saran = jumlah resep untuk 2 hari pemakaian (paling
  *                        lama masa simpan resep) dikurangi stock, dibulatkan ke atas ke ½ resep.
+ * - 6 November 2026    : mulaiBersih (editor, sekali sebelum dipakai sungguhan): isian uji di tab Data_*, Stock_Harian, dan
+ *                        Log_Perubahan dihapus lewat kosongkanIsian di Supabase sesudah dicadangkan ("Cadangan sebelum mulai
+ *                        bersih …", bisa dipulihkan dengan pulihkanCadangan); tab master tetap. Jalan pertama hanya mencatat;
+ *                        menghapus hanya jika Script Property MULAI_BERSIH berisi ya.
  */
 
-var VERSI_KODE = 'v0.44';
+var VERSI_KODE = 'v0.45';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -11935,16 +11939,25 @@ var AWALAN_SEBELUM_PULIH = 'Cadangan sebelum pemulihan ';
  */
 function buatCadanganSebelumPulih() {
   if (!DI_SUPABASE_) throw new Error('buatCadanganSebelumPulih dijalankan di Supabase lewat pulihkanCadangan.');
+  var nama = buatCadanganTersendiri_(AWALAN_SEBELUM_PULIH);
+  console.log('Cadangan sebelum pemulihan dibuat: ' + nama + '.');
+  return { nama: nama };
+}
+
+/**
+ * Cadangan JSON isi sekarang bernama "<awalan><waktu>.json" di Laporan Kitchen/Cadangan. Namanya tidak diawali nama
+ * spreadsheet, jadi tidak ikut dibuang cadangan mingguan; bisa dipulihkan dengan pulihkanCadangan. Mengembalikan namanya.
+ */
+function buatCadanganTersendiri_(awalan) {
   var folder = folderCadangan_();
   var ada = {};
   var it = folder.getFiles();
   while (it.hasNext()) ada[it.next().getName()] = true;
-  var dasar = AWALAN_SEBELUM_PULIH + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmmss');
+  var dasar = awalan + Utilities.formatDate(new Date(), zonaWaktu_(), 'yyyy-MM-dd HHmmss');
   var nama = dasar + '.json';
   for (var n = 2; ada[nama]; n++) nama = dasar + ' (' + n + ').json'; // nama unik: berkas dipilih menurut namanya
   folder.createFile(Utilities.newBlob(isiCadanganJson_(ss_()), 'application/json', nama));
-  console.log('Cadangan sebelum pemulihan dibuat: ' + nama + '.');
-  return { nama: nama };
+  return nama;
 }
 
 /* =========================================================================
@@ -13655,6 +13668,148 @@ function jalankanPemulihan_(nama) {
   }
   var baris = Object.keys(harapan).reduce(function (a, k) { return a + harapan[k]; }, 0);
   return { nama: c.nama, sebelum: sebelum, tab: Object.keys(harapan).length, baris: baris };
+}
+
+/* ---------- Mulai bersih (Code.gs v0.45; telaah aplikasi 6 November 2026, butir 476) ----------
+ * Sebelum aplikasi dipakai sungguhan, isian uji dihapus sekali dari editor Apps Script (mulaiBersih). Yang dihapus: semua
+ * baris isian di tab yang juga diarsipkan (tabArsip_: semua tab Data_* termasuk form kustom, Stock_Harian, Log_Perubahan);
+ * baris judul tetap. Yang tetap: tab master (item dan riwayat harga, staff dan PIN, resep, menu, unit, kategori, satuan,
+ * pemasok, form, hari libur), M_Konfigurasi, notifikasi HP, dan berkas di Drive (laporan PDF dan foto waste lama). Stock
+ * semua item menjadi 0; Stock opname semua kategori pada hari pertama menjadi stock awal.
+ */
+
+var PROP_MULAI_BERSIH = 'MULAI_BERSIH';
+var AWALAN_SEBELUM_BERSIH = 'Cadangan sebelum mulai bersih ';
+var KETERANGAN_MULAI_BERSIH = 'Diisi mulaiBersih (editor Apps Script) saat isian uji dihapus sebelum aplikasi dipakai sungguhan.';
+
+/** Isi tab isian: [{ nama, baris, terakhir ('yyyy-mm-dd' menurut kolom Tanggal, atau Waktu di Log_Perubahan; '' jika tidak ada) }]. */
+function ringkasIsian_() {
+  var zona = zonaSheet_();
+  return tabArsip_().map(function (nama) {
+    var isi = nilaiTab_(ss_().getSheetByName(nama));
+    var judul = (isi[0] || []).map(function (j) { return String(j).trim(); });
+    var kol = judul.indexOf('Tanggal');
+    if (kol < 0) kol = judul.indexOf('Waktu');
+    var terakhir = '';
+    if (kol >= 0) {
+      isi.forEach(function (b, i) {
+        var t = i ? teksTanggal_(b[kol], zona) : '';
+        if (tanggalSah_(t) && t > terakhir) terakhir = t;
+      });
+    }
+    return { nama: nama, baris: Math.max(0, isi.length - 1), terakhir: terakhir };
+  });
+}
+
+/**
+ * Di Supabase, dipanggil mulaiBersih (editor Apps Script). periksa (bawaan): hanya mencatat isi tiap tab isian dan tab master
+ * yang tetap. periksa false: isi sekarang disimpan dulu sebagai "Cadangan sebelum mulai bersih …", lalu semua baris isian
+ * dihapus. Berjalan dalam satu transaksi Supabase: cadangan dan penghapusan berhasil bersama atau tidak sama sekali.
+ * Mengembalikan { periksa, tab: [{ nama, baris, terakhir }], baris, terakhir, cadangan }.
+ */
+function kosongkanIsian(periksa) {
+  if (!DI_SUPABASE_) throw new Error('kosongkanIsian dijalankan di Supabase lewat mulaiBersih (editor Apps Script).');
+  periksa = periksa !== false;
+  return denganKunci_(function () {
+    var tab = ringkasIsian_().filter(function (t) { return t.baris > 0; });
+    var hasil = { periksa: periksa, tab: tab, baris: 0, terakhir: '', cadangan: '' };
+    tab.forEach(function (t) {
+      hasil.baris += t.baris;
+      if (t.terakhir > hasil.terakhir) hasil.terakhir = t.terakhir;
+    });
+    if (!hasil.baris) {
+      console.log('Tidak ada isian di tab Data_*, Stock_Harian, dan Log_Perubahan; tidak ada yang perlu dihapus.');
+      return hasil;
+    }
+    console.log((periksa ? 'Isian yang akan dihapus' : 'Isian yang dihapus') + ': ' + hasil.baris + ' baris di ' + tab.length + ' tab' +
+      (hasil.terakhir ? ', yang terbaru bertanggal ' + tanggalPanjangId_(hasil.terakhir) : '') + '.');
+    tab.forEach(function (t) {
+      console.log('- ' + t.nama + ': ' + t.baris + ' baris' + (t.terakhir ? ', terakhir ' + t.terakhir : ''));
+    });
+    var tetap = TAB_MASTER.filter(function (d) { return /^M_/.test(d.nama); }).map(function (d) {
+      var sh = ss_().getSheetByName(d.nama);
+      return sh ? d.nama + ' ' + Math.max(0, sh.getLastRow() - 1) : '';
+    }).filter(Boolean);
+    console.log('Tetap (tidak dihapus): ' + tetap.join(', ') + ' baris.');
+    if (periksa) return hasil;
+    hasil.cadangan = buatCadanganTersendiri_(AWALAN_SEBELUM_BERSIH);
+    tab.forEach(function (t) {
+      var sh = ss_().getSheetByName(t.nama);
+      if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+    });
+    lupakanMemoTab_();
+    resetMemoForm_();
+    catatStatusSistem_('mulai_bersih', 'Berhasil ' + waktuSekarangId_() + ': ' + hasil.baris + ' baris isian uji dihapus' +
+      (hasil.terakhir ? ' (terbaru ' + hasil.terakhir + ')' : '') + '. Isi sebelumnya: ' + FOLDER_LAPORAN + '/' + FOLDER_CADANGAN + '/' +
+      hasil.cadangan + '.', KETERANGAN_MULAI_BERSIH);
+    console.log('Cadangan isi sebelum dihapus: ' + hasil.cadangan + '.');
+    return hasil;
+  }, periksa);
+}
+
+/**
+ * Editor (sekali, sebelum aplikasi dipakai sungguhan): menghapus isian uji (lihat bagian ini). Jalan pertama hanya mencatat di
+ * log apa yang akan dihapus dan apa yang tetap. Jika semuanya memang isian uji: isi Script Property MULAI_BERSIH dengan ya,
+ * lalu jalankan lagi. Isi sebelum dihapus disimpan sebagai "Cadangan sebelum mulai bersih …" di Laporan Kitchen/Cadangan;
+ * untuk membatalkan, pulihkan berkas itu dengan pulihkanCadangan. Script Property MULAI_BERSIH dihapus sesudahnya, jadi
+ * menjalankannya lagi hanya mencatat.
+ */
+function mulaiBersih() {
+  if (DI_SUPABASE_) throw new Error('mulaiBersih dijalankan dari editor Apps Script.');
+  if (!sudahPindah_()) throw new Error('mulaiBersih untuk data di Supabase (sesudah pindahKeSupabase).');
+  var props = PropertiesService.getScriptProperties();
+  var setuju = String(props.getProperty(PROP_MULAI_BERSIH) || '').trim().toLowerCase() === 'ya';
+  // Kunci yang sama dengan salinan tiap 5 menit: salinan tidak berjalan di antara penghapusan dan salinan penuh di bawah.
+  var kunci = LockService.getScriptLock();
+  kunci.waitLock(30000);
+  var h;
+  try {
+    h = jalankanKosongkanIsian_(!setuju);
+    if (setuju) {
+      props.deleteProperty(PROP_MULAI_BERSIH);
+      if (h.baris) {
+        // Salinan berikutnya menulis semua tab penuh (tab isian tinggal baris judul), tidak menghapus baris satu per satu.
+        props.setProperty(PROP_SINKRON_VERSI, '{}');
+        try {
+          salinBerkasKeDrive_();
+        } catch (err) {
+          console.error('Cadangan belum tersalin ke Drive (dicoba lagi 5 menit kemudian): ' + err);
+        }
+      }
+    }
+  } finally {
+    kunci.releaseLock();
+  }
+  if (!setuju) {
+    if (h.baris) {
+      console.log('Belum ada yang dihapus. Jika semua isian di atas memang isian uji: isi Script Property ' + PROP_MULAI_BERSIH +
+        ' dengan ya (Project Settings → Script Properties), lalu jalankan mulaiBersih lagi. Isi sebelum dihapus disimpan sebagai ' +
+        'cadangan yang bisa dipulihkan dengan pulihkanCadangan.');
+    }
+    return h;
+  }
+  if (!h.baris) return h;
+  try {
+    sinkronDariSupabase();
+  } catch (err) {
+    console.error('Salinan ke Sheet belum selesai (dicoba lagi 5 menit kemudian): ' + err);
+  }
+  console.log('Selesai: ' + h.baris + ' baris isian uji dihapus. Untuk membatalkan: isi Script Property ' + PROP_PULIHKAN_CADANGAN +
+    ' dengan "' + h.cadangan + '", lalu jalankan pulihkanCadangan. Stock semua item sekarang 0: pada hari pertama, lakukan Stock ' +
+    'opname semua kategori di aplikasi (Dashboard → Stock opname) sebagai stock awal.');
+  return h;
+}
+
+function jalankanKosongkanIsian_(periksa) {
+  try {
+    return teruskanKeSupabase_('kosongkanIsian', [periksa]);
+  } catch (err) {
+    if (/tidak bisa dijalankan dari sini/.test(String(err && err.message))) {
+      throw new Error('Edge Function di Supabase masih versi lama. Tempel dulu supabase/functions/api/index.ts terbaru ke Edge ' +
+        'Function di Supabase lalu Deploy, kemudian jalankan mulaiBersih lagi.');
+    }
+    throw err;
+  }
 }
 
 /** Menghapus semua trigger Apps Script (laporan, cadangan, rekap kini di Supabase) dan memasang salinan tiap 5 menit. */

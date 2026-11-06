@@ -142,6 +142,22 @@ dijalankan dari editor Apps Script (pilih nama fungsi → **Run**), dan hasilnya
   Notifikasi HP perlu dinyalakan lagi dari tiap HP. Tautan foto waste di Riwayat tidak terbuka; fotonya tetap
   ada di Drive (`Laporan Kitchen/<Outlet>/Foto waste`).
 
+### Mulai bersih sebelum dipakai sungguhan (Code.gs v0.45)
+
+Isian uji (Stock, Suhu, Prep, Waste, opname, penjualan, form kustom, riwayat koreksi) dihapus sekali sebelum staff mulai memakai
+aplikasi. Data master tetap: item dan harga, staff dan PIN, resep, menu, unit, kategori, pemasok, form, hari libur, pengaturan
+outlet, dan notifikasi HP.
+
+1. Pastikan Edge Function dan Apps Script sudah v0.45 (kartu "Versi dan salinan" di Pengaturan → Outlet dan jadwal), dan tidak
+   ada HP yang masih menyimpan isian uji yang belum terkirim (Beranda menulis "belum terkirim").
+2. Jalankan `mulaiBersih` dari editor Apps Script. Belum ada yang dihapus: log mendaftar isian per tab (dengan tanggal terbarunya)
+   dan tab master yang tetap. Periksa bahwa semuanya memang isian uji.
+3. Project Settings → Script Properties → tambahkan `MULAI_BERSIH` berisi `ya`, lalu jalankan `mulaiBersih` lagi. Log menulis
+   "Selesai" dan nama berkas "Cadangan sebelum mulai bersih …". Script Property `MULAI_BERSIH` dihapus sendiri.
+4. Untuk membatalkan: isi `PULIHKAN_CADANGAN` dengan nama berkas itu, lalu jalankan `pulihkanCadangan`.
+5. Stock semua item sekarang 0. Pada hari pertama, lakukan Stock opname semua kategori di aplikasi (Dashboard → Stock opname)
+   sebagai stock awal. Laporan PDF dan foto waste lama di Drive tidak ikut terhapus; hapus dari Drive jika tidak diperlukan.
+
 ## Kembali ke Apps Script (jika perlu)
 
 Sheet berisi salinan lengkap (paling lambat 5 menit). Untuk kembali: tunggu satu salinan 5 menit,

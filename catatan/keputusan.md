@@ -3276,3 +3276,41 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     (`uji/alat/potret_gaya.mjs`, 277 keadaan) sebelum dan sesudah hanya berbeda di kotak info Stock opname di laptop dan desktop
     dan di tombol nama tabel. `node uji/jalankan.mjs --layar` pada 6 November: 50 berkas, 2.476 pemeriksaan lulus, 0 gagal (4
     sekaligus, 13,7 menit).
+
+### Mulai pakai: mulai bersih dan panduan staff (Code.gs v0.45, 6 November 2026)
+
+476. **Mulai bersih: isian uji dihapus sekali dari editor Apps Script.** Telaah aplikasi 6 November 2026: di database produksi semua
+    isian bertanggal 1–22 Oktober (Stock 6 baris, Suhu 9, Waste 3, Prep 1, opname 5, penyesuaian 14), tidak ada permintaan dari HP
+    pada 5–6 November, dan pengingat "dikirim ke 0 HP". Pemilik memastikan isian itu isian uji dan memilih mulai dengan data bersih
+    ("Itu data uji, kerjakan butir 1 dan 2"). Dibuat seperti pemulihan cadangan (butir pemulihan v0.26), bukan tombol di aplikasi,
+    karena hanya dijalankan sekali dan tidak boleh tertekan staff: `mulaiBersih` di editor memanggil `kosongkanIsian` di Supabase
+    lewat `__fungsi`. Jalan pertama hanya mencatat isi tiap tab (jumlah baris dan tanggal terbaru) dan tab master yang tetap;
+    penghapusan hanya jika Script Property `MULAI_BERSIH` berisi `ya` (huruf besar/kecil sama; isian lain tetap hanya mencatat), dan
+    Script Property itu dihapus sesudahnya, jadi menjalankannya lagi tidak menghapus apa pun. Yang dihapus sama dengan yang
+    diarsipkan arsip tahunan (`tabArsip_`: semua tab `Data_*` termasuk form kustom, `Stock_Harian`, `Log_Perubahan`), semua baris
+    kecuali judul. `Stock_Harian` dihitung dari tab `Data_*`, jadi stock semua item 0 tanpa perlu `hitungUlangStock_`; Stock opname
+    semua kategori pada hari pertama menjadi stock awal. Yang tetap: tab master termasuk `M_HargaItem` (harga diatur Pengelola, bukan
+    isian), `M_Konfigurasi`, Script Properties (PIN, sesi, notifikasi HP), dan berkas di Drive (laporan PDF dan foto waste lama;
+    pemilik boleh menghapusnya sendiri). Isi sebelum dihapus disimpan sebagai "Cadangan sebelum mulai bersih …" (nama tidak diawali
+    nama spreadsheet, jadi tidak dibuang cadangan mingguan; bisa dipulihkan dengan `pulihkanCadangan`). `buatCadanganTersendiri_`
+    kini dipakai bersama `buatCadanganSebelumPulih`. Di Supabase cadangan dan penghapusan berjalan dalam satu transaksi. Hasil
+    dicatat di `M_Konfigurasi` (`mulai_bersih`). Apps Script memegang kunci skrip selama penghapusan dan meminta salinan penuh ke
+    Sheet (`SINKRON_VERSI` = `{}`), karena salinan per langkah akan menghapus baris satu per satu dan Google Sheets menolak
+    menghapus semua baris yang tidak dibekukan; salinan penuh hanya mengosongkan isi. Edge Function lama (tanpa `kosongkanIsian`)
+    dijawab dengan petunjuk menempel `index.ts` dulu.
+    **Uji:** `uji/server/mulai_bersih.mjs` (44 pemeriksaan): periksa tidak mengubah apa pun; hapus mengosongkan semua tab isian
+    termasuk form kustom, judul dan tab master tetap, `M_Konfigurasi` lain tetap; cadangan satu berkas berisi isian lama dan lolos
+    `periksaIsiCadangan_`; PIN tetap; form Stock dan opname menunjukkan stock 0; Riwayat kosong; Dashboard tanpa nilai stock; opname
+    hari pertama menjadi stock awal; tanpa isian tidak ada cadangan baru; `server.js` meneruskan `kosongkanIsian` dan menolak fungsi
+    lain serta rahasia salah; editor Apps Script tiruan (Code.gs dengan `DI_SUPABASE` false dan `UrlFetchApp` tiruan): jalan pertama
+    hanya mencatat, isian selain "ya" tidak menghapus, Edge Function lama diberi petunjuk, dengan `ya` urutannya hapus → salin
+    berkas → salin tab penuh dan `MULAI_BERSIH` terhapus. `node uji/jalankan.mjs --layar` pada 6 November: 51 berkas, 2.520
+    pemeriksaan lulus, 0 gagal (4 sekaligus, 13,7 menit).
+477. **Panduan staff satu halaman.** Pemilik memilih panduan untuk staff bersamaan dengan mulai bersih. `catatan/panduan_staff.html`
+    (A4, huruf Barlow dari `fonts/`, kode QR berisi alamat aplikasi di GitHub Pages yang diperiksa terbaca): pasang di layar utama
+    (Android dan iPhone), masuk dengan nama dan PIN 6 angka, Lupa PIN?, keluar otomatis, menyalakan notifikasi dari menu nama,
+    isi form harian dari Beranda (Suhu Opening/Middle/Closing, Stock dengan Tambah keluar atau Hitung sisa, Prep List, Waste dan
+    Tidak ada hari ini, tombol Kirim), tanpa sinyal ("Tersimpan di HP. Dikirim saat ada sinyal.", draft), dan salah isi (Betulkan
+    dalam 15 menit, Laporkan kekeliruan). Teksnya mengikuti teks antarmuka di `app.js`. Bukan bagian aplikasi dan tidak dibuka dari
+    aplikasi (service worker menjawab navigasi dengan `index.html`); dicetak ke PDF dan gambar untuk dicetak atau dikirim lewat
+    WhatsApp. Jika teks antarmuka yang disebut berubah, panduan ini ikut diperbarui.

@@ -304,3 +304,8 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
 - Kiriman berisi `submissionId` yang dibuat di HP. Kiriman dengan `submissionId` yang sudah pernah
   masuk tidak ditulis lagi dan dijawab berhasil dengan `sudahTerkirim: true`, supaya antrean yang
   mengirim ulang menganggapnya selesai.
+- Mulai bersih (Code.gs v0.45, 6 November 2026; butir 476): fungsi `kosongkanIsian(periksa)` di Supabase, lewat `__fungsi` (masuk
+  `FUNGSI_PEMILIK` di `supabase/src/server.js`) → `{ periksa, tab: [{ nama, baris, terakhir }], baris, terakhir, cadangan }`; `periksa`
+  bawaan true (hanya mencatat); false: cadangan "Cadangan sebelum mulai bersih …" lalu semua baris tab `tabArsip_()` dihapus.
+  Fungsi editor Apps Script `mulaiBersih` (Script Property `MULAI_BERSIH` = `ya` untuk menghapus). `M_Konfigurasi` baris baru
+  `mulai_bersih` (dibuat saat pertama dipakai). Tidak ada aksi aplikasi baru.

@@ -113,6 +113,9 @@
 > (paling lama sampai masa simpan resep) dikurangi stock, dibulatkan ke atas ke ½ resep (Bagian 5.3, 12).
 >
 > Diperbarui 4 November 2026 (keputusan pemilik): outlet tambahan (Tahap 11) tidak dikerjakan (Bagian 13).
+> Diperbarui 6 November 2026 (keputusan pemilik, dari telaah aplikasi): mulai bersih. Sebelum aplikasi dipakai
+> sungguhan, pemilik menghapus isian uji sekali dari editor Apps Script (`mulaiBersih`) sesudah isinya dicadangkan; data
+> master tetap (Bagian 9.4).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -1739,6 +1742,15 @@ atau hari libur ditandai atau dihapus (Bagian 5.8), untuk tanggal di bulan itu.
     HP memperlakukannya seperti tanpa sinyal (isian masuk antrean HP). Pemulihan yang berhenti di tengah
     membiarkan aplikasi tetap ditutup sampai dijalankan ulang dan berhasil.
   - Langkahnya, juga untuk project Supabase baru, ada di `supabase/PANDUAN.md`.
+- **Mulai bersih** (6 November 2026, keputusan pemilik): sebelum aplikasi dipakai sungguhan, isian uji dihapus sekali dari
+  editor Apps Script (`mulaiBersih`). Jalan pertama hanya mencatat apa yang akan dihapus dan apa yang tetap; isian baru dihapus
+  jika Script Property `MULAI_BERSIH` berisi `ya`, dan Script Property itu dihapus sesudahnya. Yang dihapus: semua baris isian
+  di tab yang juga diarsipkan (semua tab `Data_*` termasuk form kustom, `Stock_Harian`, `Log_Perubahan`). Yang tetap: tab master
+  (item dan riwayat harga, staff dan PIN, resep, menu, unit, kategori, satuan, pemasok, form, hari libur), `M_Konfigurasi`,
+  notifikasi HP, dan berkas di Drive. Isi sebelum dihapus disimpan dulu sebagai "Cadangan sebelum mulai bersih …" (bisa
+  dipulihkan dengan `pulihkanCadangan`); cadangan dan penghapusan berjalan dalam satu transaksi di Supabase. Stock semua item
+  menjadi 0, jadi Stock opname semua kategori pada hari pertama menjadi stock awal. Hasilnya dicatat di `M_Konfigurasi`
+  (`mulai_bersih`).
 - Jika pembuatan cadangan gagal, kegagalannya dicatat dan disebut di email harian berikutnya.
 
 ---

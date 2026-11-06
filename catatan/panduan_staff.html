@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panduan staff InventoryKu</title>
+<!-- Panduan singkat untuk staff dapur (telaah aplikasi 6 November 2026, butir 477). Satu halaman A4 untuk dicetak atau
+     dikirim lewat WhatsApp sebagai PDF/gambar. Bukan bagian aplikasi; teksnya mengikuti teks antarmuka di app.js. Kode QR
+     berisi alamat aplikasi di GitHub Pages. -->
+<style>
+  @font-face { font-family: 'Barlow'; font-weight: 400; src: url('../fonts/barlow-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 500; src: url('../fonts/barlow-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 600; src: url('../fonts/barlow-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 600; src: url('../fonts/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
+  :root {
+    --navy: #0B1F3A;
+    --biru-malam: #16335C;
+    --amber: #F2A93B;
+    --tinta: #0F1B2D;
+    --redup: #4A5A72;
+    --garis: #C5CEDA;
+    --baja: #F3F5F8;
+  }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #FFFFFF; color: var(--tinta); }
+  body { font-family: 'Barlow', system-ui, sans-serif; font-size: 13.5px; line-height: 1.42; }
+  .halaman { width: 210mm; height: 297mm; padding: 13mm 13mm 11mm; display: flex; flex-direction: column; gap: 5mm; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 5mm; padding-bottom: 4mm; border-bottom: 2px solid var(--navy); }
+  header img { width: 15mm; height: 15mm; }
+  .merek { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 30px; line-height: 1; color: var(--navy); margin: 0; }
+  .merek span { color: #B26E0B; }
+  .subjudul { margin: 1.5mm 0 0; font-size: 15px; font-weight: 500; color: var(--biru-malam); }
+  .pembuka { margin: 0; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4.5mm; flex: 1; align-content: start; }
+  section { border: 1px solid var(--garis); border-radius: 3mm; padding: 4mm 4.5mm 3.5mm; break-inside: avoid; }
+  h2 { display: flex; align-items: center; gap: 3mm; margin: 0 0 2.5mm; font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+    font-size: 19px; line-height: 1.1; color: var(--navy); }
+  h2 .no { flex: none; display: grid; place-items: center; width: 8mm; height: 8mm; border-radius: 50%; background: var(--navy); color: #FFFFFF;
+    font-size: 16px; }
+  h2 small { font-family: 'Barlow', sans-serif; font-weight: 500; font-size: 12.5px; color: var(--redup); }
+  ul { margin: 0; padding-left: 4.5mm; }
+  li { margin: 0 0 1.6mm; }
+  li:last-child { margin-bottom: 0; }
+  b { font-weight: 600; }
+  .ui { font-weight: 600; color: var(--biru-malam); white-space: nowrap; }
+  .pasang { display: grid; grid-template-columns: 30mm 1fr; gap: 4mm; align-items: start; }
+  .qr { width: 30mm; height: 30mm; padding: 1.5mm; border: 1px solid var(--garis); border-radius: 2mm; background: #FFFFFF; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .alamat { display: block; margin: 0 0 2mm; font-weight: 600; font-size: 13px; color: var(--navy); word-break: break-all; }
+  .pesan { display: inline-block; padding: 0.4mm 2mm; border-radius: 1.5mm; background: var(--baja); font-weight: 500; }
+  .lebar { grid-column: 1 / -1; }
+  footer { display: flex; justify-content: space-between; gap: 6mm; padding-top: 3mm; border-top: 1px solid var(--garis); color: var(--redup); font-size: 12.5px; }
+  footer b { color: var(--tinta); }
+  @media screen and (max-width: 640px) {
+    .halaman { width: auto; height: auto; padding: 20px 16px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="halaman">
+  <header>
+    <img src="../icons/ikon.svg" alt="">
+    <div>
+      <p class="merek">Inventory<span>Ku</span></p>
+      <p class="subjudul">Panduan singkat untuk staff dapur</p>
+    </div>
+  </header>
+  <p class="pembuka">Form kertas Stock, Suhu, Prep List, dan Waste sekarang diisi di HP. Isian langsung sampai ke Head Kitchen dan Manager,
+    dan laporan harian dibuat otomatis.</p>
+
+  <div class="grid">
+    <section class="lebar">
+      <h2><span class="no">1</span>Pasang di HP <small>sekali saja</small></h2>
+      <div class="pasang">
+        <div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" role="img" aria-label="Kode QR alamat InventoryKu" shape-rendering="crispEdges"><path stroke="#16233b" d="M0 0.5h7m3 0h2m1 0h2m1 0h5m2 0h1m2 0h7m-33 1h1m5 0h1m2 0h1m3 0h3m1 0h1m6 0h1m1 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h4m1 0h1m1 0h2m1 0h3m3 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m2 0h2m2 0h1m2 0h1m3 0h2m2 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m1 0h2m4 0h3m1 0h1m1 0h2m4 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-25 1h2m4 0h2m5 0h1m2 0h1m-25 1h1m1 0h5m6 0h3m1 0h1m4 0h3m1 0h5m-30 1h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m3 0h1m1 0h4m1 0h1m2 0h2m1 0h2m1 0h1m-33 1h1m4 0h2m2 0h4m2 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h2m-31 1h1m1 0h1m3 0h5m2 0h3m3 0h3m1 0h2m2 0h4m-32 1h1m5 0h1m2 0h1m2 0h1m2 0h1m2 0h2m5 0h1m1 0h3m2 0h1m-29 1h2m1 0h4m3 0h4m2 0h2m1 0h1m2 0h1m2 0h1m1 0h2m-32 1h1m4 0h2m2 0h1m1 0h1m4 0h1m1 0h1m1 0h1m2 0h6m1 0h1m-27 1h1m4 0h3m1 0h1m1 0h1m1 0h9m3 0h1m-30 1h2m1 0h1m1 0h2m2 0h1m3 0h1m1 0h2m1 0h1m2 0h1m1 0h2m1 0h2m3 0h1m-32 1h2m5 0h2m1 0h1m2 0h1m1 0h4m3 0h1m2 0h2m1 0h2m1 0h1m-31 1h6m3 0h3m1 0h3m2 0h1m1 0h1m2 0h4m1 0h2m-32 1h5m4 0h2m1 0h4m1 0h2m2 0h4m1 0h5m1 0h1m-33 1h1m5 0h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h2m1 0h1m1 0h1m2 0h2m1 0h2m-33 1h1m2 0h3m1 0h1m1 0h4m1 0h2m2 0h1m4 0h1m1 0h2m2 0h1m2 0h1m-33 1h1m1 0h1m3 0h4m1 0h3m1 0h3m2 0h1m1 0h1m2 0h5m1 0h1m-32 1h1m1 0h3m3 0h1m2 0h1m3 0h1m5 0h1m1 0h1m4 0h5m-33 1h1m1 0h6m1 0h2m3 0h2m1 0h2m1 0h1m1 0h7m2 0h2m-25 1h1m1 0h2m1 0h1m2 0h1m1 0h2m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m-33 1h7m2 0h8m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h1m-31 1h1m5 0h1m1 0h2m3 0h1m2 0h1m4 0h1m1 0h2m3 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h5m1 0h2m2 0h1m2 0h1m2 0h6m-30 1h1m1 0h3m1 0h1m1 0h5m1 0h4m2 0h2m1 0h1m1 0h1m2 0h1m3 0h1m-33 1h1m1 0h3m1 0h1m1 0h3m2 0h1m3 0h1m1 0h1m1 0h1m1 0h1m2 0h2m1 0h2m-31 1h1m5 0h1m2 0h1m3 0h1m2 0h1m1 0h5m2 0h1m2 0h3m-31 1h7m1 0h1m3 0h3m2 0h1m1 0h2m2 0h2m2 0h1m3 0h1"/></svg></div>
+        <div>
+          <span class="alamat">lokadhana11-lang.github.io/inventoryku</span>
+          <ul>
+            <li>Pindai kode QR dengan kamera HP, atau ketik alamat di atas di browser.</li>
+            <li><b>Android (Chrome):</b> ketuk <span class="ui">⋮</span> di kanan atas, lalu <span class="ui">Tambahkan ke layar utama</span>
+              (atau <span class="ui">Instal aplikasi</span>).</li>
+            <li><b>iPhone (Safari):</b> ketuk <span class="ui">Bagikan</span>, lalu <span class="ui">Tambahkan ke Layar Utama</span>.</li>
+            <li>Mulai sekarang, buka InventoryKu dari ikonnya di layar HP.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="no">2</span>Masuk</h2>
+      <ul>
+        <li>Ketuk nama sendiri, lalu ketik <b>PIN 6 angka</b>. PIN diberikan Head Kitchen atau Manager. Jangan beri tahu PIN ke orang lain.</li>
+        <li>Lupa PIN? Ketuk <span class="ui">Lupa PIN?</span> di layar masuk, lalu minta PIN baru ke Head Kitchen atau Manager.</li>
+        <li>Aplikasi keluar sendiri jika beberapa menit tidak dipakai. Masuk lagi dengan PIN.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="no">3</span>Nyalakan notifikasi <small>sekali saja</small></h2>
+      <ul>
+        <li>Ketuk nama sendiri di kanan atas Beranda, pilih <span class="ui">Notifikasi</span>, geser ke <span class="ui">Nyala</span>, lalu
+          <span class="ui">Izinkan</span>.</li>
+        <li>HP akan mengingatkan saat cek suhu belum diisi dan sebelum closing jika masih ada form yang belum lengkap.</li>
+        <li>Di iPhone, notifikasi hanya bisa jika InventoryKu dibuka dari ikonnya di Layar Utama.</li>
+      </ul>
+    </section>
+
+    <section class="lebar">
+      <h2><span class="no">4</span>Isi form setiap hari</h2>
+      <ul>
+        <li><b>Beranda</b> menunjukkan form hari ini dan mana yang belum diisi. Ketuk kartunya untuk mengisi.</li>
+        <li><b>Pengecekan Suhu:</b> setiap Opening, Middle, dan Closing. <b>Stock:</b> barang masuk dan pemakaian
+          (<span class="ui">Tambah keluar</span> atau <span class="ui">Hitung sisa</span>). <b>Prep List:</b> prep yang dibuat hari itu.</li>
+        <li><b>Waste:</b> barang yang terbuang beserta alasannya. Hari ini tidak ada waste? Ketuk <span class="ui">Tidak ada hari ini</span>.</li>
+        <li>Selesai mengisi, ketuk tombol <span class="ui">Kirim</span> di bawah layar (misalnya <span class="ui">Kirim suhu</span>).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="no">5</span>Tidak ada sinyal</h2>
+      <ul>
+        <li>Tetap isi dan ketuk Kirim. Muncul <span class="pesan">Tersimpan di HP. Dikirim saat ada sinyal.</span> Isian terkirim sendiri begitu
+          ada sinyal.</li>
+        <li>Isian yang belum dikirim tersimpan sebagai draft, jadi tidak hilang walaupun aplikasi tertutup.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="no">6</span>Salah isi</h2>
+      <ul>
+        <li><b>Dalam 15 menit</b> sesudah dikirim: buka <span class="ui">Riwayat</span>, pilih kirimanmu, lalu ketuk
+          <span class="ui">Betulkan</span> di baris yang salah.</li>
+        <li>Lewat dari itu: ketuk <span class="ui">Laporkan kekeliruan</span> di baris itu, atau beri tahu Head Kitchen atau Manager.</li>
+      </ul>
+    </section>
+  </div>
+
+  <footer>
+    <span>Ada pertanyaan? Tanya <b>Head Kitchen</b> atau <b>Manager</b>.</span>
+    <span>InventoryKu · November 2026</span>
+  </footer>
+</main>
+</body>
+</html>
