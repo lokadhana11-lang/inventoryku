@@ -14,7 +14,9 @@ const CORS = {
 
 // Fungsi Code.gs yang boleh dijalankan pemilik dari editor Apps Script (diteruskan) atau oleh jadwal.
 const FUNGSI_PEMILIK = ['setupSpreadsheet', 'pasangTrigger', 'kirimLaporanSekarang', 'kirimRekapSekarang', 'buatKodePemasangan',
-  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan', 'buatCadanganSebelumPulih'];
+  'kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'arsipTahunan', 'buatCadanganSebelumPulih',
+  // Code.gs v0.45: mulaiBersih (editor) menghapus isian uji sesudah mencadangkannya.
+  'kosongkanIsian'];
 // Satu-satunya fungsi yang boleh berjalan selama aplikasi ditutup untuk pemulihan cadangan.
 const FUNGSI_SAAT_PULIH = ['buatCadanganSebelumPulih'];
 const FUNGSI_JADWAL = ['kirimLaporanHarian', 'buatCadangan', 'kirimRekapBulanan', 'pengingatSuhuOpening', 'pengingatSuhuMiddle',
