@@ -11,7 +11,7 @@
   'use strict';
 
   /** Versi aplikasi. SETIAP RILIS naikkan ini DAN VERSI di sw.js (nilainya sama). */
-  var VERSI_APLIKASI = '0.52.1';
+  var VERSI_APLIKASI = '0.52.2';
 
   var TEKS_BELUM_DIISI = 'GANTI_DENGAN_URL_WEB_APP';
   var BATAS_WAKTU_MS = 30000;
@@ -10172,7 +10172,8 @@
 
     var isiHitung = el('div', {}, [
       catatanDraft,
-      el('section', { class: 'kartu kotak-info', 'aria-label': 'Kotak info' }, [
+      // Laptop: Kategori, Tanggal, dan Cari item tiga kolom seperti kotak info Stock (butir 474).
+      el('section', { class: 'kartu kotak-info kotak-tiga', 'aria-label': 'Kotak info' }, [
         el('div', { class: 'kolom' }, [el('label', { class: 'kolom-label', for: 'opname-kategori', text: 'Kategori' }), pilihKategori]),
         el('div', { class: 'kolom' }, [el('span', { class: 'kolom-label', text: 'Tanggal' }), el('p', { class: 'opname-tanggal', text: tanggalJudul(hariIni) })]),
         el('div', { class: 'kolom kolom-cari' }, [el('label', { class: 'kolom-label', for: 'cari-item-opname', text: 'Cari item' }), inCari, infoCari]),

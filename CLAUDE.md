@@ -118,7 +118,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
 
 - **Versi terakhir:** aplikasi 0.52.0 (satu penanda menu aktif di bar atas laptop, telaah desain butir 9; butir 470–471; Code.gs
   tidak berubah), digabung lewat PR #79 dan tayang (5 November 2026). Sesudahnya: uji dijalankan 4 berkas sekaligus (butir 472,
-  PR #80), lalu aplikasi 0.52.1 (perapian `app.css` tanpa perubahan tampilan, butir 473), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
+  PR #80), aplikasi 0.52.1 (perapian `app.css` tanpa perubahan tampilan, butir 473, PR #81), lalu aplikasi 0.52.2 (kotak info
+  Stock opname tiga kolom di laptop dan tombol nama di tabel 44 px, butir 474–475; Code.gs tidak berubah), menunggu digabung. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
   0.49.0 (Pengaturan berkelompok
   dan Laporan dua kolom, butir 461–463, PR #76), 0.48.0 (susunan tiket Beranda, butir 459–460, PR #75), 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
   butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
@@ -153,7 +154,8 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   (filter Riwayat ringkas) di 0.51.0, lalu butir 9 (satu penanda menu aktif) di 0.52.0. Semua butir telaah desain sudah dibangun.
 - **Telaah aplikasi 5 November 2026:** semua PR digabung, 0.52.0 tayang, produksi 24 jam tanpa galat. Lima usul: (1) uji paralel,
   dikerjakan (butir 472); (2) satukan blok tambahan di akhir `app.css`; (3) kotak info Stock opname tiga kolom; (4) tombol tabel HPP
-  per menu 44 px; (5) hapus 25 cabang lama yang sudah tergabung. Butir 2 dikerjakan (butir 473); butir 3–5 belum dipilih.
+  per menu 44 px; (5) hapus 25 cabang lama yang sudah tergabung. Butir 2 dikerjakan (butir 473), butir 3 dan 4 sekaligus (butir
+  474–475); butir 5 belum dipilih.
 - **Telaah aplikasi 2 November 2026:** uji yang gagal karena tanggal diperbaiki dengan jam uji tetap (butir 424–427; Code.gs dan aplikasi
   tidak berubah). Uji baru tidak menulis nama bulan atau tanggal tetap (uji/README.md). Telaah kedua hari itu (semua PR sudah digabung,
   v0.41 terpasang): pemilik memilih pemantauan dulu (butir 428–436), lalu cukup untuk berapa hari (butir 437–443), lalu saran prep
