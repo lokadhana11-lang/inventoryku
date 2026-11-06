@@ -1358,12 +1358,16 @@ body.papan-ketik .layar {
   background: var(--kertas-tekan);
 }
 
-/* Nama yang bisa diketuk di tabel: sasaran sentuh 44 px (Bagian 9) tanpa menambah tinggi baris */
+/* Nama yang bisa diketuk di tabel: sasaran sentuh 44 px (Bagian 9) tanpa menambah tinggi baris.
+   Tepat 44 px berapa pun tinggi barisnya (butir 475): nama di kolom judul baris 14 px (HPP per menu, kartu stok), di sel 16 px.
+   Peramban tanpa satuan lh memakai 11 px. */
 .tabel-tombol {
   display: inline-block;
   min-width: 44px;
   padding: 11px 0;
   margin: -11px 0;
+  padding-block: calc((44px - 1lh) / 2);
+  margin-block: calc((1lh - 44px) / 2);
   border: 0;
   background: none;
   color: var(--biru-malam);
@@ -2570,7 +2574,10 @@ body.papan-ketik .lembar-aksi {
 }
 
 @media (min-width: 1024px) {
-  .kotak-info.bisa-dilipat {
+  /* Stock opname (butir 474): Kategori, Tanggal, dan Cari item tiga kolom, sejajar kotak info Stock; tidak dilipat di HP,
+     dan keterangannya tetap selebar kotak di bawahnya */
+  .kotak-info.bisa-dilipat,
+  .kotak-info.kotak-tiga {
     grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
     gap: 16px 24px;
   }

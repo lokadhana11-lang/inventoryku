@@ -61,6 +61,8 @@
 > Filter dengan satu baris ringkasan; tombol pilihan Riwayat seukuran isinya mulai 600 px (Bagian 5.4 dan 7).
 > Tambahan 5 November 2026 (keputusan pemilik, telaah desain butir 9): menu aktif di bar atas laptop dan desktop hanya ditandai
 > garis amber; pil Navy Lapis tidak lagi tampil di menu aktif (Bagian 4.3 dan 11).
+> Tambahan 6 November 2026 (keputusan pemilik, telaah aplikasi butir 3 dan 4): kotak info Stock opname tiga kolom di laptop
+> (Kategori, Tanggal, Cari item); nama yang bisa diketuk di tabel tepat 44 px, juga di kolom judul baris (Bagian 5.8 dan 9).
 > Tambahan 29 Oktober 2026 (permintaan pemilik, dari telaah aplikasi): "Tambah menu" di form Waste untuk
 > waste per porsi menu, tanda "Menu" di Riwayat, dan keterangannya di layar HPP (Bagian 5.3, 5.4, 5.10).
 > Tambahan 29 Oktober 2026 (permintaan pemilik): "Tambah item" di tiap kelompok Daftar belanja dan
@@ -1518,6 +1520,10 @@ Satu-satunya layar yang sepenuhnya navy.
   begitu angka diketik; selisih bukan nol memakai tanda Perlu ditinjau.
 - **Cari item** (20 Oktober 2026): kotak cari di kotak info, sama seperti form Stock. Hitungan item
   yang tidak tampil tetap ikut disimpan ("1 item terhitung yang tidak tampil tetap ikut disimpan.").
+- **Kotak info** (6 November 2026): HP satu kolom (Kategori, Tanggal hari ini, Cari item), tablet dua
+  kolom. Laptop dan desktop tiga kolom seperti kotak info form (Bagian 5.3): Kategori, Tanggal, dan
+  Cari item satu baris, kolomnya sejajar kotak info Stock; keterangan opname terakhir dan petunjuk
+  menghitung selebar kotak di bawahnya. Tidak dilipat di HP karena tanggalnya tidak bisa diganti.
 - Item yang dikosongkan tidak dihitung dan tidak diubah.
 - "Lanjut" membuka ringkasan: jumlah item berselisih, daftar selisihnya, dan total nilai
   (Rp). Tombol utamanya "Simpan opname".
@@ -1935,7 +1941,9 @@ indikator putar.
 ## 9. Aksesibilitas dan Batas Minimum
 
 - Kontras teks minimal 4,5; tepi kolom isian minimal 3 (lihat Bagian 2).
-- Sasaran sentuh minimal 44 × 44 px; kolom isian dan tombol 48 px.
+- Sasaran sentuh minimal 44 × 44 px; kolom isian dan tombol 48 px. Nama yang bisa diketuk di tabel
+  (nama menu di HPP per menu, tanggal di kartu stok, nama item di Riwayat, nama staff) tepat 44 px
+  tingginya tanpa menambah tinggi baris (6 November 2026).
 - Makna tidak pernah disampaikan dengan warna saja: selalu ada ikon dan kata.
 - Fokus papan ketik terlihat jelas (garis Biru Malam 2 px) di laptop/desktop.
 - Semua kolom isian punya label yang selalu terlihat, bukan hanya teks contoh di dalam kolom.

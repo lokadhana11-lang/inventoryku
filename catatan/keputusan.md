@@ -3253,3 +3253,26 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     perubahan sama persis (alatnya stabil), dan potret sesudah sama persis dengan sebelum (`uji/alat/banding_gaya.mjs`: 0 perbedaan).
     Gerak tanpa "kurangi gerak" tidak dipotret; aturan gerak yang dipindah hanya milik kartu tautan, dipindah utuh. `node
     uji/jalankan.mjs --layar` pada 5 November: 49 berkas, 2.443 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,0 menit).
+
+### Kotak info Stock opname dan tombol nama di tabel (aplikasi 0.52.2, 6 November 2026)
+
+474. **Kotak info Stock opname tiga kolom di laptop.** Telaah aplikasi 5 November 2026 butir 3, dipilih pemilik ("lanjut ke butir 3
+    sekalian butir 4"): kotak info Stock opname belum ikut pola kotak info form yang baru (butir 454), jadi di laptop masih dua kolom
+    (Kategori | Tanggal, Cari item sendirian di baris kedua dengan sisi kanan kosong). Kini mulai 1.024 px Kategori, Tanggal, dan Cari
+    item satu baris dengan lebar 4 : 3 : 3, sama dengan kotak info form (kolomnya sejajar kotak info Stock: Tanggal | Kategori | Cari
+    item), dan keterangan opname terakhir serta petunjuk menghitung tetap selebar kotak di bawahnya. Kotak di laptop 277 → 188 px
+    tingginya, sehingga daftar item naik 89 px. Caranya kelas `kotak-tiga` yang memakai aturan kolom `.kotak-info.bisa-dilipat`;
+    `lipatKotakInfo` tidak dipakai karena di HP tidak ada yang perlu diringkas (Tanggal selalu hari ini dan tidak bisa diganti),
+    jadi HP (satu kolom) dan tablet (dua kolom) tidak berubah. Urutan kolom dan urutan Tab (Kategori lalu Cari item) tetap.
+475. **Tombol nama di tabel tepat 44 px.** Telaah aplikasi 5 November 2026 butir 4: `.tabel-tombol` memakai bantalan 11 px atas dan
+    bawah (dengan margin −11 px supaya baris tidak meninggi), jadi tingginya bergantung pada tinggi baris teksnya: 43 px untuk nama
+    menu di kolom judul baris HPP per menu (huruf 14 px), 46 px di sel lain (16 px), dan tanggal di rekap harian kartu stok 46 px di
+    baris setinggi 45 px (keluar setengah piksel dari barisnya). Kini bantalannya `calc((44px - 1lh) / 2)` dan marginnya kebalikannya:
+    tepat 44 px di HPP per menu, kartu stok, Riwayat, dan Staff, selalu di dalam barisnya, tanpa mengubah tinggi baris atau letak
+    teks. Peramban tanpa satuan `lh` (Safari sebelum 16.4) tetap memakai 11 px seperti sebelumnya.
+    **Uji:** `uji/layar/opname_tabel_tombol.mjs` (33 pemeriksaan; sebelum perubahan 15 di antaranya gagal): susunan kotak info
+    Stock opname di delapan ukuran, kolom sejajar kotak info Stock, mencari item tidak mengubah susunan, urutan Tab, tinggi dan
+    letak tombol nama di HPP per menu (1.024, 1.366, 1.920), Riwayat, kartu stok, dan Staff, garis fokus, dan gerak. Potret gaya
+    (`uji/alat/potret_gaya.mjs`, 277 keadaan) sebelum dan sesudah hanya berbeda di kotak info Stock opname di laptop dan desktop
+    dan di tombol nama tabel. `node uji/jalankan.mjs --layar` pada 6 November: 50 berkas, 2.476 pemeriksaan lulus, 0 gagal (4
+    sekaligus, 13,7 menit).
