@@ -3368,4 +3368,4 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     bersih kosong = 100, nama lama tetap, harga diganti tercatat di `Log_Perubahan`, nonaktif tetap nonaktif, penolakan dengan nomor
     baris, tanpa harga, dua kali, tanpa `ganti`, hasil bersih di atas 100, harga 0, bahan dua kali, batas 50, `simpanMenu` tetap sama) dan
     `uji/layar/menu_tempel.mjs` (22 pemeriksaan: tautan, pratinjau dengan judul, "Rp 25.000", "0,15 kg", "90%", harga tetap, menu baru tanpa
-    harga dan bahan tidak ada ditandai, konfirmasi, sisa di kotak tempel; server lama; delapan ukuran dengan kata panjang). HASIL_UJI_PENUH.
+    harga dan bahan tidak ada ditandai, konfirmasi, sisa di kotak tempel; server lama; delapan ukuran dengan kata panjang). `node uji/jalankan.mjs --layar` pada 7 November: 55 berkas, 2.665 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,6 menit).
