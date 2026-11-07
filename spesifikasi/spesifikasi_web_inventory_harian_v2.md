@@ -118,6 +118,7 @@
 > master tetap (Bagian 9.4).
 > Diperbarui 7 November 2026 (permintaan pemilik, untuk memasukkan buku resep outlet): cara membuat resep, yaitu langkah
 > bernomor yang dibuka dari Prep List, dan tempel banyak resep sekaligus dari Excel atau Google Sheets (Bagian 5.1 dan 5.3).
+> Diperbarui 7 November 2026 (permintaan pemilik): tempel banyak menu sekaligus dari Excel atau Google Sheets (Bagian 5.9).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -1101,6 +1102,13 @@ Semuanya khusus Pengelola dan diperiksa di server.
 - **Bahan kecil:** bumbu, minyak, dan garnish yang sulit ditakar per porsi ditambahkan sebagai
   satu persen untuk semua menu (0 sampai 15%). Bahan yang memang ditakar boleh tetap ditulis
   sebagai bahan biasa.
+- **Tempel menu** (7 November 2026): Pengelola boleh memasukkan banyak menu sekaligus dengan menempel baris dari
+  Excel atau Google Sheets (paling banyak 50 menu): Menu, Harga jual, Bahan, Takaran per porsi, Hasil bersih (%);
+  satu baris per bahan, dan baris berikutnya dari menu yang sama boleh mengosongkan Menu. Bahan harus sudah ada
+  di `M_Item`. Aturannya sama dengan menu yang diisi satu per satu; menu baru wajib punya harga jual. Menu yang
+  sudah ada: bahannya diganti, harga jualnya diganti hanya jika diisi (tercatat di `Log_Perubahan`), dan tetap
+  aktif atau nonaktif seperti sebelumnya. Satu menu yang salah ditandai di pratinjau dan tidak ikut; server
+  menolak seluruh kiriman jika masih ada yang salah.
 - **Kemasan bungkus:** item biasa. Versi bungkus dibuat dengan "Salin menu", misalnya
   "Chicken steak (bungkus)", dengan harga jualnya sendiri.
 - Harga jual tidak punya riwayat; perubahan harga jual dan nama menu tercatat di `Log_Perubahan`.

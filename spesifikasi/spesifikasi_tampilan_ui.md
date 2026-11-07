@@ -71,6 +71,7 @@
 > stock hasil prep sesudah Prep List dikirim (Bagian 5.3, 5.7, dan 7).
 > Tambahan 7 November 2026 (permintaan pemilik): "Cara membuat" di Pengaturan → Resep dan lembar Cara membuat dari
 > Prep List, dan layar "Tempel resep" (Bagian 5.3, 5.7, dan 7).
+> Tambahan 7 November 2026 (permintaan pemilik): layar "Tempel menu" dari Pengaturan → Menu (Bagian 5.7 dan 7).
 > Tambahan 30 Oktober 2026 (permintaan pemilik): menonaktifkan item menolkan stock-nya, tombol "Nolkan stock"
 > untuk item nonaktif yang masih punya stock, dan tawaran stok pembuka saat item diaktifkan lagi (Bagian 5.7
 > dan 7).
@@ -1271,6 +1272,14 @@ Satu-satunya layar yang sepenuhnya navy.
 - Kartu "Keadaan menu": sakelar Aktif/Nonaktif (menonaktifkan meminta konfirmasi), lalu tombol
   kedua "Salin menu" untuk versi bungkus ("Chicken steak (bungkus)").
 - Tombol utama "Simpan menu", lalu "Menu tersimpan." Draft tersimpan seperti resep.
+- **Tempel menu** (7 November 2026): tombol "Tempel dari Excel/Sheets" di bawah keterangan daftar menu (hanya jika
+  server mengenalnya) membuka layar "Tempel menu", polanya sama dengan Tempel resep: kotak tempel dengan urutan
+  kolom (Menu, Harga jual, Bahan, Takaran per porsi, Hasil bersih (%)), lalu Pratinjau satu baris per menu:
+  "Baris 2–4 · Chicken Woku", "Rp 35.000 · 4 bahan" (atau "harga tetap Rp 28.000" untuk menu yang sudah ada
+  tanpa harga di tempelan), "Bahan: Chicken Woku 100 gr, Nasi Putih 170 gr, …" dengan hasil bersih di dalam kurung
+  jika di bawah 100%, dan tanda "Menu baru" (Baik), "Mengganti menu yang ada" (Perlu ditinjau), atau pesan salahnya.
+  Harga jual boleh ditulis seperti di spreadsheet ("Rp 25.000"), hasil bersih boleh diikuti "%". Bilah bawah
+  "2 menu siap, 2 salah." dan "Simpan 2 menu", lalu konfirmasi. Menu yang salah tetap di kotak tempel.
 
 **Pengaturan → Outlet dan jadwal:**
 
@@ -1767,6 +1776,7 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Kolom wajib kosong | "Isi jumlah resep untuk Sauce bolognese." |
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
 | Cara membuat resep | "Cara membuat · 4 langkah", lembar "Cara membuat Sambal dasar", "Bahan untuk 2 resep", "Langkah", "Takaran di dalam langkah ditulis untuk 1 resep. Untuk 2 resep, kalikan 2.", "Tutup"; di Pengaturan → Resep "Cara membuat (tidak wajib)" (7 November 2026) |
+| Tempel menu | "Tempel dari Excel/Sheets", "Tempel menu", "Tempel baris menu", "Menu baru", "Mengganti menu yang ada", "Isi harga jual. Menu baru tidak bisa disimpan tanpa harga jual.", "2 menu siap, 2 salah.", "Simpan 2 menu", "1 menu baru dan 1 menu diganti tersimpan." (7 November 2026) |
 | Tempel resep | "Tempel dari Excel/Sheets", "Tempel resep", "Tempel baris resep", "Resep baru", "Mengganti resep yang ada", "3 resep siap, 1 salah.", "Simpan 3 resep", "2 resep baru dan 1 resep diganti tersimpan." (7 November 2026) |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |

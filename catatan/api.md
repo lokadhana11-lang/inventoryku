@@ -317,3 +317,8 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   (khusus Pengelola, paling banyak 50 resep) → jawaban `daftarResep` ditambah `tempel: { baru: [nama], diganti: [nama] }`. `ganti`:
   aplikasi tahu item itu sudah punya resep (resep yang ada tanpa `ganti` ditolak). Masa simpan, catatan, dan langkah kosong tidak
   mengubah resep lama. Satu resep salah menolak semuanya dengan pesan "Resep X (baris n): …".
+- Tempel menu (Code.gs v0.47, aplikasi 0.54.0, 7 November 2026; butir 482–483): `daftarMenu` (juga jawaban `simpanMenu`,
+  `aturMenuAktif`) ditambah `tempelSiap: true`. Aksi baru `tempelMenu {menu: [{ no, ganti, nama, hargaJual ('' = tetap, hanya menu
+  yang sudah ada), bahan: [{ item, qty, hasilBersih }] }]}` (khusus Pengelola, paling banyak 50 menu) → jawaban `daftarMenu` ditambah
+  `tempel: { baru: [nama], diganti: [nama] }`. Menu yang sudah ada tanpa `ganti` ditolak; satu menu salah menolak semuanya dengan pesan
+  "Menu X (baris n): …". Perubahan harga jual tercatat di `Log_Perubahan`.
