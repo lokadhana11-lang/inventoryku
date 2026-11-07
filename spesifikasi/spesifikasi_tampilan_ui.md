@@ -69,6 +69,8 @@
 > kelompok "Pemasok lain" (Bagian 5.9).
 > Tambahan 30 Oktober 2026 (permintaan pemilik): catatan resep di Pengaturan → Resep dan Prep List, dan pesan
 > stock hasil prep sesudah Prep List dikirim (Bagian 5.3, 5.7, dan 7).
+> Tambahan 7 November 2026 (permintaan pemilik): "Cara membuat" di Pengaturan → Resep dan lembar Cara membuat dari
+> Prep List, dan layar "Tempel resep" (Bagian 5.3, 5.7, dan 7).
 > Tambahan 30 Oktober 2026 (permintaan pemilik): menonaktifkan item menolkan stock-nya, tombol "Nolkan stock"
 > untuk item nonaktif yang masih punya stock, dan tawaran stok pembuka saat item diaktifkan lagi (Bagian 5.7
 > dan 7).
@@ -914,6 +916,13 @@ Satu-satunya layar yang sepenuhnya navy.
 - **Catatan resep** (30 Oktober 2026): jika resep punya catatan, di bawah baris Bahan tampil "**Catatan
   resep:** Air 1,2 liter per 1 kg beras." (teks biasa, tidak redup); di tabel laptop/desktop di kolom
   Hasil dan bahan.
+- **Cara membuat** (7 November 2026): jika resep punya langkah, di bawah catatan tampil tombol tautan
+  "Cara membuat · 4 langkah" (tinggi 44 px; di tabel di kolom Hasil dan bahan). Ketukan membuka lembar
+  "Cara membuat Sambal dasar": baris ringkas "2 resep · hasil 4 kg · masa simpan 3 hari", judul kecil "Bahan
+  untuk 2 resep" dengan daftar bahan yang sudah dikalikan jumlah resep yang dipilih (1 resep jika belum
+  dipilih), judul "Langkah" dengan daftar bernomor, lalu catatan resep. Jika jumlah resep bukan 1, di atas
+  langkah tampil kotak info "Takaran di dalam langkah ditulis untuk 1 resep. Untuk 2 resep, kalikan 2."
+  Tombol "Tutup".
 - **Pesan sesudah terkirim** (30 Oktober 2026): "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5
   liter (sekarang 7,5 liter). Bahannya berkurang sesuai resep. Ini sudah tercatat di form Stock sebagai hasil
   prep, jadi tidak perlu diisi lagi di Tambah masuk." Untuk tanggal selain hari ini "(stock akhir 28 Okt:
@@ -1440,6 +1449,20 @@ Satu-satunya layar yang sepenuhnya navy.
 - Kolom "Catatan untuk juru masak (tidak wajib)" (30 Oktober 2026, paling panjang 200 huruf) di kartu
   sendiri di bawah bahan, dengan bantuan "Tampil di Prep List di bawah bahan, misalnya takaran air atau cara
   masak singkat. Tidak mengurangi stock apa pun." Hanya tampil jika server sudah punya kolom Catatan.
+- Kolom "Cara membuat (tidak wajib)" (7 November 2026): kotak teks beberapa baris di kartu sendiri di bawah
+  catatan, dengan bantuan "Satu langkah per baris. Nomornya dibuat otomatis. Takaran ditulis untuk 1 resep.
+  Tidak mengurangi stock apa pun." dan penghitung "4 langkah. Tampil bernomor di Prep List lewat Cara
+  membuat." Nomor atau tanda daftar yang ikut diketik ("1.", "-") dibuang. Lebih dari 30 langkah atau satu
+  langkah lebih dari 300 huruf ditandai di kolom itu. Daftar resep menyebut "4 langkah". Hanya tampil jika
+  server sudah punya kolom Cara Membuat.
+- **Tempel resep** (7 November 2026): tombol "Tempel dari Excel/Sheets" di bawah keterangan daftar resep
+  (hanya jika server mengenalnya) membuka layar "Tempel resep" yang polanya sama dengan "Tambah dari
+  Excel/Sheets" di Item: kotak tempel dengan urutan kolom (Item hasil, Hasil per 1 resep, Masa simpan (hari),
+  Bahan, Jumlah, Catatan, Cara membuat), lalu Pratinjau satu baris per resep: "Baris 2–9 · Bumbu Mix",
+  "90 gr · 7 bahan · masa simpan 30 hari · 2 langkah", "Bahan: Garam 30 gr, …", dan tanda "Resep baru"
+  (Baik), "Mengganti resep yang ada" (Perlu ditinjau), atau pesan salahnya (Masalah, dengan nomor baris
+  jika resepnya lebih dari satu baris). Jumlah boleh diikuti satuan item itu ("30 gr"). Bilah bawah:
+  "3 resep siap, 1 salah." dan "Simpan 3 resep", lalu konfirmasi. Resep yang salah tetap di kotak tempel.
 - Mengubah resep menampilkan catatan: "Perubahan berlaku untuk prep berikutnya. Catatan
   lama tidak berubah."
 
@@ -1743,6 +1766,8 @@ terjadi, dan pesan sesudahnya memakai kata yang sama.
 | Gagal kirim | "Belum terkirim. Periksa sinyal, lalu ketuk Kirim ulang." |
 | Kolom wajib kosong | "Isi jumlah resep untuk Sauce bolognese." |
 | Tombol kirim prep | "Kirim prep list" lalu "Prep list terkirim. Stock bertambah: Sauce bolognese +2,5 liter (sekarang 7,5 liter). …" (30 Oktober 2026; server lama: "Prep list terkirim. Stock bahan dan barang jadi sudah diperbarui."), "Tanpa resep, stock tidak bergerak: Potong ayam.", "Catatan resep: …" |
+| Cara membuat resep | "Cara membuat · 4 langkah", lembar "Cara membuat Sambal dasar", "Bahan untuk 2 resep", "Langkah", "Takaran di dalam langkah ditulis untuk 1 resep. Untuk 2 resep, kalikan 2.", "Tutup"; di Pengaturan → Resep "Cara membuat (tidak wajib)" (7 November 2026) |
+| Tempel resep | "Tempel dari Excel/Sheets", "Tempel resep", "Tempel baris resep", "Resep baru", "Mengganti resep yang ada", "3 resep siap, 1 salah.", "Simpan 3 resep", "2 resep baru dan 1 resep diganti tersimpan." (7 November 2026) |
 | Lupa PIN terkirim | "Permintaan terkirim. Minta PIN baru ke Head Kitchen atau Manager." |
 | Pemberitahuan untuk Pengelola | "Rina meminta reset PIN" |
 | Saran prep (4 November 2026) | Judul "Saran prep", baris "Saus kacang ½ resep" dengan "Stock 1 kg · cukup ± 1 hari · pakai 0,9 kg per hari", tombol "Tambahkan" lalu "Sudah di daftar", pesan "Saus kacang ½ resep ditambahkan ke daftar.", "Belum ada yang perlu dibuat hari ini.", "Belum perlu: Kaldu ayam (cukup ± 6 hari).", "Belum ada saran untuk Sambal dasar: pemakaiannya belum tercatat selama 3 hari buka (keluar di form Stock, dipakai di resep lain, atau waste).", "Saran = cukup untuk 2 hari menurut rata-rata pemakaian 14 hari terakhir (paling lama sampai masa simpan resep), dikurangi stock sekarang, dibulatkan ke atas ke ½ resep." |

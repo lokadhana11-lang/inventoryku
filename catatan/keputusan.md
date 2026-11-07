@@ -3314,3 +3314,39 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     dalam 15 menit, Laporkan kekeliruan). Teksnya mengikuti teks antarmuka di `app.js`. Bukan bagian aplikasi dan tidak dibuka dari
     aplikasi (service worker menjawab navigasi dengan `index.html`); dicetak ke PDF dan gambar untuk dicetak atau dikirim lewat
     WhatsApp. Jika teks antarmuka yang disebut berubah, panduan ini ikut diperbarui.
+
+### Cara membuat resep dan Tempel resep (Code.gs v0.46, aplikasi 0.53.0, 7 November 2026)
+
+478. **Asal dan keputusan pemilik:** pemilik mengirim buku resep outlet (13 resep bumbu, marinasi, dan saus; 14 proses menu) dan
+    bertanya apakah bisa masuk ke menu Resep dan Prep List. Yang sudah muat: hasil, masa simpan, bahan, dan catatan 200 huruf. Yang
+    tidak muat: langkah kerja bernomor, dan memasukkan banyak resep sekaligus (Pengaturan → Resep hanya satu per satu). Pemilik memilih
+    membangun keduanya lebih dulu, lalu menjawab pertanyaan isi resep (hasil saus dalam gram, takaran "secukupnya", resep Sambel Woku
+    yang berbeda dengan buku, harga jual menu). **Isi buku resep tidak disimpan di repo**, karena repo public; resep masuk lewat
+    aplikasi ke database. Spesifikasi sistem Bagian 5.1 dan 5.3; tampilan Bagian 5.3, 5.7, dan 7.
+479. **Cara membuat** (keputusan tambahan): kolom `Cara Membuat` di akhir `M_Resep` (dibuat `setupSpreadsheet`; `langkahResepSiap_`),
+    satu langkah per baris sel, ditulis `teksAman_`, supaya mudah dibaca dan diubah di Sheets tanpa tab baru. Paling banyak 30 langkah ×
+    300 huruf (resep terpanjang di buku 9 langkah, kalimat terpanjang sekitar 150 huruf). Nomor atau tanda daftar di depan langkah
+    ("1.", "2)", "-", "•") dibuang di server dan di HP, karena teks dari buku atau spreadsheet sering sudah bernomor dan aplikasi
+    menomori sendiri. Sama seperti catatan: tidak dikirim (aplikasi lama) = tidak diubah, berisi tanpa kolom ditolak sebelum sel lain
+    ditulis, tidak masuk Riwayat, PDF, atau rekap, dan tidak menggerakkan stock. `periksaIsianResep_`, `kolomTulisResep_`, dan
+    `tulisResep_` dipisah dari `aksiSimpanResep_` supaya Tempel resep memakai aturan yang sama persis.
+480. **Lembar Cara membuat di Prep List** (keputusan tambahan): tombol tautan di baris resep, bukan teks langkah langsung di kartu,
+    supaya Prep List yang berisi banyak resep tetap pendek. Lembar menampilkan bahan untuk jumlah resep yang sudah dipilih (1 resep
+    jika belum), karena itu yang ditimbang juru masak; takaran di dalam teks langkah tidak bisa dikalikan otomatis, jadi lembar
+    menyebutnya ("Untuk 2 resep, kalikan 2."). Staff tidak punya layar Resep, jadi Prep List satu-satunya tempat membacanya. Server lama
+    (tanpa `langkah`): tanpa tombol.
+481. **Tempel resep** (keputusan tambahan): pola sama dengan "Tambah dari Excel/Sheets" di Item (`uraiTempelan` kini menerima
+    susunan kolom lain, dan kolom Cara membuat dibaca tanpa merapikan ganti baris, jadi satu sel boleh berisi beberapa langkah). Format
+    panjang, satu baris per bahan, karena begitulah tabel bahan di buku dan spreadsheet resep; baris dengan Item hasil kosong atau sama
+    termasuk resep di atasnya; hasil, masa simpan, dan catatan diambil dari baris pertama yang terisi, dan nilai berbeda di dua baris
+    ditolak. Jumlah boleh diikuti satuan item itu ("30 gr"), karena buku menulisnya begitu. Item hasil dan bahan harus sudah ada:
+    membuat item dari tempelan resep akan menebak kategori dan satuan. Resep yang sudah ada diganti (hasil dan bahan), tidak ditolak,
+    supaya resep yang keliru bisa dibetulkan dengan menempel ulang; keadaan aktif tetap, dan kolom kosong (masa simpan, catatan, cara
+    membuat) tidak menghapus isinya. `ganti` dari HP menjaga agar resep yang dikira baru tetapi ternyata sudah dibuat dari HP lain tidak
+    tertimpa diam-diam. Melingkar diperiksa dengan semua resep tempelan terpasang, di HP dan di server. Paling banyak 50 resep.
+    **Uji:** `uji/server/resep_langkah.mjs` (41 pemeriksaan: kolom dan bentuk, rapikan, aplikasi lama, kosongkan, batas 30 × 300, Staff
+    ditolak, Sheet tanpa kolom lalu `setupSpreadsheet`, tempel resep baru dan diganti, nonaktif tetap nonaktif, prep dari resep tempelan
+    menggerakkan stock, penolakan dengan nomor baris, dua kali, tanpa `ganti`, melingkar dengan resep tersimpan dan di antara resep
+    tempelan, batas 50) dan `uji/layar/resep_langkah.mjs` (60 pemeriksaan: isi, draft, batas di HP, simpan, daftar menyebut langkah; lembar
+    1 dan 2 resep, Escape dan fokus kembali, tabel desktop; Tempel resep dengan judul, sel berganti baris, jumlah bersatuan, resep diganti,
+    resep salah tersisa di kotak tempel; server lama; delapan ukuran dengan langkah dan kata panjang). `node uji/jalankan.mjs --layar` pada 7 November: 53 berkas, 2.621 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,3 menit).

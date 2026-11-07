@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.45 (mulai bersih: hapus isian uji dari editor)
+// InventoryKu Code.gs v0.46 (cara membuat resep dan tempel resep)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -141,9 +141,12 @@
  *                        Log_Perubahan dihapus lewat kosongkanIsian di Supabase sesudah dicadangkan ("Cadangan sebelum mulai
  *                        bersih …", bisa dipulihkan dengan pulihkanCadangan); tab master tetap. Jalan pertama hanya mencatat;
  *                        menghapus hanya jika Script Property MULAI_BERSIH berisi ya.
+ * - 7 November 2026    : cara membuat resep (kolom Cara Membuat di M_Resep, setupSpreadsheet): langkah bernomor yang
+ *                        dibuka dari Prep List (daftarResep.langkahSiap, resep[].langkah, simpanResep.langkah,
+ *                        formPrep.resep[].langkah); tempelResep: banyak resep sekaligus dari tempelan Excel/Google Sheets.
  */
 
-var VERSI_KODE = 'v0.45';
+var VERSI_KODE = 'v0.46';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -204,6 +207,8 @@ var AKSI_ = {
   simpanResep: { jalankan: aksiSimpanResep_, pengelola: true,
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
   aturResepAktif: { jalankan: aksiAturResepAktif_, pengelola: true,
+    pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
+  tempelResep: { jalankan: aksiTempelResep_, pengelola: true,
     pesan: 'Resep hanya bisa diubah Head Kitchen atau Manager.' },
   aturItemAktif: { jalankan: aksiAturItemAktif_, pengelola: true,
     pesan: 'Item hanya bisa diubah Head Kitchen atau Manager.' },
@@ -3967,7 +3972,8 @@ var URUTAN_PREP_BAHAN = [['Tanggal', false], ['Item Hasil', true], ['Item Bahan'
  * masaSimpan, aktif, catatan, nomor, bahan: [{ item, qty }] } }. Satu resep per item
  * hasil; bahan dihubungkan lewat kolom Item Hasil. Jika satu item hasil
  * tertulis dua kali (diisi tangan), baris yang aktif didahulukan. catatan (Code.gs
- * v0.39): kolom Catatan, '' jika kolomnya belum ada.
+ * v0.39): kolom Catatan, '' jika kolomnya belum ada. langkah (Code.gs v0.46): kolom
+ * Cara Membuat, satu langkah per baris sel, [] jika kolomnya belum ada.
  */
 function bacaResep_() {
   var t = wajibTabel_('M_Resep');
@@ -3986,6 +3992,7 @@ function bacaResep_() {
       masaSimpan: masa == null || masa < 0 ? null : Math.round(masa),
       aktif: aktif,
       catatan: t.kol['Catatan'] === undefined ? '' : rapikanTeks_(nilai_(t, b, 'Catatan')),
+      langkah: t.kol[KOLOM_LANGKAH_RESEP] === undefined ? [] : bacaLangkah_(nilai_(t, b, KOLOM_LANGKAH_RESEP)),
       nomor: i + 2,
       bahan: []
     };
@@ -4007,6 +4014,47 @@ var PANJANG_CATATAN_RESEP = 200;
 function catatanResepSiap_() {
   var t = bacaTabel_('M_Resep');
   return !!t && t.kol['Catatan'] !== undefined;
+}
+
+/**
+ * Cara membuat resep (Code.gs v0.46, butir 479–480): langkah bernomor untuk juru masak, disimpan di kolom Cara Membuat
+ * M_Resep sebagai satu langkah per baris sel. Tidak menggerakkan stock. Takaran di dalam langkah ditulis untuk 1 resep.
+ */
+var KOLOM_LANGKAH_RESEP = 'Cara Membuat';
+var LANGKAH_RESEP_MAKS = 30;
+var PANJANG_LANGKAH_RESEP = 300;
+
+/** Cara membuat bisa disimpan: kolom Cara Membuat di M_Resep sudah dibuat setupSpreadsheet. */
+function langkahResepSiap_() {
+  var t = bacaTabel_('M_Resep');
+  return !!t && t.kol[KOLOM_LANGKAH_RESEP] !== undefined;
+}
+
+/** Isi sel Cara Membuat → [langkah]; baris kosong dilewati. */
+function bacaLangkah_(nilai) {
+  return String(nilai == null ? '' : nilai).split(/\r\n|\r|\n/).map(rapikanTeks_).filter(Boolean);
+}
+
+/** Satu langkah: spasi dirapikan dan nomor atau tanda daftar di depan ("1.", "2)", "-", "•") dibuang, karena aplikasi menomori sendiri. */
+function rapikanLangkah_(teks) {
+  return rapikanTeks_(teks).replace(/^(\d{1,2}\s*[.)]|[-\u2022*])\s*/, '');
+}
+
+/**
+ * Langkah dari aplikasi: [teks] → [langkah] yang sudah dirapikan (langkah kosong dilewati), atau null jika field tidak dikirim
+ * (aplikasi lama: tidak diubah). Paling banyak LANGKAH_RESEP_MAKS langkah, tiap langkah paling panjang PANJANG_LANGKAH_RESEP huruf.
+ */
+function langkahIsian_(nilai) {
+  if (nilai === undefined) return null;
+  if (!Array.isArray(nilai)) throw galatPengguna_('Cara membuat tidak terbaca. Muat ulang layar ini.');
+  var langkah = nilai.map(rapikanLangkah_).filter(Boolean);
+  if (langkah.length > LANGKAH_RESEP_MAKS) throw galatPengguna_('Cara membuat paling banyak ' + LANGKAH_RESEP_MAKS + ' langkah.');
+  langkah.forEach(function (x, i) {
+    if (x.length > PANJANG_LANGKAH_RESEP) {
+      throw galatPengguna_('Langkah ' + (i + 1) + ' paling panjang ' + PANJANG_LANGKAH_RESEP + ' huruf.');
+    }
+  });
+  return langkah;
 }
 
 /** Resep aktif yang bisa dipakai prep (hasil lebih dari 0 dan punya bahan), atau null. */
@@ -4120,6 +4168,7 @@ function ringkasResep_(r, master) {
     masaSimpan: r.masaSimpan,
     aktif: r.aktif,
     catatan: r.catatan,
+    langkah: r.langkah,
     bahan: bahan,
     biaya: b.lengkap ? b.biaya : null,
     hargaPerSatuan: b.lengkap && r.hasil > 0 ? Math.round(b.biaya / r.hasil * 100) / 100 : null,
@@ -4140,7 +4189,7 @@ function dataResep_() {
     return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga, hargaDariResep: !!m.hargaDariResep, aktif: m.aktif,
       punyaResep: !!resep[k] };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
-  return { resep: daftar, item: item, catatanSiap: catatanResepSiap_() };
+  return { resep: daftar, item: item, catatanSiap: catatanResepSiap_(), langkahSiap: langkahResepSiap_() };
 }
 
 function aksiDaftarResep_() {
@@ -4173,17 +4222,10 @@ function tulisBahanResep_(kecilLama, itemHasil, bahan) {
 }
 
 /**
- * Simpan resep (Pengaturan → Resep), khusus Pengelola. body: { baru: bool,
- * itemHasil, hasil, masaSimpan ('' = tanpa), bahan: [{ item, qty }], catatan? }.
- * catatan (Code.gs v0.39): teks untuk juru masak, paling panjang 200 huruf, tidak
- * menggerakkan stock; tidak dikirim (aplikasi lama) = tidak diubah.
- * Resep baru langsung aktif; item hasil yang sudah punya resep (aktif atau
- * nonaktif) diubah lewat resep itu. Item hasil resep yang sudah ada tidak bisa
- * diganti. Bahan memakai satuan dasar tiap item. Catatan prep lama tidak
- * berubah, karena Data_PrepBahan menyimpan salinan resep saat prep dibuat.
+ * Isian satu resep diperiksa (dipakai simpanResep dan tempelResep): { m (item hasil), kecil, hasil, masa ('' = tanpa),
+ * bahan: [{ item, qty }], catatan (null = tidak diubah), langkah (null = tidak diubah) }. Melempar galatPengguna_.
  */
-function aksiSimpanResep_(body) {
-  var master = bacaItem_();
+function periksaIsianResep_(body, master) {
   var m = master[rapikanTeks_(body.itemHasil).toLowerCase()];
   if (!m) throw galatPengguna_('Pilih item hasil dari daftar item.');
   if (!m.aktif) throw galatPengguna_(m.nama + ' nonaktif. Pilih item hasil yang aktif.');
@@ -4213,6 +4255,58 @@ function aksiSimpanResep_(body) {
     return { item: mb.nama, qty: qty };
   });
   var catatan = body.catatan === undefined ? null : teksMaster_(body.catatan, 'Catatan resep', PANJANG_CATATAN_RESEP);
+  return { m: m, kecil: kecil, hasil: hasil, masa: masa, bahan: bahan, catatan: catatan, langkah: langkahIsian_(body.langkah) };
+}
+
+/**
+ * Kolom M_Resep untuk menulis resep. Catatan atau cara membuat yang berisi tanpa kolomnya ditolak sebelum sel apa pun ditulis.
+ * isian: [hasil periksaIsianResep_].
+ */
+function kolomTulisResep_(sheet, isian) {
+  var kol = posisiKolom_(sheet, { hasil: 'Item Hasil', per1: 'Hasil per 1 Resep', masa: 'Masa Simpan (hari)', aktif: 'Aktif' });
+  kol.catatan = posisiKolomOpsional_(sheet, 'Catatan');
+  kol.langkah = posisiKolomOpsional_(sheet, KOLOM_LANGKAH_RESEP);
+  isian.forEach(function (x) {
+    if (x.catatan && !kol.catatan) {
+      throw galatPengguna_('Catatan resep belum bisa disimpan. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
+    if (x.langkah && x.langkah.length && !kol.langkah) {
+      throw galatPengguna_('Cara membuat belum bisa disimpan. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
+    }
+  });
+  return kol;
+}
+
+/**
+ * Menulis satu resep yang sudah diperiksa ke M_Resep dan M_ResepBahan. ada: resep lama (bacaResep_) atau null. Masa simpan
+ * dengan tetapKosong: '' tidak mengubah masa simpan resep lama (tempelResep). Catatan dan langkah null tidak diubah.
+ */
+function tulisResep_(sheet, kol, x, ada, tetapKosong) {
+  var nomor = ada ? ada.nomor : barisBaruMaster_(sheet, kol.hasil, 1);
+  sheet.getRange(nomor, kol.hasil).setValue(x.m.nama);
+  sheet.getRange(nomor, kol.per1).setValue(x.hasil);
+  if (!(tetapKosong && ada && x.masa === '')) sheet.getRange(nomor, kol.masa).setValue(x.masa === '' ? '' : Number(x.masa));
+  sheet.getRange(nomor, kol.aktif).setValue(ada ? ada.aktif : true);
+  if (x.catatan !== null && kol.catatan) sheet.getRange(nomor, kol.catatan).setValue(teksAman_(x.catatan));
+  if (x.langkah !== null && kol.langkah) sheet.getRange(nomor, kol.langkah).setValue(teksAman_(x.langkah.join('\n')));
+  tulisBahanResep_(x.kecil, x.m.nama, x.bahan);
+}
+
+/**
+ * Simpan resep (Pengaturan → Resep), khusus Pengelola. body: { baru: bool,
+ * itemHasil, hasil, masaSimpan ('' = tanpa), bahan: [{ item, qty }], catatan?, langkah? }.
+ * catatan (Code.gs v0.39): teks untuk juru masak, paling panjang 200 huruf, tidak
+ * menggerakkan stock; tidak dikirim (aplikasi lama) = tidak diubah. langkah (Code.gs
+ * v0.46): cara membuat, [teks]; tidak dikirim = tidak diubah, [] = dikosongkan.
+ * Resep baru langsung aktif; item hasil yang sudah punya resep (aktif atau
+ * nonaktif) diubah lewat resep itu. Item hasil resep yang sudah ada tidak bisa
+ * diganti. Bahan memakai satuan dasar tiap item. Catatan prep lama tidak
+ * berubah, karena Data_PrepBahan menyimpan salinan resep saat prep dibuat.
+ */
+function aksiSimpanResep_(body) {
+  var x = periksaIsianResep_(body, bacaItem_());
+  var m = x.m;
+  var kecil = x.kecil;
 
   return denganKunci_(function () {
     var resep = bacaResep_();
@@ -4222,27 +4316,90 @@ function aksiSimpanResep_(body) {
         '. Buka resep itu di daftar untuk mengubahnya.');
     }
     if (!body.baru && !ada) throw galatPengguna_('Resep ' + m.nama + ' tidak ditemukan. Kembali ke daftar resep.');
-    var aktif = ada ? ada.aktif : true;
-    if (aktif) {
+    var master = bacaItem_();
+    if (ada ? ada.aktif : true) {
       var graf = grafResep_(resep);
-      graf[kecil] = bahan.map(function (b) { return b.item.toLowerCase(); });
+      graf[kecil] = x.bahan.map(function (b) { return b.item.toLowerCase(); });
       periksaMelingkar_(graf, kecil, master);
     }
     var sheet = ambilTab_('M_Resep');
-    var kol = posisiKolom_(sheet, { hasil: 'Item Hasil', per1: 'Hasil per 1 Resep', masa: 'Masa Simpan (hari)', aktif: 'Aktif' });
-    var kolCatatan = posisiKolomOpsional_(sheet, 'Catatan');
-    if (catatan && !kolCatatan) {
-      throw galatPengguna_('Catatan resep belum bisa disimpan. Minta pemilik Sheet menjalankan ulang setupSpreadsheet.');
-    }
-    var nomor = ada ? ada.nomor : barisBaruMaster_(sheet, kol.hasil, 1);
-    sheet.getRange(nomor, kol.hasil).setValue(m.nama);
-    sheet.getRange(nomor, kol.per1).setValue(hasil);
-    sheet.getRange(nomor, kol.masa).setValue(masa === '' ? '' : Number(masa));
-    sheet.getRange(nomor, kol.aktif).setValue(aktif);
-    if (catatan !== null && kolCatatan) sheet.getRange(nomor, kolCatatan).setValue(teksAman_(catatan));
-    tulisBahanResep_(kecil, m.nama, bahan);
+    var kol = kolomTulisResep_(sheet, [x]);
+    tulisResep_(sheet, kol, x, ada, false);
     var data = dataResep_();
     data.disimpan = m.nama;
+    return data;
+  });
+}
+
+/** Paling banyak resep dalam satu tempelan (tempelResep). */
+var TEMPEL_RESEP_MAKS = 50;
+
+/**
+ * Banyak resep sekaligus dari tempelan Excel atau Google Sheets (Pengaturan → Resep → Tempel resep, Code.gs v0.46, butir 481),
+ * khusus Pengelola. body: { resep: [{ no (teks baris di kotak tempel, untuk pesan), ganti (bool: aplikasi tahu item ini sudah
+ * punya resep), itemHasil, hasil, masaSimpan, catatan?, langkah?, bahan: [{ item, qty }] }] }. Aturan tiap resep sama dengan
+ * simpanResep. Resep yang sudah ada diganti hasil dan bahannya dan tetap aktif atau nonaktif seperti sebelumnya; masa simpan,
+ * catatan, dan cara membuat yang kosong (tidak dikirim) tidak mengubahnya. Resep baru langsung aktif. Resep melingkar diperiksa
+ * dengan semua resep tempelan sudah terpasang. Satu resep yang salah menolak semuanya dengan nomor barisnya, supaya tidak ada
+ * separuh tempelan yang masuk. Jawaban daftarResep ditambah tempel: { baru: [nama], diganti: [nama] }.
+ */
+function aksiTempelResep_(body) {
+  var masukan = Array.isArray(body.resep) ? body.resep : [];
+  if (!masukan.length) throw galatPengguna_('Tidak ada resep untuk disimpan.');
+  if (masukan.length > TEMPEL_RESEP_MAKS) throw galatPengguna_('Paling banyak ' + TEMPEL_RESEP_MAKS + ' resep sekaligus.');
+  var master = bacaItem_();
+  var sudah = {};
+  var isian = masukan.map(function (r, i) {
+    var label = 'Resep ' + (rapikanTeks_(r && r.itemHasil) || 'tanpa item hasil') + ' (' + (r && r.no ? 'baris ' + r.no : 'ke-' + (i + 1)) + ')';
+    try {
+      var x = periksaIsianResep_({
+        itemHasil: r.itemHasil, hasil: r.hasil, masaSimpan: r.masaSimpan, bahan: r.bahan,
+        // Kosong = tidak diubah (resep lama), kosong juga untuk resep baru.
+        catatan: rapikanTeks_(r.catatan) ? r.catatan : undefined,
+        langkah: Array.isArray(r.langkah) && r.langkah.length ? r.langkah : undefined
+      }, master);
+    } catch (err) {
+      if (err.untukPengguna) throw galatPengguna_(label + ': ' + err.message);
+      throw err;
+    }
+    if (sudah[x.kecil]) throw galatPengguna_(label + ': ' + x.m.nama + ' tertulis dua kali di tempelan.');
+    sudah[x.kecil] = true;
+    x.label = label;
+    x.ganti = r.ganti === true;
+    return x;
+  });
+
+  return denganKunci_(function () {
+    var resep = bacaResep_();
+    var graf = grafResep_(resep);
+    isian.forEach(function (x) {
+      var ada = resep[x.kecil];
+      if (ada && !x.ganti) {
+        throw galatPengguna_(x.label + ': ' + x.m.nama + ' ternyata sudah punya resep. Muat ulang layar ini, lalu periksa pratinjaunya lagi.');
+      }
+      x.ada = ada || null;
+      if (ada ? ada.aktif : true) graf[x.kecil] = x.bahan.map(function (b) { return b.item.toLowerCase(); });
+      else delete graf[x.kecil];
+    });
+    var master2 = bacaItem_();
+    isian.forEach(function (x) {
+      if (!graf[x.kecil]) return;
+      try {
+        periksaMelingkar_(graf, x.kecil, master2);
+      } catch (err) {
+        if (err.untukPengguna) throw galatPengguna_(x.label + ': ' + err.message);
+        throw err;
+      }
+    });
+    var sheet = ambilTab_('M_Resep');
+    var kol = kolomTulisResep_(sheet, isian);
+    var hasil = { baru: [], diganti: [] };
+    isian.forEach(function (x) {
+      tulisResep_(sheet, kol, x, x.ada, true);
+      (x.ada ? hasil.diganti : hasil.baru).push(x.m.nama);
+    });
+    var data = dataResep_();
+    data.tempel = hasil;
     return data;
   });
 }
@@ -4298,6 +4455,7 @@ function dataFormPrep_(tanggal) {
       hasil: r.hasil,
       masaSimpan: r.masaSimpan,
       catatan: r.catatan,
+      langkah: r.langkah,
       // Saran prep (Code.gs v0.44); null tanpa rata-rata pemakaian.
       saran: saranPrep_(r, posisiStock_(rekap.item[k], tanggal).akhir, pakai[k] || null),
       bahan: r.bahan.map(function (b) {
@@ -14265,7 +14423,8 @@ var TAB_MASTER = [
       k_('Hasil per 1 Resep', 'angka'),
       k_('Masa Simpan (hari)', 'bulat'),
       k_('Aktif', null, { centang: true }),
-      k_('Catatan')
+      k_('Catatan'),
+      k_('Cara Membuat')
     ]
   },
   {

@@ -1260,6 +1260,17 @@ body.papan-ketik .layar {
   overflow-wrap: anywhere;
 }
 
+/* Pratinjau tempelan (aplikasi 0.53.0): pesan salah bisa memuat satu kata panjang dari tempelan, jadi tandanya ikut dipecah. */
+.tempel-baris .tanda-deret,
+.tempel-baris .tanda-status,
+.tempel-baris .tanda-status > span {
+  min-width: 0;
+}
+
+.tempel-baris .tanda-status {
+  overflow-wrap: anywhere;
+}
+
 .daftar-baris > .ikon {
   color: var(--tinta-redup);
 }
@@ -4014,6 +4025,48 @@ body.papan-ketik .bilah-kirim {
   font-size: 14px;
   color: var(--tinta);
   overflow-wrap: anywhere;
+}
+
+/* Cara membuat (aplikasi 0.53.0): tombol tautan di baris Prep List, lalu lembar berisi bahan dan langkah bernomor */
+.tombol-cara-membuat {
+  justify-self: start;
+  text-align: left;
+}
+
+.cara-membuat-judul {
+  margin: 16px 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cara-membuat-bahan,
+.cara-membuat-langkah {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cara-membuat-bahan {
+  padding-left: 0;
+  list-style: none;
+}
+
+.cara-membuat-langkah {
+  padding-left: 28px;
+  list-style: decimal;
+}
+
+.cara-membuat-bahan li,
+.cara-membuat-langkah li {
+  margin: 4px 0;
+}
+
+.cara-membuat-langkah li {
+  padding-left: 4px;
+  line-height: 1.5;
+}
+
+.cara-membuat-langkah li::marker {
+  font-weight: 600;
 }
 
 .tabel-prep td:not(:first-child) {

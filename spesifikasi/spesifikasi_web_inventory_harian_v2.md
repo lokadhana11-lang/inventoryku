@@ -116,6 +116,8 @@
 > Diperbarui 6 November 2026 (keputusan pemilik, dari telaah aplikasi): mulai bersih. Sebelum aplikasi dipakai
 > sungguhan, pemilik menghapus isian uji sekali dari editor Apps Script (`mulaiBersih`) sesudah isinya dicadangkan; data
 > master tetap (Bagian 9.4).
+> Diperbarui 7 November 2026 (permintaan pemilik, untuk memasukkan buku resep outlet): cara membuat resep, yaitu langkah
+> bernomor yang dibuka dari Prep List, dan tempel banyak resep sekaligus dari Excel atau Google Sheets (Bagian 5.1 dan 5.3).
 >
 > Dokumen ini mengatur **sistem**: data, role, alur, dan arsitektur. Tampilan (warna, huruf,
 > tata letak, layar) diatur di dokumen terpisah: `spesifikasi_tampilan_ui.md`.
@@ -497,7 +499,7 @@ dan tanda reorder semuanya bergantung padanya. Hanya Pengelola yang bisa menguba
 | `M_Staff` | Nama, Role (Staff / Head Kitchen / Manager), PIN (tersimpan sebagai hash), Aktif, Permintaan Reset PIN (waktu), Dihapus (waktu) | Login, `submitted_by`, `checked_by`, pemberitahuan Lupa PIN |
 | `M_Item` | Nama Item, Kategori, Satuan (dasar), Satuan Besar (opsional), Isi per Satuan Besar, Harga Satuan (Rp), Stok Minimum, Stok Maksimum (opsional), Aktif, Masa Simpan dalam hari (opsional, 19 Oktober 2026) | Dropdown item, estimasi kerugian, tanda reorder, konversi barang datang, baik sampai barang masuk |
 | `M_HargaItem` | Nama Item, Berlaku Mulai (tanggal), Harga Satuan (Rp), Dicatat Oleh, Dicatat Pada | Riwayat harga; harga yang berlaku pada suatu tanggal |
-| `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif, Catatan (opsional, 30 Oktober 2026) | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
+| `M_Resep` | Item Hasil, Hasil per 1 Resep, Masa Simpan dalam hari (opsional), Aktif, Catatan (opsional, 30 Oktober 2026), Cara Membuat (opsional, satu langkah per baris sel, 7 November 2026) | Barang jadi yang dibuat lewat Prep List; pengingat masa simpan |
 | `M_ResepBahan` | Item Hasil, Item Bahan, Qty per 1 Resep | Bahan yang dikurangi dari stock saat prep |
 | `M_Menu` | Nama Menu, Harga Jual (Rp), Aktif | Menu yang dijual dan harganya, untuk HPP (Bagian 5.9) |
 | `M_MenuBahan` | Nama Menu, Item Bahan, Qty per Porsi, Hasil Bersih (%) | Takaran bahan satu porsi dan susutnya |
@@ -654,11 +656,21 @@ menggerakkan stock.
 | Bahan per 1 resep | Daftar item bahan dan jumlahnya, masing-masing dalam satuan dasar bahan itu | Tomat 3 kg, daging giling 1 kg, bawang 0,5 kg |
 | Masa simpan (opsional) | Berapa hari barang jadi masih baik dipakai sejak dibuat | 3 hari |
 | Catatan (opsional) | 30 Oktober 2026. Teks untuk juru masak, paling panjang 200 huruf, tampil di Prep List di bawah bahan. Tidak menggerakkan stock apa pun. | Air 1,2 liter per 1 kg beras |
+| Cara membuat (opsional) | 7 November 2026. Langkah kerja bernomor, paling banyak 30 langkah, tiap langkah paling panjang 300 huruf. Takaran di dalam langkah ditulis untuk 1 resep. Dibuka dari Prep List; tidak menggerakkan stock apa pun. | 1. Larutkan bumbu di 200 ml air hangat. 2. Rendam ayam di chiller 2–4 jam. |
 
 Contoh lain: resep Nasi putih, hasil 2,2 kg nasi, bahan beras 1 kg. Air tidak dicatat sebagai bahan,
 karena tidak punya stock (stock-nya akan selalu minus); takarannya ditulis di Catatan. Angka pada contoh
 hanya ilustrasi; Pengelola mengisinya dari takaran dapur sendiri.
 
+- **Tempel resep** (7 November 2026): Pengelola boleh memasukkan banyak resep sekaligus dengan menempel baris
+  dari Excel atau Google Sheets (paling banyak 50 resep): Item hasil, Hasil per 1 resep, Masa simpan, Bahan,
+  Jumlah, Catatan, Cara membuat; satu baris per bahan, dan baris berikutnya dari resep yang sama boleh
+  mengosongkan Item hasil. Item hasil dan bahan harus sudah ada di `M_Item` (item baru ditambahkan lewat
+  "Tambah dari Excel/Sheets" di Pengaturan → Item). Aturannya sama dengan resep yang diisi satu per satu.
+  Item hasil yang sudah punya resep: hasil dan bahannya diganti, resepnya tetap aktif atau nonaktif seperti
+  sebelumnya, dan masa simpan, catatan, serta cara membuat yang dikosongkan tidak mengubah yang sudah
+  tersimpan. Satu resep yang salah ditandai di pratinjau dan tidak ikut; server menolak seluruh kiriman jika
+  masih ada yang salah, supaya tidak ada separuh tempelan yang masuk.
 - Barang jadi boleh menjadi bahan resep lain, misalnya sauce dipakai di resep lain.
 - Resep tidak boleh melingkar: jika A adalah bahan B, B tidak boleh menjadi bahan A, baik
   langsung maupun lewat resep lain. Server menolaknya.

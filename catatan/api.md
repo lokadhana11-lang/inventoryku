@@ -309,3 +309,11 @@ jawaban, `AKSI_`, `panggilApi`, `submissionId`) tetap di CLAUDE.md. Setiap aksi 
   bawaan true (hanya mencatat); false: cadangan "Cadangan sebelum mulai bersih …" lalu semua baris tab `tabArsip_()` dihapus.
   Fungsi editor Apps Script `mulaiBersih` (Script Property `MULAI_BERSIH` = `ya` untuk menghapus). `M_Konfigurasi` baris baru
   `mulai_bersih` (dibuat saat pertama dipakai). Tidak ada aksi aplikasi baru.
+- Cara membuat resep dan tempel resep (Code.gs v0.46, aplikasi 0.53.0, 7 November 2026; butir 478–481): `daftarResep` ditambah
+  `langkahSiap` (kolom `Cara Membuat` di `M_Resep` ada) dan `resep[].langkah: [teks]`; `simpanResep` menerima `langkah: [teks]`
+  (dirapikan, nomor/tanda daftar di depan dibuang, langkah kosong dilewati; paling banyak 30 langkah × 300 huruf; tidak dikirim =
+  tidak diubah, `[]` = dikosongkan; berisi tanpa kolom ditolak); `formPrep.resep[]` (juga `form` di jawaban `kirimPrep`) ditambah
+  `langkah`. Aksi baru `tempelResep {resep: [{ no, ganti, itemHasil, hasil, masaSimpan, catatan, langkah, bahan: [{ item, qty }] }]}`
+  (khusus Pengelola, paling banyak 50 resep) → jawaban `daftarResep` ditambah `tempel: { baru: [nama], diganti: [nama] }`. `ganti`:
+  aplikasi tahu item itu sudah punya resep (resep yang ada tanpa `ganti` ditolak). Masa simpan, catatan, dan langkah kosong tidak
+  mengubah resep lama. Satu resep salah menolak semuanya dengan pesan "Resep X (baris n): …".
