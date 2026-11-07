@@ -3350,3 +3350,22 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     tempelan, batas 50) dan `uji/layar/resep_langkah.mjs` (60 pemeriksaan: isi, draft, batas di HP, simpan, daftar menyebut langkah; lembar
     1 dan 2 resep, Escape dan fokus kembali, tabel desktop; Tempel resep dengan judul, sel berganti baris, jumlah bersatuan, resep diganti,
     resep salah tersisa di kotak tempel; server lama; delapan ukuran dengan langkah dan kata panjang). `node uji/jalankan.mjs --layar` pada 7 November: 53 berkas, 2.621 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,3 menit).
+
+### Tempel menu (Code.gs v0.47, aplikasi 0.54.0, 7 November 2026)
+
+482. **Asal dan keputusan pemilik:** sesudah resep dari buku resep siap ditempel (butir 478–481), Bab 3 buku itu berisi 12 menu (16
+    dengan varian Original, Truffle, dan Barbeque untuk Chicken Popcorn Snack dan Chicken Wing, yang harganya berbeda; keputusan
+    pemilik). Pemilik memilih fitur "Tempel menu" seperti Tempel resep daripada mengisi 16 menu satu per satu. Harga jual diisi pemilik
+    sendiri di kolom Harga jual sebelum menempel. Spesifikasi sistem Bagian 5.9; tampilan Bagian 5.7 dan 7.
+483. **Tempel menu** (keputusan tambahan): pola sama dengan Tempel resep (butir 481): format panjang satu baris per bahan, kolom Menu
+    kosong atau sama melanjutkan menu di atasnya, `periksaIsianMenu_` dipisah dari `aksiSimpanMenu_` supaya aturannya sama persis,
+    `ganti` dari HP, semua atau tidak sama sekali, paling banyak 50. Menu baru wajib punya harga jual (aturan Bagian 5.9 tidak
+    diubah); harga jual kosong untuk menu yang sudah ada berarti harganya tetap, supaya bahan bisa dibetulkan dengan menempel ulang tanpa
+    mengetik harga lagi. Harga yang berubah tercatat di `Log_Perubahan` seperti `simpanMenu`. Nama menu yang sudah ada tidak diganti oleh
+    tulisan di tempelan (huruf besar/kecil berbeda tetap menu yang sama). Harga jual dibaca dengan `angkaTempel` ("Rp 25.000" = 25.000),
+    takaran boleh diikuti satuan item, hasil bersih boleh diikuti "%". `angkaTempelSatuan` kini fungsi bersama Tempel resep dan Tempel menu (nama berbeda dari `angkaSatuan` untuk tampilan angka, yang sempat tertimpa saat dipindah; tertangkap uji penuh).
+    **Uji:** `uji/server/menu_tempel.mjs` (22 pemeriksaan: `tempelSiap`, Staff ditolak, menu baru dan diganti, harga kosong tetap, hasil
+    bersih kosong = 100, nama lama tetap, harga diganti tercatat di `Log_Perubahan`, nonaktif tetap nonaktif, penolakan dengan nomor
+    baris, tanpa harga, dua kali, tanpa `ganti`, hasil bersih di atas 100, harga 0, bahan dua kali, batas 50, `simpanMenu` tetap sama) dan
+    `uji/layar/menu_tempel.mjs` (22 pemeriksaan: tautan, pratinjau dengan judul, "Rp 25.000", "0,15 kg", "90%", harga tetap, menu baru tanpa
+    harga dan bahan tidak ada ditandai, konfirmasi, sisa di kotak tempel; server lama; delapan ukuran dengan kata panjang). `node uji/jalankan.mjs --layar` pada 7 November: 55 berkas, 2.665 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,6 menit).

@@ -1,4 +1,4 @@
-// InventoryKu Code.gs v0.46 (cara membuat resep dan tempel resep)
+// InventoryKu Code.gs v0.47 (tempel menu)
 /**
  * Backend InventoryKu: Apps Script yang menempel pada Google Sheet
  * (Extensions → Apps Script), dideploy sebagai Web App.
@@ -144,9 +144,10 @@
  * - 7 November 2026    : cara membuat resep (kolom Cara Membuat di M_Resep, setupSpreadsheet): langkah bernomor yang
  *                        dibuka dari Prep List (daftarResep.langkahSiap, resep[].langkah, simpanResep.langkah,
  *                        formPrep.resep[].langkah); tempelResep: banyak resep sekaligus dari tempelan Excel/Google Sheets.
+ * - 7 November 2026    : tempelMenu: banyak menu sekaligus dari tempelan Excel/Google Sheets (daftarMenu.tempelSiap).
  */
 
-var VERSI_KODE = 'v0.46';
+var VERSI_KODE = 'v0.47';
 
 /**
  * Code.gs yang sama juga dijalankan Supabase Edge Function (supabase/, sejak v0.15): di sana
@@ -314,6 +315,8 @@ var AKSI_ = {
     pesan: 'HPP dan food cost hanya untuk Head Kitchen dan Manager.' },
   daftarMenu: { jalankan: aksiDaftarMenu_, bacaSaja: true, pengelola: true,
     pesan: 'Pengaturan menu hanya untuk Head Kitchen dan Manager.' },
+  tempelMenu: { jalankan: aksiTempelMenu_, pengelola: true,
+    pesan: 'Menu hanya bisa diubah Head Kitchen atau Manager.' },
   simpanMenu: { jalankan: aksiSimpanMenu_, pengelola: true,
     pesan: 'Menu hanya bisa diubah Head Kitchen atau Manager.' },
   aturMenuAktif: { jalankan: aksiAturMenuAktif_, pengelola: true,
@@ -6772,7 +6775,8 @@ function dataMenu_() {
     var m = master[k];
     return { nama: m.nama, kategori: m.kategori, satuan: m.satuan, harga: m.harga, hargaDariResep: !!m.hargaDariResep, aktif: m.aktif };
   }).sort(function (a, b) { return a.nama.localeCompare(b.nama, 'id'); });
-  return { siap: data.ada, hariIni: hari, menu: menu, item: item, target: target, bahanKecilPersen: kecil };
+  // tempelSiap (Code.gs v0.47): server mengenal tempelMenu.
+  return { siap: data.ada, hariIni: hari, menu: menu, item: item, target: target, bahanKecilPersen: kecil, tempelSiap: true };
 }
 
 function aksiDaftarMenu_() {
@@ -6811,19 +6815,18 @@ function tulisBahanMenu_(kecilLama, nama, bahan) {
 }
 
 /**
- * Simpan menu (Pengaturan → Menu), khusus Pengelola. body: { baru, namaLama,
- * nama, hargaJual, bahan: [{ item, qty, hasilBersih }] }. Nama unik (huruf
- * besar/kecil tidak dibedakan) dan boleh diganti, karena menu tidak dirujuk
- * catatan mana pun. Bahan: item aktif, tidak ganda, takaran bersih lebih dari
- * 0 dalam satuan dasar, hasil bersih di atas 0 sampai 100 (kosong = 100).
- * Menu baru langsung aktif. Perubahan harga jual tercatat di Log_Perubahan.
+ * Isian satu menu diperiksa (dipakai simpanMenu dan tempelMenu): { nama, jual (null = kosong, hanya jika jualBolehKosong),
+ * bahan: [{ item, qty, hasilBersih }] }. Melempar galatPengguna_.
  */
-function aksiSimpanMenu_(body, pengguna) {
+function periksaIsianMenu_(body, master, jualBolehKosong) {
   var nama = periksaNama_(body.nama, 'Nama menu', PANJANG_MENU_MAKS);
-  if (body.hargaJual === '' || body.hargaJual == null) throw galatPengguna_('Isi harga jual.');
-  var jual = angkaOpsional_(body.hargaJual, 'Harga jual', 2);
-  if (!(jual > 0)) throw galatPengguna_('Harga jual harus lebih dari 0.');
-  var master = bacaItem_();
+  var jual = null;
+  if (body.hargaJual === '' || body.hargaJual == null) {
+    if (!jualBolehKosong) throw galatPengguna_('Isi harga jual.');
+  } else {
+    jual = angkaOpsional_(body.hargaJual, 'Harga jual', 2);
+    if (!(jual > 0)) throw galatPengguna_('Harga jual harus lebih dari 0.');
+  }
   var masukan = Array.isArray(body.bahan) ? body.bahan : [];
   if (!masukan.length) throw galatPengguna_('Tambah minimal satu bahan.');
   if (masukan.length > MENU_BAHAN_MAKS) throw galatPengguna_('Bahan terlalu banyak untuk satu menu.');
@@ -6842,6 +6845,22 @@ function aksiSimpanMenu_(body, pengguna) {
     if (hasil == null) throw galatPengguna_('Hasil bersih ' + mb.nama + ' diisi persen di atas 0 sampai 100, misalnya 85.');
     return { item: mb.nama, qty: qty, hasilBersih: hasil };
   });
+  return { nama: nama, jual: jual, bahan: bahan };
+}
+
+/**
+ * Simpan menu (Pengaturan → Menu), khusus Pengelola. body: { baru, namaLama,
+ * nama, hargaJual, bahan: [{ item, qty, hasilBersih }] }. Nama unik (huruf
+ * besar/kecil tidak dibedakan) dan boleh diganti, karena menu tidak dirujuk
+ * catatan mana pun. Bahan: item aktif, tidak ganda, takaran bersih lebih dari
+ * 0 dalam satuan dasar, hasil bersih di atas 0 sampai 100 (kosong = 100).
+ * Menu baru langsung aktif. Perubahan harga jual tercatat di Log_Perubahan.
+ */
+function aksiSimpanMenu_(body, pengguna) {
+  var x = periksaIsianMenu_(body, bacaItem_(), false);
+  var nama = x.nama;
+  var jual = x.jual;
+  var bahan = x.bahan;
 
   return denganKunci_(function () {
     wajibTabMenu_();
@@ -6873,6 +6892,75 @@ function aksiSimpanMenu_(body, pengguna) {
     var hasil = dataMenu_();
     hasil.disimpan = nama;
     return hasil;
+  });
+}
+
+/** Paling banyak menu dalam satu tempelan (tempelMenu). */
+var TEMPEL_MENU_MAKS = 50;
+
+/**
+ * Banyak menu sekaligus dari tempelan Excel atau Google Sheets (Pengaturan → Menu → Tempel menu, Code.gs v0.47, butir 482–483),
+ * khusus Pengelola. body: { menu: [{ no (teks baris di kotak tempel), ganti (bool: aplikasi tahu menu ini sudah ada), nama,
+ * hargaJual, bahan: [{ item, qty, hasilBersih }] }] }. Aturan tiap menu sama dengan simpanMenu, kecuali harga jual kosong boleh untuk
+ * menu yang sudah ada (harganya tetap). Menu yang sudah ada diganti bahannya (dan harga jualnya jika diisi, tercatat di
+ * Log_Perubahan) dan tetap aktif atau nonaktif seperti sebelumnya; menu baru langsung aktif. Satu menu yang salah menolak semuanya
+ * dengan nomor barisnya. Jawaban daftarMenu ditambah tempel: { baru: [nama], diganti: [nama] }.
+ */
+function aksiTempelMenu_(body, pengguna) {
+  var masukan = Array.isArray(body.menu) ? body.menu : [];
+  if (!masukan.length) throw galatPengguna_('Tidak ada menu untuk disimpan.');
+  if (masukan.length > TEMPEL_MENU_MAKS) throw galatPengguna_('Paling banyak ' + TEMPEL_MENU_MAKS + ' menu sekaligus.');
+  var master = bacaItem_();
+  var sudah = {};
+  var isian = masukan.map(function (m, i) {
+    var label = 'Menu ' + (rapikanTeks_(m && m.nama) || 'tanpa nama') + ' (' + (m && m.no ? 'baris ' + m.no : 'ke-' + (i + 1)) + ')';
+    var x;
+    try {
+      x = periksaIsianMenu_(m || {}, master, true);
+    } catch (err) {
+      if (err.untukPengguna) throw galatPengguna_(label + ': ' + err.message);
+      throw err;
+    }
+    var k = x.nama.toLowerCase();
+    if (sudah[k]) throw galatPengguna_(label + ': ' + x.nama + ' tertulis dua kali di tempelan.');
+    sudah[k] = true;
+    x.label = label;
+    x.ganti = m.ganti === true;
+    return x;
+  });
+
+  return denganKunci_(function () {
+    wajibTabMenu_();
+    var data = bacaMenu_();
+    isian.forEach(function (x) {
+      var ada = data.menu[x.nama.toLowerCase()] || null;
+      if (ada && !x.ganti) {
+        throw galatPengguna_(x.label + ': ' + ada.nama + ' ternyata sudah ada. Muat ulang layar ini, lalu periksa pratinjaunya lagi.');
+      }
+      if (!ada && x.jual == null) throw galatPengguna_(x.label + ': isi harga jual.');
+      x.ada = ada;
+    });
+    var hasil = { baru: [], diganti: [] };
+    var waktu = new Date();
+    isian.forEach(function (x) {
+      var t = wajibTabel_(TAB_MENU);
+      if (x.ada) {
+        if (x.jual != null && x.jual !== x.ada.hargaJual) {
+          tulisBarisMaster_(t, x.ada.nomor, { 'Harga Jual (Rp)': x.jual });
+          catatLog_(TAB_MENU, x.ada.nama, pengguna, waktu,
+            [['Harga Jual (Rp)', x.ada.hargaJual == null ? '' : x.ada.hargaJual, x.jual]]);
+        }
+        tulisBahanMenu_(x.ada.nama.toLowerCase(), x.ada.nama, x.bahan);
+        hasil.diganti.push(x.ada.nama);
+      } else {
+        tambahBarisMaster_(TAB_MENU, { 'Nama Menu': x.nama, 'Harga Jual (Rp)': x.jual, 'Aktif': true });
+        tulisBahanMenu_(x.nama.toLowerCase(), x.nama, x.bahan);
+        hasil.baru.push(x.nama);
+      }
+    });
+    var jawab = dataMenu_();
+    jawab.tempel = hasil;
+    return jawab;
   });
 }
 
