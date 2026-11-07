@@ -14362,7 +14362,7 @@
   }
 
   /** Angka tempelan yang boleh diikuti satuan item itu ("30 gr" untuk item ber-satuan gr); Tempel resep dan Tempel menu. */
-  function angkaSatuan(t, satuan, label) {
+  function angkaTempelSatuan(t, satuan, label) {
     var x = String(t || '').trim();
     var m = /^(.*\d)\s*([A-Za-z]+)$/.exec(x);
     if (m && satuan && m[2].toLowerCase() === String(satuan).toLowerCase()) x = m[1];
@@ -14483,7 +14483,7 @@
       var vHasil = satuNilai(g, 'hasil', 'Hasil');
       if (vHasil.galat) return salah(vHasil.galat);
       if (!vHasil.nilai) return salah('Isi hasil per 1 resep.');
-      var aHasil = angkaSatuan(vHasil.nilai, it.satuan, 'Hasil');
+      var aHasil = angkaTempelSatuan(vHasil.nilai, it.satuan, 'Hasil');
       if (aHasil.galat) return salah(aHasil.galat);
       if (!(aHasil.n > 0)) return salah('Hasil per 1 resep harus lebih dari 0.');
       var vMasa = satuNilai(g, 'masaSimpan', 'Masa simpan');
@@ -14516,7 +14516,7 @@
         if (adaBahan[ib.nama.toLowerCase()]) return salahB(ib.nama + ' tertulis dua kali. Gabungkan jumlahnya di satu baris.');
         adaBahan[ib.nama.toLowerCase()] = true;
         if (!jb) return salahB('isi jumlah ' + ib.nama + ' per 1 resep.');
-        var aj = angkaSatuan(jb, ib.satuan, 'Jumlah ' + ib.nama);
+        var aj = angkaTempelSatuan(jb, ib.satuan, 'Jumlah ' + ib.nama);
         if (aj.galat) return salahB(aj.galat);
         if (!(aj.n > 0)) return salahB('jumlah ' + ib.nama + ' harus lebih dari 0.');
         bahan.push({ item: ib.nama, qty: aj.n, satuan: ib.satuan });
@@ -15571,7 +15571,7 @@
         if (adaBahan[ib.nama.toLowerCase()]) return salahB(ib.nama + ' tertulis dua kali. Gabungkan takarannya di satu baris.');
         adaBahan[ib.nama.toLowerCase()] = true;
         if (!tb) return salahB('isi takaran ' + ib.nama + ' per porsi.');
-        var at = angkaSatuan(tb, ib.satuan, 'Takaran ' + ib.nama);
+        var at = angkaTempelSatuan(tb, ib.satuan, 'Takaran ' + ib.nama);
         if (at.galat) return salahB(at.galat);
         if (!(at.n > 0)) return salahB('takaran ' + ib.nama + ' per porsi harus lebih dari 0.');
         var persen = 100;

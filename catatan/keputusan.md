@@ -3363,7 +3363,7 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     diubah); harga jual kosong untuk menu yang sudah ada berarti harganya tetap, supaya bahan bisa dibetulkan dengan menempel ulang tanpa
     mengetik harga lagi. Harga yang berubah tercatat di `Log_Perubahan` seperti `simpanMenu`. Nama menu yang sudah ada tidak diganti oleh
     tulisan di tempelan (huruf besar/kecil berbeda tetap menu yang sama). Harga jual dibaca dengan `angkaTempel` ("Rp 25.000" = 25.000),
-    takaran boleh diikuti satuan item, hasil bersih boleh diikuti "%". `angkaSatuan` kini fungsi bersama Tempel resep dan Tempel menu.
+    takaran boleh diikuti satuan item, hasil bersih boleh diikuti "%". `angkaTempelSatuan` kini fungsi bersama Tempel resep dan Tempel menu (nama berbeda dari `angkaSatuan` untuk tampilan angka, yang sempat tertimpa saat dipindah; tertangkap uji penuh).
     **Uji:** `uji/server/menu_tempel.mjs` (22 pemeriksaan: `tempelSiap`, Staff ditolak, menu baru dan diganti, harga kosong tetap, hasil
     bersih kosong = 100, nama lama tetap, harga diganti tercatat di `Log_Perubahan`, nonaktif tetap nonaktif, penolakan dengan nomor
     baris, tanpa harga, dua kali, tanpa `ganti`, hasil bersih di atas 100, harga 0, bahan dua kali, batas 50, `simpanMenu` tetap sama) dan
