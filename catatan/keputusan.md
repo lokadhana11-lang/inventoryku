@@ -3349,4 +3349,4 @@ Hal yang tidak diatur spesifikasi, dipilih yang paling sederhana:
     menggerakkan stock, penolakan dengan nomor baris, dua kali, tanpa `ganti`, melingkar dengan resep tersimpan dan di antara resep
     tempelan, batas 50) dan `uji/layar/resep_langkah.mjs` (60 pemeriksaan: isi, draft, batas di HP, simpan, daftar menyebut langkah; lembar
     1 dan 2 resep, Escape dan fokus kembali, tabel desktop; Tempel resep dengan judul, sel berganti baris, jumlah bersatuan, resep diganti,
-    resep salah tersisa di kotak tempel; server lama; delapan ukuran dengan langkah dan kata panjang). `node uji/jalankan.mjs --layar` sedang dijalankan.
+    resep salah tersisa di kotak tempel; server lama; delapan ukuran dengan langkah dan kata panjang). `node uji/jalankan.mjs --layar` pada 7 November: 53 berkas, 2.621 pemeriksaan lulus, 0 gagal (4 sekaligus, 14,3 menit).
