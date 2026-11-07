@@ -121,7 +121,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   PR #80), aplikasi 0.52.1 (perapian `app.css` tanpa perubahan tampilan, butir 473, PR #81), aplikasi 0.52.2 (kotak info
   Stock opname tiga kolom di laptop dan tombol nama di tabel 44 px, butir 474–475, PR #82, tayang), lalu Code.gs v0.45 (mulai
   bersih: `mulaiBersih` di editor menghapus isian uji sesudah dicadangkan, dan panduan staff `catatan/panduan_staff.html`; butir
-  476–477; aplikasi tidak berubah), menunggu digabung dan dipasang (Edge Function lalu Apps Script). Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
+  476–477; aplikasi tidak berubah), digabung lewat PR #83. Lalu Code.gs v0.46 dan aplikasi 0.53.0 (buku resep ke aplikasi: cara
+  membuat resep yang dibuka dari Prep List dan Tempel resep dari Excel/Sheets; butir 478–481; `setupSpreadsheet` membuat kolom Cara
+  Membuat), menunggu digabung dan dipasang (Edge Function, Apps Script, `setupSpreadsheet`). Pertanyaan isi buku resep untuk
+  pemilik (hasil saus dalam gram, takaran "secukupnya", Sambel Woku, harga jual menu) diajukan sesudah fitur ini. Sebelumnya aplikasi 0.51.0 (filter Riwayat ringkas, butir 467–469, PR #78), 0.50.0 (pintasan Dashboard, butir 464–466, PR #77),
   0.49.0 (Pengaturan berkelompok
   dan Laporan dua kolom, butir 461–463, PR #76), 0.48.0 (susunan tiket Beranda, butir 459–460, PR #75), 0.47.0 (pemberitahuan Beranda dalam satu daftar "Perlu ditindaklanjuti",
   butir 456–458, PR #74, 5 November 2026) dan 0.46.0 (tata letak ringkas dari telaah desain butir
@@ -138,10 +141,10 @@ sistem yang berlaku. Hal yang tidak diatur: pilih yang paling sederhana dan cata
   Brevo), salinan ke Google Sheets tiap 5 menit (Sheets hanya untuk dicek; ketikan langsung tertimpa), jadwal pg_cron.
 - **Fitur yang ada:** form Stock (Semua kategori, cari, Hitung sisa, pemasok dan harga beli, masa simpan barang masuk, pesanan, cukup
   untuk berapa hari), Suhu,
-  Prep List (resep dengan catatan, hasil aktual, pesan stock hasil prep, saran prep), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
+  Prep List (resep dengan catatan, cara membuat, hasil aktual, pesan stock hasil prep, saran prep), Waste (foto, waste per porsi menu), form kustom; Riwayat (koreksi, Betulkan 15 menit untuk Staff,
   Tandai diperiksa sekaligus, kartu stok); laporan PDF, email harian, rekap bulanan, daftar belanja per pemasok (dengan Tambah item dan kelompok Pemasok lain); Dashboard (nilai
   stock, Perlu perhatian Hari ini/Rutin termasuk hampir habis, stock opname, HPP dan food cost, penjualan per menu); Pengaturan (staff, item termasuk ubah
-  banyak dan riwayat harga, resep, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
+  banyak dan riwayat harga, resep termasuk tempel dari Excel/Sheets, menu, unit, kategori dan satuan, pemasok, form dengan urutan diseret, hari libur, outlet dan jadwal; dua panel di desktop); notifikasi ke HP;
   arsip tahunan; cadangan dan pemulihan; mulai bersih (`mulaiBersih`, hapus isian uji dari editor); keamanan login; pemantauan pemasangan (salinan Apps Script, versi Code.gs, email tertahan,
   susunan Sheet; kartu "Versi dan salinan" di Outlet dan jadwal).
 - **Belum dibangun atau sengaja berbeda** (dari butir 150): outlet tambahan (Tahap 11, opsional; pemilik memutuskan tidak dikerjakan,
